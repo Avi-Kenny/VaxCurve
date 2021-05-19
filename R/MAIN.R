@@ -10,7 +10,7 @@ cfg <- list(
   setting = "pointwise est", # testing
   level_set_which = "level_set_1",
   run_or_update = "run",
-  num_sim = 1000, # 1000
+  num_sim = 1000,
   pkgs = c("simba", "dplyr", "boot", "car", "mgcv", "kdensity",
            "memoise", "twostageTE"),
   pkgs_nocluster = c("ggplot2", "viridis"),

@@ -6,11 +6,19 @@ expit <- function(x) {1/(1+exp(-x))}
 
 
 
+#' Derivative of expit function
+#' 
+#' @param x Numeric input
+#' @return Numeric output
+deriv_expit <- function(x) {exp(x)/((1+exp(x))^2)}
+
+
+
 #' Integral of expit function
 #' 
 #' @param x Numeric input
 #' @return Numeric output
-intexpit <- function(x) {log(1+exp(x))}
+int_expit <- function(x) {log(1+exp(x))}
 
 
 

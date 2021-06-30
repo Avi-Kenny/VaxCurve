@@ -9,7 +9,7 @@
 #'     choices are c("identity", "square", "sqrt", "step_0.2", "step_0.8")
 #' @param sampling A list. One of c("iid","two-phase")
 #' @return A dataframe representing the study population
-generate_data <- function(n, alpha_3, distr_A, mono_form, sampling="iid") {
+generate_data <- function(n, alpha_3, distr_A, mono_form, sampling) {
   
   # Fix parameters
   alpha_0 <- -1.5
@@ -38,9 +38,9 @@ generate_data <- function(n, alpha_3, distr_A, mono_form, sampling="iid") {
   } else if (mono_form=="sqrt") {
     mono_f <- function(x) {sqrt(x)}
   } else if (mono_form=="step_0.2") {
-    mono_f <- function(x) {as.numeric(x>0.2)}
+    mono_f <- function(x) {as.integer(x>0.2)}
   } else if (mono_form=="step_0.8") {
-    mono_f <- function(x) {as.numeric(x>0.8)}
+    mono_f <- function(x) {as.integer(x>0.8)}
   } else {
     stop("mono_form incorrectly specified")
   }
@@ -54,12 +54,12 @@ generate_data <- function(n, alpha_3, distr_A, mono_form, sampling="iid") {
     dat <- data.frame(w1=w1, w2=w2, a=a, y=y)
   }
   
-  # # Two-phase sampling
-  # if (sampling=="two-phase") {
-  #   pi <- expit(2*y-w2)
-  #   delta <- rbinom(n, size=1, prob=pi)
-  #   dat <- data.frame(w1=w1, w2=w2, a=ifelse(delta==1,a,NA), y=y)
-  # }
+  # Two-phase sampling
+  if (sampling=="two-phase") {
+    pi <- Pi(y,w1,w2)
+    delta <- rbinom(n, size=1, prob=pi)
+    dat <- data.frame(w1=w1, w2=w2, a=ifelse(delta==1,a,NA), y=y)
+  }
   
   # Generate true thetas (at midpoint and endpoint)
   {
@@ -74,8 +74,10 @@ generate_data <- function(n, alpha_3, distr_A, mono_form, sampling="iid") {
     ))
   }
   
+  # Add attributes to dataframe
   attr(dat, "theta_mp") <- theta_mp
   attr(dat, "theta_ep") <- theta_ep
+  attr(dat, "sampling") <- sampling
   
   return(dat)
   

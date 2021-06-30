@@ -11,23 +11,32 @@ if (cfg$which_sim=="estimation") {
 
   one_simulation <- function() {
     
-    # # !!!!!
-    # L <- list(n=20,alpha_3=0.7,distr_A="Unif(0,1)",mono_form="sqrt",sampling="iid",estimator="G-comp (logistic)")
+    # # !!!!! For testing !!!!!
+    # L <- list(n=200, alpha_3=0.7, distr_A="Unif(0,1)", mono_form="identity",
+    #           sampling="two-phase", estimator=list(est="G-comp (logistic)",
+    #                                                params=list(boot_reps=5)))
     
     # Generate dataset
     dat <- generate_data(L$n, L$alpha_3, L$distr_A, L$mono_form, L$sampling)
     
     # Obtain estimates
-    ests <- est_curve(dat, estimator=L$estimator, params=999, points=c(0.5,1))
-    
+    ests <- est_curve(
+      dat = dat,
+      estimator = L$estimator$est,
+      params = L$estimator$params,
+      points = c(0.5,1)
+    )
+
     # Return results ("mp"=midpoint, "ep"=endpoint)
     return (list(
       "theta_mp" = attr(dat, "theta_mp"),
       "theta_ep" = attr(dat, "theta_ep"),
       "est_mp" = ests[[1]]$est,
-      "se_mp" = ests[[1]]$se,
+      "ci_lo_mp" = ests[[1]]$ci_lo,
+      "ci_hi_mp" = ests[[1]]$ci_hi,
       "est_ep" = ests[[2]]$est,
-      "se_ep" = ests[[2]]$se
+      "ci_lo_ep" = ests[[2]]$ci_lo,
+      "ci_hi_ep" = ests[[2]]$ci_hi
     ))
     
   }
@@ -44,8 +53,8 @@ if (cfg$which_sim=="testing") {
   
   #' Run a single simulation (testing)
   #'
-  #' @return !!!!!
-  
+  #' @return A list that gives the result of the hypothesis test
+
   one_simulation <- function() {
     
     # Generate dataset

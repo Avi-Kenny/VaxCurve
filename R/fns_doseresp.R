@@ -94,7 +94,7 @@ construct_mu_n <- function(dat, type, moment=1) {
   
   if (type=="logistic") {
     model <- glm(y~w1+w2+a, data=dat, family="binomial", weights=wts(dat))
-    coeffs <- as.integer(summary(model)$coefficients[,1])
+    coeffs <- as.numeric(summary(model)$coefficients[,1])
     
     return(function(a, w1, w2){
       expit( coeffs[1] + coeffs[2]*w1 + coeffs[3]*w2 + coeffs[4]*a )
@@ -313,13 +313,13 @@ construct_Gamma_n <- function(dat, mu_n, g_n) {
     n <- nrow(dat)
     i_long <- rep(c(1:n), each=n)
     j_long <- rep(c(1:n), times=n)
-    a_long <- dat$a[i_long]
-    w1_long <- dat$w1[j_long]
-    w2_long <- dat$w2[j_long]
+    a_i_long <- dat$a[i_long]
+    w1_j_long <- dat$w1[j_long]
+    w2_j_long <- dat$w2[j_long]
     
     subpiece_1a <- (dat$y - mu_n(dat$a,dat$w1,dat$w2)) /
       g_n(dat$a,dat$w1,dat$w2)
-    subpiece_2a <- mu_n(a_long,w1_long,w2_long)
+    subpiece_2a <- mu_n(a_i_long,w1_j_long,w2_j_long)
     
     return(
       memoise(Vectorize(function(x) {
@@ -327,7 +327,7 @@ construct_Gamma_n <- function(dat, mu_n, g_n) {
         subpiece_1b <- as.integer(dat$a<=x)
         piece_1 <- mean(subpiece_1a*subpiece_1b)
         
-        subpiece_2b <- as.integer(a_long<=x)
+        subpiece_2b <- as.integer(a_i_long<=x)
         piece_2 <- mean(subpiece_2a*subpiece_2b)
         
         return(piece_1+piece_2)
@@ -339,58 +339,36 @@ construct_Gamma_n <- function(dat, mu_n, g_n) {
     
     n_orig <- nrow(dat)
     dat %<>% filter(!is.na(a))
+    s <- sum(1 / Pi(dat$y, dat$w1, dat$w2)) / n_orig
     n <- nrow(dat)
-    s <- (1/n_orig) * sum(1/Pi(dat$y, dat$w1, dat$w2))
     
-    i_long1 <- rep(c(1:n), each=n)
-    j_long1 <- rep(c(1:n), times=n)
-    i_long2 <- rep(i_long1, each=n)
-    j_long2 <- rep(j_long1, each=n)
-    k_long2 <- rep(j_long1, times=n)
+    i_long <- rep(c(1:n), each=n)
+    j_long <- rep(c(1:n), times=n)
+    a_i_long <- dat$a[i_long]
+    w1_i_long <- dat$w1[i_long]
+    w1_j_long <- dat$w1[j_long]
+    w2_i_long <- dat$w2[i_long]
+    w2_j_long <- dat$w2[j_long]
+    y_i_long <- dat$y[i_long]
+    y_j_long <- dat$y[j_long]
     
-    a_i_l1 <- dat$a[i_long1]
-    y_i_l1 <- dat$y[i_long1]
-    y_j_l1 <- dat$y[j_long1]
-    w1_i_l1 <- dat$w1[i_long1]
-    w1_j_l1 <- dat$w1[j_long1]
-    w2_i_l1 <- dat$w2[i_long1]
-    w2_j_l1 <- dat$w2[j_long1]
-    
-    a_i_l2 <- dat$a[i_long2]
-    y_i_l2 <- dat$y[i_long2]
-    y_j_l2 <- dat$y[j_long2]
-    w1_i_l2 <- dat$w1[i_long2]
-    w1_j_l2 <- dat$w1[j_long2]
-    w1_k_l2 <- dat$w1[k_long2]
-    w2_i_l2 <- dat$w2[i_long2]
-    w2_j_l2 <- dat$w2[j_long2]
-    w2_k_l2 <- dat$w2[k_long2]
-    
-    # Subpiece 1 (one-level sum)
     subpiece_1a <- (dat$y - mu_n(dat$a,dat$w1,dat$w2)) /
-      (s*Pi(dat$y, dat$w1, dat$w2) * g_n(dat$a,dat$w1,dat$w2))
-    
-    # Subpiece two (two-level sum)
-    subpiece_2a <- (
-      mu_n(a_i_l1,w1_j_l1,w2_j_l1) * (2 + 1/(s*Pi(y_j_l1, w1_j_l1, w2_j_l1)))
-    ) / (s*Pi(y_i_l1, w1_i_l1, w2_i_l1))
-    
-    # Subpiece three (three-level sum)
-    subpiece_3a <- ( 2 * mu_n(a_i_l2,w1_k_l2,w2_k_l2) ) / (
-      s*Pi(y_i_l2, w1_i_l2, w2_i_l2) * Pi(y_j_l2, w1_j_l2, w2_j_l2)
+      ( s * Pi(dat$y, dat$w1, dat$w2) * g_n(dat$a,dat$w1,dat$w2) )
+    subpiece_2a <- mu_n(a_i_long,w1_j_long,w2_j_long) / (
+      s^2 * Pi(y_i_long, w1_i_long, w2_i_long) *
+            Pi(y_j_long, w1_j_long, w2_j_long)
     )
-
+    
     return(
       memoise(Vectorize(function(x) {
         
         subpiece_1b <- as.integer(dat$a<=x)
-        piece_1 <- mean(subpiece_1a*subpiece_1b)
-        subpiece_2b <- as.integer(a_i_l1<=x)
-        piece_2 <- mean(subpiece_2a*subpiece_2b)
-        subpiece_3b <- as.integer(a_i_l2<=x)
-        piece_3 <- mean(subpiece_3a*subpiece_3b)
+        piece_1 <- sum(subpiece_1a*subpiece_1b) * (1/n_orig)
         
-        return(piece_1+piece_2+piece_3)
+        subpiece_2b <- as.integer(a_i_long<=x)
+        piece_2 <- sum(subpiece_2a*subpiece_2b) * (1/(n_orig^2))
+        
+        return(piece_1+piece_2)
         
       }))
     )
@@ -410,7 +388,7 @@ construct_Gamma_n <- function(dat, mu_n, g_n) {
 #'   - This uses stabilized IP weights
 #'   - This accesses wts() globally
 construct_Phi_n <- function (dat, type="ecdf") {
-  # Adaptation of ecdf() source code
+  # Adaptation of stats::ecdf() source code
   dat <- cbind(dat, wts=wts(dat))
   dat %<>% arrange(a)
   n <- nrow(dat)

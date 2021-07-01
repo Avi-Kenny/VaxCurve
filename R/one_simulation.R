@@ -12,9 +12,10 @@ if (cfg$which_sim=="estimation") {
   one_simulation <- function() {
     
     # # !!!!! For testing !!!!!
-    # L <- list(n=200, alpha_3=0.7, distr_A="Unif(0,1)", mono_form="identity",
-    #           sampling="two-phase", estimator=list(est="G-comp (logistic)",
-    #                                                params=list(boot_reps=5)))
+    # L <- list(n=500, alpha_3=0.7, distr_A="Unif(0,1)", mono_form="identity",
+    #   sampling="iid", estimator=list(
+    #     # est="G-comp (logistic)",params=list(boot_reps=5)))
+    #     est="Generalized Grenander",params=list(ci_type="logit")))
     
     # Generate dataset
     dat <- generate_data(L$n, L$alpha_3, L$distr_A, L$mono_form, L$sampling)
@@ -26,7 +27,7 @@ if (cfg$which_sim=="estimation") {
       params = L$estimator$params,
       points = c(0.5,1)
     )
-
+    
     # Return results ("mp"=midpoint, "ep"=endpoint)
     return (list(
       "theta_mp" = attr(dat, "theta_mp"),
@@ -61,7 +62,7 @@ if (cfg$which_sim=="testing") {
     dat <- generate_data(L$n, L$alpha_3, L$distr_A, L$mono_form, L$sampling)
     
     # Perform hypothesis test
-    reject <- do.call(L$test$type, list(dat, "incr", L$test$params))
+    reject <- use_method(L$test$type, list(dat, "incr", L$test$params))
     
     # Return results
     return (list("reject"=reject))

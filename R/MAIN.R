@@ -5,26 +5,17 @@
 ##### CONFIG #####
 ##################.
 
-
-
-# install.packages(
-#   pkgs = "EnvStats",
-#   lib = "/home/akenny/R_lib",                  # Hutch - Bionic
-#   repos = "http://cran.us.r-project.org",
-#   dependencies = TRUE
-# )
-
 # Set global config
 cfg <- list(
   which_sim = "estimation", # estimation testing
-  level_set_which = "level_set_1",
+  level_set_which = "level_set_estimation_1",
   run_or_update = "run",
-  num_sim = 500,
+  num_sim = 1,
   pkgs = c("dplyr", "boot", "car", "mgcv", "kdensity", "memoise",
            "twostageTE", "EnvStats", "fdrtool"),
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
                      "data.table", "latex2exp"), # devtools::install_github("zeehio/facetscales")
-  parallel = "outer", # none outer
+  parallel = "none", # none outer
   stop_at_error = FALSE
 )
 
@@ -64,7 +55,7 @@ library(simba)
 source("one_simulation.R")
 source("generate_data.R")
 source("est_curve.R")
-source("test2.R")
+source("test_2.R")
 source("fns_doseresp.R")
 
 
@@ -75,12 +66,13 @@ source("fns_doseresp.R")
 
 if (Sys.getenv("run") %in% c("first", "")) {
   
-  # Compare all methods
-  level_set_1 <- list(
+  # Estimation: compare all methods
+  level_set_estimation_1 <- list(
     n = 200, # c(50,100,200)
-    distr_A = c("Unif(0,1)", "Beta(0.9,1.1+0.4*w2)"),
     alpha_3 = 0.7,
-    mono_form = "identity", # c("identity", "square", "step_0.2")
+    distr_A = c("Unif(0,1)", "Beta(0.9,1.1+0.4*w2)"),
+    mono_form = c("identity", "step_0.2"), # "square"
+    sampling = c("iid", "two-phase"),
     estimator = list(
       "G-comp (logistic)" = list(
         est = "G-comp (logistic)",
@@ -94,8 +86,24 @@ if (Sys.getenv("run") %in% c("first", "")) {
       "Grenander (regular CIs)" = list(
         est = "Generalized Grenander",
         params = list(ci_type="regular"))
-    ),
-    sampling = c("iid", "two-phase")
+    )
+  )
+  
+  # Testing: compare all methods
+  level_set_testing_1 <- list(
+    n = 200, # c(50,100,200)
+    alpha_3 = 0.7,
+    distr_A = c("Unif(0,1)", "Beta(0.9,1.1+0.4*w2)"),
+    mono_form = c("identity", "step_0.2"), # "square"
+    sampling = c("iid", "two-phase"),
+    test = list(
+      "One" = list(
+        a = "a",
+        b = b),
+      "Two" = list(
+        a = "a",
+        b = b)
+    )
   )
   
   level_set <- eval(as.name(cfg$level_set_which))
@@ -110,7 +118,7 @@ if (Sys.getenv("run") %in% c("first", "")) {
 
 # Use these commands to run on Slurm:
 # sbatch --export=run='first',cluster='bionic',type='R',project='z.VaxCurve' -e ./io/slurm-%A_%a.out -o ./io/slurm-%A_%a.out --constraint=gizmok run_r.sh
-# sbatch --depend=afterok:11 --array=1-24000 --export=run='main',cluster='bionic',type='R',project='z.VaxCurve' -e ./io/slurm-%A_%a.out -o ./io/slurm-%A_%a.out --constraint=gizmok run_r.sh
+# sbatch --depend=afterok:11 --array=1-16000 --export=run='main',cluster='bionic',type='R',project='z.VaxCurve' -e ./io/slurm-%A_%a.out -o ./io/slurm-%A_%a.out --constraint=gizmok run_r.sh
 # sbatch --depend=afterok:12 --export=run='last',cluster='bionic',type='R',project='z.VaxCurve' -e ./io/slurm-%A_%a.out -o ./io/slurm-%A_%a.out --constraint=gizmok run_r.sh
 
 if (cfg$run_or_update=="run") {
@@ -133,7 +141,7 @@ if (cfg$run_or_update=="run") {
       # Add functions to simulation object
       sim %<>% add_creator(generate_data)
       methods <- c(
-        "est_curve", "test2", "expit", "deriv_expit", "logit", "deriv_logit",
+        "est_curve", "test_2", "expit", "deriv_expit", "logit", "deriv_logit",
         "construct_mu_n", "construct_deriv_theta_n", "construct_sigma2_n",
         "construct_f_a_n", "construct_f_aIw_n", "construct_g_n",
         "construct_Gamma_n", "construct_Phi_n", "Pi", "wts"

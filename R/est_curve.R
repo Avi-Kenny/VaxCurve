@@ -25,10 +25,9 @@ est_curve <- function(dat, estimator, params, points) {
       
       dat %<>% filter(!is.na(a))
       weights <- wts(dat)
-      s <- (1/n) * sum(weights)
       
       # Run model
-      model <- glm(y~w1+w2+a, data=dat, weights=wts(dat), family="binomial")
+      model <- glm(y~w1+w2+a, data=dat, weights=weights, family="binomial")
       coefs <- as.numeric(summary(model)$coefficients[,1])
       
       # Run gcomp
@@ -41,7 +40,7 @@ est_curve <- function(dat, estimator, params, points) {
         }
       )
       
-      return((weights/s)*mean(gcomp_i))
+      return(sum(weights*gcomp_i))
 
     }
     
@@ -78,11 +77,12 @@ est_curve <- function(dat, estimator, params, points) {
     construct_fns <- function(dat, return_tao_n=T) {
       
       # Construct component functions
+      # Note: mu_n=mu2_n since the y values are binary
       grid <- seq(0,1,0.01)
       Phi_n <- construct_Phi_n(dat)
       Phi_n_inv <- construct_Phi_n(dat, type="inverse")
       mu_n <- construct_mu_n(dat, type="logistic")
-      mu2_n <- construct_mu_n(dat, type="logistic", moment=2)
+      mu2_n <- mu_n # construct_mu_n(dat, type="logistic", moment=2)
       sigma2_n <- construct_sigma2_n(mu_n, mu2_n)
       f_aIw_n <- construct_f_aIw_n(dat, type="simple")
       f_a_n <- construct_f_a_n(dat, type=NULL)

@@ -1,4 +1,191 @@
 
+# Old construct_f_aIw_n function contents
+if (F) {
+  
+  #' @param type One of c("KDE (Beta)", "Beta"). The former fits a KDE with Beta
+  #'     kernels (Chen 1999). The latter fits Beta density via MLE.
+  #' @notes
+  #'   - We trim the first and last evaluation points (i.e. zero and one) because
+  #'     the kde.boundary() function estimates the density as zero there; the
+  #'     neighboring points are used as the estimates instead
+  
+  if (type=="simple") {
+    
+    dat_0 <- dplyr::filter(dat,w2==0 & !is.na(a))
+    dat_1 <- dplyr::filter(dat,w2==1 & !is.na(a))
+    
+    # print(paste("sim_uid:", L$sim_uid))
+    # print(paste("dat contains", nrow(dat), "rows.")) # !!!!!
+    # print(paste("dat contains", nrow(filter(dat, !is.na(a))), "complete rows.")) # !!!!!
+    # print(paste("dat_0 contains", nrow(dat_0), "rows.")) # !!!!!
+    # print(paste("dat_1 contains", nrow(dat_1), "rows.")) # !!!!!
+    
+    # kd_0 <- kdensity(
+    #   x = dat_0$a,
+    #   start = "gumbel",
+    #   kernel = "gaussian"
+    # )
+    kde_0 <- density(
+      x = dat_0$a,
+      kernel = "gaussian",
+      weights = wts(dat_0, scale="sum 1"),
+      from = 0,
+      to = 1
+    )
+    kd_0 <- function(x) {
+      index <- which.min(abs(kde_0$x - x))
+      area <- mean(kde_0$y)
+      return(kde_0$y[index]/area)
+    }
+    
+    # kd_1 <- kdensity(
+    #   x = dat_1$a,
+    #   start = "gumbel",
+    #   kernel = "gaussian"
+    # )
+    kde_1 <- density(
+      x = dat_1$a,
+      kernel = "gaussian",
+      weights = wts(dat_1, scale="sum 1"),
+      from = 0,
+      to = 1
+    )
+    kd_1 <- function(x) {
+      index <- which.min(abs(kde_1$x - x))
+      area <- mean(kde_1$y)
+      return(kde_1$y[index]/area)
+    }
+    
+    f_aIw_n <- function(a,w1,w2) {
+      if (w2==0) { return(kd_0(a)) }
+      if (w2==1) { return(kd_1(a)) }
+    }
+    
+    return(memoise(Vectorize(f_aIw_n)))
+    
+  }
+  
+}
+
+# Old construct_f_a_n function contents
+if (F) {
+  
+  # Run weighted KDE
+  dat %<>% filter(!is.na(a))
+  
+  # KDE (Beta kernels)
+  if (type=="KDE (Beta)") {
+    
+    kde <- kde.boundary(
+      x = dat$a,
+      boundary.kernel = "beta",
+      w = wts(dat, scale="sum 1"),
+      xmin = 0,
+      xmax = 1
+    )
+    f_a_n <- function(x) {
+      len <- length(kde$eval.points)
+      k_x <- kde$eval.points[2:(len-1)] # Trimming off first and last point
+      k_dens <- kde$estimate[2:(len-1)] # Trimming off first and last point
+      index <- which.min(abs(k_x - x))
+      return(k_dens[index])
+    }
+    
+  }
+  
+  if (type=="Beta") {
+    
+    # # !!!!!
+    # dat <- list()
+    # dat$a <- rbeta(100, shape1=0.3, shape2=0.5)
+    # # !!!!!
+    
+    # !!!!! Testing
+    {
+      # Beta(0.9,1.1+0.4*w2)
+      # Generate true marginal distribution of A
+      n <- 10000
+      beta_samp_1 <- rbeta(n, shape1=0.9, shape2=1.1)
+      beta_samp_2 <- rbeta(n, shape1=0.9, shape2=1.5)
+      beta_samp <- c(beta_samp_1, beta_samp_2)
+      ggplot(data.frame(x=beta_samp_1), aes(x=x)) + geom_histogram(bins=50)
+      ggplot(data.frame(x=beta_samp_2), aes(x=x)) + geom_histogram(bins=50)
+      ggplot(data.frame(x=beta_samp), aes(x=x)) + geom_histogram(bins=50)
+      
+    }
+    
+    dat %<>% filter(!is.na(a))
+    n <- length(dat$a)
+    
+    # !!!!! Comparison
+    Rfast::beta.mle(dat$a)
+    
+    # weights <- wts(dat, scale="sum 1") # !!!!!
+    
+    # Set the objective function (weighted likelihood)
+    #   par[1] is alpha and par[2] is beta
+    wlik <- function(par) {
+      
+      sum_loglik <- sum(sapply(c(1:n), function(i) {
+        loglik <- dbeta(dat$a[i], shape1=par[1], shape2=par[2], log=TRUE)
+        wt <- 1 # !!!!! Testing
+        # wt <- weights[i]
+        return(-1*loglik*wt)
+      }))
+      
+      return(sum_loglik)
+      
+    }
+    optim(par=c(alpha=1, beta=1), fn=wlik)
+
+  }
+  
+}
+
+# Old GAM specification function
+if (F) {
+  
+  if (mono_form=="identity") {
+    mono_f <- function(x) {x}
+  } else if (mono_form=="square") {
+    mono_f <- function(x) {x^2}
+  } else if (mono_form=="sqrt") {
+    mono_f <- function(x) {sqrt(x)}
+  } else if (mono_form=="step_0.2") {
+    mono_f <- function(x) {as.integer(x>0.2)}
+  } else if (mono_form=="step_0.8") {
+    mono_f <- function(x) {as.integer(x>0.8)}
+  } else {
+    stop("mono_form incorrectly specified")
+  }
+  
+}
+
+# Old kernel density function
+if (F) {
+  
+  # kde <- density(
+  #   x = dat$a,
+  #   kernel = "gaussian",
+  #   weights = wts(dat),
+  #   from = 0,
+  #   to = 1
+  # )
+  # f_a_n <- function(x) {
+  #   index <- which.min(abs(kde$x - x))
+  #   area <- mean(kde$y)
+  #   return(kde$y[index]/area)
+  # }
+  
+  # f_a_n <- kdensity(
+  #   x = dat$a,
+  #   start = "gumbel",
+  #   kernel = "beta", # gaussian
+  #   support = c(0,1)
+  # )
+  
+}
+
 # Debugging code in construct_fns()
 if (F) {
   mu_n_iid <- construct_mu_n(dat_iid, type="logistic")

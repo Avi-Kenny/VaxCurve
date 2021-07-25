@@ -1,155 +1,174 @@
 #' Testing approach 2: regression slope
 #' 
 #' @param dat Data returned by generate_data()
-#' @param alt_type Type of alternative hypothesis; either "incr" or "decr"
+#' @param alt_type Type of alternative hypothesis; either "incr" or "decr";
+#'     currently unused
+#' @param mu_n_type Type of regression estimator; one of One of c("Logistic",
+#'     "GAM", "Random forest")
+#' @param g_n_type Type of conditional density ratio estimator; one of
+#'     c("parametric", "binning")
 #' @param params A list, containing the following:
-#'   - `G` Domain transformation; one of c("identity","marginal")
-#'   - `bootreps` Number of bootstrap replicates to run
+#'   - `mu_n_type` Type of regression estimator; one of One of c("Logistic",
+#'     "GAM", "Random forest")
+#'   - `g_n_type` Type of conditional density ratio estimator; one of
+#'     c("parametric", "binning")
+#'   - `var` Variance estimation; one of c("boot","mixed boot")
+#'   - `boot_reps` Number of bootstrap replicates to run
 #' @return Binary; is null rejected (1) or not (0)
 #' @notes
 #'   - Note
 
 test_2 <- function(dat, alt_type="incr", params) {
   
-  # !!!!! Options for the following:
-  #   domain transfer by marginal of A (yes/no)
-  #   iid vs two-phase sampling
-  
-  # Set up component functions
-  {
-    # Set up G constructor
-    construct_G <- function(params, dat) {
-      if (params$G == "identity") {
-        return(
-          function(x) { x }
-        )
-      }
-      if (params$G == "marginal") {
-        
-        ecdf_G <- construct_Phi_n(dat)
-        
-        return(
-          function(x) { ecdf_G(x) }
-        )
-      }
-    }
-    
-    # lambda function (returns a constant)
-    lambda <- function(k, G, dat) {
-      
-      if (attr(dat, "sampling")=="iid") {
-        
-        return( mean((G(dat$a, dat))^k) )
-        
-      } else if (attr(dat, "sampling")=="two-phase") {
-        
-        n_orig <- nrow(dat)
-        dat %<>% filter(!is.na(a))
-        sum((G(dat$a, dat))^k) / n_orig
-        # weights <- 1 / Pi(dat$y, dat$w1, dat$w2)
-        
-      }
-      
-      
-      
-      
-      
-    }
-    
-    # Construct influence function
-    # !!!!! Vectorize? Memoise?
-    # !!!!! Also option to use one-step or plug-in ?????
-    construct_infl_fn <- function(sub_x, x) {
-      
-      # !!!!!
-      
-      return(999)
-      
-    }
-    
-  }
-  
-  # Run bootstrap
-  {
-    
-    # Pre-calculate values
-    {
-      piece_3 <- mean(
-        (
-          lambda(2,G,dat)*(G(dat$a,dat))^2 -
-            lambda(3,G,dat)*G(dat$a,dat)
-        ) * Gamma_n(dat$a, dat)
-      )
-      
-      pre <- list(
-        piece_3 = piece_3
-      )
-      
-    }
+  if (params$var=="boot") {
     
     # Define the statistic to bootstrap
-    bootstat <- function(dat,indices) {
+    bootstat <- function(dat_orig,indices) {
       
-      dat_boot <- dat[indices,]
+      dat <- dat_orig[indices,]
       
-      # Run regression
+      s_0 <- ss(dat)
+      n_orig <- nrow(dat)
+      dat_0 <- dat %>% filter(!is.na(a))
+      n_0 <- nrow(dat_0)
+      weights_0 <- wts(dat_0, scale="none")
+      G_0 <- construct_Phi_n(dat)
+      mu_0 <- construct_mu_n(dat_0, type=params$mu_n_type)
+      f_aIw_n <- construct_f_aIw_n(dat_0, type=params$g_n_type)
+      f_a_n <- construct_f_a_n(dat_0, f_aIw_n=f_aIw_n)
+      g_0 <- construct_g_n(f_aIw_n, f_a_n)
+      Gamma_0 <- construct_Gamma_n(dat, mu_0, g_0)
       
-      
-      x <- array(1:24, c(4,3,2))
-      dim1 <- c(1.1,2.2,3.3,4.4)
-      dim2 <- c(11,22,33)
-      dim3 <- c(0,1)
-      x[which(dim1==2.2),which(dim2==33),which(dim3==0)]
-      
-      # Pre-calculate requisite functions
-      {
-        # !!!!!
-      }
-      
-      # Expectation
-      # !!!!! Pre-calculate this; should be a single function that looks up values from a lookup table
-      piece_1 <- mean(
-        apply(
-          X = expand.grid(x=dat$a, x_prime=dat_boot$a),
-          MARGIN = 1,
-          FUN = function(r) {
-            x <- r[["x"]]
-            x_prime <- r[["x_prime"]]
-            return(
-              infl_fn(sub_x=x, x=x_prime) * (
-                lambda(2,G,dat_boot)*(G(x,dat_boot))^2 -
-                  lambda(3,G,dat_boot)*G(x,dat_boot)
-              )
-            )
-          }
-        )
+      beta_0 <- (1/n_orig) * sum(
+        (weights_0/s_0) *
+          (
+            lambda(2, G_0, dat)*(G_0(dat_0$a))^2 -
+              lambda(3, G_0, dat)*G_0(dat_0$a)
+          ) *
+          (Gamma_0(dat_0$a))
       )
       
-      # Psi(P_n^#, Gamma_n)
-      piece_2 <- mean(
-        (
-          lambda(2,G,dat_boot)*(G(dat_boot$a,dat_boot))^2 -
-            lambda(3,G,dat_boot)*G(dat_boot$a,dat_boot)
-        ) * Gamma_n(dat_boot$a, dat)
-      )
-      
-      # Psi(P_n, Gamma_n)
-      # Pre-calculated and accessed via parent environment
-      piece_3 <- pre$piece_3
-      
-      return (piece_1+piece_2+piece_3)
+      return (beta_0)
       
     }
     
     # Run bootstrap
     boot_obj <- boot(data=dat, statistic=bootstat, R=params$boot_reps)
     
+    # Calculate beta_n
+    beta_0 <- bootstat(dat, c(1:nrow(dat)))
+    
     # Calculate critical value (for a one-sided test)
     crit_val <- qnorm(0.05, mean=mean(boot_obj$t), sd=sd(boot_obj$t))
-    # crit_val <- as.numeric(quantile(boot_obj$t, 0.05))
     
+  } else if (params$var=="mixed boot") {
+    
+    # Pre-calculate non-bootstrapped pieces
+    {
+      dat_0_orig <- dat
+      s_0 <- ss(dat_0_orig)
+      n_orig <- nrow(dat_0_orig)
+      dat_0 <- dat_0_orig %>% filter(!is.na(a))
+      n_0 <- nrow(dat_0)
+      weights_0 <- wts(dat_0, scale="none")
+      
+      G_0 <- construct_Phi_n(dat_0_orig)
+      mu_0 <- construct_mu_n(dat_0, type=params$mu_n_type)
+      
+      f_aIw_n <- construct_f_aIw_n(dat_0, type=params$g_n_type)
+      f_a_n <- construct_f_a_n(dat_0, f_aIw_n=f_aIw_n)
+      g_0 <- construct_g_n(f_aIw_n, f_a_n)
+      Gamma_0 <- construct_Gamma_n(dat_0_orig, mu_0, g_0)
+      lambda_2 <- lambda(k=2, G_0, dat_0)
+      lambda_3 <- lambda(k=3, G_0, dat_0)
+      eta_0 <- construct_eta_n(dat_0_orig, mu_0)
+      theta_naive_0 <- construct_theta_naive_n(dat_0_orig, mu_0)
+      
+      beta_0 <- (1/n_orig) * sum(
+        (weights_0/s_0) *
+          (
+            lambda(2, G_0, dat_0_orig)*(G_0(dat_0$a))^2 -
+              lambda(3, G_0, dat_0_orig)*G_0(dat_0$a)
+          ) *
+          (Gamma_0(dat_0$a))
+      )
+      
+      piece_3 <- -2*beta_0
+      
+    }
+    
+    # Define the statistic to bootstrap
+    bootstat <- function(dat_orig,indices) {
+      
+      dat_b_orig <- dat_orig[indices,]
+      s_b <- ss(dat_b_orig)
+      dat_b <- dat_b_orig %>% filter(!is.na(a))
+      n_b <- nrow(dat_b)
+      weights_b <- wts(dat_b, scale="none")
+      G_n <- construct_Phi_n(dat_b_orig)
+      
+      piece_1 <- (1/n_orig) * sum(
+        (weights_b/s_b) *
+          (
+            lambda(k=2, G_0, dat_b_orig)*(G_0(dat_b$a))^2 -
+              lambda(k=3, G_0, dat_b_orig)*G_0(dat_b$a)
+          ) *
+          (Gamma_0(dat_b$a))
+      )
+      
+      piece_2 <- (1/n_orig) * sum(
+        (weights_0/s_0) *
+          (
+            lambda(2, G_n, dat_0_orig)*(G_n(dat_0$a))^2 -
+              lambda(3, G_n, dat_0_orig)*G_n(dat_0$a)
+          ) *
+          Gamma_0(dat_0$a)
+      )
+      
+      index_0 <- rep(c(1:n_0), each=n_b)
+      index_b <- rep(c(1:n_b), times=n_0)
+      a_0_long <- dat_0$a[index_0]
+      a_b_long <- dat_b$a[index_b]
+      y_b_long <- dat_b$y[index_b]
+      w1_b_long <- dat_b$w1[index_b]
+      w2_b_long <- dat_b$w2[index_b]
+      weights_0_long <- weights_0[index_0]
+      weights_b_long <- weights_b[index_b]
+      
+      piece_4 <- (1/n_orig)^2 * sum(
+        (weights_0_long/s_0) * (weights_b_long/s_b) *
+          (
+            (
+              (as.integer(a_b_long<=a_0_long)) *
+                (
+                  ( y_b_long - mu_0(a_b_long, w1_b_long, w2_b_long) ) /
+                    g_0(a_b_long, w1_b_long, w2_b_long) +
+                    theta_naive_0(a_b_long)
+                )
+            ) +
+              eta_0(a_0_long, w1_b_long, w2_b_long) -
+              (2*Gamma_0(a_0_long))
+          ) *
+          (
+            lambda(2, G_0, dat_0_orig)*(G_0(a_0_long))^2 -
+              lambda(3, G_0, dat_0_orig)*G_0(a_0_long)
+          )
+      )
+      
+      return (beta_0+piece_1+piece_2+piece_3+piece_4)
+      
+    }
+
+    # Run bootstrap
+    boot_obj <- boot(data=dat_0_orig, statistic=bootstat, R=params$boot_reps)
+    
+    # Calculate critical value (for a one-sided test)
+    crit_val <- qnorm(0.05, mean=mean(boot_obj$t), sd=sd(boot_obj$t))
+    
+  } else {
+    stop("Invalid specification for params$var")
   }
   
-  return(as.numeric(crit_val>0))
+  return(as.integer(crit_val>0))
   
 }

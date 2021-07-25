@@ -1,10 +1,14 @@
 #' Estimate the causal dose-response curve at a point
 #' 
 #' @param dat Data returned by generate_data()
-#' @param estimator Which estimator to use; one of c("G-comp (logistic)",
-#'     "G-comp (GAM)","Generalized Grenander")
+#' @param estimator Which estimator to use; one of c("G-comp", "Generalized
+#'     Grenander")
 #' @param params A list, containing the following:
-#'   - `boot_reps` Used for G-comp (logistic); number of bootstrap replicates
+#'   - `mu_n_type` Type of regression estimator; one of One of c("Logistic",
+#'     "GAM", "Random forest")
+#'   - `g_n_type` Type of conditional density ratio estimator; one of
+#'     c("parametric", "binning")
+#'   - `boot_reps` Used for G-comp; number of bootstrap replicates
 #'   - `Phi` Used for Grenander; one of c("marginal","identity") # !!!!! Not yet implemented
 #'   - `ci_type` One of c("regular", "logit", "sample split"). "regular" is the
 #'     standard approach. "logit" transforms the CIs so that the bounds are in
@@ -17,61 +21,43 @@
 
 est_curve <- function(dat, estimator, params, points) {
   
-  n <- nrow(dat)
-  
-  if (estimator=="G-comp (logistic)") {
+  if (estimator=="G-comp") {
     
-    gcomp <- function(dat, a) {
-      
-      dat %<>% filter(!is.na(a))
-      weights <- wts(dat)
-      
-      # Run model
-      model <- glm(y~w1+w2+a, data=dat, weights=weights, family="binomial")
-      coefs <- as.numeric(summary(model)$coefficients[,1])
-      
-      # Run gcomp
-      gcomp_i <- apply(
-        X = dat,
-        MARGIN = 1,
-        FUN = function(r) {
-          M_i <- c(1,r[["w1"]],r[["w2"]],a)
-          return(expit(as.numeric(M_i %*% coefs)))
-        }
-      )
-      
-      return(sum(weights*gcomp_i))
-
-    }
+    # Compute estimates
+    mu_n <- construct_mu_n(dat, type=params$mu_n_type)
+    gcomp_n <- construct_gcomp(dat, mu_n=mu_n)
+    ests <- gcomp_n(points)
     
-    # Note: this is inefficient, but fine if length(points) is small
-    res <- list()
-    for (p in 1:length(points)) {
-      
-      # Calculate estimate
-      est <- gcomp(dat, points[p])
-      
-      # Get bootstrap CI
+    # Run bootstrap for SEs
+    {
       my_stat <- function(dat,indices) {
         d <- dat[indices,]
-        return (gcomp(d, points[p]))
+        mu_n <- construct_mu_n(d, type=params$mu_n_type)
+        gcomp_n <- construct_gcomp(d, mu_n=mu_n)
+        return (gcomp_n(points))
       }
       boot_obj <- boot(data=dat, statistic=my_stat, R=params$boot_reps)
-      ci <- boot.ci(boot_obj, type="norm", conf=0.95)
-      ci_lo <- ci$normal[2]
-      ci_hi <- ci$normal[3]
-      
-      res[[p]] <- list(point=points[p], est=est, ci_lo=ci_lo, ci_hi=ci_hi)
-      
+    }
+
+    # Parse results object
+    res <- list()
+    for (p in 1:length(points)) {
+      boot_sd <- sd(boot_obj$t[,p])
+      res[[p]] <- list(
+        point = points[p],
+        est = ests[p],
+        ci_lo = ests[p] - 1.96*boot_sd,
+        ci_hi = ests[p] + 1.96*boot_sd
+        # t_quant <- qt(1-(0.05/2), df=(params$boot_reps-1))
+        # ci_lo <- ests - t_quant*ses
+      )
     }
     
     return (res)
     
-  } else if (estimator=="logistic GAM") {
-    
-    # !!!!!
-    
   } else if (estimator=="Generalized Grenander") {
+    
+    n <- nrow(dat)
     
     # Construct theta_n and tao_n, given a dataset
     construct_fns <- function(dat, return_tao_n=T) {
@@ -81,11 +67,12 @@ est_curve <- function(dat, estimator, params, points) {
       grid <- seq(0,1,0.01)
       Phi_n <- construct_Phi_n(dat)
       Phi_n_inv <- construct_Phi_n(dat, type="inverse")
-      mu_n <- construct_mu_n(dat, type="logistic")
-      mu2_n <- mu_n # construct_mu_n(dat, type="logistic", moment=2)
+      mu_n <- construct_mu_n(dat, type=params$mu_n_type)
+      gcomp_n <- construct_gcomp(dat, mu_n=mu_n)
+      mu2_n <- mu_n
       sigma2_n <- construct_sigma2_n(mu_n, mu2_n)
-      f_aIw_n <- construct_f_aIw_n(dat, type="simple")
-      f_a_n <- construct_f_a_n(dat, type=NULL)
+      f_aIw_n <- construct_f_aIw_n(dat, type=params$g_n_type)
+      f_a_n <- construct_f_a_n(dat, f_aIw_n=f_aIw_n)
       g_n <- construct_g_n(f_aIw_n, f_a_n)
       Gamma_n <- construct_Gamma_n(dat, mu_n, g_n)
       Psi_n <- function(x) { Gamma_n(Phi_n_inv(x)) }
@@ -113,7 +100,7 @@ est_curve <- function(dat, estimator, params, points) {
         
         # Construct tao_n
         if (return_tao_n==T) {
-          deriv_theta_n <- construct_deriv_theta_n(dat, theta_n, grid)
+          deriv_theta_n <- construct_deriv_theta_n(gcomp_n)
           tao_n <- function(x) {
             (4*deriv_theta_n(x) * mean(apply(
               X = dat,

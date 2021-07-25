@@ -36,4 +36,4 @@ vignettes/*.pdf
 rsconnect/
 
 # AK additions
-R/simba.out
+simba.out

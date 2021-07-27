@@ -9,10 +9,10 @@
 # devtools::install_github("tedwestling/ctsCausal")
 # devtools::install_github("zeehio/facetscales")
 cfg <- list(
-  which_sim = "testing", # estimation testing
-  level_set_which = "level_set_testing_1", # level_set_estimation_1 level_set_testing_1
+  which_sim = "estimation", # estimation testing
+  level_set_which = "level_set_temp", # level_set_estimation_1 level_set_testing_1
   run_or_update = "run",
-  num_sim = 1,
+  num_sim = 100,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "twostageTE", "EnvStats",
            "fdrtool"), # "ranger"       "ctsCausal", "SuperLearner", "earth", "Rsolnp", "sets"
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
@@ -69,6 +69,30 @@ if (load_pkgs_local) {
 ##########################################################.
 
 if (Sys.getenv("simba_run") %in% c("first", "")) {
+  
+  # !!!!! Temp/testing !!!!!
+  level_set_temp <- list(
+    n = 1000,
+    alpha_3 = 0.75,
+    distr_A = "Unif(0,1)",
+    reg_true = "Logistic",
+    sampling = "two-phase", # iid
+    estimator = list(
+      "G-comp" = list(
+        est = "G-comp",
+        params = list(mu_n_type="Logistic", boot_reps=100)
+      )
+      # "Grenander (logit CIs)" = list(
+      #   est = "Generalized Grenander",
+      #   params = list(mu_n_type="GAM", g_n_type="parametric", ci_type="logit")
+      # ),
+      # "Grenander (split CIs, m=5)" = list(
+      #   est = "Generalized Grenander",
+      #   params = list(mu_n_type="GAM", g_n_type="parametric",
+      #                 ci_type="sample split", m=5)
+      # )
+    )
+  )
   
   # Estimation: compare all methods
   # Not currently using (ci_type="sample split", m=5) or (ci_type="regular")
@@ -197,7 +221,7 @@ if (cfg$run_or_update=="run") {
     last = {
       
       sim %>% summarize() %>% print()
-
+      
     },
     
     cluster_config = cluster_config
@@ -264,7 +288,7 @@ if (FALSE) {
     )
   }
   summ <- summarize(sim, bias_pct=summ_bias, mse=summ_mse, coverage=summ_cov)
-
+  
   summ %<>% rename("Estimator"=estimator)
   
   p_data <- pivot_longer(
@@ -341,10 +365,10 @@ if (FALSE) {
     #          width=0.8, color="white", size=0.35) +
     facet_grid_sc(cols=dplyr::vars(reg_true), rows=dplyr::vars(stat),
                   scales=list(y=list(
-      Bias = scale_y_continuous(labels = percent_format()),
-      Coverage = scale_y_continuous(labels = percent_format()),
-      MSE = scale_y_continuous()
-    ))) +
+                    Bias = scale_y_continuous(labels = percent_format()),
+                    Coverage = scale_y_continuous(labels = percent_format()),
+                    MSE = scale_y_continuous()
+                  ))) +
     theme(legend.position="bottom") +
     # scale_color_manual(values=m_colors) +
     labs(title=paste0("Estimand: ",estimand_,"; MargDist(A): ",distr_A_),
@@ -417,7 +441,7 @@ if (FALSE) {
       mean(expit(alpha_0 + alpha_1*w1 + alpha_2*w2 + alpha_3*sqrt(x)))
     } else if (reg_true=="Complex") {
       mean(expit(alpha_0 + alpha_1*sin(2*pi*w1) + alpha_2*w2 +
-                       alpha_3*sqrt(x) + alpha_4*w1*w2))
+                   alpha_3*sqrt(x) + alpha_4*w1*w2))
     }
   })
   
@@ -438,7 +462,7 @@ if (FALSE) {
     points = grid
   )))
   ests2$which <- "Grenander (logit CIs)"
-
+  
   # Estimate curve: Grenander (regular CIs)
   ests3 <- as.data.frame(rbindlist(est_curve(
     dat = dat,
@@ -677,7 +701,7 @@ if (FALSE) {
     geom_line() +
     facet_wrap(~covariates, ncol=2) +
     labs(color="Estimator", title="Estimation of regression: E[Y|W,A]")
-
+  
 }
 
 
@@ -745,10 +769,10 @@ if (FALSE) {
   
   # Nonparametric estimate (adapted from Diaz & VDL)
   {
-
+    
     # k is the number of bins
     construct_f_aIw_n_nonpar <- function(dat, k) {
-
+      
       alphas <- seq(0, 1, length.out=k+1)
       dat_trunc <- filter(dat, !is.na(a))
       n_trunc <- nrow(dat_trunc)
@@ -764,28 +788,28 @@ if (FALSE) {
         dens <- k*p1*p2
         return(dens)
       }, vectorize.args=c("a","w1","w2"))
-
+      
       wlik <- function(par) {
-
+        
         # par[1] through par[k-1] are the hazard components for the bins 1 to k-1
         # par[k] and par[k+1] correspond to W1 and W2
         sum_loglik <- sum(sapply(c(1:n_trunc), function(i) {
           lik <- dens(a=dat_trunc$a[i], w1=dat_trunc$w1[i], w2=dat_trunc$w2[i],
-                    par)
+                      par)
           return(weights[i]*log(lik))
         }))
-
+        
         return(-1*sum_loglik)
-
+        
       }
-
+      
       opt <- optim(par=rep(0,k+1), fn=wlik, method="CG")
       if (opt$convergence!=0) {
         warning("Nonpar conditional density: optim() did not converge")
       }
-
+      
       return(Vectorize(memoise(function(a, w1, w2){
-
+        
         bin <- ifelse(a==1, k, which.min(a>=alphas)-1)
         par <- opt$par
         hz <- sapply(c(1:(k-1)), function(j) {
@@ -793,15 +817,15 @@ if (FALSE) {
         })
         p1 <- ifelse(bin==k, 1, hz[bin])
         p2 <- ifelse(bin==1, 1, prod(1-hz[1:(bin-1)]))
-
+        
         return(k*p1*p2)
-
+        
       })))
-
+      
     }
-
+    
     f_aIw_n_nonpar <- construct_f_aIw_n_nonpar(dat, k=10)
-
+    
   }
   
   # Generate plot data

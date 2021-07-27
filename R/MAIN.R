@@ -12,12 +12,12 @@ cfg <- list(
   which_sim = "estimation", # estimation testing
   level_set_which = "level_set_temp", # level_set_estimation_1 level_set_testing_1
   run_or_update = "run",
-  num_sim = 100,
+  num_sim = 10,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "twostageTE", "EnvStats",
            "fdrtool"), # "ranger"       "ctsCausal", "SuperLearner", "earth", "Rsolnp", "sets"
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
                      "data.table", "latex2exp", "tidyr"),
-  parallel = "none", # none outer
+  parallel = "outer", # none outer
   stop_at_error = FALSE
 )
 
@@ -186,10 +186,11 @@ if (cfg$run_or_update=="run") {
       # Add functions to simulation object
       sim %<>% add_creator(generate_data)
       methods <- c(
-        "est_curve", "test_2", "test_wald", "expit", "deriv_expit", "logit", "deriv_logit",
-        "construct_mu_n", "construct_deriv_theta_n", "construct_sigma2_n",
-        "construct_f_a_n", "construct_f_aIw_n", "construct_g_n",
-        "construct_Gamma_n", "construct_Phi_n", "Pi", "wts"
+        "est_curve", "test_2", "test_wald", "expit", "deriv_expit", "logit",
+        "deriv_logit", "construct_mu_n", "construct_deriv_theta_n",
+        "construct_sigma2_n", "construct_f_a_n", "construct_f_aIw_n",
+        "construct_g_n", "construct_Gamma_n", "construct_Phi_n", "Pi", "wts",
+        "construct_gcomp"
       )
       for (method in methods) {
         sim %<>% add_method(method, eval(as.name(method)))

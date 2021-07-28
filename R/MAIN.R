@@ -10,11 +10,11 @@
 # devtools::install_github("zeehio/facetscales")
 cfg <- list(
   which_sim = "estimation", # estimation testing
-  level_set_which = "level_set_temp", # level_set_estimation_1 level_set_testing_1
+  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
   run_or_update = "run",
   num_sim = 1000,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "twostageTE", "EnvStats",
-           "fdrtool"), # "ranger", "ctsCausal", "SuperLearner", "earth", "Rsolnp", "sets"
+           "fdrtool", "splines"), # "ranger", "ctsCausal", "SuperLearner", "earth", "Rsolnp", "sets"
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
                      "data.table", "latex2exp", "tidyr"),
   parallel = "none", # none outer
@@ -64,6 +64,28 @@ if (load_pkgs_local) {
 
 
 
+#############################################.
+##### TESTING: Dataset for testing code #####
+#############################################.
+
+if (FALSE) {
+  
+  L <- list(n=1000, alpha_3=0.75, distr_A="Unif(0,1)",
+            reg_true="Logistic", sampling="iid",
+            # test=list(type="test_2",params=list(boot_reps=2))
+            estimator=list(
+              # est="Generalized Grenander",params=list(ci_type="logit")))
+              est="G-comp",params=list(mu_n_type="Random forest", boot_reps=5)))
+  C <- list(alpha_0=-1.5, alpha_1=0.3, alpha_2=0.7, alpha_4=-0.3,
+            points=seq(0,1,0.1))
+  
+  # Generate dataset
+  dat <- generate_data(L$n, L$alpha_3, L$distr_A, L$reg_true, L$sampling)
+  
+}
+
+
+
 ##########################################################.
 ##### MAIN: Set level sets for different simulations #####
 ##########################################################.
@@ -80,17 +102,12 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
     estimator = list(
       "G-comp" = list(
         est = "G-comp",
-        params = list(mu_n_type="Logistic", boot_reps=100)
-      ),
-      "Grenander (logit CIs)" = list(
-        est = "Generalized Grenander",
-        params = list(mu_n_type="Logistic", g_n_type="parametric", ci_type="logit")
-      ),
-      "Grenander (regular CIs)" = list(
-        est = "Generalized Grenander",
-        params = list(mu_n_type="Logistic", g_n_type="parametric", ci_type="regular")
-        # params = list(mu_n_type="GAM", g_n_type="parametric", ci_type="logit")
+        params = list(mu_n_type="Logistic", boot_reps=10) # 100
       )
+      # "Grenander (logit CIs)" = list(
+      #   est = "Generalized Grenander",
+      #   params = list(mu_n_type="Logistic", g_n_type="parametric", ci_type="logit") # mu_n_type="GAM"
+      # )
       # "Grenander (split CIs, m=5)" = list(
       #   est = "Generalized Grenander",
       #   params = list(mu_n_type="GAM", g_n_type="parametric",
@@ -102,11 +119,11 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
   # Estimation: compare all methods
   # Not currently using (ci_type="sample split", m=5) or (ci_type="regular")
   level_set_estimation_1 <- list(
-    n = 1000,
+    n = 5000,
     alpha_3 = 0.75,
     distr_A = c("Unif(0,1)", "Beta(0.9,1.1+0.4*w2)"), # "Beta(0.8+0.9*w1,0.8+0.4*w2)"
     reg_true = c("Logistic", "GAM"),
-    sampling = "two-phase", # iid
+    sampling = c("iid", "two-phase"), # iid two-phase
     estimator = list(
       "G-comp" = list(
         est = "G-comp",
@@ -115,12 +132,12 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
       "Grenander (logit CIs)" = list(
         est = "Generalized Grenander",
         params = list(mu_n_type="GAM", g_n_type="parametric", ci_type="logit")
-      ),
-      "Grenander (split CIs, m=5)" = list(
-        est = "Generalized Grenander",
-        params = list(mu_n_type="GAM", g_n_type="parametric",
-                      ci_type="sample split", m=5)
       )
+      # "Grenander (split CIs, m=5)" = list(
+      #   est = "Generalized Grenander",
+      #   params = list(mu_n_type="GAM", g_n_type="parametric",
+      #                 ci_type="sample split", m=5)
+      # )
     )
   )
   
@@ -202,20 +219,21 @@ if (cfg$run_or_update=="run") {
       }
       
       # Add constants
-      alpha_0 <- -1.5
-      alpha_1 <- 0.3
-      alpha_2 <- 0.7
-      alpha_4 <- -0.3
-      data(chernoff_realizations)
-      sim %<>% add_constants(
-        # points = 0.5,
-        points = seq(0,1,0.1),
-        chern = chernoff_realizations,
-        alpha_0 = alpha_0,
-        alpha_1 = alpha_1,
-        alpha_2 = alpha_2,
-        alpha_4 = alpha_4
-      )
+      {
+        alpha_0 <- -1.5
+        alpha_1 <- 0.3
+        alpha_2 <- 0.7
+        alpha_4 <- -0.3
+        data(chernoff_realizations)
+        sim %<>% add_constants(
+          points = seq(0,1,0.1),
+          chern = chernoff_realizations,
+          alpha_0 = alpha_0,
+          alpha_1 = alpha_1,
+          alpha_2 = alpha_2,
+          alpha_4 = alpha_4
+        )
+      }
       
       # Simulation script
       sim %<>% set_script(one_simulation)
@@ -318,7 +336,7 @@ if (FALSE) {
     `G-comp` = cb_colors[1],
     `Grenander (logit CIs)` = cb_colors[2],
     `Grenander (split CIs, m=5)` = cb_colors[3]
-    # `Grenander (regular CIs)` = cb_colors[3],
+    # `Grenander (regular CIs)` = cb_colors[4],
   )
   
   # Bias plot
@@ -647,9 +665,9 @@ if (FALSE) {
 if (FALSE) {
   
   # Set levels here
-  n <- 1000
-  reg_true <- "Complex" # Logistic GAM Complex
-  sampling <- "two-phase" # iid two-phase
+  n <- 5000
+  reg_true <- "Logistic" # Logistic GAM Complex
+  sampling <- "iid" # iid two-phase
   
   # Generate data
   L <- list(alpha_3=0.7)
@@ -657,7 +675,7 @@ if (FALSE) {
   dat <- generate_data(
     n = n,
     alpha_3 = 0.7,
-    distr_A = "Beta(0.9,1.1+0.4*w2)", # Unif(0,1)
+    distr_A = "Unif(0,1)", # Unif(0,1) Beta(0.9,1.1+0.4*w2)
     reg_true = reg_true,
     sampling = sampling
   )
@@ -673,7 +691,7 @@ if (FALSE) {
     }
   }
   
-  #
+  # Construct regression functions
   mu_n_logistic <- construct_mu_n(dat=dat, type="Logistic")
   mu_n_gam <- construct_mu_n(dat=dat, type="GAM")
   mu_n_rf <- construct_mu_n(dat=dat, type="Random forest")

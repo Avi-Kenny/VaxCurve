@@ -115,7 +115,7 @@ ss <- function(dat_orig) {
 construct_mu_n <- function(dat, type, moment=1) {
   
   dat %<>% filter(!is.na(a))
-  
+
   if (moment!=1) {
     dat %<>% mutate(y=y^moment)
   }
@@ -130,23 +130,46 @@ construct_mu_n <- function(dat, type, moment=1) {
     )
     coeffs <- as.numeric(summary(model)$coefficients[,1])
     
-    return(function(a, w1, w2){
+    return(Vectorize(function(a, w1, w2){
       expit( coeffs[1] + coeffs[2]*w1 + coeffs[3]*w2 + coeffs[4]*a )
-    })
+    }))
+    
   }
   
   if (type=="GAM") {
     
-    model <- gam(
-      y~w1+w2+s(a, bs="cr"),
+    k <- 4
+    knots <- seq(0,1,1/(k+1))[2:(k+1)]
+    ns_basis <- ns(dat$a, knots=knots, Boundary.knots=c(0,1))
+    formula <- "y ~ w1 + w2"
+    for (i in 1:(k+1)) {
+      dat[paste0("b_",i)] <- ns_basis[,i]
+      formula <- paste0(formula," + b_",i)
+    }
+    
+    dat$wts <- wts(dat, scale="mean 1")
+    model <- glm(
+      formula,
       data = dat,
       family = "binomial",
-      weights = wts(dat, scale="mean 1")
+      weights = wts
     )
-
-    return(memoise(Vectorize(function(a, w1, w2){
-      predict.gam(model, list(a=a, w1=w1, w2=w2), type="response")
-    })))
+    coeffs <- as.numeric(summary(model)$coefficients[,1])
+    
+    # Construct natural spline basis in advance over grid
+    grid <- seq(0,1,0.01)
+    nsb_grid <- ns(grid, knots=knots, Boundary.knots=c(0,1))
+    
+    return(Vectorize(function(a, w1, w2){
+      index <- which.min(abs(a-grid))
+      nsb_a <- as.numeric(nsb_grid[index,])
+      lin_pred <- coeffs[1] + coeffs[2]*w1 + coeffs[3]*w2
+      for (i in 1:(k+1)) {
+        lin_pred <- lin_pred + coeffs[i+3]*nsb_a[i]
+      }
+      return(expit(lin_pred))
+    }))
+    
   }
   
   if (type=="Random forest") {
@@ -157,6 +180,9 @@ construct_mu_n <- function(dat, type, moment=1) {
       num.trees = 500,
       case.weights = wts(dat, scale="mean 1")
     )
+    
+    # !!!!! Pre-calculate function values over grid; must be grid of (a,w)
+    # !!!!! After this, remove the memoise() wrapper
     
     return(memoise(Vectorize(function(a, w1, w2){
       predict(model, data.frame(a=a, w1=w1, w2=w2))$predictions

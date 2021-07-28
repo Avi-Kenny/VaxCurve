@@ -1,4 +1,22 @@
 
+# Old GAM code (using mgcv; slow predictions)
+if (F) {
+  
+  model <- gam(
+    y~w1+w2+s(a, bs="cr"),
+    # y~w1+w2+s(a, bs="tp"),
+    # y~w1+w2+s(a, k=5, bs="cr", fx=TRUE),
+    data = dat,
+    family = "binomial",
+    weights = wts(dat, scale="mean 1")
+  )
+
+  return(memoise(Vectorize(function(a, w1, w2){
+    predict.gam(model, list(a=a, w1=w1, w2=w2), type="response")
+  })))
+  
+}
+
 # Old construct_f_aIw_n function contents
 if (F) {
   

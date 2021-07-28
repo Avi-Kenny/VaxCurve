@@ -26,7 +26,7 @@ if (F) {
     opt <- optim(par=c(1,1,1), fn=wlik, method="CG") # BFGS CG SANN
     if (opt$convergence!=0) { warning("nonconvergence of optim()") }
     dens(c(0,1,2,3)+0.5, phi1=opt$par[1], phi2=opt$par[2], phi3=opt$par[3])
-    sum(d)
+    # sum(d)
   }
   
   # Version 2 (only dens)

@@ -56,7 +56,7 @@ generate_data <- function(n, alpha_3, distr_A, reg_true, sampling) {
     dat <- data.frame(w1=w1, w2=w2, a=ifelse(delta==1,a,NA), y=y)
   }
 
-  # Set up function to calculate true regression values on seq(0,1,0.1)
+  # Set up function to calculate true regression values over C$points
   # These are Monte Carlo approximations
   # Values depend on reg_true and alpha_3
   {
@@ -83,7 +83,7 @@ generate_data <- function(n, alpha_3, distr_A, reg_true, sampling) {
   }
   
   # Add attributes to dataframe
-  attr(dat, "theta_true") <- theta_true_f(seq(0,1,0.1))
+  attr(dat, "theta_true") <- theta_true_f(C$points)
   attr(dat, "sampling") <- sampling
   
   return(dat)

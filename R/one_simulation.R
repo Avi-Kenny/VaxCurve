@@ -27,14 +27,14 @@ if (cfg$which_sim=="estimation") {
       dat = dat,
       estimator = L$estimator$est,
       params = L$estimator$params,
-      points = seq(0,1,0.1)
+      points = C$points
     )
     
     # Return results
     theta_true <- attr(dat, "theta_true")
     res_list <- list()
-    for (i in c(1:11)) {
-      m <- format(round(i/10-0.1,1), nsmall=1)
+    for (i in 1:length(C$points)) {
+      m <- format(C$points[i], nsmall=1)
       res_list[paste0("theta_",m)] <- theta_true[i]
       res_list[paste0("est_",m)] <- ests[[i]]$est
       res_list[paste0("ci_lo_",m)] <- ests[[i]]$ci_lo

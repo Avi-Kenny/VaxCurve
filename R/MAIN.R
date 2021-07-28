@@ -12,12 +12,12 @@ cfg <- list(
   which_sim = "estimation", # estimation testing
   level_set_which = "level_set_temp", # level_set_estimation_1 level_set_testing_1
   run_or_update = "run",
-  num_sim = 10,
+  num_sim = 1000,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "twostageTE", "EnvStats",
-           "fdrtool"), # "ranger"       "ctsCausal", "SuperLearner", "earth", "Rsolnp", "sets"
+           "fdrtool"), # "ranger", "ctsCausal", "SuperLearner", "earth", "Rsolnp", "sets"
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
                      "data.table", "latex2exp", "tidyr"),
-  parallel = "outer", # none outer
+  parallel = "none", # none outer
   stop_at_error = FALSE
 )
 
@@ -55,11 +55,11 @@ if (load_pkgs_local) {
 # Load simba + functions
 {
   library(simba)
-  source("one_simulation.R")
-  source("generate_data.R")
-  source("est_curve.R")
-  source("test_2.R")
-  source("fns_doseresp.R")
+  source("one_simulation.R", local=TRUE)
+  source("generate_data.R", local=TRUE)
+  source("est_curve.R", local=TRUE)
+  source("test_2.R", local=TRUE)
+  source("fns_doseresp.R", local=TRUE)
 }
 
 
@@ -72,20 +72,25 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
   
   # !!!!! Temp/testing !!!!!
   level_set_temp <- list(
-    n = 1000,
+    n = 500,
     alpha_3 = 0.75,
     distr_A = "Unif(0,1)",
     reg_true = "Logistic",
-    sampling = "two-phase", # iid
+    sampling = "iid", # two-phase iid
     estimator = list(
       "G-comp" = list(
         est = "G-comp",
         params = list(mu_n_type="Logistic", boot_reps=100)
+      ),
+      "Grenander (logit CIs)" = list(
+        est = "Generalized Grenander",
+        params = list(mu_n_type="Logistic", g_n_type="parametric", ci_type="logit")
+      ),
+      "Grenander (regular CIs)" = list(
+        est = "Generalized Grenander",
+        params = list(mu_n_type="Logistic", g_n_type="parametric", ci_type="regular")
+        # params = list(mu_n_type="GAM", g_n_type="parametric", ci_type="logit")
       )
-      # "Grenander (logit CIs)" = list(
-      #   est = "Generalized Grenander",
-      #   params = list(mu_n_type="GAM", g_n_type="parametric", ci_type="logit")
-      # ),
       # "Grenander (split CIs, m=5)" = list(
       #   est = "Generalized Grenander",
       #   params = list(mu_n_type="GAM", g_n_type="parametric",
@@ -167,7 +172,7 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
 # sbatch --depend=afterok:12 --export=simba_run='last',cluster='bionic',type='R',project='z.VaxCurve' -e ./io/slurm-%A_%a.out -o ./io/slurm-%A_%a.out --constraint=gizmok run_r.sh
 
 if (cfg$run_or_update=="run") {
-  
+
   run_on_cluster(
     
     first = {
@@ -178,7 +183,7 @@ if (cfg$run_or_update=="run") {
         num_sim = cfg$num_sim,
         parallel = cfg$parallel,
         stop_at_error = cfg$stop_at_error,
-        seed = 3,
+        seed = 4,
         packages = cfg$pkgs
       )
       sim <- do.call(set_levels, c(list(sim), level_set))
@@ -190,7 +195,7 @@ if (cfg$run_or_update=="run") {
         "deriv_logit", "construct_mu_n", "construct_deriv_theta_n",
         "construct_sigma2_n", "construct_f_a_n", "construct_f_aIw_n",
         "construct_g_n", "construct_Gamma_n", "construct_Phi_n", "Pi", "wts",
-        "construct_gcomp"
+        "construct_gcomp", "ss"
       )
       for (method in methods) {
         sim %<>% add_method(method, eval(as.name(method)))
@@ -203,6 +208,8 @@ if (cfg$run_or_update=="run") {
       alpha_4 <- -0.3
       data(chernoff_realizations)
       sim %<>% add_constants(
+        # points = 0.5,
+        points = seq(0,1,0.1),
         chern = chernoff_realizations,
         alpha_0 = alpha_0,
         alpha_1 = alpha_1,
@@ -260,7 +267,13 @@ if (cfg$run_or_update=="update") {
 
 if (FALSE) {
   
-  # # Read in simulation object
+  # # !!!!!
+  # sim %>% summarize(
+  #   coverage=list(name="cov_0.5", truth="theta_0.5", lower="ci_lo_0.5",
+  #                 upper="ci_hi_0.5", na.rm=TRUE)
+  # )
+  
+  # Read in simulation object
   sim <- readRDS("../simba.out/sim_est_20210722_mod.simba")
   
   # Summarize results

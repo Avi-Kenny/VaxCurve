@@ -40,6 +40,7 @@ est_curve <- function(dat, estimator, params, points) {
     }
 
     # Parse results object
+    # t_quant <- qt(1-(0.05/2), df=(params$boot_reps-1))
     res <- list()
     for (p in 1:length(points)) {
       boot_sd <- sd(boot_obj$t[,p])
@@ -48,16 +49,12 @@ est_curve <- function(dat, estimator, params, points) {
         est = ests[p],
         ci_lo = ests[p] - 1.96*boot_sd,
         ci_hi = ests[p] + 1.96*boot_sd
-        # t_quant <- qt(1-(0.05/2), df=(params$boot_reps-1))
-        # ci_lo <- ests - t_quant*ses
       )
     }
     
     return (res)
     
   } else if (estimator=="Generalized Grenander") {
-    
-    n <- nrow(dat)
     
     # Construct theta_n and tao_n, given a dataset
     construct_fns <- function(dat, return_tao_n=T) {
@@ -160,12 +157,14 @@ est_curve <- function(dat, estimator, params, points) {
       
       # Construct CIs
       # The 0.975 quantile of the Chernoff distribution occurs at roughly x=1.00
+      qnt <- 1.00 # qnorm(0.975, sd=0.52)
+      n <- nrow(filter(dat, !is.na(a)))
       if (params$ci_type=="regular") {
-        ci_lo <- ests - 1.00*tao_ns/(n^(1/3))
-        ci_hi <- ests + (1.00*tao_ns)/(n^(1/3))
+        ci_lo <- ests - (qnt*tao_ns)/(n^(1/3))
+        ci_hi <- ests + (qnt*tao_ns)/(n^(1/3))
       } else if (params$ci_type=="logit") {
-        ci_lo <- expit( logit(ests) - (1.00*tao_ns*deriv_logit(ests))/(n^(1/3)) )
-        ci_hi <- expit( logit(ests) + (1.00*tao_ns*deriv_logit(ests))/(n^(1/3)) )
+        ci_lo <- expit( logit(ests) - (qnt*tao_ns*deriv_logit(ests))/(n^(1/3)) )
+        ci_hi <- expit( logit(ests) + (qnt*tao_ns*deriv_logit(ests))/(n^(1/3)) )
       }
       
     }

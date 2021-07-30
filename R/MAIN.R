@@ -285,12 +285,6 @@ if (cfg$run_or_update=="update") {
 
 if (FALSE) {
   
-  # # !!!!!
-  # sim %>% summarize(
-  #   coverage=list(name="cov_0.5", truth="theta_0.5", lower="ci_lo_0.5",
-  #                 upper="ci_hi_0.5", na.rm=TRUE)
-  # )
-  
   # Read in simulation object
   sim <- readRDS("../simba.out/sim_est_20210722_mod.simba")
   
@@ -341,6 +335,7 @@ if (FALSE) {
   
   # Bias plot
   # Export: 8" x 5"
+  p_data %<>% filter(sampling=="two-phase") # !!!!!
   ggplot(
     filter(p_data, stat=="bias"),
     aes(x=point, y=value, color=Estimator, group=Estimator)
@@ -365,7 +360,7 @@ if (FALSE) {
     scale_y_continuous(labels=percent) +
     scale_color_manual(values=m_colors) +
     labs(title="Coverage (%)", x="A", y=NULL, color="Estimator")
-  
+
   # MSE plot
   # Export: 8" x 5"
   ggplot(
@@ -377,60 +372,60 @@ if (FALSE) {
     facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(reg_true)) +
     scale_color_manual(values=m_colors) +
     labs(title="MSE", x="A", y=NULL, color="Estimator") +
-    ylim(0,0.01)
+    ylim(0,0.0115)
   
-  # Export: 6" x 4"
-  distr_A_ <- "Beta(0.9,1.1+0.4*w2)" # Unif(0,1) Beta(0.9,1.1+0.4*w2)
-  estimand_ <- "Midpoint" # Midpoint Endpoint
-  ggplot(
-    filter(p_data, distr_A==distr_A_ & estimand==estimand_),
-    aes(x=n, y=value, color=Estimator)
-  ) +
-    geom_hline(
-      aes(yintercept=y),
-      data=data.frame(y=0.95, stat="Coverage"),
-      linetype="longdash", color="grey"
-    ) +
-    geom_point() +
-    geom_line() +
-    # geom_bar(stat="identity", position=position_dodge(),
-    #          width=0.8, color="white", size=0.35) +
-    facet_grid_sc(cols=dplyr::vars(reg_true), rows=dplyr::vars(stat),
-                  scales=list(y=list(
-                    Bias = scale_y_continuous(labels = percent_format()),
-                    Coverage = scale_y_continuous(labels = percent_format()),
-                    MSE = scale_y_continuous()
-                  ))) +
-    theme(legend.position="bottom") +
-    # scale_color_manual(values=m_colors) +
-    labs(title=paste0("Estimand: ",estimand_,"; MargDist(A): ",distr_A_),
-         y=NULL, x=NULL, color="Estimator")
+  # # Export: 6" x 4"
+  # distr_A_ <- "Beta(0.9,1.1+0.4*w2)" # Unif(0,1) Beta(0.9,1.1+0.4*w2)
+  # estimand_ <- "Midpoint" # Midpoint Endpoint
+  # ggplot(
+  #   filter(p_data, distr_A==distr_A_ & estimand==estimand_),
+  #   aes(x=n, y=value, color=Estimator)
+  # ) +
+  #   geom_hline(
+  #     aes(yintercept=y),
+  #     data=data.frame(y=0.95, stat="Coverage"),
+  #     linetype="longdash", color="grey"
+  #   ) +
+  #   geom_point() +
+  #   geom_line() +
+  #   # geom_bar(stat="identity", position=position_dodge(),
+  #   #          width=0.8, color="white", size=0.35) +
+  #   facet_grid_sc(cols=dplyr::vars(reg_true), rows=dplyr::vars(stat),
+  #                 scales=list(y=list(
+  #                   Bias = scale_y_continuous(labels = percent_format()),
+  #                   Coverage = scale_y_continuous(labels = percent_format()),
+  #                   MSE = scale_y_continuous()
+  #                 ))) +
+  #   theme(legend.position="bottom") +
+  #   # scale_color_manual(values=m_colors) +
+  #   labs(title=paste0("Estimand: ",estimand_,"; MargDist(A): ",distr_A_),
+  #        y=NULL, x=NULL, color="Estimator")
   
   
-  # !!!!! Temp (export 7.5 x 4.5)
-  distr_A_ <- "Beta(0.9,1.1+0.4*w2)" # Unif(0,1) Beta(0.9,1.1+0.4*w2)
-  estimand_ <- "Endpoint" # Midpoint Endpoint
-  ggplot(
-    filter(p_data, distr_A==distr_A_ & estimand==estimand_),
-    aes(x=sampling, y=value, fill=Estimator)
-  ) +
-    geom_hline(
-      aes(yintercept=y),
-      data=data.frame(y=0.95, stat="Coverage"),
-      linetype="longdash", color="grey"
-    ) +
-    geom_bar(stat="identity", position=position_dodge(),
-             width=0.8, color="white", size=0.35) +
-    facet_grid_sc(cols=dplyr::vars(reg_true), rows=dplyr::vars(stat),
-                  scales=list(y=list(
-                    Bias = scale_y_continuous(labels = percent_format()),
-                    Coverage = scale_y_continuous(labels = percent_format()),
-                    MSE = scale_y_continuous()
-                  ))) +
-    theme(legend.position="bottom") +
-    scale_fill_manual(values=m_colors) +
-    labs(title=paste0("Estimand: ",estimand_,"; MargDist(A): ",distr_A_),
-         y=NULL, x=NULL, color="Estimator")
+  # # !!!!! Temp (export 7.5 x 4.5)
+  # distr_A_ <- "Beta(0.9,1.1+0.4*w2)" # Unif(0,1) Beta(0.9,1.1+0.4*w2)
+  # estimand_ <- "Endpoint" # Midpoint Endpoint
+  # ggplot(
+  #   filter(p_data, distr_A==distr_A_ & estimand==estimand_),
+  #   aes(x=sampling, y=value, fill=Estimator)
+  # ) +
+  #   geom_hline(
+  #     aes(yintercept=y),
+  #     data=data.frame(y=0.95, stat="Coverage"),
+  #     linetype="longdash", color="grey"
+  #   ) +
+  #   geom_bar(stat="identity", position=position_dodge(),
+  #            width=0.8, color="white", size=0.35) +
+  #   facet_grid_sc(cols=dplyr::vars(reg_true), rows=dplyr::vars(stat),
+  #                 scales=list(y=list(
+  #                   Bias = scale_y_continuous(labels = percent_format()),
+  #                   Coverage = scale_y_continuous(labels = percent_format()),
+  #                   MSE = scale_y_continuous()
+  #                 ))) +
+  #   theme(legend.position="bottom") +
+  #   scale_fill_manual(values=m_colors) +
+  #   labs(title=paste0("Estimand: ",estimand_,"; MargDist(A): ",distr_A_),
+  #        y=NULL, x=NULL, color="Estimator")
   
 }
 

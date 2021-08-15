@@ -1,4 +1,27 @@
 
+# generate_data old regression code
+if (F) {
+  
+  #' @param reg_true True functional form of the regression; one of the following:
+  #'     - "Logistic": E[Y|W,A]=expit(a0+a1*W1+a2*W2+a3*A)
+  #'     - "GAM": E[Y|W,A]=expit(a0+a1*W1+a2*W2+a3*sqrt(A))
+  #'     - "Complex": E[Y|W,A]=expit(a0+a1*sin(2*pi*W1)+a2*W2+a3*sqrt(A)+a4*W1*W2)
+  
+  # Compute true regression function (i.e. P(Y=1|W,A))
+  if (reg_true=="Logistic") {
+    probs <- expit(C$alpha_0 + C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a)
+  } else if (reg_true=="GAM") {
+    probs <- expit(C$alpha_0 + C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*sqrt(a))
+  } else if (reg_true=="Complex") {
+    probs <- expit(C$alpha_0 + C$alpha_1*sin(2*pi*w1) + C$alpha_2*w2 +
+                     alpha_3*sqrt(a) + C$alpha_4*w1*w2)
+  }
+  
+  # Sample outcome
+  y <- rbinom(n, size=1, prob=probs)
+  
+}
+
 # Old GAM code (using mgcv; slow predictions)
 if (F) {
   

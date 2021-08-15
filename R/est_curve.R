@@ -54,7 +54,9 @@ est_curve <- function(dat, estimator, params, points) {
     
     return (res)
     
-  } else if (estimator=="Generalized Grenander") {
+  }
+  
+  if (estimator=="Generalized Grenander") {
     
     # Construct theta_n and tao_n, given a dataset
     construct_fns <- function(dat, return_tao_n=T) {
@@ -177,8 +179,6 @@ est_curve <- function(dat, estimator, params, points) {
     }
     return(res)
     
-  } else {
-    stop("estimator incorrectly specified")
   }
   
 }

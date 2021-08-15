@@ -44,10 +44,10 @@ deriv_logit <- function(x) {
 #' @param w1 Vector `w1` of dataset returned by generate_data()
 #' @param w2 Vector `w2` of dataset returned by generate_data()
 #' @return A vector of probabilities of sampling
-Pi <- function(y, w1, w2) {
+Pi <- function(delta_star, w1, w2) {
   
-  # Note: does not currently depend on w1
-  return(expit(2*y-w2))
+  pi <- function(w1,w2) { expit(w1+w2) }
+  return(delta_star + (1-delta_star)*pi(w1,w2))
   
 }
 
@@ -65,7 +65,7 @@ wts <- function(dat, scale) {
   if (attr(dat, "sampling")=="iid") {
     weights <- rep(1, nrow(dat))
   } else if (attr(dat, "sampling")=="two-phase") {
-    weights <- 1 / Pi(dat$y, dat$w1, dat$w2)
+    weights <- 1 / Pi(dat$delta_star, dat$w1, dat$w2)
   }
   
   if (scale=="sum 1") {
@@ -187,6 +187,48 @@ construct_mu_n <- function(dat, type, moment=1) {
     return(memoise(Vectorize(function(a, w1, w2){
       predict(model, data.frame(a=a, w1=w1, w2=w2))$predictions
     })))
+  }
+  
+}
+
+
+
+#' Construct conditional survival estimator S_n
+#' 
+#' @param dat Dataset returned by generate_data(); accepts either full data or
+#'     truncated data
+#' @param type Currently only "Cox" is implemented
+#' @param csf Logical; if TRUE, estimate the conditional survival
+#'     function of the censoring distribution instead
+#' @return Conditional density estimator function
+construct_S_n <- function(dat, type, csf=FALSE) {
+  
+  if (type=="Cox") {
+    
+    weights <- wts(dat, scale="mean 1")
+    
+    if (csf) dat$delta_star <- 1-dat$delta_star
+    
+    # Fit Cox model
+    model <- coxph(
+      Surv(y_star, delta_star)~w1+w2+a,
+      data = dat,
+      weights = weights
+    )
+    coeffs <- model$coefficients
+    
+    # Get cumulative hazard estimate
+    bh <- basehaz(model, centered=FALSE)
+    
+    return(memoise(Vectorize(function(t, w1, w2, a){
+      
+      index <- which.min(abs(bh$time-t))
+      H_0_t <- bh$hazard[index]
+      lin <- coeffs[1]*w1 + coeffs[2]*w2 + coeffs[3]*a
+      return(exp(-1*H_0_t*exp(lin)))
+      
+    })))
+    
   }
   
 }
@@ -565,14 +607,14 @@ construct_Gamma_n <- function(dat_orig, mu_n, g_n) {
     w1_j_long <- dat$w1[j_long]
     w2_i_long <- dat$w2[i_long]
     w2_j_long <- dat$w2[j_long]
-    y_i_long <- dat$y[i_long]
-    y_j_long <- dat$y[j_long]
+    delta_star_i_long <- dat$delta_star[i_long]
+    delta_star_j_long <- dat$delta_star[j_long]
     
     subpiece_1a <- ( (dat$y - mu_n(dat$a,dat$w1,dat$w2)) * weights ) /
       ( s * g_n(dat$a,dat$w1,dat$w2) )
     subpiece_2a <- mu_n(a_i_long,w1_j_long,w2_j_long) / (
-      s^2 * Pi(y_i_long, w1_i_long, w2_i_long) *
-            Pi(y_j_long, w1_j_long, w2_j_long)
+      s^2 * Pi(delta_star_i_long, w1_i_long, w2_i_long) *
+            Pi(delta_star_j_long, w1_j_long, w2_j_long)
     )
     
     return(

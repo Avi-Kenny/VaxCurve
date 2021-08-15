@@ -14,7 +14,7 @@ cfg <- list(
   run_or_update = "run",
   num_sim = 1000,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "twostageTE", "EnvStats",
-           "fdrtool", "splines"), # "ranger", "ctsCausal", "SuperLearner", "earth", "Rsolnp", "sets"
+           "fdrtool", "splines", "survival"), # "ranger", "ctsCausal", "SuperLearner", "earth", "Rsolnp", "sets"
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
                      "data.table", "latex2exp", "tidyr"),
   parallel = "none", # none outer
@@ -648,6 +648,107 @@ if (FALSE) {
   ggplot(rbind(dat,dat2), aes(x=xcoor, y=DF, color=factor(which))) +
     geom_line() +
     labs(x="x", y="CDF", color="Distribution")
+  
+}
+
+
+
+#############################################################.
+##### TESTING: Conditional survival function estimators #####
+#############################################################.
+
+if (FALSE) {
+  
+  # Generate data
+  C <- list(points=c(0.5,0.8))
+  dat <- generate_data(n=5000, alpha_3=0.7, distr_A="Unif(0,1)",
+                       surv_true="CoxPH", sampling="two-phase")
+  
+  
+  S_n <- construct_S_n(dat, type="Cox")
+  
+  S_0 <- Vectorize(function(t, w1, w2, a) {
+    lambda <- 10^(-4)
+    v <- 1.5
+    alpha <- c(0.3,0.7,0.5)
+    alpha_3 <- 0.7
+    lin <- alpha[1]*w1 + alpha[2]*w2 + alpha_3*a
+    return(exp(-1*lambda*(t^v)*exp(lin)))
+  })
+  
+  # Plot true curve against estimated curve
+  times <- c(1:200)
+  df <- data.frame(
+    time = rep(times, 8),
+    survival = c(
+      S_n(t=times, w1=0, w2=1, a=0),
+      S_n(t=times, w1=1, w2=1, a=0),
+      S_n(t=times, w1=0, w2=1, a=1),
+      S_n(t=times, w1=1, w2=1, a=1),
+      S_0(t=times, w1=0, w2=1, a=0),
+      S_0(t=times, w1=1, w2=1, a=0),
+      S_0(t=times, w1=0, w2=1, a=1),
+      S_0(t=times, w1=1, w2=1, a=1)
+    ),
+    which = rep(c("Cox","True S_0"), each=4*length(times)),
+    covs = rep(rep(c("w1=0,a=0","w1=1,a=0","w1=0,a=1","w1=1,a=1"),2),
+               each=length(times))
+  )
+  ggplot(df, aes(x=time, y=survival, color=which)) +
+    geom_line() +
+    facet_wrap(~covs, ncol=2) +
+    labs(title="Estimation of conditional survival: S_0[t|W,A]",
+         color="Estimator")
+    
+}
+
+
+
+##############################################################.
+##### TESTING: Conditional censoring function estimators #####
+##############################################################.
+
+if (FALSE) {
+  
+  # Generate data
+  C <- list(points=c(0.5,0.8))
+  dat <- generate_data(n=5000, alpha_3=0.7, distr_A="Unif(0,1)",
+                       surv_true="CoxPH", sampling="two-phase")
+  
+  Sc_n <- construct_S_n(dat, type="Cox", csf=TRUE)
+  
+  Sc_0 <- Vectorize(function(t, w1, w2, a) {
+    lambda2 <- 0.5 * 10^(-4)
+    v2 <- 1.5
+    alpha <- c(0.3,0.7,0.5)
+    alpha_3 <- 0.7
+    lin <- alpha[1]*w1 + alpha[2]*w2 + alpha_3*a
+    return(exp(-1*lambda2*(t^v2)*exp(lin)))
+  })
+  
+  # Plot true curve against estimated curve
+  times <- c(1:200)
+  df <- data.frame(
+    time = rep(times, 8),
+    survival = c(
+      Sc_n(t=times, w1=0, w2=1, a=0),
+      Sc_n(t=times, w1=1, w2=1, a=0),
+      Sc_n(t=times, w1=0, w2=1, a=1),
+      Sc_n(t=times, w1=1, w2=1, a=1),
+      Sc_0(t=times, w1=0, w2=1, a=0),
+      Sc_0(t=times, w1=1, w2=1, a=0),
+      Sc_0(t=times, w1=0, w2=1, a=1),
+      Sc_0(t=times, w1=1, w2=1, a=1)
+    ),
+    which = rep(c("Cox","True S^C_0"), each=4*length(times)),
+    covs = rep(rep(c("w1=0,a=0","w1=1,a=0","w1=0,a=1","w1=1,a=1"),2),
+               each=length(times))
+  )
+  ggplot(df, aes(x=time, y=survival, color=which)) +
+    geom_line() +
+    facet_wrap(~covs, ncol=2) +
+    labs(title="Estimation of conditional survival: S_0[t|W,A]",
+         color="Estimator")
   
 }
 

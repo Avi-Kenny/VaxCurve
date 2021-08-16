@@ -61,19 +61,24 @@ est_curve <- function(dat, estimator, params, points) {
     # Construct theta_n and tao_n, given a dataset
     construct_fns <- function(dat, return_tao_n=T) {
       
+      # ARCHIVE
+      # mu_n <- construct_mu_n(dat, type=params$mu_n_type)
+      # mu2_n <- mu_n # mu_n=mu2_n since the y values are binary
+      # sigma2_n <- construct_sigma2_n(mu_n, mu2_n)
+      
       # Construct component functions
-      # Note: mu_n=mu2_n since the y values are binary
       grid <- seq(0,1,0.01)
       Phi_n <- construct_Phi_n(dat)
       Phi_n_inv <- construct_Phi_n(dat, type="inverse")
-      mu_n <- construct_mu_n(dat, type=params$mu_n_type)
-      gcomp_n <- construct_gcomp(dat, mu_n=mu_n)
-      mu2_n <- mu_n
-      sigma2_n <- construct_sigma2_n(mu_n, mu2_n)
+      gcomp_n <- construct_gcomp(dat, mu_n=mu_n) # !!!!! probably needs to be updated
       f_aIw_n <- construct_f_aIw_n(dat, type=params$g_n_type)
       f_a_n <- construct_f_a_n(dat, f_aIw_n=f_aIw_n)
       g_n <- construct_g_n(f_aIw_n, f_a_n)
-      Gamma_n <- construct_Gamma_n(dat, mu_n, g_n)
+      S_n <- construct_S_n(dat, params$S_n_type)
+      Sc_n <- construct_S_n(dat, params$S_n_type, csf=TRUE)
+      omega_n <- construct_omega_n(S_n, Sc_n)
+      Gamma_n <- construct_Gamma_n(dat, omega_n, S_n, g_n)
+
       Psi_n <- function(x) { Gamma_n(Phi_n_inv(x)) }
       gcm <- gcmlcm(x=grid, y=Psi_n(grid), type="gcm")
       dGCM <- Vectorize(function(x) {

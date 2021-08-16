@@ -1,4 +1,223 @@
 
+# Testing of regression estimators
+if (F) {
+  
+  ##########################################.
+  ##### TESTING: Regression estimators #####
+  ##########################################.
+  
+  if (FALSE) {
+    
+    # Set levels here
+    n <- 5000
+    reg_true <- "Logistic" # Logistic GAM Complex
+    sampling <- "iid" # iid two-phase
+    
+    # Generate data
+    L <- list(alpha_3=0.7)
+    C <- list(alpha_0=-1.5, alpha_1=0.3, alpha_2=0.7, alpha_4=-0.3)
+    dat <- generate_data(
+      n = n,
+      alpha_3 = 0.7,
+      distr_A = "Unif(0,1)", # Unif(0,1) Beta(0.9,1.1+0.4*w2)
+      reg_true = reg_true,
+      sampling = sampling
+    )
+    
+    # True regression function
+    mu_0 <- function(a,w1,w2) {
+      if (reg_true=="Logistic") {
+        expit(-1.5 + 0.3*w1 + 0.7*w2 + 0.7*a)
+      } else if (reg_true=="GAM") {
+        expit(-1.5 + 0.3*w1 + 0.7*w2 + 0.7*sqrt(a))
+      } else if (reg_true=="Complex") {
+        expit(-1.5 + 0.3*sin(2*pi*w1) + 0.7*w2 + 0.7*sqrt(a) + -0.3*w1*w2)
+      }
+    }
+    
+    # Construct regression functions
+    mu_n_logistic <- construct_mu_n(dat=dat, type="Logistic")
+    mu_n_gam <- construct_mu_n(dat=dat, type="GAM")
+    mu_n_rf <- construct_mu_n(dat=dat, type="Random forest")
+    
+    # Generate plot data
+    grid <- seq(0,1,0.01)
+    mu_models <- c("Truth", "Logistic", "Random forest", "GAM")
+    n_models <- length(mu_models)
+    len <- length(grid)
+    plot_data <- data.frame(
+      a = rep(grid, 4*n_models),
+      mu = c(
+        sapply(grid, function(a) { mu_0(a, w1=0.2, w2=0) }),
+        sapply(grid, function(a) { mu_0(a, w1=0.8, w2=0) }),
+        sapply(grid, function(a) { mu_0(a, w1=0.2, w2=1) }),
+        sapply(grid, function(a) { mu_0(a, w1=0.8, w2=1) }),
+        sapply(grid, function(a) { mu_n_logistic(a, w1=0.2, w2=0) }),
+        sapply(grid, function(a) { mu_n_logistic(a, w1=0.8, w2=0) }),
+        sapply(grid, function(a) { mu_n_logistic(a, w1=0.2, w2=1) }),
+        sapply(grid, function(a) { mu_n_logistic(a, w1=0.8, w2=1) }),
+        sapply(grid, function(a) { mu_n_rf(a, w1=0.2, w2=0) }),
+        sapply(grid, function(a) { mu_n_rf(a, w1=0.8, w2=0) }),
+        sapply(grid, function(a) { mu_n_rf(a, w1=0.2, w2=1) }),
+        sapply(grid, function(a) { mu_n_rf(a, w1=0.8, w2=1) }),
+        sapply(grid, function(a) { mu_n_gam(a, w1=0.2, w2=0) }),
+        sapply(grid, function(a) { mu_n_gam(a, w1=0.8, w2=0) }),
+        sapply(grid, function(a) { mu_n_gam(a, w1=0.2, w2=1) }),
+        sapply(grid, function(a) { mu_n_gam(a, w1=0.8, w2=1) })
+      ),
+      which = rep(mu_models, each=len*4),
+      covariates = rep(c(
+        rep("W1=0.2, W2=0",len),
+        rep("W1=0.8, W2=0",len),
+        rep("W1=0.2, W2=1",len),
+        rep("W1=0.8, W2=1",len)
+      ), n_models)
+    )
+    ggplot(plot_data, aes(x=a, y=mu, color=factor(which))) +
+      geom_line() +
+      facet_wrap(~covariates, ncol=2) +
+      labs(color="Estimator", title="Estimation of regression: E[Y|W,A]")
+    
+  }
+
+}
+
+# Regression estimator
+if (F) {
+  
+  #' Construct regression function mu_n
+  #' 
+  #' @param dat Dataset returned by generate_data(); accepts either full data or
+  #'     truncated data
+  #' @param type One of c("Logistic", "GAM", "Random forest")
+  #' @param moment If moment=k, the regression E[Y^k|A,W] is estimated
+  #' @return Regression function
+  construct_mu_n <- function(dat, type, moment=1) {
+    
+    dat %<>% filter(!is.na(a))
+    
+    if (moment!=1) {
+      dat %<>% mutate(y=y^moment)
+    }
+    
+    if (type=="Logistic") {
+      
+      model <- glm(
+        y~w1+w2+a,
+        data = dat,
+        family = "binomial",
+        weights = wts(dat, scale="mean 1")
+      )
+      coeffs <- as.numeric(summary(model)$coefficients[,1])
+      
+      return(Vectorize(function(a, w1, w2){
+        expit( coeffs[1] + coeffs[2]*w1 + coeffs[3]*w2 + coeffs[4]*a )
+      }))
+      
+    }
+    
+    if (type=="GAM") {
+      
+      k <- 4
+      knots <- seq(0,1,1/(k+1))[2:(k+1)]
+      ns_basis <- ns(dat$a, knots=knots, Boundary.knots=c(0,1))
+      formula <- "y ~ w1 + w2"
+      for (i in 1:(k+1)) {
+        dat[paste0("b_",i)] <- ns_basis[,i]
+        formula <- paste0(formula," + b_",i)
+      }
+      
+      dat$wts <- wts(dat, scale="mean 1")
+      model <- glm(
+        formula,
+        data = dat,
+        family = "binomial",
+        weights = wts
+      )
+      coeffs <- as.numeric(summary(model)$coefficients[,1])
+      
+      # Construct natural spline basis in advance over grid
+      grid <- seq(0,1,0.01)
+      nsb_grid <- ns(grid, knots=knots, Boundary.knots=c(0,1))
+      
+      return(Vectorize(function(a, w1, w2){
+        index <- which.min(abs(a-grid))
+        nsb_a <- as.numeric(nsb_grid[index,])
+        lin_pred <- coeffs[1] + coeffs[2]*w1 + coeffs[3]*w2
+        for (i in 1:(k+1)) {
+          lin_pred <- lin_pred + coeffs[i+3]*nsb_a[i]
+        }
+        return(expit(lin_pred))
+      }))
+      
+    }
+    
+    if (type=="Random forest") {
+      
+      model <- ranger(
+        y~w1+w2+a,
+        data = dat,
+        num.trees = 500,
+        case.weights = wts(dat, scale="mean 1")
+      )
+      
+      return(memoise(Vectorize(function(a, w1, w2){
+        predict(model, data.frame(a=a, w1=w1, w2=w2))$predictions
+      })))
+    }
+    
+  }
+  
+}
+
+
+
+# Chernoff realizations
+if (F) {
+  
+  library(twostageTE)
+  data(chernoff_realizations)
+  
+}
+
+# Old deriv_theta_n estimator
+if (F) {
+  
+  # Estimate entire function on grid
+  theta_ns <- sapply(grid, theta_n)
+  if (theta_ns[1]==theta_ns[length(grid)]) {
+    stop("theta_n is flat")
+  }
+  
+  grid_width <- grid[2] - grid[1]
+  points_x <- c(grid[1])
+  points_y <- c(theta_ns[1])
+  for (i in 2:length(grid)) {
+    if (theta_ns[i]-theta_ns[i-1]!=0) {
+      points_x <- c(points_x, grid[i]-(grid_width/2))
+      points_y <- c(points_y, mean(c(theta_ns[i],theta_ns[i-1])))
+    }
+  }
+  points_x <- c(points_x, grid[length(grid)])
+  points_y <- c(points_y, theta_ns[length(grid)])
+  points_sl <- c()
+  for (i in 2:length(points_x)) {
+    slope <- (points_y[i]-points_y[i-1]) /
+      (points_x[i]-points_x[i-1])
+    points_sl <- c(points_sl, slope)
+  }
+  
+  deriv_theta_n <- Vectorize(function(x) {
+    if (x==0) {
+      index <- 1
+    } else {
+      index <- which(x<=points_x)[1]-1
+    }
+    points_sl[index]
+  })
+  
+}
+
 # generate_data old regression code
 if (F) {
   

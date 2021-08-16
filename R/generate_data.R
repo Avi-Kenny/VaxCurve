@@ -1,7 +1,7 @@
 #' Generate data
 #' 
 #' @param n Sample size
-#' @param alpha_3 Height of the dose-response curve
+#' @param alpha_3 Dose-response "relationship strength" parameter
 #' @param distr_A Distribution of A; possibly dependent on covariates. One of
 #'     c("Unif(0,1)", "Beta(0.9,1.1+0.4*w2)", "Beta(0.8+0.9*w1,0.8+0.4*w2)")
 #' @param surv_true True form of the survival function; one c("CoxPH","Complex")
@@ -30,36 +30,28 @@ generate_data <- function(n, alpha_3, distr_A, surv_true, sampling) {
   
   # Generate event times
   {
-    # Set parameters
-    lambda <- 10^(-4)
-    v <- 1.5
-    alpha <- c(0.3,0.7,0.5)
-    
     # Generate survival times (Weibull)
     U <- runif(n)
     H_0_inv <- function(t) {
-      ((1/lambda)*t)^(1/v)
+      ((1/C$lambda)*t)^(1/C$v)
     }
     if (surv_true=="CoxPH") {
-      lin <- alpha[1]*w1 + alpha[2]*w2 + alpha_3*a
+      lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
     } else if (surv_true=="Complex") {
-      lin <- ( alpha[1]*w1 + (alpha[2]*w2 * alpha_3*a) ) * a
+      lin <- ( C$alpha_1*w1 + (C$alpha_2*w2 * alpha_3*a) ) * w1
     }
     t <- H_0_inv(-1*log(U)*exp(-1*lin))
     
     # Generate censoring times (Weibull)
-    t_e <- 200
     t_study_end <- 300
     U <- runif(n)
     H_0_inv2 <- function(t) {
-      lambda2 <- 0.5 * 10^(-4)
-      v2 <- 1.5
-      ((1/lambda2)*t)^(1/v2)
+      ((1/C$lambda2)*t)^(1/C$v2)
     }
     if (surv_true=="CoxPH") {
-      lin <- alpha[1]*w1 + alpha[2]*w2 + alpha_3*a
+      lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
     } else if (surv_true=="Complex") {
-      lin <- ( alpha[1]*w1 + (alpha[2]*w2 * alpha_3*a) ) * a
+      lin <- ( C$alpha_1*w1 + (C$alpha_2*w2 * alpha_3*a) ) * w1
     }
     c <- H_0_inv2(-1*log(U)*exp(-1*lin))
     c <- pmin(c,t_study_end)
@@ -86,7 +78,7 @@ generate_data <- function(n, alpha_3, distr_A, surv_true, sampling) {
 
   # Set up function to calculate true regression values over C$points
   # These are Monte Carlo approximations
-  # Values depend on reg_true and alpha_3
+  # Values depend on surv_true and alpha_3
   {
     m <- 10^5
     w1 <- runif(m)
@@ -94,13 +86,13 @@ generate_data <- function(n, alpha_3, distr_A, surv_true, sampling) {
     
     theta_true_f <- Vectorize(function(a) {
       if (surv_true=="CoxPH") {
-        lin <- alpha[1]*w1 + alpha[2]*w2 + alpha_3*a
+        lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
       } else if (surv_true=="Complex") {
-        lin <- ( alpha[1]*w1 + (alpha[2]*w2 * alpha_3*a) ) * a
+        lin <- ( C$alpha_1*w1 + (C$alpha_2*w2 * alpha_3*a) ) * w1
       }
       
       return(mean(
-        1 - exp( -1 * lambda * (t_e^v) * exp(lin) )
+        1 - exp( -1 * C$lambda * (C$t_e^C$v) * exp(lin) )
       ))
     })
   }

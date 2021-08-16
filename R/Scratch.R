@@ -2,6 +2,23 @@
 # TEMP
 if (F) {
   
+  int <- (3/5)*3^5 + (2/3)*3^3
+  print(int)
+  
+  G <- function(x) { x^3 + 2*x }
+  h <- function(x) { x^2 }
+  m <- 1000000
+  i <- c(1:m)
+  int_appx <- sum(
+    (G((3*i)/m)-G((3*i-3)/m)) * (h((3*i)/m))
+  )
+  print(int_appx)
+  
+}
+
+# TEMP
+if (F) {
+  
   dat <- c(0,0,0,0,1,1,1,2,2,3)+0.5
   n <- length(dat)
   I <- as.integer

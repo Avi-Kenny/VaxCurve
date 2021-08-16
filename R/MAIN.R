@@ -13,7 +13,7 @@ cfg <- list(
   level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
   run_or_update = "run",
   num_sim = 1000,
-  pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "twostageTE", "EnvStats",
+  pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats",
            "fdrtool", "splines", "survival"), # "ranger", "ctsCausal", "SuperLearner", "earth", "Rsolnp", "sets"
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
                      "data.table", "latex2exp", "tidyr"),
@@ -209,7 +209,7 @@ if (cfg$run_or_update=="run") {
       sim %<>% add_creator(generate_data)
       methods <- c(
         "est_curve", "test_2", "test_wald", "expit", "deriv_expit", "logit",
-        "deriv_logit", "construct_mu_n", "construct_deriv_theta_n",
+        "deriv_logit", "construct_S_n", "construct_deriv_theta_n",
         "construct_sigma2_n", "construct_f_a_n", "construct_f_aIw_n",
         "construct_g_n", "construct_Gamma_n", "construct_Phi_n", "Pi", "wts",
         "construct_gcomp", "ss"
@@ -219,19 +219,20 @@ if (cfg$run_or_update=="run") {
       }
       
       # Add constants
+      # lambda and v are the Weibull parameters for the survival distribution
+      # lambda2 and v2 are the Weibull parameters for the censoring distribution
       {
-        alpha_0 <- -1.5
-        alpha_1 <- 0.3
-        alpha_2 <- 0.7
-        alpha_4 <- -0.3
-        data(chernoff_realizations)
         sim %<>% add_constants(
+          lambda = 10^(-4),
+          v = 1.5,
+          lambda2 = 0.5 * 10^(-4),
+          v2 = 1.5,
           points = seq(0,1,0.1),
-          chern = chernoff_realizations,
-          alpha_0 = alpha_0,
-          alpha_1 = alpha_1,
-          alpha_2 = alpha_2,
-          alpha_4 = alpha_4
+          # alpha_0 = -1.5,
+          alpha_1 = 0.3,
+          alpha_2 = 0.7,
+          # alpha_4 = -0.3,
+          t_e = 200
         )
       }
       
@@ -754,81 +755,51 @@ if (FALSE) {
 
 
 
-##########################################.
-##### TESTING: Regression estimators #####
-##########################################.
+######################################.
+##### TESTING: theta_n estimator #####
+######################################.
 
 if (FALSE) {
   
-  # Set levels here
-  n <- 5000
-  reg_true <- "Logistic" # Logistic GAM Complex
-  sampling <- "iid" # iid two-phase
-  
   # Generate data
-  L <- list(alpha_3=0.7)
-  C <- list(alpha_0=-1.5, alpha_1=0.3, alpha_2=0.7, alpha_4=-0.3)
-  dat <- generate_data(
-    n = n,
-    alpha_3 = 0.7,
-    distr_A = "Unif(0,1)", # Unif(0,1) Beta(0.9,1.1+0.4*w2)
-    reg_true = reg_true,
-    sampling = sampling
-  )
+  C <- list(points=c(0.5,0.8))
+  dat <- generate_data(n=5000, alpha_3=0.7, distr_A="Unif(0,1)",
+                       surv_true="CoxPH", sampling="two-phase")
   
-  # True regression function
-  mu_0 <- function(a,w1,w2) {
-    if (reg_true=="Logistic") {
-      expit(-1.5 + 0.3*w1 + 0.7*w2 + 0.7*a)
-    } else if (reg_true=="GAM") {
-      expit(-1.5 + 0.3*w1 + 0.7*w2 + 0.7*sqrt(a))
-    } else if (reg_true=="Complex") {
-      expit(-1.5 + 0.3*sin(2*pi*w1) + 0.7*w2 + 0.7*sqrt(a) + -0.3*w1*w2)
-    }
-  }
+  Sc_n <- construct_S_n(dat, type="Cox", csf=TRUE)
   
-  # Construct regression functions
-  mu_n_logistic <- construct_mu_n(dat=dat, type="Logistic")
-  mu_n_gam <- construct_mu_n(dat=dat, type="GAM")
-  mu_n_rf <- construct_mu_n(dat=dat, type="Random forest")
+  Sc_0 <- Vectorize(function(t, w1, w2, a) {
+    lambda2 <- 0.5 * 10^(-4)
+    v2 <- 1.5
+    alpha <- c(0.3,0.7,0.5)
+    alpha_3 <- 0.7
+    lin <- alpha[1]*w1 + alpha[2]*w2 + alpha_3*a
+    return(exp(-1*lambda2*(t^v2)*exp(lin)))
+  })
   
-  # Generate plot data
-  grid <- seq(0,1,0.01)
-  mu_models <- c("Truth", "Logistic", "Random forest", "GAM")
-  n_models <- length(mu_models)
-  len <- length(grid)
-  plot_data <- data.frame(
-    a = rep(grid, 4*n_models),
-    mu = c(
-      sapply(grid, function(a) { mu_0(a, w1=0.2, w2=0) }),
-      sapply(grid, function(a) { mu_0(a, w1=0.8, w2=0) }),
-      sapply(grid, function(a) { mu_0(a, w1=0.2, w2=1) }),
-      sapply(grid, function(a) { mu_0(a, w1=0.8, w2=1) }),
-      sapply(grid, function(a) { mu_n_logistic(a, w1=0.2, w2=0) }),
-      sapply(grid, function(a) { mu_n_logistic(a, w1=0.8, w2=0) }),
-      sapply(grid, function(a) { mu_n_logistic(a, w1=0.2, w2=1) }),
-      sapply(grid, function(a) { mu_n_logistic(a, w1=0.8, w2=1) }),
-      sapply(grid, function(a) { mu_n_rf(a, w1=0.2, w2=0) }),
-      sapply(grid, function(a) { mu_n_rf(a, w1=0.8, w2=0) }),
-      sapply(grid, function(a) { mu_n_rf(a, w1=0.2, w2=1) }),
-      sapply(grid, function(a) { mu_n_rf(a, w1=0.8, w2=1) }),
-      sapply(grid, function(a) { mu_n_gam(a, w1=0.2, w2=0) }),
-      sapply(grid, function(a) { mu_n_gam(a, w1=0.8, w2=0) }),
-      sapply(grid, function(a) { mu_n_gam(a, w1=0.2, w2=1) }),
-      sapply(grid, function(a) { mu_n_gam(a, w1=0.8, w2=1) })
+  # Plot true curve against estimated curve
+  times <- c(1:200)
+  df <- data.frame(
+    time = rep(times, 8),
+    survival = c(
+      Sc_n(t=times, w1=0, w2=1, a=0),
+      Sc_n(t=times, w1=1, w2=1, a=0),
+      Sc_n(t=times, w1=0, w2=1, a=1),
+      Sc_n(t=times, w1=1, w2=1, a=1),
+      Sc_0(t=times, w1=0, w2=1, a=0),
+      Sc_0(t=times, w1=1, w2=1, a=0),
+      Sc_0(t=times, w1=0, w2=1, a=1),
+      Sc_0(t=times, w1=1, w2=1, a=1)
     ),
-    which = rep(mu_models, each=len*4),
-    covariates = rep(c(
-      rep("W1=0.2, W2=0",len),
-      rep("W1=0.8, W2=0",len),
-      rep("W1=0.2, W2=1",len),
-      rep("W1=0.8, W2=1",len)
-    ), n_models)
+    which = rep(c("Cox","True S^C_0"), each=4*length(times)),
+    covs = rep(rep(c("w1=0,a=0","w1=1,a=0","w1=0,a=1","w1=1,a=1"),2),
+               each=length(times))
   )
-  ggplot(plot_data, aes(x=a, y=mu, color=factor(which))) +
+  ggplot(df, aes(x=time, y=survival, color=which)) +
     geom_line() +
-    facet_wrap(~covariates, ncol=2) +
-    labs(color="Estimator", title="Estimation of regression: E[Y|W,A]")
+    facet_wrap(~covs, ncol=2) +
+    labs(title="Estimation of conditional survival: S_0[t|W,A]",
+         color="Estimator")
   
 }
 

@@ -105,94 +105,6 @@ ss <- function(dat_orig) {
 
 
 
-#' Construct regression function mu_n
-#' 
-#' @param dat Dataset returned by generate_data(); accepts either full data or
-#'     truncated data
-#' @param type One of c("Logistic", "GAM", "Random forest")
-#' @param moment If moment=k, the regression E[Y^k|A,W] is estimated
-#' @return Regression function
-construct_mu_n <- function(dat, type, moment=1) {
-  
-  dat %<>% filter(!is.na(a))
-
-  if (moment!=1) {
-    dat %<>% mutate(y=y^moment)
-  }
-  
-  if (type=="Logistic") {
-    
-    model <- glm(
-      y~w1+w2+a,
-      data = dat,
-      family = "binomial",
-      weights = wts(dat, scale="mean 1")
-    )
-    coeffs <- as.numeric(summary(model)$coefficients[,1])
-    
-    return(Vectorize(function(a, w1, w2){
-      expit( coeffs[1] + coeffs[2]*w1 + coeffs[3]*w2 + coeffs[4]*a )
-    }))
-    
-  }
-  
-  if (type=="GAM") {
-    
-    k <- 4
-    knots <- seq(0,1,1/(k+1))[2:(k+1)]
-    ns_basis <- ns(dat$a, knots=knots, Boundary.knots=c(0,1))
-    formula <- "y ~ w1 + w2"
-    for (i in 1:(k+1)) {
-      dat[paste0("b_",i)] <- ns_basis[,i]
-      formula <- paste0(formula," + b_",i)
-    }
-    
-    dat$wts <- wts(dat, scale="mean 1")
-    model <- glm(
-      formula,
-      data = dat,
-      family = "binomial",
-      weights = wts
-    )
-    coeffs <- as.numeric(summary(model)$coefficients[,1])
-    
-    # Construct natural spline basis in advance over grid
-    grid <- seq(0,1,0.01)
-    nsb_grid <- ns(grid, knots=knots, Boundary.knots=c(0,1))
-    
-    return(Vectorize(function(a, w1, w2){
-      index <- which.min(abs(a-grid))
-      nsb_a <- as.numeric(nsb_grid[index,])
-      lin_pred <- coeffs[1] + coeffs[2]*w1 + coeffs[3]*w2
-      for (i in 1:(k+1)) {
-        lin_pred <- lin_pred + coeffs[i+3]*nsb_a[i]
-      }
-      return(expit(lin_pred))
-    }))
-    
-  }
-  
-  if (type=="Random forest") {
-    
-    model <- ranger(
-      y~w1+w2+a,
-      data = dat,
-      num.trees = 500,
-      case.weights = wts(dat, scale="mean 1")
-    )
-    
-    # !!!!! Pre-calculate function values over grid; must be grid of (a,w)
-    # !!!!! After this, remove the memoise() wrapper
-    
-    return(memoise(Vectorize(function(a, w1, w2){
-      predict(model, data.frame(a=a, w1=w1, w2=w2))$predictions
-    })))
-  }
-  
-}
-
-
-
 #' Construct conditional survival estimator S_n
 #' 
 #' @param dat Dataset returned by generate_data(); accepts either full data or
@@ -284,45 +196,6 @@ construct_deriv_theta_n <- function(gcomp_n) {
   }
   
   return(memoise(Vectorize(deriv_theta_n)))
-  
-  
-  # !!!!! OLD ESTIMATOR
-  if (F) {
-    
-    # Estimate entire function on grid
-    theta_ns <- sapply(grid, theta_n)
-    if (theta_ns[1]==theta_ns[length(grid)]) {
-      stop("theta_n is flat")
-    }
-    
-    grid_width <- grid[2] - grid[1]
-    points_x <- c(grid[1])
-    points_y <- c(theta_ns[1])
-    for (i in 2:length(grid)) {
-      if (theta_ns[i]-theta_ns[i-1]!=0) {
-        points_x <- c(points_x, grid[i]-(grid_width/2))
-        points_y <- c(points_y, mean(c(theta_ns[i],theta_ns[i-1])))
-      }
-    }
-    points_x <- c(points_x, grid[length(grid)])
-    points_y <- c(points_y, theta_ns[length(grid)])
-    points_sl <- c()
-    for (i in 2:length(points_x)) {
-      slope <- (points_y[i]-points_y[i-1]) /
-        (points_x[i]-points_x[i-1])
-      points_sl <- c(points_sl, slope)
-    }
-    
-    deriv_theta_n <- Vectorize(function(x) {
-      if (x==0) {
-        index <- 1
-      } else {
-        index <- which(x<=points_x)[1]-1
-      }
-      points_sl[index]
-    })
-    
-  }
   
   return(deriv_theta_n)
   
@@ -486,6 +359,35 @@ construct_g_n <- function(f_aIw_n, f_a_n) {
 
 
 
+#' Construct estimator of nuisance influence function omega_n
+#' 
+#' @param S_n Conditional survival function estimator returned by construct_S_n
+#' @param Sc_n Conditional censoring survival function estimator returned by
+#'     construct_S_n
+#' @param m Number of partitions used for the integral approximation
+#' @return Estimator function of nuisance omega_0
+construct_omega_n <- function(S_n, Sc_n, m=100) {
+  
+  return(memoise(Vectorize(function(w1,w2,y_star,delta_star,a) {
+    
+    indices <- c(1:m)
+    k <- min(y_star,C$t_e)
+    integral <- sum(
+      ( S_n(t=(i*k)/m, w1,w2,a) - S_n(t=((i-1)*k)/m, w1,w2,a) ) *
+      ( (S_n(t=(i*k)/m, w1,w2,a))^2 * Sc_n(t=(i*k)/m, w1,w2,a) )^-1
+    )
+    S_n(t=C$t_e, w1,w2,a) * (
+      ( delta_star * as.integer(y_star<=C$t_e) ) /
+      ( S_n(t=y_star, w1,w2,a) * Sc_n(t=y_star, w1,w2,a) ) +
+      integral
+    )
+    
+  })))
+  
+}
+
+
+
 #' Construct nuisance estimator eta_n
 #' 
 #' @param dat_orig Dataset returned by generate_data(); this must be the FULL
@@ -553,85 +455,55 @@ lambda <- function(k, G, dat_orig) {
 
 
 
-#' Construct Gamma_n primitive estimator
+#' Construct Gamma_n primitive one-step estimator
 #' 
 #' @param dat_orig Dataset returned by generate_data(); this must be the FULL
 #'     DATA, including the "missing" observations
-#' @param mu_n A regression function returned by construct_mu_n()
+#' @param omega_n A regression function returned by construct_omega_n()
+#' @param S_n A conditional survival function returned by construct_S_n()
 #' @param g_n A density ratio estimator function returned by construct_g_n()
 #' @return Gamma_n estimator
-#' @notes This is the one-step estimator from Westling & Carone 2020
-construct_Gamma_n <- function(dat_orig, mu_n, g_n) {
+#' @notes This is a generalization of the one-step estimator from Westling &
+#'     Carone 2020
+construct_Gamma_n <- function(dat_orig, omega_n, S_n, g_n) {
   
   dat <- dat_orig
   
-  if (attr(dat, "sampling")=="iid") {
-    
-    n <- nrow(dat)
-    i_long <- rep(c(1:n), each=n)
-    j_long <- rep(c(1:n), times=n)
-    a_i_long <- dat$a[i_long]
-    w1_j_long <- dat$w1[j_long]
-    w2_j_long <- dat$w2[j_long]
-    
-    subpiece_1a <- (dat$y - mu_n(dat$a,dat$w1,dat$w2)) /
-      g_n(dat$a,dat$w1,dat$w2)
-    subpiece_2a <- mu_n(a_i_long,w1_j_long,w2_j_long)
-    
-    return(
-      memoise(Vectorize(function(x) {
-        
-        subpiece_1b <- as.integer(dat$a<=x)
-        piece_1 <- mean(subpiece_1a*subpiece_1b)
-        
-        subpiece_2b <- as.integer(a_i_long<=x)
-        piece_2 <- mean(subpiece_2a*subpiece_2b)
-        
-        return(piece_1+piece_2)
-        
-      }))
-    )
-    
-  } else if (attr(dat, "sampling")=="two-phase") {
-    
-    s <- ss(dat)
-    n_orig <- nrow(dat)
-    dat %<>% filter(!is.na(a))
-    n <- nrow(dat)
-    weights <- wts(dat, scale="none")
-    
-    i_long <- rep(c(1:n), each=n)
-    j_long <- rep(c(1:n), times=n)
-    a_i_long <- dat$a[i_long]
-    w1_i_long <- dat$w1[i_long]
-    w1_j_long <- dat$w1[j_long]
-    w2_i_long <- dat$w2[i_long]
-    w2_j_long <- dat$w2[j_long]
-    delta_star_i_long <- dat$delta_star[i_long]
-    delta_star_j_long <- dat$delta_star[j_long]
-    
-    subpiece_1a <- ( (dat$y - mu_n(dat$a,dat$w1,dat$w2)) * weights ) /
-      ( s * g_n(dat$a,dat$w1,dat$w2) )
-    subpiece_2a <- mu_n(a_i_long,w1_j_long,w2_j_long) / (
-      s^2 * Pi(delta_star_i_long, w1_i_long, w2_i_long) *
-            Pi(delta_star_j_long, w1_j_long, w2_j_long)
-    )
-    
-    return(
-      memoise(Vectorize(function(x) {
-        
-        subpiece_1b <- as.integer(dat$a<=x)
-        piece_1 <- sum(subpiece_1a*subpiece_1b) * (1/n_orig)
-        
-        subpiece_2b <- as.integer(a_i_long<=x)
-        piece_2 <- sum(subpiece_2a*subpiece_2b) * (1/(n_orig^2))
-        
-        return(piece_1+piece_2)
-        
-      }))
-    )
-    
-  }
+  s <- ss(dat)
+  n_orig <- nrow(dat)
+  dat %<>% filter(!is.na(a))
+  n <- nrow(dat)
+  weights <- wts(dat, scale="none")
+  
+  i_long <- rep(c(1:n), each=n)
+  j_long <- rep(c(1:n), times=n)
+  a_i_long <- dat$a[i_long]
+  w1_i_long <- dat$w1[i_long]
+  w1_j_long <- dat$w1[j_long]
+  w2_i_long <- dat$w2[i_long]
+  w2_j_long <- dat$w2[j_long]
+  delta_star_i_long <- dat$delta_star[i_long]
+  delta_star_j_long <- dat$delta_star[j_long]
+  
+  subpiece_1a <- ( 1 + omega_n(dat$a,dat$w1,dat$w2) / g_n(dat$a,dat$w1,dat$w2) ) * ( weights / s )
+  subpiece_2a <- S_n(C$t_e, w1_j_long, w2_j_long, a_i_long) / (
+    s^2 * Pi(delta_star_i_long, w1_i_long, w2_i_long) *
+      Pi(delta_star_j_long, w1_j_long, w2_j_long)
+  )
+  
+  return(
+    memoise(Vectorize(function(x) {
+      
+      subpiece_1b <- as.integer(dat$a<=x)
+      piece_1 <- sum(subpiece_1a*subpiece_1b) * (1/n_orig)
+      
+      subpiece_2b <- as.integer(a_i_long<=x)
+      piece_2 <- sum(subpiece_2a*subpiece_2b) * (1/(n_orig^2))
+      
+      return(piece_1-piece_2)
+      
+    }))
+  )
   
 }
 

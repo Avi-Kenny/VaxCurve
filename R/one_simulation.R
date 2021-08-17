@@ -12,7 +12,7 @@ if (cfg$which_sim=="estimation") {
   one_simulation <- function() {
     
     # Generate dataset
-    dat <- generate_data(L$n, L$alpha_3, L$distr_A, L$reg_true, L$sampling)
+    dat <- generate_data(L$n, L$alpha_3, L$distr_A, L$surv_true, L$sampling)
     
     # Obtain estimates
     ests <- est_curve(
@@ -53,7 +53,7 @@ if (cfg$which_sim=="testing") {
   one_simulation <- function() {
     
     # Generate dataset
-    dat <- generate_data(L$n, L$alpha_3, L$distr_A, L$reg_true, L$sampling)
+    dat <- generate_data(L$n, L$alpha_3, L$distr_A, L$surv_true, L$sampling)
     
     # Perform hypothesis test
     reject <- use_method(L$test$type, list(

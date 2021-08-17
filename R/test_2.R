@@ -3,13 +3,9 @@
 #' @param dat Data returned by generate_data()
 #' @param alt_type Type of alternative hypothesis; either "incr" or "decr";
 #'     currently unused
-#' @param mu_n_type Type of regression estimator; one of One of c("Logistic",
-#'     "GAM", "Random forest")
-#' @param g_n_type Type of conditional density ratio estimator; one of
-#'     c("parametric", "binning")
 #' @param params A list, containing the following:
-#'   - `mu_n_type` Type of regression estimator; one of One of c("Logistic",
-#'     "GAM", "Random forest")
+#'   - `S_n_type` S_n_type Type of survival function estimator; currently only
+#'     c("Cox PH")
 #'   - `g_n_type` Type of conditional density ratio estimator; one of
 #'     c("parametric", "binning")
 #'   - `var` Variance estimation; one of c("boot","mixed boot")
@@ -27,20 +23,22 @@ test_2 <- function(dat, alt_type="incr", params) {
       
       dat <- dat_orig[indices,]
       
-      s_0 <- ss(dat)
+      ss_0 <- ss(dat)
       n_orig <- nrow(dat)
       dat_0 <- dat %>% filter(!is.na(a))
       n_0 <- nrow(dat_0)
       weights_0 <- wts(dat_0, scale="none")
       G_0 <- construct_Phi_n(dat)
-      mu_0 <- construct_mu_n(dat_0, type=params$mu_n_type)
       f_aIw_n <- construct_f_aIw_n(dat_0, type=params$g_n_type)
       f_a_n <- construct_f_a_n(dat_0, f_aIw_n=f_aIw_n)
       g_0 <- construct_g_n(f_aIw_n, f_a_n)
-      Gamma_0 <- construct_Gamma_n(dat, mu_0, g_0)
+      S_0 <- construct_S_n(dat, type=params$S_n_type)
+      Sc_0 <- construct_S_n(dat, type=params$S_n_type, csf=TRUE)
+      omega_0 <- construct_omega_n(S_0, Sc_0)
+      Gamma_0 <- construct_Gamma_n(dat, omega_0, S_0, g_0)
       
       beta_0 <- (1/n_orig) * sum(
-        (weights_0/s_0) *
+        (weights_0/ss_0) *
           (
             lambda(2, G_0, dat)*(G_0(dat_0$a))^2 -
               lambda(3, G_0, dat)*G_0(dat_0$a)
@@ -65,15 +63,17 @@ test_2 <- function(dat, alt_type="incr", params) {
     
     # Pre-calculate non-bootstrapped pieces
     {
+      # !!!!! Update
+      
       dat_0_orig <- dat
-      s_0 <- ss(dat_0_orig)
+      ss_0 <- ss(dat_0_orig)
       n_orig <- nrow(dat_0_orig)
       dat_0 <- dat_0_orig %>% filter(!is.na(a))
       n_0 <- nrow(dat_0)
       weights_0 <- wts(dat_0, scale="none")
       
       G_0 <- construct_Phi_n(dat_0_orig)
-      mu_0 <- construct_mu_n(dat_0, type=params$mu_n_type)
+      # mu_0 <- construct_mu_n(dat_0, type=params$mu_n_type) # !!!!! Update
       
       f_aIw_n <- construct_f_aIw_n(dat_0, type=params$g_n_type)
       f_a_n <- construct_f_a_n(dat_0, f_aIw_n=f_aIw_n)
@@ -85,7 +85,7 @@ test_2 <- function(dat, alt_type="incr", params) {
       theta_naive_0 <- construct_theta_naive_n(dat_0_orig, mu_0)
       
       beta_0 <- (1/n_orig) * sum(
-        (weights_0/s_0) *
+        (weights_0/ss_0) *
           (
             lambda(2, G_0, dat_0_orig)*(G_0(dat_0$a))^2 -
               lambda(3, G_0, dat_0_orig)*G_0(dat_0$a)
@@ -117,7 +117,7 @@ test_2 <- function(dat, alt_type="incr", params) {
       )
       
       piece_2 <- (1/n_orig) * sum(
-        (weights_0/s_0) *
+        (weights_0/ss_0) *
           (
             lambda(2, G_n, dat_0_orig)*(G_n(dat_0$a))^2 -
               lambda(3, G_n, dat_0_orig)*G_n(dat_0$a)
@@ -136,7 +136,7 @@ test_2 <- function(dat, alt_type="incr", params) {
       weights_b_long <- weights_b[index_b]
       
       piece_4 <- (1/n_orig)^2 * sum(
-        (weights_0_long/s_0) * (weights_b_long/s_b) *
+        (weights_0_long/ss_0) * (weights_b_long/s_b) *
           (
             (
               (as.integer(a_b_long<=a_0_long)) *

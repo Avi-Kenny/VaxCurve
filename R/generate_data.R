@@ -4,7 +4,8 @@
 #' @param alpha_3 Dose-response "relationship strength" parameter
 #' @param distr_A Distribution of A; possibly dependent on covariates. One of
 #'     c("Unif(0,1)", "Beta(0.9,1.1+0.4*w2)", "Beta(0.8+0.9*w1,0.8+0.4*w2)")
-#' @param surv_true True form of the survival function; one c("CoxPH","Complex")
+#' @param surv_true True form of the survival function; one c("Cox PH",
+#'     "Complex")
 #' @param sampling A list. One of c("iid","two-phase")
 #' @return A dataframe representing the study population
 generate_data <- function(n, alpha_3, distr_A, surv_true, sampling) {
@@ -35,26 +36,26 @@ generate_data <- function(n, alpha_3, distr_A, surv_true, sampling) {
     H_0_inv <- function(t) {
       ((1/C$lambda)*t)^(1/C$v)
     }
-    if (surv_true=="CoxPH") {
+    if (surv_true=="Cox PH") {
       lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
     } else if (surv_true=="Complex") {
-      lin <- ( C$alpha_1*w1 + (C$alpha_2*w2 * alpha_3*a) ) * w1
+      lin <- C$alpha_2*w2*as.numeric(abs(w1-0.5)<0.2) + alpha_3*w1*a
     }
     t <- H_0_inv(-1*log(U)*exp(-1*lin))
     
     # Generate censoring times (Weibull)
-    t_study_end <- 300
+    # t_study_end <- 300
     U <- runif(n)
     H_0_inv2 <- function(t) {
       ((1/C$lambda2)*t)^(1/C$v2)
     }
-    if (surv_true=="CoxPH") {
+    if (surv_true=="Cox PH") {
       lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
     } else if (surv_true=="Complex") {
-      lin <- ( C$alpha_1*w1 + (C$alpha_2*w2 * alpha_3*a) ) * w1
+      lin <- C$alpha_2*w2*as.numeric(abs(w1-0.5)<0.2) + alpha_3*w1*a
     }
     c <- H_0_inv2(-1*log(U)*exp(-1*lin))
-    c <- pmin(c,t_study_end)
+    # c <- pmin(c,t_study_end)
     
     # Generate survival variables
     y_star <- pmin(t,c)
@@ -78,22 +79,27 @@ generate_data <- function(n, alpha_3, distr_A, surv_true, sampling) {
 
   # Set up function to calculate true regression values over C$points
   # These are Monte Carlo approximations
-  # Values depend on surv_true and alpha_3
   {
     m <- 10^5
     w1 <- runif(m)
     w2 <- rbinom(m, size=1, prob=0.5)
     
     theta_true_f <- Vectorize(function(a) {
-      if (surv_true=="CoxPH") {
-        lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
-      } else if (surv_true=="Complex") {
-        lin <- ( C$alpha_1*w1 + (C$alpha_2*w2 * alpha_3*a) ) * w1
+      
+      lin <- function(w1,w2,a) {
+        if (surv_true=="Cox PH") {
+          C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
+        } else if (surv_true=="Complex") {
+          ( C$alpha_1*w1 + (C$alpha_2*w2 * alpha_3*a) ) * w1
+        }
       }
       
-      return(mean(
-        1 - exp( -1 * C$lambda * (C$t_e^C$v) * exp(lin) )
-      ))
+      S_0 <- function(t, w1, w2, a) {
+        exp( -1 * C$lambda * (t^C$v) * exp(lin(w1,w2,a)) )
+      }
+      
+      return(1 - mean(S_0(C$t_e, w1, w2, a)))
+      
     })
   }
   

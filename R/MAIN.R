@@ -10,9 +10,9 @@
 # devtools::install_github("zeehio/facetscales")
 cfg <- list(
   which_sim = "estimation", # estimation testing
-  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
+  level_set_which = "level_set_temp", # level_set_estimation_1 level_set_testing_1
   run_or_update = "run",
-  num_sim = 1000,
+  num_sim = 500,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats",
            "fdrtool", "splines", "survival"), # "ranger", "ctsCausal", "SuperLearner", "earth", "Rsolnp", "sets"
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
@@ -70,17 +70,23 @@ if (load_pkgs_local) {
 
 if (FALSE) {
   
-  L <- list(n=1000, alpha_3=0.75, distr_A="Unif(0,1)",
-            reg_true="Logistic", sampling="iid",
-            # test=list(type="test_2",params=list(boot_reps=2))
-            estimator=list(
-              # est="Generalized Grenander",params=list(ci_type="logit")))
-              est="G-comp",params=list(mu_n_type="Random forest", boot_reps=5)))
-  C <- list(alpha_0=-1.5, alpha_1=0.3, alpha_2=0.7, alpha_4=-0.3,
-            points=seq(0,1,0.1))
+  C <- list(lambda=10^-4, v=1.5, lambda2=0.5*10^-4, v2=1.5,
+            points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
   
-  # Generate dataset
-  dat <- generate_data(L$n, L$alpha_3, L$distr_A, L$reg_true, L$sampling)
+  dat <- generate_data(
+    n = 1000, # 5000
+    alpha_3 = 0.7,
+    distr_A = "Unif(0,1)",
+    surv_true = "Cox PH",
+    sampling = "iid" # iid two-phase
+  )
+  
+  ests <- est_curve(
+    dat = dat,
+    estimator = "Generalized Grenander",
+    params = list(S_n_type="Cox PH", g_n_type="parametric", ci_type="logit"),
+    points = C$points
+  )
   
 }
 
@@ -94,23 +100,23 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
   
   # !!!!! Temp/testing !!!!!
   level_set_temp <- list(
-    n = 500,
+    n = 5000,
     alpha_3 = 0.75,
     distr_A = "Unif(0,1)",
-    reg_true = "Logistic",
-    sampling = "iid", # two-phase iid
+    surv_true = "Cox PH", # "Cox PH" "Complex"
+    sampling = "two-phase", # two-phase iid
     estimator = list(
-      "G-comp" = list(
-        est = "G-comp",
-        params = list(mu_n_type="Logistic", boot_reps=10) # 100
+      # "G-comp" = list(
+      #   est = "G-comp",
+      #   params = list(S_n_type="Cox PH", boot_reps=100)
+      # ),
+      "Grenander (logit CIs)" = list(
+        est = "Generalized Grenander",
+        params = list(S_n_type="Cox PH", g_n_type="parametric", ci_type="logit")
       )
-      # "Grenander (logit CIs)" = list(
-      #   est = "Generalized Grenander",
-      #   params = list(mu_n_type="Logistic", g_n_type="parametric", ci_type="logit") # mu_n_type="GAM"
-      # )
       # "Grenander (split CIs, m=5)" = list(
       #   est = "Generalized Grenander",
-      #   params = list(mu_n_type="GAM", g_n_type="parametric",
+      #   params = list(S_n_type="Cox PH", g_n_type="parametric",
       #                 ci_type="sample split", m=5)
       # )
     )
@@ -122,20 +128,20 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
     n = 5000,
     alpha_3 = 0.75,
     distr_A = c("Unif(0,1)", "Beta(0.9,1.1+0.4*w2)"), # "Beta(0.8+0.9*w1,0.8+0.4*w2)"
-    reg_true = c("Logistic", "GAM"),
-    sampling = c("iid", "two-phase"), # iid two-phase
+    surv_true = c("Cox PH", "Complex"),
+    sampling = "two-phase", # c("iid", "two-phase")
     estimator = list(
       "G-comp" = list(
         est = "G-comp",
-        params = list(mu_n_type="GAM", boot_reps=100)
+        params = list(S_n_type="Cox PH", boot_reps=100)
       ),
       "Grenander (logit CIs)" = list(
         est = "Generalized Grenander",
-        params = list(mu_n_type="GAM", g_n_type="parametric", ci_type="logit")
+        params = list(S_n_type="Cox PH", g_n_type="parametric", ci_type="logit")
       )
       # "Grenander (split CIs, m=5)" = list(
       #   est = "Generalized Grenander",
-      #   params = list(mu_n_type="GAM", g_n_type="parametric",
+      #   params = list(S_n_type="Cox PH", g_n_type="parametric",
       #                 ci_type="sample split", m=5)
       # )
     )
@@ -150,15 +156,15 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
     # alpha_3 = c(0,0.25,0.5), # c(0,0.25,0.5,0.75)
     distr_A = "Unif(0,1)",
     # distr_A = c("Unif(0,1)", "Beta(0.9,1.1+0.4*w2)"), # "Beta(0.8+0.9*w1,0.8+0.4*w2)"
-    reg_true = "GAM",
-    # reg_true = c("Logistic", "GAM"),
+    surv_true = "Cox PH",
+    # surv_true = c("Cox PH", "Complex"),
     sampling = "two-phase", # iid
     test = list(
       "Slope (mixed boot)" = list(
         type = "test_2",
         params = list(
           var = "mixed boot",
-          mu_n_type = "GAM",
+          S_n_type="Cox PH",
           g_n_type = "parametric",
           boot_reps = 3
           # boot_reps = 100
@@ -170,7 +176,7 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
   )
   
   # !!!!! Estimation/testing but with different nuisance estimators
-  # mu_n_type = c("Logistic", "GAM", "Random forest")
+  # S_n_type = c("Cox PH", "...")
   # g_n_type = c("parametric", "binning")
   
   level_set <- eval(as.name(cfg$level_set_which))
@@ -208,11 +214,13 @@ if (cfg$run_or_update=="run") {
       # Add functions to simulation object
       sim %<>% add_creator(generate_data)
       methods <- c(
-        "est_curve", "test_2", "test_wald", "expit", "deriv_expit", "logit",
-        "deriv_logit", "construct_S_n", "construct_deriv_theta_n",
-        "construct_sigma2_n", "construct_f_a_n", "construct_f_aIw_n",
-        "construct_g_n", "construct_Gamma_n", "construct_Phi_n", "Pi", "wts",
-        "construct_gcomp", "ss"
+        "construct_deriv_theta_n", "construct_eta_n", "construct_f_a_n",
+        "construct_f_aIw_n", "construct_g_n", "construct_gamma_n",
+        "construct_Gamma_n", "construct_gcomp", "construct_omega_n",
+        "construct_Phi_n", "construct_S_n", "construct_tau_n",
+        "deriv_expit", "deriv_logit", "est_curve", "expit", "generate_data",
+        "lambda", "logit", "one_simulation", "Pi", "ss", "test_2","test_wald",
+        "wts"
       )
       for (method in methods) {
         sim %<>% add_method(method, eval(as.name(method)))
@@ -221,20 +229,16 @@ if (cfg$run_or_update=="run") {
       # Add constants
       # lambda and v are the Weibull parameters for the survival distribution
       # lambda2 and v2 are the Weibull parameters for the censoring distribution
-      {
-        sim %<>% add_constants(
-          lambda = 10^(-4),
-          v = 1.5,
-          lambda2 = 0.5 * 10^(-4),
-          v2 = 1.5,
-          points = seq(0,1,0.1),
-          # alpha_0 = -1.5,
-          alpha_1 = 0.3,
-          alpha_2 = 0.7,
-          # alpha_4 = -0.3,
-          t_e = 200
-        )
-      }
+      sim %<>% add_constants(
+        lambda = 10^-4,
+        v = 1.5,
+        lambda2 = 0.5 * 10^-4,
+        v2 = 1.5,
+        points = seq(0,1,0.1),
+        alpha_1 = 0.3,
+        alpha_2 = 0.7,
+        t_e = 200
+      )
       
       # Simulation script
       sim %<>% set_script(one_simulation)
@@ -320,7 +324,7 @@ if (FALSE) {
   
   p_data <- pivot_longer(
     data = summ,
-    cols = -c(level_id,n,alpha_3,distr_A,reg_true,sampling,Estimator),
+    cols = -c(level_id,n,alpha_3,distr_A,surv_true,sampling,Estimator),
     names_to = c("stat","point"),
     names_sep = "_"
   )
@@ -343,7 +347,7 @@ if (FALSE) {
   ) +
     geom_point() +
     geom_line() +
-    facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(reg_true)) +
+    facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(surv_true)) +
     scale_y_continuous(labels=percent) +
     scale_color_manual(values=m_colors) +
     labs(title="Bias (%)", x="A", y=NULL, color="Estimator")
@@ -357,9 +361,10 @@ if (FALSE) {
     geom_hline(aes(yintercept=0.95), linetype="longdash", color="grey") +
     geom_point() +
     geom_line() +
-    facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(reg_true)) +
+    facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(surv_true)) +
     scale_y_continuous(labels=percent) +
     scale_color_manual(values=m_colors) +
+    # ylim(0.75,1) +
     labs(title="Coverage (%)", x="A", y=NULL, color="Estimator")
 
   # MSE plot
@@ -370,210 +375,11 @@ if (FALSE) {
   ) +
     geom_point() +
     geom_line() +
-    facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(reg_true)) +
+    facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(surv_true)) +
     scale_color_manual(values=m_colors) +
-    labs(title="MSE", x="A", y=NULL, color="Estimator") +
-    ylim(0,0.0115)
-  
-  # # Export: 6" x 4"
-  # distr_A_ <- "Beta(0.9,1.1+0.4*w2)" # Unif(0,1) Beta(0.9,1.1+0.4*w2)
-  # estimand_ <- "Midpoint" # Midpoint Endpoint
-  # ggplot(
-  #   filter(p_data, distr_A==distr_A_ & estimand==estimand_),
-  #   aes(x=n, y=value, color=Estimator)
-  # ) +
-  #   geom_hline(
-  #     aes(yintercept=y),
-  #     data=data.frame(y=0.95, stat="Coverage"),
-  #     linetype="longdash", color="grey"
-  #   ) +
-  #   geom_point() +
-  #   geom_line() +
-  #   # geom_bar(stat="identity", position=position_dodge(),
-  #   #          width=0.8, color="white", size=0.35) +
-  #   facet_grid_sc(cols=dplyr::vars(reg_true), rows=dplyr::vars(stat),
-  #                 scales=list(y=list(
-  #                   Bias = scale_y_continuous(labels = percent_format()),
-  #                   Coverage = scale_y_continuous(labels = percent_format()),
-  #                   MSE = scale_y_continuous()
-  #                 ))) +
-  #   theme(legend.position="bottom") +
-  #   # scale_color_manual(values=m_colors) +
-  #   labs(title=paste0("Estimand: ",estimand_,"; MargDist(A): ",distr_A_),
-  #        y=NULL, x=NULL, color="Estimator")
-  
-  
-  # # !!!!! Temp (export 7.5 x 4.5)
-  # distr_A_ <- "Beta(0.9,1.1+0.4*w2)" # Unif(0,1) Beta(0.9,1.1+0.4*w2)
-  # estimand_ <- "Endpoint" # Midpoint Endpoint
-  # ggplot(
-  #   filter(p_data, distr_A==distr_A_ & estimand==estimand_),
-  #   aes(x=sampling, y=value, fill=Estimator)
-  # ) +
-  #   geom_hline(
-  #     aes(yintercept=y),
-  #     data=data.frame(y=0.95, stat="Coverage"),
-  #     linetype="longdash", color="grey"
-  #   ) +
-  #   geom_bar(stat="identity", position=position_dodge(),
-  #            width=0.8, color="white", size=0.35) +
-  #   facet_grid_sc(cols=dplyr::vars(reg_true), rows=dplyr::vars(stat),
-  #                 scales=list(y=list(
-  #                   Bias = scale_y_continuous(labels = percent_format()),
-  #                   Coverage = scale_y_continuous(labels = percent_format()),
-  #                   MSE = scale_y_continuous()
-  #                 ))) +
-  #   theme(legend.position="bottom") +
-  #   scale_fill_manual(values=m_colors) +
-  #   labs(title=paste0("Estimand: ",estimand_,"; MargDist(A): ",distr_A_),
-  #        y=NULL, x=NULL, color="Estimator")
-  
-}
+    ylim(0,0.001) +
+    labs(title="MSE", x="A", y=NULL, color="Estimator")
 
-
-
-#########################################.
-##### VIZ: Estimation (method demo) #####
-#########################################.
-
-if (FALSE) {
-  
-  # Set parameters
-  n <- 1000
-  alpha_0 <- -1.5
-  alpha_1 <- 0.3
-  alpha_2 <- 0.7
-  alpha_3 <- 0.7
-  alpha_4 <- -0.3
-  reg_true <- "Logistic" # Logistic GAM Complex
-  grid <- seq(0,1,0.1)
-  # grid <- seq(0,1,0.01)
-  
-  # Generate dataset
-  dat <- generate_data(
-    n = n,
-    alpha_3 = alpha_3,
-    distr_A = "Beta(0.9,1.1+0.4*w2)",
-    reg_true = reg_true,
-    sampling = "two-phase"
-  )
-  
-  # Approximate true values of theta_0
-  m <- 10000
-  w1 <- rnorm(m)
-  w2 <- rbinom(m, size=1, prob=0.5)
-  true_vals <- sapply(grid, function(x) {
-    if (reg_true=="Logistic") {
-      mean(expit(alpha_0 + alpha_1*w1 + alpha_2*w2 + alpha_3*x))
-    } else if (reg_true=="GAM") {
-      mean(expit(alpha_0 + alpha_1*w1 + alpha_2*w2 + alpha_3*sqrt(x)))
-    } else if (reg_true=="Complex") {
-      mean(expit(alpha_0 + alpha_1*sin(2*pi*w1) + alpha_2*w2 +
-                   alpha_3*sqrt(x) + alpha_4*w1*w2))
-    }
-  })
-  
-  # Estimate curve: G-comp
-  ests <- as.data.frame(rbindlist(est_curve(
-    dat = dat,
-    estimator = "G-comp",
-    list(boot_reps=100),
-    points = grid
-  )))
-  ests$which <- "G-comp"
-  
-  # Estimate curve: Grenander (logit CIs)
-  ests2 <- as.data.frame(rbindlist(est_curve(
-    dat = dat,
-    estimator = "Generalized Grenander",
-    params = list(ci_type="logit"),
-    points = grid
-  )))
-  ests2$which <- "Grenander (logit CIs)"
-  
-  # Estimate curve: Grenander (regular CIs)
-  ests3 <- as.data.frame(rbindlist(est_curve(
-    dat = dat,
-    estimator = "Generalized Grenander",
-    params = list(ci_type="regular"),
-    points = grid
-  )))
-  ests3$which <- "Grenander (regular CIs)"
-  
-  # Estimate curve: Grenander (split CIs; m=5)
-  ests4 <- as.data.frame(rbindlist(est_curve(
-    dat = dat,
-    estimator = "Generalized Grenander",
-    params = list(ci_type="sample split", m=5),
-    points = grid
-  )))
-  ests4$which <- "Grenander (split CIs; m=5)"
-  
-  ests <- rbind(ests, ests2, ests3, ests4)
-  
-  # Attach true values
-  ests <- rbind(ests, data.frame(
-    point = grid,
-    est = true_vals,
-    ci_lo = true_vals,
-    ci_hi = true_vals,
-    which = rep("theta_0", length(grid))
-  ))
-  
-  # # Plot results
-  # # Export: 8" x 3"
-  # ggplot(
-  #   ests,
-  #   aes(x=point, y=est, color=which, fill=which)) +
-  #   geom_line() +
-  #   # geom_point() +
-  #   geom_ribbon(
-  #     aes(ymin=ci_lo, ymax=ci_hi), # fill=as.factor(group_var)
-  #     alpha = 0.2,
-  #     linetype = "dotted"
-  #   ) +
-  #   facet_wrap(~which, ncol=3) +
-  #   labs(
-  #     x = "x",
-  #     y = unname(latex2exp::TeX("$\\hat{\\theta}_n(x)$")),
-  #     color = "Which",
-  #     fill = "Which"
-  #   )
-  
-  # Plot results
-  # Export: 8" x 3"
-  d2 <- filter(ests, which=="theta_0")
-  d2_nrows <- nrow(d2)
-  d2 <- rbind(d2,d2,d2,d2)
-  d2$which <- rep(unique(filter(ests, which!="theta_0")$which), each=d2_nrows)
-  ggplot(
-    filter(ests, which!="theta_0"),
-    aes(x=point, y=est, color=which, fill=which)) +
-    geom_line() +
-    # geom_point() +
-    geom_ribbon(
-      aes(ymin=ci_lo, ymax=ci_hi), # fill=as.factor(group_var)
-      alpha = 0.2,
-      linetype = "dotted"
-    ) +
-    facet_wrap(~which, ncol=4) +
-    theme(legend.position="bottom") +
-    labs(
-      x = "x",
-      y = unname(latex2exp::TeX("$\\hat{\\theta}_n(x)$")),
-      color = "Which",
-      fill = "Which"
-    ) +
-    geom_line(
-      data = d2,
-      color = "black",
-      linetype = "dashed"
-    )
-  
-  # end_true <- (filter(ests, point==1 & which=="theta_0"))$est
-  # end_gcomp <- (filter(ests, point==1 & which=="G-comp"))$est
-  # print((end_true-end_gcomp)^2)
-  
 }
 
 
@@ -615,7 +421,7 @@ if (FALSE) {
   ) +
     geom_point() +
     geom_line() +
-    facet_grid(cols=dplyr::vars(reg_true), rows=dplyr::vars(distr_A)) +
+    facet_grid(cols=dplyr::vars(surv_true), rows=dplyr::vars(distr_A)) +
     scale_y_continuous(labels=percent) +
     theme(legend.position="bottom") +
     scale_color_manual(values=m_colors) +
@@ -661,20 +467,24 @@ if (FALSE) {
 if (FALSE) {
   
   # Generate data
-  C <- list(points=c(0.5,0.8))
-  dat <- generate_data(n=5000, alpha_3=0.7, distr_A="Unif(0,1)",
-                       surv_true="CoxPH", sampling="two-phase")
+  {
+    C <- list(lambda=10^-4, v=1.5, lambda2=0.5*10^-4, v2=1.5,
+              points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
+    alpha_3 <- 0.7
+    dat <- generate_data(
+      n = 5000,
+      alpha_3 = alpha_3,
+      distr_A = "Unif(0,1)",
+      surv_true = "Cox PH",
+      sampling = "two-phase"
+    )
+  }
   
-  
-  S_n <- construct_S_n(dat, type="Cox")
+  S_n <- construct_S_n(dat, type="Cox PH")
   
   S_0 <- Vectorize(function(t, w1, w2, a) {
-    lambda <- 10^(-4)
-    v <- 1.5
-    alpha <- c(0.3,0.7,0.5)
-    alpha_3 <- 0.7
-    lin <- alpha[1]*w1 + alpha[2]*w2 + alpha_3*a
-    return(exp(-1*lambda*(t^v)*exp(lin)))
+    lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
+    return(exp(-1*C$lambda*(t^C$v)*exp(lin)))
   })
   
   # Plot true curve against estimated curve
@@ -691,7 +501,7 @@ if (FALSE) {
       S_0(t=times, w1=0, w2=1, a=1),
       S_0(t=times, w1=1, w2=1, a=1)
     ),
-    which = rep(c("Cox","True S_0"), each=4*length(times)),
+    which = rep(c("Cox PH","True S_0"), each=4*length(times)),
     covs = rep(rep(c("w1=0,a=0","w1=1,a=0","w1=0,a=1","w1=1,a=1"),2),
                each=length(times))
   )
@@ -712,19 +522,24 @@ if (FALSE) {
 if (FALSE) {
   
   # Generate data
-  C <- list(points=c(0.5,0.8))
-  dat <- generate_data(n=5000, alpha_3=0.7, distr_A="Unif(0,1)",
-                       surv_true="CoxPH", sampling="two-phase")
-  
-  Sc_n <- construct_S_n(dat, type="Cox", csf=TRUE)
-  
-  Sc_0 <- Vectorize(function(t, w1, w2, a) {
-    lambda2 <- 0.5 * 10^(-4)
-    v2 <- 1.5
-    alpha <- c(0.3,0.7,0.5)
+  {
+    C <- list(lambda=10^-4, v=1.5, lambda2=0.5*10^-4, v2=1.5,
+              points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
     alpha_3 <- 0.7
-    lin <- alpha[1]*w1 + alpha[2]*w2 + alpha_3*a
-    return(exp(-1*lambda2*(t^v2)*exp(lin)))
+    dat <- generate_data(
+      n = 5000,
+      alpha_3 = alpha_3,
+      distr_A = "Unif(0,1)",
+      surv_true = "Cox PH",
+      sampling = "two-phase"
+    )
+  }
+  
+  Sc_n <- construct_S_n(dat, type="Cox PH", csf=TRUE)
+  
+  S_0 <- Vectorize(function(t, w1, w2, a) {
+    lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
+    return(exp(-1*C$lambda2*(t^C$v2)*exp(lin)))
   })
   
   # Plot true curve against estimated curve
@@ -741,7 +556,7 @@ if (FALSE) {
       Sc_0(t=times, w1=0, w2=1, a=1),
       Sc_0(t=times, w1=1, w2=1, a=1)
     ),
-    which = rep(c("Cox","True S^C_0"), each=4*length(times)),
+    which = rep(c("Cox PH","True S^C_0"), each=4*length(times)),
     covs = rep(rep(c("w1=0,a=0","w1=1,a=0","w1=0,a=1","w1=1,a=1"),2),
                each=length(times))
   )
@@ -762,44 +577,82 @@ if (FALSE) {
 if (FALSE) {
   
   # Generate data
-  C <- list(points=c(0.5,0.8))
-  dat <- generate_data(n=5000, alpha_3=0.7, distr_A="Unif(0,1)",
-                       surv_true="CoxPH", sampling="two-phase")
+  {
+    C <- list(lambda=10^-4, v=1.5, lambda2=0.5*10^-4, v2=1.5,
+              points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
+    dat <- generate_data(
+      n = 1000,
+      alpha_3 = 0.7,
+      distr_A = "Unif(0,1)",
+      surv_true = "Cox PH",
+      sampling = "two-phase"
+    )
+  }
   
-  Sc_n <- construct_S_n(dat, type="Cox", csf=TRUE)
-  
-  Sc_0 <- Vectorize(function(t, w1, w2, a) {
-    lambda2 <- 0.5 * 10^(-4)
-    v2 <- 1.5
-    alpha <- c(0.3,0.7,0.5)
-    alpha_3 <- 0.7
-    lin <- alpha[1]*w1 + alpha[2]*w2 + alpha_3*a
-    return(exp(-1*lambda2*(t^v2)*exp(lin)))
-  })
-  
-  # Plot true curve against estimated curve
-  times <- c(1:200)
-  df <- data.frame(
-    time = rep(times, 8),
-    survival = c(
-      Sc_n(t=times, w1=0, w2=1, a=0),
-      Sc_n(t=times, w1=1, w2=1, a=0),
-      Sc_n(t=times, w1=0, w2=1, a=1),
-      Sc_n(t=times, w1=1, w2=1, a=1),
-      Sc_0(t=times, w1=0, w2=1, a=0),
-      Sc_0(t=times, w1=1, w2=1, a=0),
-      Sc_0(t=times, w1=0, w2=1, a=1),
-      Sc_0(t=times, w1=1, w2=1, a=1)
+  # Obtain estimates
+  ests <- est_curve(
+    dat = dat,
+    estimator = "Generalized Grenander",
+    params = list(
+      S_n_type = "Cox PH",
+      g_n_type = "parametric",
+      ci_type = "logit" # none
     ),
-    which = rep(c("Cox","True S^C_0"), each=4*length(times)),
-    covs = rep(rep(c("w1=0,a=0","w1=1,a=0","w1=0,a=1","w1=1,a=1"),2),
-               each=length(times))
+    points = C$points
   )
-  ggplot(df, aes(x=time, y=survival, color=which)) +
+  
+  # Return results
+  theta_true <- attr(dat, "theta_true")
+  theta_ests <- c()
+  ci_lo <- c()
+  ci_hi <- c()
+  len <- length(C$points)
+  for (i in 1:len) {
+    theta_ests <- c(theta_ests, ests[[i]]$est)
+    ci_lo <- c(ci_lo, ests[[i]]$ci_lo)
+    ci_hi <- c(ci_hi, ests[[i]]$ci_hi)
+  }
+  
+  plot_data <- data.frame(
+    x = rep(C$points, 2),
+    theta = c(theta_ests, theta_true),
+    which = rep(c("Estimate","Truth"), each=len),
+    ci_lo = c(ci_lo, theta_true),
+    ci_hi = c(ci_hi, theta_true)
+  )
+  ggplot(plot_data, aes(x=x, y=theta, color=factor(which))) +
     geom_line() +
-    facet_wrap(~covs, ncol=2) +
-    labs(title="Estimation of conditional survival: S_0[t|W,A]",
-         color="Estimator")
+    ylim(c(0,1)) +
+    labs(color="Which", fill="Which") +
+    geom_ribbon(
+      aes(ymin=ci_lo, ymax=ci_hi, fill=factor(which)),
+      alpha = 0.2,
+      linetype = "dotted"
+    )
+  
+  # # Plot true curve against estimated curve
+  # times <- c(1:200)
+  # df <- data.frame(
+  #   time = rep(times, 8),
+  #   survival = c(
+  #     Sc_n(t=times, w1=0, w2=1, a=0),
+  #     Sc_n(t=times, w1=1, w2=1, a=0),
+  #     Sc_n(t=times, w1=0, w2=1, a=1),
+  #     Sc_n(t=times, w1=1, w2=1, a=1),
+  #     Sc_0(t=times, w1=0, w2=1, a=0),
+  #     Sc_0(t=times, w1=1, w2=1, a=0),
+  #     Sc_0(t=times, w1=0, w2=1, a=1),
+  #     Sc_0(t=times, w1=1, w2=1, a=1)
+  #   ),
+  #   which = rep(c("Cox PH","True S^C_0"), each=4*length(times)),
+  #   covs = rep(rep(c("w1=0,a=0","w1=1,a=0","w1=0,a=1","w1=1,a=1"),2),
+  #              each=length(times))
+  # )
+  # ggplot(df, aes(x=time, y=survival, color=which)) +
+  #   geom_line() +
+  #   facet_wrap(~covs, ncol=2) +
+  #   labs(title="Estimation of conditional survival: S_0[t|W,A]",
+  #        color="Estimator")
   
 }
 
@@ -817,14 +670,17 @@ if (FALSE) {
   sampling <- "two-phase"                     # iid two-phase
   
   # Generate data
-  C <- list(alpha_0=-1.5, alpha_1=0.3, alpha_2=0.7, alpha_4=-0.3)
-  dat <- generate_data(
-    n = n,
-    alpha_3 = 0.7,
-    distr_A = distr_A,
-    reg_true = "Logistic",
-    sampling = sampling
-  )
+  {
+    C <- list(lambda=10^-4, v=1.5, lambda2=0.5*10^-4, v2=1.5,
+              points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
+    dat <- generate_data(
+      n = n,
+      alpha_3 = 0.7,
+      distr_A = distr_A,
+      surv_true = "Cox PH",
+      sampling = sampling
+    )
+  }
   
   # True conditional density function
   f_aIw_0 <- function(a,w1,w2) {
@@ -890,7 +746,7 @@ if (FALSE) {
       
       wlik <- function(par) {
         
-        # par[1] through par[k-1] are the hazard components for the bins 1 to k-1
+        # par[1] through par[k-1] are the hazard components for bins 1 to k-1
         # par[k] and par[k+1] correspond to W1 and W2
         sum_loglik <- sum(sapply(c(1:n_trunc), function(i) {
           lik <- dens(a=dat_trunc$a[i], w1=dat_trunc$w1[i], w2=dat_trunc$w2[i],

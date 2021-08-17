@@ -109,13 +109,13 @@ ss <- function(dat_orig) {
 #' 
 #' @param dat Dataset returned by generate_data(); accepts either full data or
 #'     truncated data
-#' @param type Currently only "Cox" is implemented
+#' @param type Currently only "Cox PH" is implemented
 #' @param csf Logical; if TRUE, estimate the conditional survival
 #'     function of the censoring distribution instead
 #' @return Conditional density estimator function
 construct_S_n <- function(dat, type, csf=FALSE) {
   
-  if (type=="Cox") {
+  if (type=="Cox PH") {
     
     weights <- wts(dat, scale="mean 1")
     
@@ -135,9 +135,9 @@ construct_S_n <- function(dat, type, csf=FALSE) {
     return(memoise(Vectorize(function(t, w1, w2, a){
       
       index <- which.min(abs(bh$time-t))
-      H_0_t <- bh$hazard[index]
-      lin <- coeffs[1]*w1 + coeffs[2]*w2 + coeffs[3]*a
-      return(exp(-1*H_0_t*exp(lin)))
+      H_0 <- bh$hazard[index]
+      lin <- coeffs[[1]]*w1 + coeffs[[2]]*w2 + coeffs[[3]]*a
+      return(exp(-1*H_0*exp(lin)))
       
     })))
     
@@ -147,25 +147,16 @@ construct_S_n <- function(dat, type, csf=FALSE) {
 
 
 
-#' Construct g-computation estimator function
+#' Construct g-computation estimator function of theta_0
 #' 
 #' @param dat Dataset returned by generate_data(); must be full data
 #' @param mu_n A regression estimator returned by construct_mu_n()
 #' @return G-computation estimator of theta_0
-construct_gcomp <- function(dat, mu_n) {
+construct_gcomp <- function(dat_orig, S_n) {
   
-  # Declare gcomp function
-  gcomp <- function(a) {
-    mean(apply(
-      X = dat,
-      MARGIN = 1,
-      FUN = function(r) {
-        mu_n(a, r[["w1"]], r[["w2"]])
-      }
-    ))
-  }
-  
-  return(memoise(Vectorize(gcomp)))
+  return(memoise(Vectorize(function(a) {
+    1 - mean(S_n(C$t_e, dat_orig$w1, dat_orig$w2, a))
+  })))
   
 }
 
@@ -196,23 +187,60 @@ construct_deriv_theta_n <- function(gcomp_n) {
   }
   
   return(memoise(Vectorize(deriv_theta_n)))
-  
-  return(deriv_theta_n)
-  
+
 }
 
 
 
-#' Construct conditional variance estimator function sigma^2_n(Y|A,W)
+#' Construct tau_n Chernoff scale factor function
 #' 
-#' @param mu_n Dataset returned by generate_data()
-#' @param mu2_n Currently only "logistic"
-#' @return Conditional variane estimator function
-construct_sigma2_n <- function(mu_n, mu2_n) {
+#' @param deriv_theta_n A derivative estimator returned by
+#'     deriv_theta_n()
+#' @param gamma_n Nuisance function estimator returned by construct_gamma_n()
+#' @param f_a_n Density estimator returned by construct_f_a_n()
+#' @return Chernoff scale factor estimator function
+construct_tau_n <- function(deriv_theta_n, gamma_n, f_a_n) {
   
-  return(memoise(Vectorize(function(a, w1, w2){
-    mu2_n(a,w1,w2) - (mu_n(a,w1,w2))^2
+  return(memoise(Vectorize(function(x){
+    (4*deriv_theta_n(x)*f_a_n(x)*gamma_n(x))^(1/3)
   })))
+
+}
+
+
+
+#' Construct gamma_n nuisance estimator function
+#' 
+#' @param dat_orig Dataset returned by generate_data(); this must be the FULL
+#'     DATA, including the "missing" observations
+#' @param type Type of regression; currently only c("linear")
+#' @param omega_n A nuisance influence function returned by construct_omega_n()
+#' @param f_aIw_n A conditional density estimator returned by
+#'     construct_f_aIw_n()
+#' @return gamma_n nuisance estimator function
+construct_gamma_n <- function(dat_orig, type, omega_n, f_aIw_n) {
+  
+  # Construct weights
+  s <- ss(dat_orig)
+  dat_orig$weights <- wts(dat_orig, scale="none")
+  
+  # Construct pseudo-outcomes
+  dat_orig %<>% mutate(
+    po = ifelse(
+      is.na(a),
+      0,
+      ( (omega_n(w1,w2,y_star,delta_star,a))*(weights/s)) / f_aIw_n(a,w1,w2) )^2
+  )
+  
+  # Run regression
+  if (type=="linear") {
+    model <- lm(po~a, data=filter(dat_orig,!is.na(a)), weights=weights)
+    coeff <- as.numeric(model$coefficients)
+    
+    return(memoise(Vectorize(function(x){
+      coeff[1] + coeff[2]*x
+    })))
+  }
   
 }
 
@@ -226,14 +254,9 @@ construct_sigma2_n <- function(mu_n, mu2_n) {
 #' @return Marginal density estimator function
 construct_f_a_n <- function(dat, f_aIw_n) {
   
-  w1 <- dat$w1
-  w2 <- dat$w2
-  
-  f_a_n <- function (a) {
-    mean(f_aIw_n(a,w1,w2))
-  }
-  
-  return(memoise(Vectorize(f_a_n)))
+  return(memoise(Vectorize(function(a) {
+    mean(f_aIw_n(a,dat$w1,dat$w2))
+  })))
 
 }
 
@@ -366,20 +389,29 @@ construct_g_n <- function(f_aIw_n, f_a_n) {
 #'     construct_S_n
 #' @param m Number of partitions used for the integral approximation
 #' @return Estimator function of nuisance omega_0
-construct_omega_n <- function(S_n, Sc_n, m=100) {
+construct_omega_n <- function(S_n, Sc_n, m=400) {
   
   return(memoise(Vectorize(function(w1,w2,y_star,delta_star,a) {
     
-    indices <- c(1:m)
+    i <- c(1:m)
     k <- min(y_star,C$t_e)
+    # integral <- sum(
+    #   ( S_n(t=(i*k)/m, w1,w2,a) - S_n(t=((i-1)*k)/m, w1,w2,a) ) *
+    #   ( (S_n(t=(i*k)/m, w1,w2,a))^2 * Sc_n(t=(i*k)/m, w1,w2,a) )^-1
+    # )
+    # S_n(t=C$t_e, w1,w2,a) * (
+    #   ( delta_star * as.integer(y_star<=C$t_e) ) /
+    #   ( S_n(t=y_star, w1,w2,a) * Sc_n(t=y_star, w1,w2,a) ) +
+    #   integral
+    # )
     integral <- sum(
-      ( S_n(t=(i*k)/m, w1,w2,a) - S_n(t=((i-1)*k)/m, w1,w2,a) ) *
-      ( (S_n(t=(i*k)/m, w1,w2,a))^2 * Sc_n(t=(i*k)/m, w1,w2,a) )^-1
+      ( S_n(t=round((i*k)/m), w1,w2,a) - S_n(t=round(((i-1)*k)/m), w1,w2,a) ) *
+        ( (S_n(t=round((i*k)/m), w1,w2,a))^2 * Sc_n(t=round((i*k)/m), w1,w2,a) )^-1
     )
     S_n(t=C$t_e, w1,w2,a) * (
       ( delta_star * as.integer(y_star<=C$t_e) ) /
-      ( S_n(t=y_star, w1,w2,a) * Sc_n(t=y_star, w1,w2,a) ) +
-      integral
+        ( S_n(t=round(y_star), w1,w2,a) * Sc_n(t=round(y_star), w1,w2,a) ) +
+        integral
     )
     
   })))
@@ -459,7 +491,7 @@ lambda <- function(k, G, dat_orig) {
 #' 
 #' @param dat_orig Dataset returned by generate_data(); this must be the FULL
 #'     DATA, including the "missing" observations
-#' @param omega_n A regression function returned by construct_omega_n()
+#' @param omega_n A nuisance influence function returned by construct_omega_n()
 #' @param S_n A conditional survival function returned by construct_S_n()
 #' @param g_n A density ratio estimator function returned by construct_g_n()
 #' @return Gamma_n estimator
@@ -485,7 +517,10 @@ construct_Gamma_n <- function(dat_orig, omega_n, S_n, g_n) {
   delta_star_i_long <- dat$delta_star[i_long]
   delta_star_j_long <- dat$delta_star[j_long]
   
-  subpiece_1a <- ( 1 + omega_n(dat$a,dat$w1,dat$w2) / g_n(dat$a,dat$w1,dat$w2) ) * ( weights / s )
+  subpiece_1a <- ( 1 + (
+    omega_n(dat$w1,dat$w2,dat$y_star,dat$delta_star,dat$a) /
+    g_n(dat$a,dat$w1,dat$w2)
+  ) ) * ( weights / s )
   subpiece_2a <- S_n(C$t_e, w1_j_long, w2_j_long, a_i_long) / (
     s^2 * Pi(delta_star_i_long, w1_i_long, w2_i_long) *
       Pi(delta_star_j_long, w1_j_long, w2_j_long)

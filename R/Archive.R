@@ -1,4 +1,80 @@
 
+# Old conditional variance function
+if (F) {
+  
+  #' Construct conditional variance estimator function sigma^2_n(Y|A,W)
+  #' 
+  #' @param mu_n Dataset returned by generate_data()
+  #' @param mu2_n Currently only "logistic"
+  #' @return Conditional variane estimator function
+  construct_sigma2_n <- function(mu_n, mu2_n) {
+    
+    return(memoise(Vectorize(function(a, w1, w2){
+      mu2_n(a,w1,w2) - (mu_n(a,w1,w2))^2
+    })))
+    
+  }
+  
+}
+
+# Old visualizations (Bias, MSE, Coverage in one graph)
+if (F) {
+  
+  # Export: 6" x 4"
+  distr_A_ <- "Beta(0.9,1.1+0.4*w2)" # Unif(0,1) Beta(0.9,1.1+0.4*w2)
+  estimand_ <- "Midpoint" # Midpoint Endpoint
+  ggplot(
+    filter(p_data, distr_A==distr_A_ & estimand==estimand_),
+    aes(x=n, y=value, color=Estimator)
+  ) +
+    geom_hline(
+      aes(yintercept=y),
+      data=data.frame(y=0.95, stat="Coverage"),
+      linetype="longdash", color="grey"
+    ) +
+    geom_point() +
+    geom_line() +
+    # geom_bar(stat="identity", position=position_dodge(),
+    #          width=0.8, color="white", size=0.35) +
+    facet_grid_sc(cols=dplyr::vars(reg_true), rows=dplyr::vars(stat),
+                  scales=list(y=list(
+                    Bias = scale_y_continuous(labels = percent_format()),
+                    Coverage = scale_y_continuous(labels = percent_format()),
+                    MSE = scale_y_continuous()
+                  ))) +
+    theme(legend.position="bottom") +
+    # scale_color_manual(values=m_colors) +
+    labs(title=paste0("Estimand: ",estimand_,"; MargDist(A): ",distr_A_),
+         y=NULL, x=NULL, color="Estimator")
+  
+  
+  # !!!!! Temp (export 7.5 x 4.5)
+  distr_A_ <- "Beta(0.9,1.1+0.4*w2)" # Unif(0,1) Beta(0.9,1.1+0.4*w2)
+  estimand_ <- "Endpoint" # Midpoint Endpoint
+  ggplot(
+    filter(p_data, distr_A==distr_A_ & estimand==estimand_),
+    aes(x=sampling, y=value, fill=Estimator)
+  ) +
+    geom_hline(
+      aes(yintercept=y),
+      data=data.frame(y=0.95, stat="Coverage"),
+      linetype="longdash", color="grey"
+    ) +
+    geom_bar(stat="identity", position=position_dodge(),
+             width=0.8, color="white", size=0.35) +
+    facet_grid_sc(cols=dplyr::vars(reg_true), rows=dplyr::vars(stat),
+                  scales=list(y=list(
+                    Bias = scale_y_continuous(labels = percent_format()),
+                    Coverage = scale_y_continuous(labels = percent_format()),
+                    MSE = scale_y_continuous()
+                  ))) +
+    theme(legend.position="bottom") +
+    scale_fill_manual(values=m_colors) +
+    labs(title=paste0("Estimand: ",estimand_,"; MargDist(A): ",distr_A_),
+         y=NULL, x=NULL, color="Estimator")
+  
+}
+
 # Testing of regression estimators
 if (F) {
   

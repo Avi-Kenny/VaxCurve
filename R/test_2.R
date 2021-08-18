@@ -1,6 +1,6 @@
 #' Testing approach 2: regression slope
 #' 
-#' @param dat Data returned by generate_data()
+#' @param dat_orig Data returned by generate_data(); FULL data
 #' @param alt_type Type of alternative hypothesis; either "incr" or "decr";
 #'     currently unused
 #' @param params A list, containing the following:
@@ -11,10 +11,47 @@
 #'   - `var` Variance estimation; one of c("boot","mixed boot")
 #'   - `boot_reps` Number of bootstrap replicates to run
 #' @return Binary; is null rejected (1) or not (0)
-#' @notes
-#'   - Note
-
-test_2 <- function(dat, alt_type="incr", params) {
+test_2 <- function(dat_orig, alt_type="incr", params) {
+  
+  if (params$var=="asymptotic") {
+    
+    # Construct component functions
+    ss <- ss(dat_orig)
+    n_orig <- nrow(dat_orig)
+    dat <- dat_orig %>% filter(!is.na(a))
+    weights_n <- wts(dat, scale="none")
+    G_n <- construct_Phi_n(dat_orig)
+    f_aIw_n <- construct_f_aIw_n(dat, type=params$g_n_type)
+    f_a_n <- construct_f_a_n(dat_orig, f_aIw_n)
+    g_n <- construct_g_n(f_aIw_n, f_a_n)
+    S_n <- construct_S_n(dat, type=params$S_n_type)
+    Sc_n <- construct_S_n(dat, type=params$S_n_type, csf=TRUE)
+    omega_n <- construct_omega_n(S_n, Sc_n)
+    Gamma_n <- construct_Gamma_n(dat_orig, omega_n, S_n, g_n)
+    gcomp_n <- construct_gcomp(dat_orig, S_n=S_0)
+    eta_n <- construct_eta_n(dat_orig, S_n=S_0)
+    
+    # Compute the test statistic
+    beta_n <- (1/n_orig) * sum(
+      (weights/ss) * (
+        lambda(2, G_n, dat)*(G_n(dat$a))^2 -
+        lambda(3, G_n, dat)*G_n(dat$a)
+      ) *
+      (Gamma_n(dat$a))
+    )
+    
+    # Estimate the test statistic variance
+    infl_fn_1 <- construct_infl_fn_1(dat_orig, Gamma_n, Phi_n=G_n)
+    infl_fn_Gamma <- construct_infl_fn_Gamma(omega_n, g_n, gcomp_n, eta_n,
+                                             Gamma_n)
+    infl_fn_2 <- construct_infl_fn_2(dat_orig, Phi_n=G_n, infl_fn_Gamma)
+    var_hat <- beta_n_var_hat(dat_orig, infl_fn_1, infl_fn_2) / nrow(dat_orig)
+    sd_hat <- sqrt(var_hat)
+    
+    # Calculate critical value (for a one-sided test)
+    crit_val <- qnorm(0.05, mean=beta_n, sd=sd_hat)
+    
+  }
   
   if (params$var=="boot") {
     
@@ -30,12 +67,12 @@ test_2 <- function(dat, alt_type="incr", params) {
       weights_0 <- wts(dat_0, scale="none")
       G_0 <- construct_Phi_n(dat)
       f_aIw_n <- construct_f_aIw_n(dat_0, type=params$g_n_type)
-      f_a_n <- construct_f_a_n(dat_0, f_aIw_n=f_aIw_n)
+      f_a_n <- construct_f_a_n(dat_orig, f_aIw_n=f_aIw_n)
       g_0 <- construct_g_n(f_aIw_n, f_a_n)
       S_0 <- construct_S_n(dat, type=params$S_n_type)
       Sc_0 <- construct_S_n(dat, type=params$S_n_type, csf=TRUE)
       omega_0 <- construct_omega_n(S_0, Sc_0)
-      Gamma_0 <- construct_Gamma_n(dat, omega_0, S_0, g_0)
+      Gamma_0 <- construct_Gamma_n(dat_orig, omega_0, S_0, g_0)
       
       beta_0 <- (1/n_orig) * sum(
         (weights_0/ss_0) *
@@ -59,12 +96,12 @@ test_2 <- function(dat, alt_type="incr", params) {
     # Calculate critical value (for a one-sided test)
     crit_val <- qnorm(0.05, mean=mean(boot_obj$t), sd=sd(boot_obj$t))
     
-  } else if (params$var=="mixed boot") {
+  }
+  
+  if (params$var=="mixed boot") {
     
     # Pre-calculate non-bootstrapped pieces
     {
-      # !!!!! Update
-      
       dat_0_orig <- dat
       ss_0 <- ss(dat_0_orig)
       n_orig <- nrow(dat_0_orig)
@@ -73,17 +110,18 @@ test_2 <- function(dat, alt_type="incr", params) {
       weights_0 <- wts(dat_0, scale="none")
       
       G_0 <- construct_Phi_n(dat_0_orig)
-      # mu_0 <- construct_mu_n(dat_0, type=params$mu_n_type) # !!!!! Update
-      
+      S_0 <- construct_S_n(dat_0, type=params$S_n_type)
+      Sc_0 <- construct_S_n(dat_0, type=params$S_n_type, csf=TRUE)
+      omega_0 <- construct_omega_n(S_0, Sc_0)
       f_aIw_n <- construct_f_aIw_n(dat_0, type=params$g_n_type)
-      f_a_n <- construct_f_a_n(dat_0, f_aIw_n=f_aIw_n)
+      f_a_n <- construct_f_a_n(dat_0_orig, f_aIw_n=f_aIw_n)
       g_0 <- construct_g_n(f_aIw_n, f_a_n)
-      Gamma_0 <- construct_Gamma_n(dat_0_orig, mu_0, g_0)
+      Gamma_0 <- construct_Gamma_n(dat_0_orig, omega_0, S_0, g_0)
       lambda_2 <- lambda(k=2, G_0, dat_0)
       lambda_3 <- lambda(k=3, G_0, dat_0)
-      eta_0 <- construct_eta_n(dat_0_orig, mu_0)
-      theta_naive_0 <- construct_theta_naive_n(dat_0_orig, mu_0)
-      
+      eta_0 <- construct_eta_n(dat_0_orig, S_0)
+      gcomp_0 <- construct_gcomp(dat_0_orig, S_0)
+
       beta_0 <- (1/n_orig) * sum(
         (weights_0/ss_0) *
           (
@@ -143,7 +181,7 @@ test_2 <- function(dat, alt_type="incr", params) {
                 (
                   ( y_b_long - mu_0(a_b_long, w1_b_long, w2_b_long) ) /
                     g_0(a_b_long, w1_b_long, w2_b_long) +
-                    theta_naive_0(a_b_long)
+                    gcomp_0(a_b_long)
                 )
             ) +
               eta_0(a_0_long, w1_b_long, w2_b_long) -
@@ -165,8 +203,6 @@ test_2 <- function(dat, alt_type="incr", params) {
     # Calculate critical value (for a one-sided test)
     crit_val <- qnorm(0.05, mean=mean(boot_obj$t), sd=sd(boot_obj$t))
     
-  } else {
-    stop("Invalid specification for params$var")
   }
   
   return(as.integer(crit_val>0))

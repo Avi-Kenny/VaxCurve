@@ -1,4 +1,243 @@
 
+# New test statistic variance estimator
+if (F) {
+  
+  # Set up data
+  {
+    C <- list(lambda=10^-4, v=1.5, lambda2=0.5*10^-4, v2=1.5,
+              points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
+    
+    dat <- generate_data(
+      n = 800, # 5000
+      alpha_3 = 0.7,
+      distr_A = "Unif(0,1)",
+      surv_true = "Cox PH",
+      sampling = "iid" # iid two-phase
+    )
+  }
+  
+  # Define the statistic to bootstrap
+  bootstat <- function(dat_orig, indices) {
+    
+    dat <- dat_orig[indices,]
+    
+    ss_0 <- ss(dat)
+    n_orig <- nrow(dat)
+    dat_0 <- dat %>% filter(!is.na(a))
+    n_0 <- nrow(dat_0)
+    weights_0 <- wts(dat_0, scale="none")
+    G_0 <- construct_Phi_n(dat)
+    f_aIw_n <- construct_f_aIw_n(dat_0, type="parametric")
+    f_a_n <- construct_f_a_n(dat_0, f_aIw_n=f_aIw_n)
+    g_0 <- construct_g_n(f_aIw_n, f_a_n)
+    S_0 <- construct_S_n(dat, type="Cox PH")
+    Sc_0 <- construct_S_n(dat, type="Cox PH", csf=TRUE)
+    omega_0 <- construct_omega_n(S_0, Sc_0)
+    Gamma_0 <- construct_Gamma_n(dat, omega_0, S_0, g_0)
+    
+    beta_0 <- (1/n_orig) * sum(
+      (weights_0/ss_0) *
+        (
+          lambda(2, G_0, dat)*(G_0(dat_0$a))^2 -
+          lambda(3, G_0, dat)*G_0(dat_0$a)
+        ) *
+        (Gamma_0(dat_0$a))
+    )
+    
+    return (beta_0)
+    
+  }
+  
+  # Run bootstrap
+  boot_obj <- boot(data=dat, statistic=bootstat, R=50)
+  
+  # # Calculate beta_n
+  # beta_0 <- bootstat(dat, c(1:nrow(dat)))
+
+  # See actual distribution of test statistic
+  betas <- c()
+  for (i in 1:50) {
+    
+    dat <- generate_data(
+      n = 800, # 5000
+      alpha_3 = 0.7,
+      distr_A = "Unif(0,1)",
+      surv_true = "Cox PH",
+      sampling = "iid" # iid two-phase
+    )
+    
+    beta_0 <- bootstat(dat, c(1:nrow(dat)))
+    betas <- c(betas, beta_0)
+    
+  }
+  
+  # New variance estimator
+  {
+    # Set up component functions
+    ss_0 <- ss(dat)
+    n_orig <- nrow(dat)
+    dat_0 <- dat %>% filter(!is.na(a))
+    n_0 <- nrow(dat_0)
+    weights_0 <- wts(dat_0, scale="none")
+    G_0 <- construct_Phi_n(dat)
+    f_aIw_n <- construct_f_aIw_n(dat_0, type="parametric")
+    f_a_n <- construct_f_a_n(dat_0, f_aIw_n=f_aIw_n)
+    g_0 <- construct_g_n(f_aIw_n, f_a_n)
+    S_0 <- construct_S_n(dat, type="Cox PH")
+    Sc_0 <- construct_S_n(dat, type="Cox PH", csf=TRUE)
+    omega_0 <- construct_omega_n(S_0, Sc_0)
+    Gamma_0 <- construct_Gamma_n(dat, omega_0, S_0, g_0)
+    gcomp_n <- construct_gcomp(dat_orig=dat, S_n=S_0)
+    eta_n <- construct_eta_n(dat_orig=dat, S_n=S_0)
+    
+    # Define component 1 influence function
+    construct_infl_fn_1 <- function(dat_orig, Gamma_n, Phi_n) {
+      
+      ss <- ss(dat_orig)
+      n_orig <- nrow(dat_orig)
+      dat <- dat_orig %>% filter(!is.na(a))
+      wts_j <- wts(dat, scale="none")
+      a_j <- dat$a
+      
+      return(memoise(Vectorize(function(w1,w2,y_star,delta_star,delta,a) {
+        
+        piece_1 <- (1/n_orig) * sum( (wts_j/ss) * (
+          ((2/3)*Phi_n(a_j)-(1/4))*as.integer(a<=a_j) -
+            (Phi_n(a_j))^2 +
+            (1/2)*Phi_n(a_j)
+        ) * Gamma_n(a_j))
+        
+        piece_2 <- ((1/3)*Phi_n(a)^2 - (1/4)*Phi_n(a)) * Gamma_n(a)
+        
+        return(
+          (delta/Pi(delta_star, w1, w2)) * (piece_1+piece_2)
+        )
+        
+      })))
+      
+    }
+    
+    # Define Gamma_n influence function
+    construct_infl_fn_Gamma <- function(omega_n, g_n, gcomp_n, eta_n, Gamma_n) {
+      
+      return(memoise(Vectorize(function(x,w1,w2,y_star,delta_star,delta,a) {
+        (delta/Pi(delta_star, w1, w2)) * (
+          as.integer(a<=x)*(
+            (omega_n(w1,w2,y_star,delta_star,a)/g_n(a,w1,w2)) + gcomp_n(a)
+          ) +
+            eta_n(x,w1,w2) -
+            2*Gamma_n(x)
+        )
+      })))
+      
+    }
+    
+    # Define component 2 influence function
+    construct_infl_fn_2 <- function(dat_orig, Phi_n, infl_fn_Gamma) {
+      
+      ss <- ss(dat_orig)
+      n_orig <- nrow(dat_orig)
+      dat <- dat_orig %>% filter(!is.na(a))
+      wts_j <- wts(dat, scale="none")
+      a_j <- dat$a
+      
+      return(memoise(Vectorize(function(w1,w2,y_star,delta_star,delta,a) {
+        (1/n_orig) * sum( (wts_j/ss) * (
+          ( (1/3)*(Phi_n(a_j))^2 - (1/4)*Phi_n(a_j) ) *
+            infl_fn_Gamma(a_j,w1,w2,y_star,delta_star,delta,a)
+        ))
+      })))
+      
+    }
+    
+    infl_fn_1 <- construct_infl_fn_1(dat_orig=dat, Gamma_n=Gamma_0, Phi_n=G_0)
+    infl_fn_Gamma <- construct_infl_fn_Gamma(omega_n=omega_0, g_n=g_0,
+                                             gcomp_n=gcomp_n, eta_n,
+                                             Gamma_n=Gamma_0)
+    infl_fn_2 <- construct_infl_fn_2(dat_orig=dat, Phi_n=G_0, infl_fn_Gamma)
+    
+    # Define variance estimator
+    var_est <- function(dat_orig, infl_fn_1, infl_fn_2) {
+      
+      n_orig <- nrow(dat_orig)
+      dat <- dat_orig %>% filter(!is.na(a))
+      
+      return(
+        (1/n_orig) * sum((
+          infl_fn_1(dat$w1, dat$w2, dat$y_star, dat$delta_star,
+                    dat$delta, dat$a) +
+          infl_fn_2(dat$w1, dat$w2, dat$y_star, dat$delta_star,
+                    dat$delta, dat$a)
+        )^2)
+      )
+      
+    }
+    
+  }
+  
+  var_est <- var_est(dat_orig=dat, infl_fn_1, infl_fn_2)
+  
+  # Bootstrap SE
+  # n=400: 0.0002719989
+  # n=800: 0.0001763408
+  print(sd(boot_obj$t))
+  
+  # Empirical SE
+  # n=400: 0.0002465471
+  # n=800: 0.0001991434
+  print(sd(betas))
+  
+  # New variance estimator
+  # n=400: 0.0002176057
+  # n=800: 0.0001671064
+  print(sqrt(var_est/nrow(dat)))
+  
+}
+
+# Probability integral transform
+if (F) {
+  
+  x <- rbeta(5,0.1,0.1)
+  F_n <- ecdf(x)
+  print(x)
+  print(F_n(x))
+  
+  n <- 100
+  i <- c(1:n)
+  sum(i^2)
+  n^3/3 + n^2/2 + n/6
+  sum(i^3)
+  n^4/4 + n^3/2 + n^2/4
+  
+}
+
+# Benchmarking hashing/memoising structures
+if (F) {
+  
+  library(memoise)
+  library(microbenchmark)
+  
+  # Unmemoised function
+  fn <- function(x,y) { x*y*1000 }
+  
+  # memoise() vs. new.env()
+  mem_fn <- memoise(fn)
+  htab <- new.env()
+  
+  # Initialize hash structures
+  for (i in c(1:20)) {
+    for (j in c(1:20)) {
+      x <- mem_fn(i,j)
+      htab[[paste0(i,";",j)]] <- x
+    }
+  }
+  
+  # Run benchmarks
+  microbenchmark({x <- mem_fn(5,6)}, times=1000L)
+  microbenchmark({x <- htab[[paste0(5,";",6)]]}, times=1000L)
+  
+}
+
 # TEMP
 if (F) {
   

@@ -9,10 +9,10 @@
 # devtools::install_github("tedwestling/ctsCausal")
 # devtools::install_github("zeehio/facetscales")
 cfg <- list(
-  which_sim = "estimation", # estimation testing
-  level_set_which = "level_set_temp", # level_set_estimation_1 level_set_testing_1
+  which_sim = "testing", # estimation testing
+  level_set_which = "level_set_testing_1", # level_set_estimation_1 level_set_testing_1
   run_or_update = "run",
-  num_sim = 500,
+  num_sim = 1,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats",
            "fdrtool", "splines", "survival"), # "ranger", "ctsCausal", "SuperLearner", "earth", "Rsolnp", "sets"
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
@@ -74,7 +74,7 @@ if (FALSE) {
             points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
   
   dat <- generate_data(
-    n = 1000, # 5000
+    n = 100, # 5000
     alpha_3 = 0.7,
     distr_A = "Unif(0,1)",
     surv_true = "Cox PH",
@@ -88,6 +88,17 @@ if (FALSE) {
     points = C$points
   )
   
+  reject <- test_2(
+    dat = dat,
+    alt_type = "incr",
+    params = list(
+      var = "mixed boot",
+      S_n_type="Cox PH",
+      g_n_type = "parametric",
+      boot_reps = 5
+    )
+  )
+
 }
 
 
@@ -158,20 +169,17 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
     # distr_A = c("Unif(0,1)", "Beta(0.9,1.1+0.4*w2)"), # "Beta(0.8+0.9*w1,0.8+0.4*w2)"
     surv_true = "Cox PH",
     # surv_true = c("Cox PH", "Complex"),
-    sampling = "two-phase", # iid
+    sampling = "iid", # iid two-phase
     test = list(
-      "Slope (mixed boot)" = list(
+      "Slope" = list(
         type = "test_2",
         params = list(
-          var = "mixed boot",
+          var = "asymptotic",
           S_n_type="Cox PH",
-          g_n_type = "parametric",
-          boot_reps = 3
+          g_n_type = "parametric"
           # boot_reps = 100
         )
       )
-      # "Wald" = list(type="test_wald", params=list())
-      # "Westling 2020" = list(type="test_causalnull", params=list()) # !!!!! Not yet ready
     )
   )
   
@@ -220,7 +228,8 @@ if (cfg$run_or_update=="run") {
         "construct_Phi_n", "construct_S_n", "construct_tau_n",
         "deriv_expit", "deriv_logit", "est_curve", "expit", "generate_data",
         "lambda", "logit", "one_simulation", "Pi", "ss", "test_2","test_wald",
-        "wts"
+        "wts", "construct_infl_fn_1", "construct_infl_fn_2",
+        "construct_infl_fn_Gamma", "beta_n_var_hat"
       )
       for (method in methods) {
         sim %<>% add_method(method, eval(as.name(method)))

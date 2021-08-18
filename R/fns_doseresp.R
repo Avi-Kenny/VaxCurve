@@ -248,14 +248,14 @@ construct_gamma_n <- function(dat_orig, type, omega_n, f_aIw_n) {
 
 #' Construct estimator of marginal density f_A
 #' 
-#' @param dat Dataset returned by generate_data(); must be full data
+#' @param dat_orig Dataset returned by generate_data(); must be full data
 #' @param f_aIw_n A conditional density estimator returned by
 #'     construct_f_aIw_n()
 #' @return Marginal density estimator function
-construct_f_a_n <- function(dat, f_aIw_n) {
+construct_f_a_n <- function(dat_orig, f_aIw_n) {
   
   return(memoise(Vectorize(function(a) {
-    mean(f_aIw_n(a,dat$w1,dat$w2))
+    mean(f_aIw_n(a,dat_orig$w1,dat_orig$w2))
   })))
 
 }
@@ -424,32 +424,17 @@ construct_omega_n <- function(S_n, Sc_n, m=400) {
 #' 
 #' @param dat_orig Dataset returned by generate_data(); this must be the FULL
 #'     DATA, including the "missing" observations
+#' @param S_n Conditional survival function estimator returned by construct_S_n
 #' @return Estimator function of nuisance eta_0
-construct_eta_n <- function(dat_orig, mu_n) {
+construct_eta_n <- function(dat_orig, S_n) {
   
-  s <- ss(dat_orig)
+  ss <- ss(dat_orig)
   n_orig <- nrow(dat_orig)
   dat <- dat_orig %>% filter(!is.na(a))
   weights <- wts(dat, scale="none")
   
   return(memoise(Vectorize(function(x,w1,w2) {
-    sum(weights * as.integer(dat$a<=x) * mu_n(dat$a,w1,w2)) / (n_orig*s)
-  })))
-  
-}
-
-
-
-#' Construct nuisance estimator theta_naive_n
-#' 
-#' @param dat_orig Dataset returned by generate_data(); this must be the FULL
-#'     DATA, including the "missing" observations
-#' @return The "naive" estimator of theta_0
-#' @notes This is a "simple" estimator of theta_n rather than the Grenander type
-construct_theta_naive_n <- function(dat_orig, mu_n) {
-  
-  return(memoise(Vectorize(function(a) {
-    mean(mu_n(a,dat_orig$w1,dat_orig$w2))
+    sum(weights * as.integer(dat$a<=x) * (1-S_n(C$t_e, w1, w2, dat$a))) / (n_orig*ss)
   })))
   
 }
@@ -602,37 +587,97 @@ test_wald <- function(dat, alt_type="incr", params) {
 
 
 
-#' Westling 2020 test of the causal null
+#' !!!!! document
 #' 
-#' @param dat Data returned by generate_data_dr()
-#' @param params Unused
-#' @return Binary; is null rejected (1) or not (0)
-test_causalnull <- function(dat, alt_type="incr", params) {
+#' @param x x
+#' @return x
+construct_infl_fn_1 <- function(dat_orig, Gamma_n, Phi_n) {
   
-  if (attr(dat, "sampling")=="iid") {
+  ss <- ss(dat_orig)
+  n_orig <- nrow(dat_orig)
+  dat <- dat_orig %>% filter(!is.na(a))
+  wts_j <- wts(dat, scale="none")
+  a_j <- dat$a
+  
+  return(memoise(Vectorize(function(w1,w2,y_star,delta_star,delta,a) {
     
-    Y <- dat$y
-    A <- dat$a
-    W <- subset(dat, select=c(w1,w2))
+    piece_1 <- (1/n_orig) * sum( (wts_j/ss) * (
+      ((2/3)*Phi_n(a_j)-(1/4))*as.integer(a<=a_j) -
+        (Phi_n(a_j))^2 +
+        (1/2)*Phi_n(a_j)
+    ) * Gamma_n(a_j))
     
-    test_obj <- causalNullTest(
-      Y = Y,
-      A = A,
-      W = W,
-      p = 2
-      # control = list()
+    piece_2 <- ((1/3)*Phi_n(a)^2 - (1/4)*Phi_n(a)) * Gamma_n(a)
+    
+    return(
+      (delta/Pi(delta_star, w1, w2)) * (piece_1+piece_2)
     )
     
-  } else if (attr(dat, "sampling")=="two-phase") {
-    # Multiple imputation step for two-phase sampled data
-    # !!!!! TO DO !!!!!
-    stop("Not yet implemented for two-phase sampling")
-  }
+  })))
   
-  # !!!!! Right now this is a two-sided test, being compared to a one-sided test
-  two_sided_p <- test_obj$test$p.val
-  reject <- as.integer(two_sided_p<0.05)
+}
+
+
+
+#' !!!!! document
+#' 
+#' @param x x
+#' @return x
+construct_infl_fn_Gamma <- function(omega_n, g_n, gcomp_n, eta_n, Gamma_n) {
   
-  return (reject)
+  return(memoise(Vectorize(function(x,w1,w2,y_star,delta_star,delta,a) {
+    (delta/Pi(delta_star, w1, w2)) * (
+      as.integer(a<=x)*(
+        (omega_n(w1,w2,y_star,delta_star,a)/g_n(a,w1,w2)) + gcomp_n(a)
+      ) +
+        eta_n(x,w1,w2) -
+        2*Gamma_n(x)
+    )
+  })))
+  
+}
+
+
+
+#' !!!!! document
+#' 
+#' @param x x
+#' @return x
+construct_infl_fn_2 <- function(dat_orig, Phi_n, infl_fn_Gamma) {
+  
+  ss <- ss(dat_orig)
+  n_orig <- nrow(dat_orig)
+  dat <- dat_orig %>% filter(!is.na(a))
+  wts_j <- wts(dat, scale="none")
+  a_j <- dat$a
+  
+  return(memoise(Vectorize(function(w1,w2,y_star,delta_star,delta,a) {
+    (1/n_orig) * sum( (wts_j/ss) * (
+      ( (1/3)*(Phi_n(a_j))^2 - (1/4)*Phi_n(a_j) ) *
+        infl_fn_Gamma(a_j,w1,w2,y_star,delta_star,delta,a)
+    ))
+  })))
+  
+}
+
+
+
+#' !!!!! document
+#' 
+#' @param x x
+#' @return x
+beta_n_var_hat <- function(dat_orig, infl_fn_1, infl_fn_2) {
+  
+  n_orig <- nrow(dat_orig)
+  dat <- dat_orig %>% filter(!is.na(a))
+  
+  return(
+    (1/n_orig) * sum((
+      infl_fn_1(dat$w1, dat$w2, dat$y_star, dat$delta_star,
+                dat$delta, dat$a) +
+        infl_fn_2(dat$w1, dat$w2, dat$y_star, dat$delta_star,
+                  dat$delta, dat$a)
+    )^2)
+  )
   
 }

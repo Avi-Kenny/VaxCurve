@@ -40,14 +40,23 @@ deriv_logit <- function(x) {
 
 #' Probability of sampling
 #' 
+#' @param sampling One of c("iid", "two-phase")
 #' @param y Vector `y` of dataset returned by generate_data()
 #' @param w1 Vector `w1` of dataset returned by generate_data()
 #' @param w2 Vector `w2` of dataset returned by generate_data()
 #' @return A vector of probabilities of sampling
-Pi <- function(delta_star, w1, w2) {
+Pi <- function(sampling, delta_star, w1, w2) {
   
-  pi <- function(w1,w2) { expit(w1+w2) }
-  return(delta_star + (1-delta_star)*pi(w1,w2))
+  if (sampling=="iid") {
+    
+    return(rep(1, length(w1)))
+    
+  } else if (sampling=="two-phase") {
+    
+    pi <- function(w1,w2) { expit(w1+w2) }
+    return(delta_star + (1-delta_star)*pi(w1,w2))
+    
+  }
   
 }
 
@@ -62,11 +71,7 @@ Pi <- function(delta_star, w1, w2) {
 #'   - Pi is accessed globally
 wts <- function(dat, scale) {
   
-  if (attr(dat, "sampling")=="iid") {
-    weights <- rep(1, nrow(dat))
-  } else if (attr(dat, "sampling")=="two-phase") {
-    weights <- 1 / Pi(dat$delta_star, dat$w1, dat$w2)
-  }
+  weights <- 1 / Pi(attr(dat,"sampling"), dat$delta_star, dat$w1, dat$w2)
   
   if (scale=="sum 1") {
     weights <- weights / sum(weights)
@@ -89,16 +94,15 @@ wts <- function(dat, scale) {
 #' @return IP weight stabilization factor "s"
 #' @notes
 #'   - wts is accessed globally (and therefore so is Pi)
-ss <- function(dat_orig) {
+stab <- function(dat_orig) {
   
-  if (attr(dat_orig, "sampling")=="iid") {
+  if (attr(dat_orig,"sampling")=="iid") {
     return(1)
-  } else if (attr(dat_orig, "sampling")=="two-phase") {
+  } else if (attr(dat_orig,"sampling")=="two-phase") {
     n_orig <- nrow(dat_orig)
     dat_orig %<>% filter(!is.na(a))
     weights <- wts(dat_orig, scale="none")
-    s <- sum(weights)/n_orig
-    return(s)
+    return(sum(weights)/n_orig)
   }
   
 }
@@ -213,7 +217,7 @@ construct_tau_n <- function(deriv_theta_n, gamma_n, f_a_n) {
 #' 
 #' @param dat_orig Dataset returned by generate_data(); this must be the FULL
 #'     DATA, including the "missing" observations
-#' @param type Type of regression; currently only c("linear")
+#' @param type Type of regression; one of c("linear", "cubic")
 #' @param omega_n A nuisance influence function returned by construct_omega_n()
 #' @param f_aIw_n A conditional density estimator returned by
 #'     construct_f_aIw_n()
@@ -221,7 +225,7 @@ construct_tau_n <- function(deriv_theta_n, gamma_n, f_a_n) {
 construct_gamma_n <- function(dat_orig, type, omega_n, f_aIw_n) {
   
   # Construct weights
-  s <- ss(dat_orig)
+  s <- stab(dat_orig)
   dat_orig$weights <- wts(dat_orig, scale="none")
   
   # Construct pseudo-outcomes
@@ -239,6 +243,16 @@ construct_gamma_n <- function(dat_orig, type, omega_n, f_aIw_n) {
     
     return(memoise(Vectorize(function(x){
       coeff[1] + coeff[2]*x
+    })))
+  }
+  
+  # Run regression
+  if (type=="cubic") {
+    model <- lm(po~a+I(a^2)+I(a^3), data=filter(dat_orig,!is.na(a)), weights=weights)
+    coeff <- as.numeric(model$coefficients)
+    
+    return(memoise(Vectorize(function(x){
+      coeff[1] + coeff[2]*x + coeff[3]*(x^2) + coeff[4]*(x^3)
     })))
   }
   
@@ -395,6 +409,7 @@ construct_omega_n <- function(S_n, Sc_n, m=400) {
     
     i <- c(1:m)
     k <- min(y_star,C$t_e)
+    
     # integral <- sum(
     #   ( S_n(t=(i*k)/m, w1,w2,a) - S_n(t=((i-1)*k)/m, w1,w2,a) ) *
     #   ( (S_n(t=(i*k)/m, w1,w2,a))^2 * Sc_n(t=(i*k)/m, w1,w2,a) )^-1
@@ -428,13 +443,17 @@ construct_omega_n <- function(S_n, Sc_n, m=400) {
 #' @return Estimator function of nuisance eta_0
 construct_eta_n <- function(dat_orig, S_n) {
   
-  ss <- ss(dat_orig)
+  s <- stab(dat_orig)
   n_orig <- nrow(dat_orig)
   dat <- dat_orig %>% filter(!is.na(a))
   weights <- wts(dat, scale="none")
   
   return(memoise(Vectorize(function(x,w1,w2) {
-    sum(weights * as.integer(dat$a<=x) * (1-S_n(C$t_e, w1, w2, dat$a))) / (n_orig*ss)
+    sum(
+      weights * as.integer(dat$a<=x) *
+      (1-S_n(C$t_e, w1, w2, dat$a))
+    ) /
+    (n_orig*s)
   })))
   
 }
@@ -451,22 +470,14 @@ construct_eta_n <- function(dat_orig, S_n) {
 #' @return Value of lambda
 lambda <- function(k, G, dat_orig) {
   
-  if (attr(dat_orig, "sampling")=="iid") {
-    
-    return( mean((G(dat_orig$a))^k) )
-    
-  } else if (attr(dat_orig, "sampling")=="two-phase") {
-    
-    n_orig <- nrow(dat_orig)
-    s_0 <- ss(dat_orig)
-    dat <- dat_orig %>% filter(!is.na(a))
-    weights_0 <- wts(dat, scale="none")
-    lambda <- (1/n_orig) * sum(
-      (weights_0/s_0) * (G(dat$a))^k
-    )
-    return(lambda)
-    
-  }
+  n_orig <- nrow(dat_orig)
+  s <- stab(dat_orig)
+  dat <- dat_orig %>% filter(!is.na(a))
+  weights <- wts(dat, scale="none")
+  lambda <- (1/n_orig) * sum(
+    (weights/s) * (G(dat$a))^k
+  )
+  return(lambda)
   
 }
 
@@ -486,7 +497,7 @@ construct_Gamma_n <- function(dat_orig, omega_n, S_n, g_n) {
   
   dat <- dat_orig
   
-  s <- ss(dat)
+  s <- stab(dat_orig)
   n_orig <- nrow(dat)
   dat %<>% filter(!is.na(a))
   n <- nrow(dat)
@@ -502,13 +513,14 @@ construct_Gamma_n <- function(dat_orig, omega_n, S_n, g_n) {
   delta_star_i_long <- dat$delta_star[i_long]
   delta_star_j_long <- dat$delta_star[j_long]
   
+  sampling <- attr(dat,"sampling")
   subpiece_1a <- ( 1 + (
     omega_n(dat$w1,dat$w2,dat$y_star,dat$delta_star,dat$a) /
     g_n(dat$a,dat$w1,dat$w2)
   ) ) * ( weights / s )
   subpiece_2a <- S_n(C$t_e, w1_j_long, w2_j_long, a_i_long) / (
-    s^2 * Pi(delta_star_i_long, w1_i_long, w2_i_long) *
-      Pi(delta_star_j_long, w1_j_long, w2_j_long)
+    s^2 * Pi(sampling, delta_star_i_long, w1_i_long, w2_i_long) *
+    Pi(sampling, delta_star_j_long, w1_j_long, w2_j_long)
   )
   
   return(
@@ -541,7 +553,7 @@ construct_Gamma_n <- function(dat_orig, omega_n, S_n, g_n) {
 construct_Phi_n <- function (dat_orig, type="ecdf") {
   
   dat <- dat_orig
-  s <- ss(dat)
+  s <- stab(dat_orig)
   dat <- cbind(dat, wts=wts(dat, scale="none"))
   dat %<>% arrange(a)
   n_orig <- nrow(dat)
@@ -551,8 +563,8 @@ construct_Phi_n <- function (dat_orig, type="ecdf") {
   vals_y <- c()
   for (j in 1:length(vals_x)) {
     indices <- which(dat$a==vals_x[j])
-    wts_j <- dat$wts[indices]
-    new_y_val <- sum(wts_j) / (n_orig*s)
+    weights_j <- dat$wts[indices]
+    new_y_val <- sum(weights_j) / (n_orig*s)
     vals_y <- c(vals_y, new_y_val)
   }
   vals_y <- cumsum(vals_y)
@@ -591,26 +603,68 @@ test_wald <- function(dat, alt_type="incr", params) {
 #' 
 #' @param x x
 #' @return x
-construct_infl_fn_1 <- function(dat_orig, Gamma_n, Phi_n) {
+construct_rho_n <- function(dat_orig, Phi_n) {
   
-  ss <- ss(dat_orig)
+  s <- stab(dat_orig)
   n_orig <- nrow(dat_orig)
   dat <- dat_orig %>% filter(!is.na(a))
-  wts_j <- wts(dat, scale="none")
+  weights_j <- wts(dat, scale="none")
   a_j <- dat$a
+  
+  return(memoise(Vectorize(function(a) {
+    
+    return((1/n_orig) * sum(
+      (weights_j/s) * (Phi_n(a_j)^3) * (as.integer(a<=a_j) - Phi_n(a_j))
+    ))
+    
+  })))
+  
+}
+
+
+
+#' !!!!! document
+#' 
+#' @param x x
+#' @return x
+construct_xi_n <- function(Phi_n, lambda_2, lambda_3) {
+  
+  return(memoise(Vectorize(function(a_i,a_j) {
+    return(
+      (2*as.integer(a_i<=a_j) - 3*Phi_n(a_j))*Phi_n(a_j)*lambda_2 +
+      (2*Phi_n(a_j) - as.integer(a_i<=a_j))*lambda_3
+    )
+  })))
+  
+}
+
+
+
+#' !!!!! document
+#' 
+#' @param x x
+#' @return x
+construct_infl_fn_1 <- function(dat_orig, Gamma_n, Phi_n, xi_n, rho_n,
+                                lambda_2, lambda_3) {
+  
+  s <- stab(dat_orig)
+  n_orig <- nrow(dat_orig)
+  dat <- dat_orig %>% filter(!is.na(a))
+  weights_j <- wts(dat, scale="none")
+  a_j <- dat$a
+  sampling <- attr(dat,"sampling")
   
   return(memoise(Vectorize(function(w1,w2,y_star,delta_star,delta,a) {
     
-    piece_1 <- (1/n_orig) * sum( (wts_j/ss) * (
-      ((2/3)*Phi_n(a_j)-(1/4))*as.integer(a<=a_j) -
-        (Phi_n(a_j))^2 +
-        (1/2)*Phi_n(a_j)
-    ) * Gamma_n(a_j))
+    piece_1 <- (1/n_orig) * sum(
+      # (weights_j/s) * (xi_n(a,a_j)-rho_n(a)) * Gamma_n(a_j)
+      (weights_j/s) * (xi_n(a,a_j)) * Gamma_n(a_j)
+    )
     
-    piece_2 <- ((1/3)*Phi_n(a)^2 - (1/4)*Phi_n(a)) * Gamma_n(a)
+    piece_2 <- (lambda_2*(Phi_n(a)^2) - lambda_3*Phi_n(a)) * Gamma_n(a)
     
     return(
-      (delta/Pi(delta_star, w1, w2)) * (piece_1+piece_2)
+      (delta/(s*Pi(sampling, delta_star,w1,w2))) * (piece_1+piece_2)
     )
     
   })))
@@ -623,10 +677,14 @@ construct_infl_fn_1 <- function(dat_orig, Gamma_n, Phi_n) {
 #' 
 #' @param x x
 #' @return x
-construct_infl_fn_Gamma <- function(omega_n, g_n, gcomp_n, eta_n, Gamma_n) {
+construct_infl_fn_Gamma <- function(dat_orig, omega_n, g_n, gcomp_n, eta_n,
+                                    Gamma_n) {
+  
+  s <- stab(dat_orig)
+  sampling <- attr(dat_orig,"sampling")
   
   return(memoise(Vectorize(function(x,w1,w2,y_star,delta_star,delta,a) {
-    (delta/Pi(delta_star, w1, w2)) * (
+    (delta/(s*Pi(sampling, delta_star,w1,w2))) * (
       as.integer(a<=x)*(
         (omega_n(w1,w2,y_star,delta_star,a)/g_n(a,w1,w2)) + gcomp_n(a)
       ) +
@@ -643,17 +701,18 @@ construct_infl_fn_Gamma <- function(omega_n, g_n, gcomp_n, eta_n, Gamma_n) {
 #' 
 #' @param x x
 #' @return x
-construct_infl_fn_2 <- function(dat_orig, Phi_n, infl_fn_Gamma) {
+construct_infl_fn_2 <- function(dat_orig, Phi_n, infl_fn_Gamma, lambda_2,
+                                lambda_3) {
   
-  ss <- ss(dat_orig)
+  s <- stab(dat_orig)
   n_orig <- nrow(dat_orig)
   dat <- dat_orig %>% filter(!is.na(a))
-  wts_j <- wts(dat, scale="none")
+  weights_j <- wts(dat, scale="none")
   a_j <- dat$a
   
   return(memoise(Vectorize(function(w1,w2,y_star,delta_star,delta,a) {
-    (1/n_orig) * sum( (wts_j/ss) * (
-      ( (1/3)*(Phi_n(a_j))^2 - (1/4)*Phi_n(a_j) ) *
+    (1/n_orig) * sum((weights_j/s) * (
+      ( lambda_2*(Phi_n(a_j)^2) - lambda_3*Phi_n(a_j) ) *
         infl_fn_Gamma(a_j,w1,w2,y_star,delta_star,delta,a)
     ))
   })))

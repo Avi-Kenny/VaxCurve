@@ -9,10 +9,10 @@
 # devtools::install_github("tedwestling/ctsCausal")
 # devtools::install_github("zeehio/facetscales")
 cfg <- list(
-  which_sim = "testing", # estimation testing
-  level_set_which = "level_set_testing_1", # level_set_estimation_1 level_set_testing_1
+  which_sim = "estimation", # estimation testing
+  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
   run_or_update = "run",
-  num_sim = 1,
+  num_sim = 500,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats",
            "fdrtool", "splines", "survival"), # "ranger", "ctsCausal", "SuperLearner", "earth", "Rsolnp", "sets"
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
@@ -72,15 +72,17 @@ if (FALSE) {
   
   C <- list(lambda=10^-4, v=1.5, lambda2=0.5*10^-4, v2=1.5,
             points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
+  # C <- list(lambda=10^-4, v=1.5, lambda2=0.3*10^-5, v2=1.5,
+  #           points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
   
   dat <- generate_data(
-    n = 100, # 5000
+    n = 400, # 5000
     alpha_3 = 0.7,
     distr_A = "Unif(0,1)",
     surv_true = "Cox PH",
     sampling = "iid" # iid two-phase
   )
-  
+
   ests <- est_curve(
     dat = dat,
     estimator = "Generalized Grenander",
@@ -92,7 +94,7 @@ if (FALSE) {
     dat = dat,
     alt_type = "incr",
     params = list(
-      var = "mixed boot",
+      var = "asymptotic",
       S_n_type="Cox PH",
       g_n_type = "parametric",
       boot_reps = 5
@@ -111,7 +113,7 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
   
   # !!!!! Temp/testing !!!!!
   level_set_temp <- list(
-    n = 5000,
+    n = 1000,
     alpha_3 = 0.75,
     distr_A = "Unif(0,1)",
     surv_true = "Cox PH", # "Cox PH" "Complex"
@@ -139,8 +141,9 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
     n = 5000,
     alpha_3 = 0.75,
     distr_A = c("Unif(0,1)", "Beta(0.9,1.1+0.4*w2)"), # "Beta(0.8+0.9*w1,0.8+0.4*w2)"
-    surv_true = c("Cox PH", "Complex"),
-    sampling = "two-phase", # c("iid", "two-phase")
+    surv_true = "Cox PH",
+    # surv_true = c("Cox PH", "Complex"),
+    sampling = "two-phase",
     estimator = list(
       "G-comp" = list(
         est = "G-comp",
@@ -161,24 +164,23 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
   # Testing: compare all methods
   # Not currently using (var="boot")
   level_set_testing_1 <- list(
-    n = 200,
-    # n = 1000,
-    alpha_3 = 0.75,
-    # alpha_3 = c(0,0.25,0.5), # c(0,0.25,0.5,0.75)
-    distr_A = "Unif(0,1)",
-    # distr_A = c("Unif(0,1)", "Beta(0.9,1.1+0.4*w2)"), # "Beta(0.8+0.9*w1,0.8+0.4*w2)"
+    # n = c(1000,2000),
+    n = 1000,
+    alpha_3 = c(0,0.4,0.8),
+    distr_A = c("Unif(0,1)", "Beta(0.9,1.1+0.4*w2)"), # "Beta(0.8+0.9*w1,0.8+0.4*w2)"
     surv_true = "Cox PH",
     # surv_true = c("Cox PH", "Complex"),
-    sampling = "iid", # iid two-phase
+    sampling = "two-phase", # iid two-phase
     test = list(
-      "Slope" = list(
+      "Slope (est lambdas)" = list(
         type = "test_2",
-        params = list(
-          var = "asymptotic",
-          S_n_type="Cox PH",
-          g_n_type = "parametric"
-          # boot_reps = 100
-        )
+        params = list(var="asymptotic", S_n_type="Cox PH",
+                      g_n_type="parametric", est_known_nuis=TRUE)
+      ),
+      "Slope (true lambdas)" = list(
+        type = "test_2",
+        params = list(var="asymptotic", S_n_type="Cox PH",
+                      g_n_type="parametric", est_known_nuis=FALSE)
       )
     )
   )
@@ -227,7 +229,7 @@ if (cfg$run_or_update=="run") {
         "construct_Gamma_n", "construct_gcomp", "construct_omega_n",
         "construct_Phi_n", "construct_S_n", "construct_tau_n",
         "deriv_expit", "deriv_logit", "est_curve", "expit", "generate_data",
-        "lambda", "logit", "one_simulation", "Pi", "ss", "test_2","test_wald",
+        "lambda", "logit", "one_simulation", "Pi", "stab", "test_2","test_wald",
         "wts", "construct_infl_fn_1", "construct_infl_fn_2",
         "construct_infl_fn_Gamma", "beta_n_var_hat"
       )
@@ -300,7 +302,7 @@ if (cfg$run_or_update=="update") {
 if (FALSE) {
   
   # Read in simulation object
-  sim <- readRDS("../simba.out/sim_est_20210722_mod.simba")
+  sim <- readRDS("../simba.out/sim_est_20210816_2_incomplete.simba")
   
   # Summarize results
   # !!!!! Count the number of NAs in coverage
@@ -342,14 +344,14 @@ if (FALSE) {
                  "#0072B2", "#D55E00", "#CC79A7", "#999999")
   m_colors <- c(
     `G-comp` = cb_colors[1],
-    `Grenander (logit CIs)` = cb_colors[2],
-    `Grenander (split CIs, m=5)` = cb_colors[3]
+    `Grenander (logit CIs)` = cb_colors[2]
+    # `Grenander (split CIs, m=5)` = cb_colors[3]
     # `Grenander (regular CIs)` = cb_colors[4],
   )
   
   # Bias plot
   # Export: 8" x 5"
-  p_data %<>% filter(sampling=="two-phase") # !!!!!
+  # p_data %<>% filter(sampling=="two-phase") # !!!!!
   ggplot(
     filter(p_data, stat=="bias"),
     aes(x=point, y=value, color=Estimator, group=Estimator)
@@ -357,7 +359,8 @@ if (FALSE) {
     geom_point() +
     geom_line() +
     facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(surv_true)) +
-    scale_y_continuous(labels=percent) +
+    scale_y_continuous(labels=percent, limits=c(-0.12,0.12)) +
+    # scale_y_continuous(labels=percent) +
     scale_color_manual(values=m_colors) +
     labs(title="Bias (%)", x="A", y=NULL, color="Estimator")
   
@@ -546,7 +549,7 @@ if (FALSE) {
   
   Sc_n <- construct_S_n(dat, type="Cox PH", csf=TRUE)
   
-  S_0 <- Vectorize(function(t, w1, w2, a) {
+  Sc_0 <- Vectorize(function(t, w1, w2, a) {
     lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
     return(exp(-1*C$lambda2*(t^C$v2)*exp(lin)))
   })
@@ -594,7 +597,7 @@ if (FALSE) {
       alpha_3 = 0.7,
       distr_A = "Unif(0,1)",
       surv_true = "Cox PH",
-      sampling = "two-phase"
+      sampling = "iid"
     )
   }
   
@@ -609,7 +612,7 @@ if (FALSE) {
     ),
     points = C$points
   )
-  
+
   # Return results
   theta_true <- attr(dat, "theta_true")
   theta_ests <- c()

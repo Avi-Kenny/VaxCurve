@@ -1,15 +1,17 @@
 
-# New test statistic variance estimator
+# Checking the influence function of Gamma_n
 if (F) {
   
   # Set up data
   {
+    # C <- list(lambda=10^-4, v=1.5, lambda2=0.3*10^-5, v2=1.5,
+    #           points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
     C <- list(lambda=10^-4, v=1.5, lambda2=0.5*10^-4, v2=1.5,
               points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
     
     dat <- generate_data(
-      n = 800, # 5000
-      alpha_3 = 0.7,
+      n = 400, # 5000
+      alpha_3 = 0,
       distr_A = "Unif(0,1)",
       surv_true = "Cox PH",
       sampling = "iid" # iid two-phase
@@ -19,178 +21,245 @@ if (F) {
   # Define the statistic to bootstrap
   bootstat <- function(dat_orig, indices) {
     
-    dat <- dat_orig[indices,]
+    dat_orig <- dat_orig[indices,]
     
-    ss_0 <- ss(dat)
-    n_orig <- nrow(dat)
-    dat_0 <- dat %>% filter(!is.na(a))
-    n_0 <- nrow(dat_0)
-    weights_0 <- wts(dat_0, scale="none")
-    G_0 <- construct_Phi_n(dat)
-    f_aIw_n <- construct_f_aIw_n(dat_0, type="parametric")
-    f_a_n <- construct_f_a_n(dat_0, f_aIw_n=f_aIw_n)
-    g_0 <- construct_g_n(f_aIw_n, f_a_n)
-    S_0 <- construct_S_n(dat, type="Cox PH")
-    Sc_0 <- construct_S_n(dat, type="Cox PH", csf=TRUE)
-    omega_0 <- construct_omega_n(S_0, Sc_0)
-    Gamma_0 <- construct_Gamma_n(dat, omega_0, S_0, g_0)
+    # Construct component functions
+    s <- stab(dat_orig)
+    n_orig <- nrow(dat_orig)
+    dat <- dat_orig %>% filter(!is.na(a))
+    weights <- wts(dat, scale="none")
+    G_n <- construct_Phi_n(dat_orig)
+    f_aIw_n <- construct_f_aIw_n(dat, type="parametric")
+    f_a_n <- construct_f_a_n(dat_orig, f_aIw_n)
+    g_n <- construct_g_n(f_aIw_n, f_a_n)
+    S_n <- construct_S_n(dat, type="Cox PH")
+    Sc_n <- construct_S_n(dat, type="Cox PH", csf=TRUE)
+    omega_n <- construct_omega_n(S_n, Sc_n)
+    Gamma_n <- construct_Gamma_n(dat_orig, omega_n, S_n, g_n)
     
-    beta_0 <- (1/n_orig) * sum(
-      (weights_0/ss_0) *
-        (
-          lambda(2, G_0, dat)*(G_0(dat_0$a))^2 -
-          lambda(3, G_0, dat)*G_0(dat_0$a)
-        ) *
-        (Gamma_0(dat_0$a))
-    )
-    
-    return (beta_0)
+    # Return the value of Gamma_n(0.5)
+    return (Gamma_n(0.5))
     
   }
   
   # Run bootstrap
   boot_obj <- boot(data=dat, statistic=bootstat, R=50)
   
-  # # Calculate beta_n
-  # beta_0 <- bootstat(dat, c(1:nrow(dat)))
-
   # See actual distribution of test statistic
-  betas <- c()
+  Gammas <- c()
   for (i in 1:50) {
     
     dat <- generate_data(
-      n = 800, # 5000
-      alpha_3 = 0.7,
+      n = 400, # 5000
+      alpha_3 = 0,
       distr_A = "Unif(0,1)",
       surv_true = "Cox PH",
       sampling = "iid" # iid two-phase
     )
     
-    beta_0 <- bootstat(dat, c(1:nrow(dat)))
-    betas <- c(betas, beta_0)
+    Gammas <- c(Gammas, bootstat(dat, c(1:nrow(dat))))
     
   }
   
-  # New variance estimator
+  # Estimate variance using influence function
   {
-    # Set up component functions
-    ss_0 <- ss(dat)
-    n_orig <- nrow(dat)
-    dat_0 <- dat %>% filter(!is.na(a))
-    n_0 <- nrow(dat_0)
-    weights_0 <- wts(dat_0, scale="none")
-    G_0 <- construct_Phi_n(dat)
-    f_aIw_n <- construct_f_aIw_n(dat_0, type="parametric")
-    f_a_n <- construct_f_a_n(dat_0, f_aIw_n=f_aIw_n)
-    g_0 <- construct_g_n(f_aIw_n, f_a_n)
-    S_0 <- construct_S_n(dat, type="Cox PH")
-    Sc_0 <- construct_S_n(dat, type="Cox PH", csf=TRUE)
-    omega_0 <- construct_omega_n(S_0, Sc_0)
-    Gamma_0 <- construct_Gamma_n(dat, omega_0, S_0, g_0)
-    gcomp_n <- construct_gcomp(dat_orig=dat, S_n=S_0)
-    eta_n <- construct_eta_n(dat_orig=dat, S_n=S_0)
     
-    # Define component 1 influence function
-    construct_infl_fn_1 <- function(dat_orig, Gamma_n, Phi_n) {
+    # Construct component functions
+    dat_orig <- dat
+    s <- stab(dat_orig)
+    n_orig <- nrow(dat_orig)
+    dat <- dat_orig %>% filter(!is.na(a))
+    weights <- wts(dat, scale="none")
+    G_n <- construct_Phi_n(dat_orig)
+    f_aIw_n <- construct_f_aIw_n(dat, type="parametric")
+    f_a_n <- construct_f_a_n(dat_orig, f_aIw_n)
+    g_n <- construct_g_n(f_aIw_n, f_a_n)
+    S_n <- construct_S_n(dat, type="Cox PH")
+    Sc_n <- construct_S_n(dat, type="Cox PH", csf=TRUE)
+    omega_n <- construct_omega_n(S_n, Sc_n)
+    gcomp_n <- construct_gcomp(dat_orig, S_n)
+    eta_n <- construct_eta_n(dat_orig, S_n)
+    Gamma_n <- construct_Gamma_n(dat_orig, omega_n, S_n, g_n)
+    
+    # !!!!!
+    if (F) {
       
-      ss <- ss(dat_orig)
-      n_orig <- nrow(dat_orig)
-      dat <- dat_orig %>% filter(!is.na(a))
-      wts_j <- wts(dat, scale="none")
-      a_j <- dat$a
+      plot1 <- ggplot(dat_orig, aes(x=a, y=po)) + geom_point() +
+      geom_smooth(formula=y~x, method=lm)
       
-      return(memoise(Vectorize(function(w1,w2,y_star,delta_star,delta,a) {
-        
-        piece_1 <- (1/n_orig) * sum( (wts_j/ss) * (
-          ((2/3)*Phi_n(a_j)-(1/4))*as.integer(a<=a_j) -
-            (Phi_n(a_j))^2 +
-            (1/2)*Phi_n(a_j)
-        ) * Gamma_n(a_j))
-        
-        piece_2 <- ((1/3)*Phi_n(a)^2 - (1/4)*Phi_n(a)) * Gamma_n(a)
-        
-        return(
-          (delta/Pi(delta_star, w1, w2)) * (piece_1+piece_2)
-        )
-        
-      })))
+      plot2 <- ggplot(dat_orig, aes(x=a, y=po)) + geom_point()
+      model <- lm(po~a, data=filter(dat_orig,!is.na(a)))
+      coeff1 <- as.numeric(model$coefficients)
+      plot2$layers <- c({
+        stat_function(fun = function(x) {
+          coeff1[1] + coeff1[2]*x
+        }, color="turquoise")
+      }, plot2$layers)
+      
+      plot3 <- ggplot(dat_orig, aes(x=a, y=po)) + geom_point()
+      model <- lm(po~a+I(a^2)+I(a^3), data=filter(dat_orig,!is.na(a)))
+      coeff <- as.numeric(model$coefficients)
+      plot3$layers <- c({
+        stat_function(fun = function(x) {
+          coeff[1] + coeff[2]*x + coeff[3]*(x^2) + coeff[4]*(x^3)
+        }, color="turquoise")
+      }, plot3$layers)
+      
+      
+      plot1
+      plot2
+      plot3
+      #
+      
+      
+
       
     }
     
-    # Define Gamma_n influence function
-    construct_infl_fn_Gamma <- function(omega_n, g_n, gcomp_n, eta_n, Gamma_n) {
-      
-      return(memoise(Vectorize(function(x,w1,w2,y_star,delta_star,delta,a) {
-        (delta/Pi(delta_star, w1, w2)) * (
-          as.integer(a<=x)*(
-            (omega_n(w1,w2,y_star,delta_star,a)/g_n(a,w1,w2)) + gcomp_n(a)
-          ) +
-            eta_n(x,w1,w2) -
-            2*Gamma_n(x)
-        )
-      })))
-      
-    }
+    # Construct influence function
+    infl_fn_Gamma <- construct_infl_fn_Gamma(dat_orig, omega_n, g_n, gcomp_n,
+                                             eta_n, Gamma_n)
     
-    # Define component 2 influence function
-    construct_infl_fn_2 <- function(dat_orig, Phi_n, infl_fn_Gamma) {
-      
-      ss <- ss(dat_orig)
-      n_orig <- nrow(dat_orig)
-      dat <- dat_orig %>% filter(!is.na(a))
-      wts_j <- wts(dat, scale="none")
-      a_j <- dat$a
-      
-      return(memoise(Vectorize(function(w1,w2,y_star,delta_star,delta,a) {
-        (1/n_orig) * sum( (wts_j/ss) * (
-          ( (1/3)*(Phi_n(a_j))^2 - (1/4)*Phi_n(a_j) ) *
-            infl_fn_Gamma(a_j,w1,w2,y_star,delta_star,delta,a)
-        ))
-      })))
-      
-    }
-    
-    infl_fn_1 <- construct_infl_fn_1(dat_orig=dat, Gamma_n=Gamma_0, Phi_n=G_0)
-    infl_fn_Gamma <- construct_infl_fn_Gamma(omega_n=omega_0, g_n=g_0,
-                                             gcomp_n=gcomp_n, eta_n,
-                                             Gamma_n=Gamma_0)
-    infl_fn_2 <- construct_infl_fn_2(dat_orig=dat, Phi_n=G_0, infl_fn_Gamma)
-    
-    # Define variance estimator
-    var_est <- function(dat_orig, infl_fn_1, infl_fn_2) {
-      
-      n_orig <- nrow(dat_orig)
-      dat <- dat_orig %>% filter(!is.na(a))
-      
-      return(
-        (1/n_orig) * sum((
-          infl_fn_1(dat$w1, dat$w2, dat$y_star, dat$delta_star,
-                    dat$delta, dat$a) +
-          infl_fn_2(dat$w1, dat$w2, dat$y_star, dat$delta_star,
-                    dat$delta, dat$a)
-        )^2)
-      )
-      
-    }
+    # Estimate variance and SD
+    var_hat <- mean((
+      infl_fn_Gamma(x=0.5,dat$w1,dat$w2,dat$y_star,dat$delta_star,dat$delta,dat$a)
+    )^2)
+    sd_hat <- sqrt(var_hat/nrow(dat))
     
   }
-  
-  var_est <- var_est(dat_orig=dat, infl_fn_1, infl_fn_2)
   
   # Bootstrap SE
-  # n=400: 0.0002719989
-  # n=800: 0.0001763408
+  # n=400: 0.0315789
+  #        0.03146832
   print(sd(boot_obj$t))
   
   # Empirical SE
-  # n=400: 0.0002465471
-  # n=800: 0.0001991434
+  # n=400: 0.03128305
+  #        0.03187881
+  print(sd(Gammas))
+  
+  # IF-based variance estimator
+  # n=400: 0.02280982
+  #        0.02301398
+  print(sd_hat)
+  
+}
+
+# New test statistic variance estimator
+if (F) {
+  
+  # Set up data
+  {
+    C <- list(lambda=10^-4, v=1.5, lambda2=0.5*10^-4, v2=1.5,
+              points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
+    
+    dat <- generate_data(
+      n = 400, # 5000
+      alpha_3 = 0,
+      distr_A = "Unif(0,1)",
+      surv_true = "Cox PH",
+      sampling = "iid" # iid two-phase
+    )
+  }
+  
+  # New variance estimator
+  # 0.0003858254
+  sd_hat <- test_2(
+    dat_orig = dat,
+    alt_type = "incr",
+    params = list(
+      var = "asymptotic",
+      S_n_type="Cox PH",
+      g_n_type = "parametric"
+    ),
+    return_sd = TRUE
+  )
+  
+  # Define the statistic to bootstrap
+  bootstat <- function(dat_orig, indices) {
+    
+    dat_orig <- dat_orig[indices,]
+    
+    # Construct component functions
+    s <- stab(dat_orig)
+    n_orig <- nrow(dat_orig)
+    dat <- dat_orig %>% filter(!is.na(a))
+    weights <- wts(dat, scale="none")
+    G_n <- construct_Phi_n(dat_orig)
+    f_aIw_n <- construct_f_aIw_n(dat, type="parametric")
+    f_a_n <- construct_f_a_n(dat_orig, f_aIw_n)
+    g_n <- construct_g_n(f_aIw_n, f_a_n)
+    S_n <- construct_S_n(dat, type="Cox PH")
+    Sc_n <- construct_S_n(dat, type="Cox PH", csf=TRUE)
+    omega_n <- construct_omega_n(S_n, Sc_n)
+    Gamma_n <- construct_Gamma_n(dat_orig, omega_n, S_n, g_n)
+    gcomp_n <- construct_gcomp(dat_orig, S_n)
+    eta_n <- construct_eta_n(dat_orig, S_n)
+    rho_n <- construct_rho_n(dat_orig, Phi_n=G_n)
+    xi_n <- construct_xi_n(Phi_n=G_n, lambda_2, lambda_3)
+    lambda_2 <- lambda(2,G_n,dat_orig)
+    lambda_3 <- lambda(3,G_n,dat_orig)
+    
+    # Compute the test statistic
+    beta_n <- (1/n_orig) * sum(
+      (weights/s) * (
+        lambda_2*(G_n(dat$a))^2 -
+          lambda_3*G_n(dat$a)
+      ) *
+        (Gamma_n(dat$a))
+    )
+    
+    return (beta_n)
+    
+  }
+  
+  # dat_backup <- dat
+  # With rho term
+  # > sd_hat
+  # [1] 0.0003745018
+  # 
+  # Without rho term
+  # > sd_hat
+  # [1] 0.0002074883
+  
+  
+  # Run bootstrap
+  boot_obj <- boot(data=dat, statistic=bootstat, R=50)
+  
+  # See actual distribution of test statistic
+  betas <- c()
+  for (i in 1:50) {
+    
+    dat <- generate_data(
+      n = 400, # 5000
+      alpha_3 = 0,
+      distr_A = "Unif(0,1)",
+      surv_true = "Cox PH",
+      sampling = "iid" # iid two-phase
+    )
+    
+    beta_n <- bootstat(dat, c(1:nrow(dat)))
+    betas <- c(betas, beta_n)
+    
+  }
+  
+  # Bootstrap SE
+  # OLD: n=400: 0.0002719989
+  # OLD: n=800: 0.0001763408
+  # n=400: 0.0003272367
+  print(sd(boot_obj$t))
+  
+  # Empirical SE
+  # OLD: n=400: 0.0002465471
+  # OLD: n=800: 0.0001991434
+  # n=400: 0.0002166801
   print(sd(betas))
   
   # New variance estimator
-  # n=400: 0.0002176057
-  # n=800: 0.0001671064
-  print(sqrt(var_est/nrow(dat)))
+  # OLD: n=400: 0.0002176057
+  # OLD: n=800: 0.0001671064
+  # n=400: 0.0003858254
+  print(sd_hat)
   
 }
 
@@ -543,8 +612,8 @@ if (F) {
     s <- sum(dat$wts) / n
     for (j in 1:length(vals_x)) {
       indices <- which(dat$a==vals_x[j])
-      wts_j <- dat$wts[indices]
-      new_y_val <- sum(wts_j) / (n*s)
+      weights_j <- dat$wts[indices]
+      new_y_val <- sum(weights_j) / (n*s)
       vals_y <- c(vals_y, new_y_val)
     }
     vals_y <- cumsum(vals_y)

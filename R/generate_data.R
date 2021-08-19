@@ -71,7 +71,7 @@ generate_data <- function(n, alpha_3, distr_A, surv_true, sampling) {
   
   # Two-phase sampling
   if (sampling=="two-phase") {
-    Pi <- Pi(delta_star,w1,w2)
+    Pi <- Pi("two-phase",delta_star,w1,w2)
     delta <- rbinom(n, size=1, prob=Pi)
     dat <- data.frame(w1=w1, w2=w2, a=ifelse(delta==1,a,NA),
                       y_star=y_star, delta_star=delta_star)

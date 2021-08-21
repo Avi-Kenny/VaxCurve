@@ -1,4 +1,96 @@
 
+# New hashing/memoising structure for creators
+if (F) {
+  
+  # Creator option #1
+  creator_1 <- function(vals) {
+    
+    # Declare function
+    fn <- function(x,y) { x*y }
+    
+    # Set environment
+    htab <- new.env()
+    
+    # Run function on vals
+    for (i in 1:nrow(vals)) {
+      row <- vals[i,]
+      key <- paste(row, collapse=";")
+      htab[[key]] <- do.call("fn", as.list(as.numeric(row)))
+    }
+    
+    return (htab)
+    
+  }
+  
+  # Usage
+  vals <- expand.grid(a=c(1:n), w=c(1:n))
+  fn_1 <- creator_1(vals)
+  z <- function(...) {
+    paste(c(...), collapse=";")
+  }
+  v <- function(fn, ...) {
+    apply(
+      X = cbind(...),
+      MARGIN = 1,
+      FUN = function(x) {fn[[z(x)]]}
+    )
+  }
+  
+  fn_1[[z(1,2)]]
+  fn_1[[z(4,5)]]
+  fn_1[[z(7,8)]]
+  v(fn_1,c(1,4,7),c(2,5,8))
+
+  fn_1[[z(2,2)]]
+  fn_1[[z(2,5)]]
+  fn_1[[z(2,8)]]
+  v(fn_1,3,c(2,5,8))
+  
+  n <- 10000
+  vals <- data.frame(a=c(1:n), w=c(2:(n+1)))
+  
+  microbenchmark({
+    fn_1[["77;98"]]
+  }, times=1000L)
+  microbenchmark({
+    fn_1[[paste(c(77,98), collapse=";")]]
+  }, times=1000L)
+  microbenchmark({
+    fn_1[[z(77,98)]]
+  }, times=1000L)
+
+  # memoise() vs. new.env()
+  mem_fn <- memoise(fn)
+  htab_old <- new.env()
+  
+  # Initialize hash structures
+  # n= 200:  0.4 sec
+  # n= 400:  1.8 sec
+  # n= 800: 10.4 sec
+  # n=1600: 10.4 sec
+  n <- 1600
+  system.time({
+    for (i in c(1:n)) {
+      for (j in c(1:n)) {
+        htab_old[[paste0(i,";",j)]] <- fn(i,j)
+      }
+    }
+  })
+  
+  system.time({
+    for (i in c(1:n)) {
+      for (j in c(1:n)) {
+        x <- mem_fn(i,j)
+      }
+    }
+  })
+  
+  # Run benchmarks
+  microbenchmark({x <- mem_fn(5,6)}, times=1000L)
+  microbenchmark({x <- htab[[paste0(5,";",6)]]}, times=1000L)
+  
+}
+
 # Checking lambda factors with mixture distribution
 if (F) {
   
@@ -306,14 +398,30 @@ if (F) {
   # memoise() vs. new.env()
   mem_fn <- memoise(fn)
   htab <- new.env()
+  htab_old <- new.env()
   
   # Initialize hash structures
-  for (i in c(1:20)) {
-    for (j in c(1:20)) {
-      x <- mem_fn(i,j)
-      htab[[paste0(i,";",j)]] <- x
+  # n= 200:  0.4 sec
+  # n= 400:  1.8 sec
+  # n= 800: 10.4 sec
+  # n=1600: 10.4 sec
+  n <- 1600
+  htab_old <- new.env()
+  system.time({
+    for (i in c(1:n)) {
+      for (j in c(1:n)) {
+        htab_old[[paste0(i,";",j)]] <- fn(i,j)
+      }
     }
-  }
+  })
+  
+  system.time({
+    for (i in c(1:n)) {
+      for (j in c(1:n)) {
+        x <- mem_fn(i,j)
+      }
+    }
+  })
   
   # Run benchmarks
   microbenchmark({x <- mem_fn(5,6)}, times=1000L)

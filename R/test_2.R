@@ -31,7 +31,11 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
     omega_n <- construct_omega_n(S_n, Sc_n)
     Gamma_n <- construct_Gamma_n(dat_orig, omega_n, S_n, g_n)
     gcomp_n <- construct_gcomp(dat_orig, S_n)
-    eta_n <- construct_eta_n(dat_orig, S_n)
+    eta_n <- construct_eta_n(
+      dat_orig,
+      vals = expand.grid(x=seq(0,1,0.01), w1=seq(0,1,0.01), w2=c(0,1)),
+      S_n
+    )
     rho_n <- construct_rho_n(dat_orig, Phi_n=G_n)
     xi_n <- construct_xi_n(Phi_n=G_n, lambda_2, lambda_3)
     lambda_2 <- lambda(2,G_n,dat_orig)
@@ -58,6 +62,14 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
                                              eta_n, Gamma_n)
     infl_fn_2 <- construct_infl_fn_2(dat_orig, Phi_n=G_n, infl_fn_Gamma,
                                      lambda_2, lambda_3)
+    
+    # # !!!!! Test code to speed things up
+    # dat_orig %<>% mutate(
+    #   w1 = round(w1, 2),
+    #   a = round(a, 2),
+    #   y_star = round(y_star, 0)
+    # )
+    
     var_hat <- beta_n_var_hat(dat_orig, infl_fn_1, infl_fn_2) / nrow(dat_orig)
     sd_hat <- sqrt(var_hat)
     

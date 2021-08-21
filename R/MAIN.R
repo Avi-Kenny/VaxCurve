@@ -71,6 +71,7 @@ if (load_pkgs_local) {
 
 if (FALSE) {
   
+  params <- list(g_n_type="parametric", S_n_type="Cox PH")
   C <- list(lambda=10^-4, v=1.5, lambda2=0.5*10^-4, v2=1.5,
             points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
   # C <- list(lambda=10^-4, v=1.5, lambda2=0.3*10^-5, v2=1.5,
@@ -156,7 +157,7 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
     # surv_true = c("Cox PH", "Complex"),
     sampling = "two-phase", # iid two-phase
     test = list(
-      "Slope (true lambdas)" = list(
+      "Slope" = list(
         type = "test_2",
         params = list(var="asymptotic", S_n_type="Cox PH",
                       g_n_type="parametric", est_known_nuis=FALSE)

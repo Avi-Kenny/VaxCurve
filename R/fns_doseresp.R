@@ -38,6 +38,31 @@ deriv_logit <- function(x) {
 
 
 
+#' Helper function to create hashed environment keys
+#' 
+#' @param ... A vector of function arguments
+#' @return Hashed environment key
+z <- function(...) {
+  paste(c(...), collapse=";")
+}
+
+
+
+#' Helper function to access hashed environment values (vectorized)
+#' 
+#' @param fn The hashed environment (function) to access
+#' @param ... One or more parameters to pass to `fn`
+#' @return Values
+v <- function(fn, ...) {
+  apply(
+    X = cbind(...),
+    MARGIN = 1,
+    FUN = function(x) {fn[[paste(c(x), collapse=";")]]}
+  )
+}
+
+
+
 #' Probability of sampling
 #' 
 #' @param sampling One of c("iid", "two-phase")
@@ -441,20 +466,32 @@ construct_omega_n <- function(S_n, Sc_n, m=400) {
 #'     DATA, including the "missing" observations
 #' @param S_n Conditional survival function estimator returned by construct_S_n
 #' @return Estimator function of nuisance eta_0
-construct_eta_n <- function(dat_orig, S_n) {
+construct_eta_n <- function(dat_orig, vals, S_n) {
   
+  # Prep
   s <- stab(dat_orig)
   n_orig <- nrow(dat_orig)
   dat <- dat_orig %>% filter(!is.na(a))
   weights <- wts(dat, scale="none")
   
-  return(memoise(Vectorize(function(x,w1,w2) {
+  # Declare function
+  fn <- function(x,w1,w2) {
     sum(
       weights * as.integer(dat$a<=x) *
-      (1-S_n(C$t_e, w1, w2, dat$a))
+        (1-S_n(C$t_e, w1, w2, dat$a))
+        # (1-v(S_n,C$t_e,w1,w2,dat$a))
     ) /
-    (n_orig*s)
-  })))
+      (n_orig*s)
+  }
+  
+  # Run function on vals and return hashed environment
+  htab <- new.env()
+  for (i in 1:nrow(vals)) {
+    row <- vals[i,]
+    key <- paste(row, collapse=";")
+    htab[[key]] <- do.call(fn, as.list(as.numeric(row)))
+  }
+  return (htab)
   
 }
 
@@ -688,7 +725,8 @@ construct_infl_fn_Gamma <- function(dat_orig, omega_n, g_n, gcomp_n, eta_n,
       as.integer(a<=x)*(
         (omega_n(w1,w2,y_star,delta_star,a)/g_n(a,w1,w2)) + gcomp_n(a)
       ) +
-        eta_n(x,w1,w2) -
+        # eta_n(x,w1,w2) -
+        v(eta_n,round(x,2),round(w1,2),w2) -
         2*Gamma_n(x)
     )
   })))
@@ -730,24 +768,16 @@ beta_n_var_hat <- function(dat_orig, infl_fn_1, infl_fn_2) {
   n_orig <- nrow(dat_orig)
   dat <- dat_orig %>% filter(!is.na(a))
   
-  # b_sum <- 0
-  # for (i in c(1:nrow(dat))) {
-  #   s <- (
-  #     infl_fn_1(dat$w1[i], dat$w2[i], dat$y_star[i], dat$delta_star[i],
-  #               dat$delta[i], dat$a[i]) +
-  #     infl_fn_2(dat$w1[i], dat$w2[i], dat$y_star[i], dat$delta_star[i],
-  #               dat$delta[i], dat$a[i])
-  #   )^2
-  #   b_sum <- b_sum + s
-  # }
-  
-  b_sum <- sapply(c(1:nrow(dat)), function(i) {
-    (infl_fn_1(dat$w1[i], dat$w2[i], dat$y_star[i], dat$delta_star[i],
-               dat$delta[i], dat$a[i]) +
-     infl_fn_2(dat$w1[i], dat$w2[i], dat$y_star[i], dat$delta_star[i],
-               dat$delta[i], dat$a[i])
+  b_sum <- 0
+  for (i in c(1:nrow(dat))) {
+    s <- (
+      infl_fn_1(dat$w1[i], dat$w2[i], dat$y_star[i], dat$delta_star[i],
+                dat$delta[i], dat$a[i]) +
+      infl_fn_2(dat$w1[i], dat$w2[i], dat$y_star[i], dat$delta_star[i],
+                dat$delta[i], dat$a[i])
     )^2
-  })
+    b_sum <- b_sum + s
+  }
   
   return(
     (1/n_orig) * sum(b_sum)

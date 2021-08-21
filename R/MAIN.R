@@ -9,15 +9,16 @@
 # devtools::install_github("tedwestling/ctsCausal")
 # devtools::install_github("zeehio/facetscales")
 cfg <- list(
-  which_sim = "estimation", # estimation testing
-  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
+  which_sim = "testing", # estimation testing
+  level_set_which = "level_set_testing_1", # level_set_estimation_1 level_set_testing_1
   run_or_update = "run",
-  num_sim = 500,
-  pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats",
-           "fdrtool", "splines", "survival"), # "ranger", "ctsCausal", "SuperLearner", "earth", "Rsolnp", "sets"
+  num_sim = 10,
+  pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
+           "splines", "survival", "SuperLearner", "survSuperLearner",
+           "randomForestSRC"), # "ctsCausal"
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
                      "data.table", "latex2exp", "tidyr"),
-  parallel = "none", # none outer
+  parallel = "none",
   stop_at_error = FALSE
 )
 
@@ -76,7 +77,7 @@ if (FALSE) {
   #           points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
   
   dat <- generate_data(
-    n = 400, # 5000
+    n = 500, # 5000
     alpha_3 = 0.7,
     distr_A = "Unif(0,1)",
     surv_true = "Cox PH",
@@ -89,15 +90,15 @@ if (FALSE) {
     params = list(S_n_type="Cox PH", g_n_type="parametric", ci_type="logit"),
     points = C$points
   )
-  
+
   reject <- test_2(
     dat = dat,
     alt_type = "incr",
     params = list(
       var = "asymptotic",
-      S_n_type="Cox PH",
+      S_n_type = "Cox PH",
       g_n_type = "parametric",
-      boot_reps = 5
+      est_known_nuis = FALSE
     )
   )
 
@@ -111,47 +112,28 @@ if (FALSE) {
 
 if (Sys.getenv("simba_run") %in% c("first", "")) {
   
-  # !!!!! Temp/testing !!!!!
-  level_set_temp <- list(
-    n = 1000,
-    alpha_3 = 0.75,
-    distr_A = "Unif(0,1)",
-    surv_true = "Cox PH", # "Cox PH" "Complex"
-    sampling = "two-phase", # two-phase iid
-    estimator = list(
-      # "G-comp" = list(
-      #   est = "G-comp",
-      #   params = list(S_n_type="Cox PH", boot_reps=100)
-      # ),
-      "Grenander (logit CIs)" = list(
-        est = "Generalized Grenander",
-        params = list(S_n_type="Cox PH", g_n_type="parametric", ci_type="logit")
-      )
-      # "Grenander (split CIs, m=5)" = list(
-      #   est = "Generalized Grenander",
-      #   params = list(S_n_type="Cox PH", g_n_type="parametric",
-      #                 ci_type="sample split", m=5)
-      # )
-    )
-  )
-  
   # Estimation: compare all methods
   # Not currently using (ci_type="sample split", m=5) or (ci_type="regular")
   level_set_estimation_1 <- list(
     n = 5000,
     alpha_3 = 0.75,
-    distr_A = c("Unif(0,1)", "Beta(0.9,1.1+0.4*w2)"), # "Beta(0.8+0.9*w1,0.8+0.4*w2)"
+    distr_A = "Mixture",
+    # distr_A = c("Unif(0,1)", "Beta(0.9,1.1+0.4*w2)"), # "Beta(0.8+0.9*w1,0.8+0.4*w2)"
     surv_true = "Cox PH",
     # surv_true = c("Cox PH", "Complex"),
     sampling = "two-phase",
     estimator = list(
-      "G-comp" = list(
-        est = "G-comp",
-        params = list(S_n_type="Cox PH", boot_reps=100)
-      ),
-      "Grenander (logit CIs)" = list(
+      # "G-comp" = list(
+      #   est = "G-comp",
+      #   params = list(S_n_type="Cox PH", boot_reps=100)
+      # ),
+      "Grenander (parametric g_n)" = list(
         est = "Generalized Grenander",
         params = list(S_n_type="Cox PH", g_n_type="parametric", ci_type="logit")
+      ),
+      "Grenander (binning g_n)" = list(
+        est = "Generalized Grenander",
+        params = list(S_n_type="Cox PH", g_n_type="binning", ci_type="logit")
       )
       # "Grenander (split CIs, m=5)" = list(
       #   est = "Generalized Grenander",
@@ -165,18 +147,15 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
   # Not currently using (var="boot")
   level_set_testing_1 <- list(
     # n = c(1000,2000),
-    n = 1000,
-    alpha_3 = c(0,0.4,0.8),
-    distr_A = c("Unif(0,1)", "Beta(0.9,1.1+0.4*w2)"), # "Beta(0.8+0.9*w1,0.8+0.4*w2)"
+    n = c(500,1000,2000,4000,8000),
+    alpha_3 = 0,
+    # alpha_3 = c(0,0.4,0.8),
+    distr_A = "Unif(0,1)",
+    # distr_A = c("Unif(0,1)", "Beta(0.9,1.1+0.4*w2)"), # "Beta(0.8+0.9*w1,0.8+0.4*w2)"
     surv_true = "Cox PH",
     # surv_true = c("Cox PH", "Complex"),
     sampling = "two-phase", # iid two-phase
     test = list(
-      "Slope (est lambdas)" = list(
-        type = "test_2",
-        params = list(var="asymptotic", S_n_type="Cox PH",
-                      g_n_type="parametric", est_known_nuis=TRUE)
-      ),
       "Slope (true lambdas)" = list(
         type = "test_2",
         params = list(var="asymptotic", S_n_type="Cox PH",
@@ -302,7 +281,7 @@ if (cfg$run_or_update=="update") {
 if (FALSE) {
   
   # Read in simulation object
-  sim <- readRDS("../simba.out/sim_est_20210816_2_incomplete.simba")
+  sim <- readRDS("../simba.out/sim_est_20210819.simba")
   
   # Summarize results
   # !!!!! Count the number of NAs in coverage
@@ -374,9 +353,8 @@ if (FALSE) {
     geom_point() +
     geom_line() +
     facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(surv_true)) +
-    scale_y_continuous(labels=percent) +
+    scale_y_continuous(labels=percent, limits=c(0.75,1)) +
     scale_color_manual(values=m_colors) +
-    # ylim(0.75,1) +
     labs(title="Coverage (%)", x="A", y=NULL, color="Estimator")
 
   # MSE plot
@@ -403,42 +381,45 @@ if (FALSE) {
 if (FALSE) {
   
   # # Read in simulation object
-  sim <- readRDS("../simba.out/sim_testing_20210705.simba")
+  sim <- readRDS("../simba.out/sim_testing_20210820.simba")
   
   # !!!!! Modify everything below
+  #   color should be n-value
+  #   x-axis should be alpha_3
   
   # Summarize resuls
   summ <- summarize(sim)
   
   summ %<>% rename(
-    "Power" = mean_reject,
-    "Test" = test
+    "Power" = mean_reject
   )
   
   cb_colors <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
                  "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
   m_colors <- c(
-    `Slope (boot)` = cb_colors[2],
-    `Slope (mixed boot)` = cb_colors[3],
-    `Wald` = cb_colors[4]
+    `500` = cb_colors[2],
+    `1000` = cb_colors[3]
+    # `Slope (boot)` = cb_colors[2],
+    # `Slope (mixed boot)` = cb_colors[3],
+    # `Wald` = cb_colors[4]
   )
   
   # Export: 7" x 4.5"
   # distr_A_ <- "Beta(0.9,1.1+0.4*w2)" # Unif(0,1) Beta(0.9,1.1+0.4*w2)
-  alpha_3_ <- 0.7 # 0 0.7
-  sampling_ <- "two-phase" # iid two-phase
   ggplot(
-    filter(summ, alpha_3==alpha_3_ & sampling==sampling_),
-    aes(x=n, y=Power, color=Test)
+    summ,
+    aes(x=alpha_3, y=Power, color=factor(n))
   ) +
     geom_point() +
     geom_line() +
-    facet_grid(cols=dplyr::vars(surv_true), rows=dplyr::vars(distr_A)) +
+    facet_grid(cols=dplyr::vars(test), rows=dplyr::vars(distr_A)) +
+    # facet_grid(cols=dplyr::vars(surv_true), rows=dplyr::vars(distr_A)) +
     scale_y_continuous(labels=percent) +
     theme(legend.position="bottom") +
     scale_color_manual(values=m_colors) +
-    labs(title = paste0("alpha_3: ",alpha_3_,"; Sampling: ",sampling_),
-         color = "Test")
+    labs(title="Testing", color="Sample size")
+    # labs(title = paste0("alpha_3: ",alpha_3_,"; Sampling: ",sampling_),
+    #      color = "Test")
   
 }
 
@@ -483,11 +464,12 @@ if (FALSE) {
     C <- list(lambda=10^-4, v=1.5, lambda2=0.5*10^-4, v2=1.5,
               points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
     alpha_3 <- 0.7
+    surv_true <- "Complex"
     dat <- generate_data(
-      n = 5000,
+      n = 2000,
       alpha_3 = alpha_3,
       distr_A = "Unif(0,1)",
-      surv_true = "Cox PH",
+      surv_true = surv_true,
       sampling = "two-phase"
     )
   }
@@ -495,26 +477,66 @@ if (FALSE) {
   S_n <- construct_S_n(dat, type="Cox PH")
   
   S_0 <- Vectorize(function(t, w1, w2, a) {
-    lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
-    return(exp(-1*C$lambda*(t^C$v)*exp(lin)))
+    if (surv_true=="Cox PH") {
+      lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
+      return(exp(-1*C$lambda*(t^C$v)*exp(lin)))
+    } else if (surv_true=="Complex") {
+      # lin <- C$alpha_2*w2*as.numeric(abs(w1-0.5)<0.2) + alpha_3*w1*a
+      lin <- w2*w1*a
+      return(exp(-1*C$lambda*(t^C$v)*exp(lin)))
+    }
   })
+  
+  # !!!!!
+  {
+    # survlistWrappers()
+    dat2 <- filter(dat, !is.na(a))
+    weights <- wts(dat2, scale="none")
+    newX <- expand.grid(w1=c(0,1), w2=c(1), a=c(0,1))
+    # sl_library <- c("survSL.coxph", "survSL.weibreg", "survSL.rfsrc", "survSL.km")
+    sl_library <- c("survSL.coxph", "survSL.km", "survSL.rfsrc")
+    
+    # [1] "survSL.coxph"     "survSL.expreg"    ""      
+    # [4] "survSL.km"        "survSL.loglogreg" "survSL.pchreg"   
+    # [7] "survSL.pchSL"     "survSL.require"   ""    
+    # [10] "survSL.template"  "survSL.weibreg"    
+    
+    srv <- survSuperLearner(
+      time = dat2$y_star,
+      event = dat2$delta_star,
+      X = subset(dat2,select=c(w1,w2,a)),
+      newX = newX,
+      new.times = c(1:200),
+      # event.SL.library = c("survSL.coxph"),
+      # cens.SL.library = c("survSL.coxph"),
+      event.SL.library = sl_library,
+      cens.SL.library = sl_library,
+      control = list(max.SL.iter=20),
+      obsWeights = weights
+    )
+
+  }
   
   # Plot true curve against estimated curve
   times <- c(1:200)
   df <- data.frame(
-    time = rep(times, 8),
+    time = rep(times, 12),
     survival = c(
       S_n(t=times, w1=0, w2=1, a=0),
       S_n(t=times, w1=1, w2=1, a=0),
       S_n(t=times, w1=0, w2=1, a=1),
       S_n(t=times, w1=1, w2=1, a=1),
+      srv$event.SL.predict[1,],
+      srv$event.SL.predict[2,],
+      srv$event.SL.predict[3,],
+      srv$event.SL.predict[4,],
       S_0(t=times, w1=0, w2=1, a=0),
       S_0(t=times, w1=1, w2=1, a=0),
       S_0(t=times, w1=0, w2=1, a=1),
       S_0(t=times, w1=1, w2=1, a=1)
     ),
-    which = rep(c("Cox PH","True S_0"), each=4*length(times)),
-    covs = rep(rep(c("w1=0,a=0","w1=1,a=0","w1=0,a=1","w1=1,a=1"),2),
+    which = rep(c("Cox PH","SL","True S_0"), each=4*length(times)),
+    covs = rep(rep(c("w1=0,a=0","w1=1,a=0","w1=0,a=1","w1=1,a=1"),3),
                each=length(times))
   )
   ggplot(df, aes(x=time, y=survival, color=which)) +

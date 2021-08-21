@@ -1,4 +1,18 @@
 
+# Checking lambda factors with mixture distribution
+if (F) {
+  
+  n <- 10^6
+  prob <- 0.9 # 0.9
+  mix <- rbinom(n, size=1, prob=prob)
+  unif <- runif(n)
+  a <- mix*unif
+  F_a <- ecdf(a)
+  mean((F_a(a))^2)
+  mean((F_a(a))^3)
+  
+}
+
 # Checking the influence function of Gamma_n
 if (F) {
   

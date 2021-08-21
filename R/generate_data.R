@@ -25,6 +25,10 @@ generate_data <- function(n, alpha_3, distr_A, surv_true, sampling) {
     shape1 <- 0.8 + 0.9*w1
     shape2 <- 0.8 + 0.4*w2
     a <- rbeta(n, shape1=shape1, shape2=shape2)
+  } else if (distr_A=="Mixture") {
+    mix <- rbinom(n, size=1, prob=0.9)
+    unif <- runif(n)
+    a <- mix*unif
   } else {
     stop("distr_A incorrectly specified")
   }
@@ -39,7 +43,8 @@ generate_data <- function(n, alpha_3, distr_A, surv_true, sampling) {
     if (surv_true=="Cox PH") {
       lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
     } else if (surv_true=="Complex") {
-      lin <- C$alpha_2*w2*as.numeric(abs(w1-0.5)<0.2) + alpha_3*w1*a
+      # lin <- C$alpha_2*w2*as.numeric(abs(w1-0.5)<0.2) + alpha_3*w1*a
+      lin <- w2*w1*a
     }
     t <- H_0_inv(-1*log(U)*exp(-1*lin))
     

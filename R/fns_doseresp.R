@@ -730,13 +730,27 @@ beta_n_var_hat <- function(dat_orig, infl_fn_1, infl_fn_2) {
   n_orig <- nrow(dat_orig)
   dat <- dat_orig %>% filter(!is.na(a))
   
+  # b_sum <- 0
+  # for (i in c(1:nrow(dat))) {
+  #   s <- (
+  #     infl_fn_1(dat$w1[i], dat$w2[i], dat$y_star[i], dat$delta_star[i],
+  #               dat$delta[i], dat$a[i]) +
+  #     infl_fn_2(dat$w1[i], dat$w2[i], dat$y_star[i], dat$delta_star[i],
+  #               dat$delta[i], dat$a[i])
+  #   )^2
+  #   b_sum <- b_sum + s
+  # }
+  
+  b_sum <- sapply(c(1:nrow(dat)), function(i) {
+    (infl_fn_1(dat$w1[i], dat$w2[i], dat$y_star[i], dat$delta_star[i],
+               dat$delta[i], dat$a[i]) +
+     infl_fn_2(dat$w1[i], dat$w2[i], dat$y_star[i], dat$delta_star[i],
+               dat$delta[i], dat$a[i])
+    )^2
+  })
+  
   return(
-    (1/n_orig) * sum((
-      infl_fn_1(dat$w1, dat$w2, dat$y_star, dat$delta_star,
-                dat$delta, dat$a) +
-        infl_fn_2(dat$w1, dat$w2, dat$y_star, dat$delta_star,
-                  dat$delta, dat$a)
-    )^2)
+    (1/n_orig) * sum(b_sum)
   )
   
 }

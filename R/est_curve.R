@@ -8,11 +8,11 @@
 #'   - `g_n_type` Type of conditional density ratio estimator; one of
 #'     c("parametric", "binning")
 #'   - `boot_reps` Used for G-comp; number of bootstrap replicates
-#'   - `Phi` Used for Grenander; one of c("marginal","identity") # !!!!! Not yet implemented
 #'   - `ci_type` One of c("regular", "logit", "sample split", "none"). "regular"
 #'     is the standard approach. "logit" transforms the CIs so that the bounds
 #'     are in [0,1]. "sample split" is the Banerjee method (and also returns a
 #'     different estimator).
+#'   - `cf_folds` Number of cross-fitting folds
 #'   - `m` If params$ci_type=="sample split", the number of splits
 #' @param points A vector representing the points to estimate
 #' @return A list of lists of the form:
@@ -55,6 +55,38 @@ est_curve <- function(dat_orig, estimator, params, points) {
   }
   
   if (estimator=="Generalized Grenander") {
+    
+    if (is.null(params$cf_folds) || params$cf_folds==1) {
+      
+      
+      
+    }
+    
+    # # Construct data splits (discarding "extra rows" at end)
+    # m <- params$m
+    # splits <- matrix(NA, nrow=m, ncol=2)
+    # split_size <- as.integer(n/m)
+    # splits[,2] <- (1:m)*split_size
+    # splits[,1] <- ((1:m)*split_size+1)-split_size
+    # 
+    # # Construct estimate separately for each data split
+    # ests <- c()
+    # ses <- c()
+    # for (point in points) {
+    #   split_ests <- sapply(c(1:m), function(x) {
+    #     dat_split <- dat_orig[c(splits[x,1]:splits[x,2]),]
+    #     theta_n <- construct_fns(dat_orig=dat_split, return_tau_n=F)$theta_n
+    #     return(theta_n(point))
+    #   })
+    #   
+    #   ests <- c(ests, mean(split_ests))
+    #   ses <- c(ses, sd(split_ests)/sqrt(m))
+    # }
+    # 
+    # # Construct CIs
+    # t_quant <- qt(1-(0.05/2), df=(m-1))
+    # ci_lo <- ests - t_quant*ses
+    # ci_hi <- ests + t_quant*ses
     
     # Construct theta_n and tau_n, given a dataset
     construct_fns <- function(dat_orig, return_tau_n=T) {
@@ -161,7 +193,6 @@ est_curve <- function(dat_orig, estimator, params, points) {
         # Construct CIs
         # The 0.975 quantile of the Chernoff distribution occurs at roughly x=1.00
         qnt <- 1.00 # qnorm(0.975, sd=0.52)
-        # n <- nrow(filter(dat_orig, !is.na(a))) # !!!!! incorrect
         n_orig <- nrow(dat_orig)
         if (params$ci_type=="regular") {
           ci_lo <- ests - (qnt*tau_ns)/(n_orig^(1/3))

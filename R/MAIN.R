@@ -74,10 +74,8 @@ if (FALSE) {
   params <- list(g_n_type="parametric", S_n_type="Cox PH")
   C <- list(lambda=10^-4, v=1.5, lambda2=0.5*10^-4, v2=1.5,
             points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
-  # C <- list(lambda=10^-4, v=1.5, lambda2=0.3*10^-5, v2=1.5,
-  #           points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
-  
-  dat <- generate_data(
+
+  dat_orig <- generate_data(
     n = 500, # 5000
     alpha_3 = 0.7,
     distr_A = "Unif(0,1)",
@@ -86,14 +84,14 @@ if (FALSE) {
   )
 
   ests <- est_curve(
-    dat = dat,
+    dat_orig = dat_orig,
     estimator = "Generalized Grenander",
     params = list(S_n_type="Cox PH", g_n_type="parametric", ci_type="logit"),
     points = C$points
   )
 
   reject <- test_2(
-    dat = dat,
+    dat_orig = dat_orig,
     alt_type = "incr",
     params = list(
       var = "asymptotic",
@@ -206,7 +204,7 @@ if (cfg$run_or_update=="run") {
       methods <- c(
         "construct_deriv_theta_n", "construct_eta_n", "construct_f_a_n",
         "construct_f_aIw_n", "construct_g_n", "construct_gamma_n",
-        "construct_Gamma_n", "construct_gcomp", "construct_omega_n",
+        "construct_Gamma_n", "construct_gcomp_n", "construct_omega_n",
         "construct_Phi_n", "construct_S_n", "construct_tau_n",
         "deriv_expit", "deriv_logit", "est_curve", "expit", "generate_data",
         "lambda", "logit", "one_simulation", "Pi", "stab", "test_2","test_wald",

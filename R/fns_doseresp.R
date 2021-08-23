@@ -38,7 +38,7 @@ deriv_logit <- function(x) {
 
 
 
-#' Helper function to create hashed environment keys
+#' Helper function to create hash table keys
 #' 
 #' @param ... A vector of function arguments
 #' @return Hashed environment key
@@ -48,20 +48,56 @@ z <- function(...) {
 
 
 
-#' Helper function to access hashed environment values (vectorized)
+#' Helper function to allow for vectorized access of hash table
 #' 
-#' @param fn The hashed environment (function) to access
-#' @param ... One or more parameters to pass to `fn`
-#' @return Values
-v <- function(fn, ...) {
-  apply(
-    X = cbind(...),
-    MARGIN = 1,
-    FUN = function(x) {fn[[paste(c(x), collapse=";")]]}
-  )
+#' @param fn The hash table (function) to access
+#' @param ... Function arguments, to construct hash table keys
+#' @return Function values
+# v <- function(fn, ...) {
+#   apply(
+#     X = cbind(...),
+#     MARGIN = 1,
+#     FUN = function(x) {
+#       key <- paste(c(x), collapse=";")
+#       val <- fn[[key]]
+#       return(val)
+#     }
+#   )
+# }
+v <- memoise(function(fn, ...) {
+  do.call("mapply", c(
+    FUN = function(...) {
+      key <- paste(c(...), collapse=";")
+      return(get(fn, envir=parent.frame(n=3))[[key]])
+    },
+    list(...)
+  ))
+})
+
+
+
+#' Helper function to create hash table from a function
+#' 
+#' @param fn The function to convert to a hash table
+#' @param vals Dataframe of values to run function on
+#' @return Hash table
+create_htab <- function(fn, vals) {
+  
+  # Create, populate, and return hash table
+  htab <- new.env()
+  for (i in 1:nrow(vals)) {
+    row <- vals[i,]
+    key <- paste(row, collapse=";")
+    htab[[key]] <- do.call(fn, as.list(as.numeric(row)))
+    # v <- do.call(fn, as.list(as.numeric(row)))
+    # if (is.null(v)) {
+    #   stop(paste0("key: ",key))
+    # }
+    # htab[[key]] <- v
+  }
+  return (htab)
+  
 }
-
-
 
 #' Probability of sampling
 #' 
@@ -138,11 +174,12 @@ stab <- function(dat_orig) {
 #' 
 #' @param dat Dataset returned by generate_data(); accepts either full data or
 #'     truncated data
+#' @param vals Dataframe of values to run function on
 #' @param type Currently only "Cox PH" is implemented
 #' @param csf Logical; if TRUE, estimate the conditional survival
 #'     function of the censoring distribution instead
 #' @return Conditional density estimator function
-construct_S_n <- function(dat, type, csf=FALSE) {
+construct_S_n <- function(dat, vals, type, csf=FALSE) {
   
   if (type=="Cox PH") {
     
@@ -156,19 +193,29 @@ construct_S_n <- function(dat, type, csf=FALSE) {
       data = dat,
       weights = weights
     )
-    coeffs <- model$coefficients
+    c_1 <- model$coefficients[[1]]
+    c_2 <- model$coefficients[[2]]
+    c_3 <- model$coefficients[[3]]
     
     # Get cumulative hazard estimate
     bh <- basehaz(model, centered=FALSE)
     
-    return(memoise(Vectorize(function(t, w1, w2, a){
-      
+    # Pre-calculate H_0 vector
+    H_0 <- c()
+    for (t in 0:C$t_e) {
       index <- which.min(abs(bh$time-t))
-      H_0 <- bh$hazard[index]
-      lin <- coeffs[[1]]*w1 + coeffs[[2]]*w2 + coeffs[[3]]*a
-      return(exp(-1*H_0*exp(lin)))
-      
-    })))
+      H_0[t+1] <- bh$hazard[index]
+    }
+    
+    # return(memoise(Vectorize(function(t, w1, w2, a){
+    #   return(exp(-1*H_0[t+1]*exp(c_1*w1+c_2*w2+c_3*a)))
+    # })))
+    fn <- function(t, w1, w2, a){
+      return(exp(-1*H_0[t+1]*exp(c_1*w1+c_2*w2+c_3*a)))
+    }
+    
+    # Run function on vals and return hash table
+    return (create_htab(fn, vals))
     
   }
   
@@ -178,14 +225,19 @@ construct_S_n <- function(dat, type, csf=FALSE) {
 
 #' Construct g-computation estimator function of theta_0
 #' 
-#' @param dat Dataset returned by generate_data(); must be full data
+#' @param dat_orig Dataset returned by generate_data(); must be full data
+#' @param vals Dataframe of values to run function on
 #' @param mu_n A regression estimator returned by construct_mu_n()
 #' @return G-computation estimator of theta_0
-construct_gcomp <- function(dat_orig, S_n) {
+construct_gcomp_n <- function(dat_orig, vals, S_n) {
   
-  return(memoise(Vectorize(function(a) {
-    1 - mean(S_n(C$t_e, dat_orig$w1, dat_orig$w2, a))
-  })))
+  # Declare function
+  fn <- function(a) {
+    1 - mean(v("S_n",C$t_e,round(dat_orig$w1,1),dat_orig$w2,round(a,1)))
+  }
+  
+  # Run function on vals and return hash table
+  return (create_htab(fn, vals))
   
 }
 
@@ -193,7 +245,7 @@ construct_gcomp <- function(dat_orig, S_n) {
 
 #' Construct derivative estimator theta'_n
 #' 
-#' @param gcomp_n G-comp estimator of theta_0 returned by construct_gcomp()
+#' @param gcomp_n G-comp estimator of theta_0 returned by construct_gcomp_n()
 construct_deriv_theta_n <- function(gcomp_n) {
   
   deriv_theta_n <- function(a) {
@@ -211,7 +263,7 @@ construct_deriv_theta_n <- function(gcomp_n) {
       p2 <- 1
     }
     
-    return( (gcomp_n(p2)-gcomp_n(p1))/width )
+    return( (gcomp_n[[z(round(p2,3))]]-gcomp_n[[z(round(p1,3))]])/width )
     
   }
   
@@ -408,53 +460,56 @@ construct_f_aIw_n <- function(dat, type) {
 
 #' Construct density ratio estimator g_n
 #' 
+#' @param vals Dataframe of values to run function on
 #' @param f_aIw_n Conditional density estimator returned by construct_f_aIw_n
 #' @param f_a_n Marginal density estimator returned by construct_f_a_n
 #' @return Density ratio estimator function
-construct_g_n <- function(f_aIw_n, f_a_n) {
+construct_g_n <- function(vals, f_aIw_n, f_a_n) {
   
-  return(memoise(Vectorize(function(a,w1,w2) {
+  # Declare function
+  fn <- function(a,w1,w2) {
     f_aIw_n(a,w1,w2) / f_a_n(a)
-  })))
+  }
   
+  # Run function on vals and return hash table
+  return (create_htab(fn, vals))
+
 }
 
 
 
 #' Construct estimator of nuisance influence function omega_n
 #' 
+#' @param vals Dataframe of values to run function on
 #' @param S_n Conditional survival function estimator returned by construct_S_n
 #' @param Sc_n Conditional censoring survival function estimator returned by
 #'     construct_S_n
 #' @param m Number of partitions used for the integral approximation
 #' @return Estimator function of nuisance omega_0
-construct_omega_n <- function(S_n, Sc_n, m=400) {
+construct_omega_n <- function(vals, S_n, Sc_n, m=400) {
   
-  return(memoise(Vectorize(function(w1,w2,y_star,delta_star,a) {
+  # Declare function
+  fn <- function(w1,w2,a,y_star,delta_star) {
     
     i <- c(1:m)
     k <- min(y_star,C$t_e)
+    w1 <- round(w1,1)
+    a <- round(a,1)
     
-    # integral <- sum(
-    #   ( S_n(t=(i*k)/m, w1,w2,a) - S_n(t=((i-1)*k)/m, w1,w2,a) ) *
-    #   ( (S_n(t=(i*k)/m, w1,w2,a))^2 * Sc_n(t=(i*k)/m, w1,w2,a) )^-1
-    # )
-    # S_n(t=C$t_e, w1,w2,a) * (
-    #   ( delta_star * as.integer(y_star<=C$t_e) ) /
-    #   ( S_n(t=y_star, w1,w2,a) * Sc_n(t=y_star, w1,w2,a) ) +
-    #   integral
-    # )
     integral <- sum(
-      ( S_n(t=round((i*k)/m), w1,w2,a) - S_n(t=round(((i-1)*k)/m), w1,w2,a) ) *
-        ( (S_n(t=round((i*k)/m), w1,w2,a))^2 * Sc_n(t=round((i*k)/m), w1,w2,a) )^-1
+      (v("S_n",round((i*k)/m),w1,w2,a) - v("S_n",round(((i-1)*k)/m),w1,w2,a)) *
+      ((v("S_n",round((i*k)/m),w1,w2,a))^2 * v("Sc_n",round((i*k)/m),w1,w2,a))^-1
     )
-    S_n(t=C$t_e, w1,w2,a) * (
-      ( delta_star * as.integer(y_star<=C$t_e) ) /
-        ( S_n(t=round(y_star), w1,w2,a) * Sc_n(t=round(y_star), w1,w2,a) ) +
+    S_n[[z(C$t_e,w1,w2,a)]] * (
+      (delta_star * as.integer(y_star<=C$t_e)) /
+        (S_n[[z(round(k),w1,w2,a)]] * Sc_n[[z(round(k),w1,w2,a)]]) +
         integral
     )
-    
-  })))
+
+  }
+  
+  # Run function on vals and return hash table
+  return (create_htab(fn, vals))
   
 }
 
@@ -464,6 +519,7 @@ construct_omega_n <- function(S_n, Sc_n, m=400) {
 #' 
 #' @param dat_orig Dataset returned by generate_data(); this must be the FULL
 #'     DATA, including the "missing" observations
+#' @param vals Dataframe of values to run function on
 #' @param S_n Conditional survival function estimator returned by construct_S_n
 #' @return Estimator function of nuisance eta_0
 construct_eta_n <- function(dat_orig, vals, S_n) {
@@ -474,24 +530,24 @@ construct_eta_n <- function(dat_orig, vals, S_n) {
   dat <- dat_orig %>% filter(!is.na(a))
   weights <- wts(dat, scale="none")
   
+  # Declare temporary memoised version of v(S_n,...)
+  # v_mem <- memoise(function(w1,w2) {
+  #   v(S_n,C$t_e,round(w1,1),w2,round(dat$a,1))
+  # })
+  
   # Declare function
   fn <- function(x,w1,w2) {
     sum(
       weights * as.integer(dat$a<=x) *
-        (1-S_n(C$t_e, w1, w2, dat$a))
-        # (1-v(S_n,C$t_e,w1,w2,dat$a))
+        (1-v("S_n",C$t_e,round(w1,1),w2,round(dat$a,1)))
+        # (1-v_mem(w1,w2))
+        # (1-S_n(C$t_e,round(w1,1),w2,round(dat$a,1)))
     ) /
       (n_orig*s)
   }
   
-  # Run function on vals and return hashed environment
-  htab <- new.env()
-  for (i in 1:nrow(vals)) {
-    row <- vals[i,]
-    key <- paste(row, collapse=";")
-    htab[[key]] <- do.call(fn, as.list(as.numeric(row)))
-  }
-  return (htab)
+  # Run function on vals and return hash table
+  return (create_htab(fn, vals))
   
 }
 
@@ -530,16 +586,15 @@ lambda <- function(k, G, dat_orig) {
 #' @return Gamma_n estimator
 #' @notes This is a generalization of the one-step estimator from Westling &
 #'     Carone 2020
-construct_Gamma_n <- function(dat_orig, omega_n, S_n, g_n) {
+construct_Gamma_n <- function(dat_orig, vals, omega_n, S_n, g_n) {
   
+  # Prep
   dat <- dat_orig
-  
   s <- stab(dat_orig)
   n_orig <- nrow(dat)
   dat %<>% filter(!is.na(a))
   n <- nrow(dat)
   weights <- wts(dat, scale="none")
-  
   i_long <- rep(c(1:n), each=n)
   j_long <- rep(c(1:n), times=n)
   a_i_long <- dat$a[i_long]
@@ -549,30 +604,32 @@ construct_Gamma_n <- function(dat_orig, omega_n, S_n, g_n) {
   w2_j_long <- dat$w2[j_long]
   delta_star_i_long <- dat$delta_star[i_long]
   delta_star_j_long <- dat$delta_star[j_long]
-  
   sampling <- attr(dat,"sampling")
   subpiece_1a <- ( 1 + (
-    omega_n(dat$w1,dat$w2,dat$y_star,dat$delta_star,dat$a) /
-    g_n(dat$a,dat$w1,dat$w2)
+    v("omega_n",dat$w1,dat$w2,dat$a,dat$y_star,dat$delta_star) /
+    v("g_n",dat$a,dat$w1,dat$w2)
   ) ) * ( weights / s )
-  subpiece_2a <- S_n(C$t_e, w1_j_long, w2_j_long, a_i_long) / (
-    s^2 * Pi(sampling, delta_star_i_long, w1_i_long, w2_i_long) *
-    Pi(sampling, delta_star_j_long, w1_j_long, w2_j_long)
+  subpiece_2a <- v("S_n",C$t_e,round(w1_j_long,1),w2_j_long,round(a_i_long,1)) /
+  (
+    s^2 * Pi(sampling,delta_star_i_long,w1_i_long,w2_i_long) *
+    Pi(sampling,delta_star_j_long,w1_j_long,w2_j_long)
   )
   
-  return(
-    memoise(Vectorize(function(x) {
-      
-      subpiece_1b <- as.integer(dat$a<=x)
-      piece_1 <- sum(subpiece_1a*subpiece_1b) * (1/n_orig)
-      
-      subpiece_2b <- as.integer(a_i_long<=x)
-      piece_2 <- sum(subpiece_2a*subpiece_2b) * (1/(n_orig^2))
-      
-      return(piece_1-piece_2)
-      
-    }))
-  )
+  # Declare function
+  fn <- function(x) {
+    
+    subpiece_1b <- as.integer(dat$a<=x)
+    piece_1 <- sum(subpiece_1a*subpiece_1b) * (1/n_orig)
+    
+    subpiece_2b <- as.integer(a_i_long<=x)
+    piece_2 <- sum(subpiece_2a*subpiece_2b) * (1/(n_orig^2))
+    
+    return(piece_1-piece_2)
+    
+  }
+  
+  # Run function on vals and return hash table
+  return (create_htab(fn, vals))
   
 }
 
@@ -695,10 +752,10 @@ construct_infl_fn_1 <- function(dat_orig, Gamma_n, Phi_n, xi_n, rho_n,
     
     piece_1 <- (1/n_orig) * sum(
       # (weights_j/s) * (xi_n(a,a_j)-rho_n(a)) * Gamma_n(a_j)
-      (weights_j/s) * (xi_n(a,a_j)) * Gamma_n(a_j)
+      (weights_j/s) * (xi_n(a,a_j)) * v("Gamma_n",a_j)
     )
     
-    piece_2 <- (lambda_2*(Phi_n(a)^2) - lambda_3*Phi_n(a)) * Gamma_n(a)
+    piece_2 <- (lambda_2*(Phi_n(a)^2) - lambda_3*Phi_n(a)) * Gamma_n[[z(a)]]
     
     return(
       (delta/(s*Pi(sampling, delta_star,w1,w2))) * (piece_1+piece_2)
@@ -723,11 +780,11 @@ construct_infl_fn_Gamma <- function(dat_orig, omega_n, g_n, gcomp_n, eta_n,
   return(memoise(Vectorize(function(x,w1,w2,y_star,delta_star,delta,a) {
     (delta/(s*Pi(sampling, delta_star,w1,w2))) * (
       as.integer(a<=x)*(
-        (omega_n(w1,w2,y_star,delta_star,a)/g_n(a,w1,w2)) + gcomp_n(a)
+        (omega_n[[z(w1,w2,a,y_star,delta_star)]]/g_n[[z(a,w1,w2)]]) +
+        gcomp_n[[z(round(a,3))]]
       ) +
-        # eta_n(x,w1,w2) -
-        v(eta_n,round(x,2),round(w1,2),w2) -
-        2*Gamma_n(x)
+        eta_n[[z(round(x,2),round(w1,2),w2)]] - 
+        2*Gamma_n[[z(x)]]
     )
   })))
   

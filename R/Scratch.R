@@ -1,4 +1,310 @@
 
+# Does memoising work if function is passed?
+if (F) {
+  
+  f <- function() {
+    print(get("hey", envir=parent.frame()))
+  }
+  
+  (function(hey) {
+    f()
+  })("there")
+  
+  fn_mem <- memoise(function(x) {
+    Sys.sleep(2)
+    return(9)
+  })
+  fn_mem(1)
+  
+  fn2 <- function(fn) {
+    fn(1)
+  }
+  fn3 <- function(fn) {
+    fn(1)
+  }
+  fn2(fn_mem)
+  fn3(fn_mem)
+  
+}
+
+# Fastest way of getting a vectorized/memoised function (part 2)
+if (F) {
+  
+  construct_S_n_mem <- function(dat, vals) {
+      model <- coxph(Surv(y_star, delta_star)~w1+w2+a, data=dat)
+      c_1 <- model$coefficients[[1]]
+      c_2 <- model$coefficients[[2]]
+      c_3 <- model$coefficients[[3]]
+      bh <- basehaz(model, centered=FALSE)
+      H_0 <- c()
+      for (t in 0:C$t_e) {
+        index <- which.min(abs(bh$time-t))
+        H_0[t+1] <- bh$hazard[index]
+      }
+      # return(Vectorize(memoise(function(t, w1, w2, a){
+      #   return(exp(-1*H_0[t+1]*exp(c_1*w1+c_2*w2+c_3*a)))
+      # })))
+      return(memoise(Vectorize(function(t, w1, w2, a){
+        return(exp(-1*H_0[t+1]*exp(c_1*w1+c_2*w2+c_3*a)))
+      })))
+  }
+  
+  construct_S_n_htab <- function(dat, vals) {
+    model <- coxph(Surv(y_star, delta_star)~w1+w2+a, data=dat)
+    c_1 <- model$coefficients[[1]]
+    c_2 <- model$coefficients[[2]]
+    c_3 <- model$coefficients[[3]]
+    bh <- basehaz(model, centered=FALSE)
+    H_0 <- c()
+    for (t in 0:C$t_e) {
+      index <- which.min(abs(bh$time-t))
+      H_0[t+1] <- bh$hazard[index]
+    }
+    fn <- function(t, w1, w2, a){
+      return(exp(-1*H_0[t+1]*exp(c_1*w1+c_2*w2+c_3*a)))
+    }
+    return (create_htab(fn, vals))
+  }
+  
+  vals_S_n <- expand.grid(t=c(0:C$t_e),w1=seq(0,1,0.1),w2=c(0,1),a=seq(0,1,0.1))
+  S_n_mem <- construct_S_n_mem(dat, vals_S_n)
+  for (i in 1:nrow(vals_S_n)) {
+    row <- vals_S_n[i,]
+    x <- do.call(S_n_mem, as.list(as.numeric(row)))
+  }
+  S_n_htab <- construct_S_n_htab(dat, vals_S_n)
+  
+  v1 <- function(fn, ...) {
+    apply(
+      X = cbind(...),
+      MARGIN = 1,
+      FUN = function(x) {
+        # key <- "200;0;0;0.1"
+        key <- paste(x, collapse=";")
+        val <- fn[[key]]
+        return(val)
+      }
+    )
+  }
+  v2 <- function(fn, ...) {
+    do.call("mapply", c(
+      FUN = function(...) {
+        # key <- "200;0;0;0.1"
+        key <- paste(c(...), collapse=";")
+        return(fn[[key]])
+      },
+      list(...)
+    ))
+  }
+  v3 <- memoise(function(...) {
+    do.call("mapply", c(
+      FUN = function(...) {
+        key <- paste(c(...), collapse=";")
+        return(S_n_htab[[key]])
+      },
+      list(...)
+    ))
+  })
+  
+  S_n_mem(C$t_e,0,0,round(dat$a,1))[1:10]
+  v1(S_n_htab,C$t_e,0,0,round(dat$a,1))[1:10]
+  v2(S_n_htab,C$t_e,0,0,round(dat$a,1))[1:10]
+  v3(C$t_e,0,0,round(dat$a,1))[1:10]
+  v4("S_n_htab",C$t_e,0,0,round(dat$a,1))[1:10]
+  
+  microbenchmark({
+    # S_n_mem(C$t_e,0,0,c(0.1,0.2,0.3))[1:10]
+    S_n_mem(C$t_e,0,0,round(dat$a,1))[1:10]
+  }, times=100L)
+  microbenchmark({
+    # v1(S_n_htab,C$t_e,0,0,c(0.1,0.2,0.3))[1:10]
+    v1(S_n_htab,C$t_e,0,0,round(dat$a,1))[1:10]
+  }, times=100L)
+  microbenchmark({
+    # v2(S_n_htab,C$t_e,0,0,c(0.1,0.2,0.3))[1:10]
+    v2(S_n_htab,C$t_e,0,0,round(dat$a,1))[1:10]
+  }, times=100L)
+  microbenchmark({
+    # v2(S_n_htab,C$t_e,0,0,c(0.1,0.2,0.3))[1:10]
+    v3(C$t_e,0,0,round(dat$a,1))[1:10]
+  }, times=100L)
+  microbenchmark({
+    # v2(S_n_htab,C$t_e,0,0,c(0.1,0.2,0.3))[1:10]
+    v4("S_n_htab",C$t_e,0,0,round(dat$a,1))[1:10]
+  }, times=100L)
+  
+}
+
+# Fastest way of getting a vectorized/memoised function (part 1)
+if (F) {
+  
+  n <- 4*10^4
+  fn <- function(x,y) { x^2+y }
+  
+  # Method 1: memoise/Vectorize
+  # mean: 838 microsec
+  fn_1 <- Vectorize(memoise(fn))
+  for(i in 1:n) {
+    x <- fn_1(i,10)
+  }
+  microbenchmark({
+    fn_1(c(100:200),10)
+  }, times=100L)
+  
+  # Method 2: hash table
+  # mean: 205 microsec
+  htab <- new.env()
+  for(i in 1:n) {
+    htab[[paste(c(i,10), collapse=";")]] <- fn_1(i,10)
+  }
+  fn_2 <- function(...) {
+    apply(
+      X = cbind(...),
+      MARGIN = 1,
+      FUN = function(x) {
+        key <- paste(c(x), collapse=";")
+        val <- htab[[key]]
+        return(val)
+      }
+    )
+  }
+  microbenchmark({
+    fn_2(c(100:200),10)
+  }, times=100L)
+  
+  # Create, populate, and return hash table
+  for (i in 1:n) {
+    row <- vals[i,]
+    key <- paste(row, collapse=";")
+    htab[[key]] <- do.call(fn, as.list(as.numeric(row)))
+    # v <- do.call(fn, as.list(as.numeric(row)))
+    # if (is.null(v)) {
+    #   stop(paste0("key: ",key))
+    # }
+    # htab[[key]] <- v
+  }
+  return (htab)
+  
+}
+
+# !!!! TEMP
+if (F) {
+  
+  # fn_mem <- memoise(Vectorize(function(x) {x^2}))
+  # htab <- new.env()
+  # 
+  # for(i in 1:10000) {
+  #   x <- fn_mem(i)
+  #   row <- vals[i,]
+  #   key <- paste(row, collapse=";")
+  #   htab[[key]] <- do.call(fn, as.list(as.numeric(row)))
+  # }
+  
+  S_n <- construct_S_n(dat, vals_S_n, type=params$S_n_type)
+  
+  
+  
+  
+  S_n_htab_vc <- Vectorize(function(w,x,y,z) {
+    S_n_htab[["200;0;0;0.1"]]
+    # S_n_htab[[paste(c(w,x,y,z), collapse=";")]]
+  })
+  
+  
+  microbenchmark({
+    S_n_htab_vc(200,0,0,rep(0.1,100))
+    # S_n_htab[[paste0("200;0;0;",0.1)]]
+    # v(S_n_htab,C$t_e,0,0,round(dat$a,1))
+  }, times=100L)
+  
+  microbenchmark({
+    S_n_mem(200,0,0,rep(0.1,100))
+    # S_n_mem(C$t_e,0,0,round(dat$a,1))
+  }, times=100L)
+  
+  (function(a,b,c) {
+    mc <- match.call()
+    called_args <- as.list(mc)[-1]
+    print(called_args)
+  })(1,2,3)
+
+  function (t, w1, w2, a) 
+  {
+    mc <- match.call()
+    encl <- parent.env(environment())
+    called_args <- as.list(mc)[-1]
+    default_args <- encl$`_default_args`
+    default_args <- default_args[setdiff(names(default_args), 
+                                         names(called_args))]
+    called_args[encl$`_omit_args`] <- NULL
+    args <- c(lapply(called_args, eval, parent.frame()), lapply(default_args, 
+                                                                eval, envir = environment()))
+    key <- encl$`_hash`(c(encl$`_f_hash`, args, lapply(encl$`_additional`, 
+                                                       function(x) eval(x[[2L]], environment(x)))))
+    res <- encl$`_cache`$get(key)
+    if (inherits(res, "key_missing")) {
+      mc[[1L]] <- encl$`_f`
+      res <- withVisible(eval(mc, parent.frame()))
+      encl$`_cache`$set(key, res)
+    }
+    if (res$visible) {
+      res$value
+    }
+    else {
+      invisible(res$value)
+    }
+  }
+  
+  
+  
+  
+  
+  library(stringi)
+  
+  v1 <- function(fn, ...) {
+    apply(
+      X = cbind(...),
+      MARGIN = 1,
+      FUN = function(x) {
+        fn[[paste(c(x), collapse=";")]]
+      }
+    )
+  }
+  
+  v2 <- function(fn, ...) {
+    apply(
+      X = cbind(...),
+      MARGIN = 1,
+      FUN = function(x) {
+        fn[[paste(x, collapse=";")]]
+      }
+    )
+  }
+  
+  v3 <- function(fn, ...) {
+    apply(
+      X = cbind(...),
+      MARGIN = 1,
+      FUN = function(x) {
+        fn[[stri_join(x,collapse=";")]]
+      }
+    )
+  }
+  
+  microbenchmark({
+    v1(S_n,C$t_e,round(w1,1),w2,round(dat_orig$a,1))
+  }, times=100L)
+  
+  microbenchmark({
+    v2(S_n,C$t_e,round(w1,1),w2,round(dat_orig$a,1))
+  }, times=100L)
+  
+  microbenchmark({
+    v3(S_n,C$t_e,round(w1,1),w2,round(dat_orig$a,1))
+  }, times=100L)
+  
+}
+
 # New hashing/memoising structure for creators
 if (F) {
   
@@ -183,7 +489,7 @@ if (F) {
     S_n <- construct_S_n(dat, type="Cox PH")
     Sc_n <- construct_S_n(dat, type="Cox PH", csf=TRUE)
     omega_n <- construct_omega_n(S_n, Sc_n)
-    gcomp_n <- construct_gcomp(dat_orig, S_n)
+    gcomp_n <- construct_gcomp_n(dat_orig, S_n)
     eta_n <- construct_eta_n(dat_orig, S_n)
     Gamma_n <- construct_Gamma_n(dat_orig, omega_n, S_n, g_n)
     
@@ -299,7 +605,7 @@ if (F) {
     Sc_n <- construct_S_n(dat, type="Cox PH", csf=TRUE)
     omega_n <- construct_omega_n(S_n, Sc_n)
     Gamma_n <- construct_Gamma_n(dat_orig, omega_n, S_n, g_n)
-    gcomp_n <- construct_gcomp(dat_orig, S_n)
+    gcomp_n <- construct_gcomp_n(dat_orig, S_n)
     eta_n <- construct_eta_n(dat_orig, S_n)
     rho_n <- construct_rho_n(dat_orig, Phi_n=G_n)
     xi_n <- construct_xi_n(Phi_n=G_n, lambda_2, lambda_3)

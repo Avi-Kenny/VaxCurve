@@ -23,7 +23,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
     
     # Compute estimates
     S_n <- construct_S_n(dat_orig, type=params$S_n_type)
-    gcomp_n <- construct_gcomp(dat_orig, S_n=S_n)
+    gcomp_n <- construct_gcomp_n(dat_orig, S_n=S_n) # !!!!! vals should include points
     ests <- gcomp_n(points)
     
     # Run bootstrap for SEs
@@ -31,7 +31,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
       my_stat <- function(dat_orig,indices) {
         d <- dat_orig[indices,]
         S_n <- construct_S_n(d, type=params$S_n_type)
-        gcomp_n <- construct_gcomp(d, S_n=S_n)
+        gcomp_n <- construct_gcomp_n(d, S_n=S_n)
         return (gcomp_n(points))
       }
       boot_obj <- boot(data=dat_orig, statistic=my_stat, R=params$boot_reps)
@@ -95,7 +95,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
       grid <- seq(0,1,0.01)
       Phi_n <- construct_Phi_n(dat_orig)
       Phi_n_inv <- construct_Phi_n(dat_orig, type="inverse")
-      gcomp_n <- construct_gcomp(dat_orig, S_n=S_n)
+      gcomp_n <- construct_gcomp_n(dat_orig, S_n=S_n)
       f_aIw_n <- construct_f_aIw_n(dat_orig, type=params$g_n_type)
       f_a_n <- construct_f_a_n(dat_orig, f_aIw_n=f_aIw_n)
       g_n <- construct_g_n(f_aIw_n, f_a_n)

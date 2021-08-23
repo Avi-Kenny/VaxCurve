@@ -23,11 +23,11 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
     dat <- dat_orig %>% filter(!is.na(a))
     weights <- wts(dat, scale="none")
     
-    # Construct vals
+    # Construct dataframes of values to pre-compute functions on
     vals_A <- data.frame(a=dat$a)
     vals_AW <- data.frame(a=dat$a, w1=dat$w1, w2=dat$w2)
     vals_eta_n <- expand.grid(x=seq(0,1,0.01), w1=seq(0,1,0.01), w2=c(0,1))
-    vals_A_grid <- data.frame(a=seq(0,1,0.001))
+    vals_A_grid <- data.frame(a=seq(0,1,0.01))
     vals_S_n <- expand.grid(t=c(0:C$t_e), w1=seq(0,1,0.1), w2=c(0,1),
                             a=seq(0,1,0.1))
     

@@ -12,14 +12,14 @@ cfg <- list(
   which_sim = "testing", # estimation testing
   level_set_which = "level_set_testing_1", # level_set_estimation_1 level_set_testing_1
   run_or_update = "run",
-  num_sim = 10,
+  num_sim = 1, # !!!!!
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC"), # "ctsCausal"
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
                      "data.table", "latex2exp", "tidyr"),
   parallel = "none",
-  stop_at_error = FALSE
+  stop_at_error = TRUE # !!!!!
 )
 
 # Set cluster config
@@ -145,8 +145,8 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
   # Testing: compare all methods
   # Not currently using (var="boot")
   level_set_testing_1 <- list(
-    # n = c(1000,2000),
-    n = c(500,1000,2000,4000,8000),
+    n = 500,
+    # n = c(500,1000,2000,4000,8000),
     alpha_3 = 0,
     # alpha_3 = c(0,0.4,0.8),
     distr_A = "Unif(0,1)",
@@ -209,7 +209,7 @@ if (cfg$run_or_update=="run") {
         "deriv_expit", "deriv_logit", "est_curve", "expit", "generate_data",
         "lambda", "logit", "one_simulation", "Pi", "stab", "test_2","test_wald",
         "wts", "construct_infl_fn_1", "construct_infl_fn_2",
-        "construct_infl_fn_Gamma", "beta_n_var_hat"
+        "construct_infl_fn_Gamma", "beta_n_var_hat", "v", "z"
       )
       for (method in methods) {
         sim %<>% add_method(method, eval(as.name(method)))
@@ -662,30 +662,6 @@ if (FALSE) {
       alpha = 0.2,
       linetype = "dotted"
     )
-  
-  # # Plot true curve against estimated curve
-  # times <- c(1:200)
-  # df <- data.frame(
-  #   time = rep(times, 8),
-  #   survival = c(
-  #     Sc_n(t=times, w1=0, w2=1, a=0),
-  #     Sc_n(t=times, w1=1, w2=1, a=0),
-  #     Sc_n(t=times, w1=0, w2=1, a=1),
-  #     Sc_n(t=times, w1=1, w2=1, a=1),
-  #     Sc_0(t=times, w1=0, w2=1, a=0),
-  #     Sc_0(t=times, w1=1, w2=1, a=0),
-  #     Sc_0(t=times, w1=0, w2=1, a=1),
-  #     Sc_0(t=times, w1=1, w2=1, a=1)
-  #   ),
-  #   which = rep(c("Cox PH","True S^C_0"), each=4*length(times)),
-  #   covs = rep(rep(c("w1=0,a=0","w1=1,a=0","w1=0,a=1","w1=1,a=1"),2),
-  #              each=length(times))
-  # )
-  # ggplot(df, aes(x=time, y=survival, color=which)) +
-  #   geom_line() +
-  #   facet_wrap(~covs, ncol=2) +
-  #   labs(title="Estimation of conditional survival: S_0[t|W,A]",
-  #        color="Estimator")
   
 }
 

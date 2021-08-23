@@ -89,11 +89,6 @@ create_htab <- function(fn, vals) {
     row <- vals[i,]
     key <- paste(row, collapse=";")
     htab[[key]] <- do.call(fn, as.list(as.numeric(row)))
-    # v <- do.call(fn, as.list(as.numeric(row)))
-    # if (is.null(v)) {
-    #   stop(paste0("key: ",key))
-    # }
-    # htab[[key]] <- v
   }
   return (htab)
   
@@ -251,7 +246,7 @@ construct_deriv_theta_n <- function(gcomp_n) {
   deriv_theta_n <- function(a) {
     
     # Set derivative appx x-coordinates
-    width <- 0.05
+    width <- 0.04
     p1 <- a - width/2
     p2 <- a + width/2
     if (p1<0) {
@@ -307,10 +302,10 @@ construct_gamma_n <- function(dat_orig, type, omega_n, f_aIw_n) {
   
   # Construct pseudo-outcomes
   dat_orig %<>% mutate(
-    po = ifelse(
-      is.na(a),
-      0,
-      ( (omega_n(w1,w2,y_star,delta_star,a))*(weights/s)) / f_aIw_n(a,w1,w2) )^2
+    po = ifelse(is.na(a), 0, (
+      ( v("omega_n",w1,w2,a,y_star,delta_star)) * (weights/s) ) /
+      f_aIw_n(a,w1,w2)
+    )^2
   )
   
   # Run regression
@@ -318,9 +313,9 @@ construct_gamma_n <- function(dat_orig, type, omega_n, f_aIw_n) {
     model <- lm(po~a, data=filter(dat_orig,!is.na(a)), weights=weights)
     coeff <- as.numeric(model$coefficients)
     
-    return(memoise(Vectorize(function(x){
+    return(Vectorize(function(x){
       coeff[1] + coeff[2]*x
-    })))
+    }))
   }
   
   # Run regression
@@ -328,9 +323,9 @@ construct_gamma_n <- function(dat_orig, type, omega_n, f_aIw_n) {
     model <- lm(po~a+I(a^2)+I(a^3), data=filter(dat_orig,!is.na(a)), weights=weights)
     coeff <- as.numeric(model$coefficients)
     
-    return(memoise(Vectorize(function(x){
+    return(Vectorize(function(x){
       coeff[1] + coeff[2]*x + coeff[3]*(x^2) + coeff[4]*(x^3)
-    })))
+    }))
   }
   
 }
@@ -497,8 +492,12 @@ construct_omega_n <- function(vals, S_n, Sc_n, m=400) {
     a <- round(a,1)
     
     integral <- sum(
-      (v("S_n",round((i*k)/m),w1,w2,a) - v("S_n",round(((i-1)*k)/m),w1,w2,a)) *
-      ((v("S_n",round((i*k)/m),w1,w2,a))^2 * v("Sc_n",round((i*k)/m),w1,w2,a))^-1
+      (
+        v("S_n",round((i*k)/m),w1,w2,a) - v("S_n",round(((i-1)*k)/m),w1,w2,a)
+      ) *
+      (
+        (v("S_n",round((i*k)/m),w1,w2,a))^2 * v("Sc_n",round((i*k)/m),w1,w2,a)
+      )^-1
     )
     S_n[[z(C$t_e,w1,w2,a)]] * (
       (delta_star * as.integer(y_star<=C$t_e)) /

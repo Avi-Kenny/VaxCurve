@@ -1,4 +1,189 @@
 
+# Rewriting v() function
+if (F) {
+  
+  create_htab <- function(fn, vals) {
+    
+    # Create and populate hash table (for function values)
+    htab <- new.env()
+    for (i in 1:nrow(vals)) {
+      row <- vals[i,]
+      key <- paste(row, collapse=";")
+      htab[[key]] <- do.call(fn, as.list(as.numeric(row)))
+    }
+    
+    # Create hash table (for vectorized evaluations; populated on the fly)
+    htab_v <- new.env()
+    
+    # Create function
+    return(function(...) {
+      
+      if (max(sapply(list(...), length))==1) {
+        key <- paste(c(...), collapse=";")
+        val <- htab[[key]]
+        if (is.null(val)) stop(paste0("Value corresponding to key '",key,
+                                      "' has not been set"))
+        return(val)
+      } else {
+        
+        # Memoize vectorized evaluations
+        hsh <- rlang::hash(list(...))
+        vec <- htab_v[[hsh]]
+        if (!is.null(vec)) {
+          return(vec)
+        } else {
+          vec <- do.call("mapply", c(
+            FUN = function(...) {
+              key <- paste(c(...), collapse=";")
+              val <- htab[[key]]
+              if (is.null(val)) stop(paste0("Value corresponding to key '",key,
+                                            "' has not been set"))
+              return(val)
+            },
+            list(...)
+          ))
+          htab_v[[hsh]] <- vec
+          return(vec)
+        }
+      }
+    })
+  }
+  
+  fn <- function(x,y) { x*y }
+  vals <- data.frame(x=c(1:100), y=c(2:101))
+  my_fun <- create_htab(fn, vals)
+  my_fun(2,3)
+  my_fun(7,8)
+  my_fun(c(1:100),c(2:101))
+  #
+
+  
+  
+  
+  
+  v <- memoise(function(fn, ...) {
+  })
+  
+  v2 <- (function() {
+    
+    htab <- new.env()
+    
+    # res <- 1
+    v <- function(fn, ...) {
+      
+      
+      rlang::hash
+      val <- htab[[as.character(x)]] # !!!!! get / parent.frame ?
+      if (!is.null(val)) {
+        return(val)
+      } else {
+        # Main function here
+        val <- (function(x) {
+          Sys.sleep(1)
+          val <- x^2
+        })(x)
+        htab[[as.character(x)]] <- val
+        return(val)
+      }
+    }
+    return(v)
+  })()
+  
+  hey <- 3
+  (function(x){print(substitute(x))})(hey)
+  
+  
+  
+  c(S_n[["10;0;1;0.5"]],S_n[["20;0;1;0.5"]])
+  v("S_n",c(10,20),0,1,0.5)
+  v2("S_n",c(10,20),0,1,0.5)
+  
+  # The problem is that we can't both memoise and pass in the entire object; have to memoise manually
+  
+  
+  
+  # Memoized function
+  ff <- (function() {
+    
+    htab <- new.env()
+    
+    # res <- 1
+    ff <- function(x) {
+      val <- htab[[as.character(x)]] # !!!!! get / parent.frame ?
+      if (!is.null(val)) {
+        return(val)
+      } else {
+        # Main function here
+        val <- (function(x) {
+          Sys.sleep(1)
+          val <- x^2
+        })(x)
+        htab[[as.character(x)]] <- val
+        return(val)
+      }
+    }
+    return(ff)
+  })()
+  ff(3)
+  ff(3)
+  ff(4)
+  ff(4)
+  #
+  
+  
+  
+  
+  ff <- function(x,...) {
+    mc <- match.call()
+    print(mc)
+    # encl <- parent.env(environment())
+    # print(encl)
+    called_args <- as.list(mc)[-1]
+    print(called_args)
+    # default_args <- encl$`_default_args`
+    # default_args <- default_args[setdiff(names(default_args), 
+    #                                      names(called_args))]
+    # called_args[encl$`_omit_args`] <- NULL
+    # args <- c(lapply(called_args, eval, parent.frame()), 
+    #           lapply(default_args, eval, envir = environment()))
+    # key <- encl$`_hash`(c(encl$`_f_hash`, args, lapply(encl$`_additional`, 
+    #                                                    function(x) eval(x[[2L]], environment(x)))))
+    # res <- encl$`_cache`$get(key)
+    # if (inherits(res, "key_missing")) {
+    #   mc[[1L]] <- encl$`_f`
+    #   res <- withVisible(eval(mc, parent.frame()))
+    #   encl$`_cache`$set(key, res)
+    # }
+    # if (res$visible) {
+    #   res$value
+    # }
+    # else {
+    #   invisible(res$value)
+    # }
+  }
+  formals(memo_f) <- f_formals
+  attr(memo_f, "memoised") <- TRUE
+  if (is.null(envir)) {
+    envir <- baseenv()
+  }
+  if (is_old_cache(cache)) {
+    hash <- cache$digest
+    cache <- wrap_old_cache(cache)
+  }
+  memo_f_env <- new.env(parent = envir)
+  memo_f_env$`_cache` <- cache
+  memo_f_env$`_f` <- f
+  memo_f_env$`_f_hash` <- rlang::hash(list(formals(f), as.character(body(f))))
+  memo_f_env$`_additional` <- additional
+  memo_f_env$`_omit_args` <- omit_args
+  memo_f_env$`_default_args` <- Filter(function(x) !identical(x, 
+                                                              quote(expr = )), f_formals)
+  environment(memo_f) <- memo_f_env
+  class(memo_f) <- c("memoised", "function")
+  memo_f
+  
+}
+
 # Does memoising work if function is passed?
 if (F) {
   

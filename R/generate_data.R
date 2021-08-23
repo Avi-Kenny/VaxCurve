@@ -68,7 +68,6 @@ generate_data <- function(n, alpha_3, distr_A, surv_true, sampling) {
     
   }
   
-  
   # IID sampling
   if (sampling=="iid") {
     dat <- data.frame(w1=w1, w2=w2, a=a, y_star=y_star, delta_star=delta_star)

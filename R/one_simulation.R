@@ -12,11 +12,11 @@ if (cfg$which_sim=="estimation") {
   one_simulation <- function() {
     
     # Generate dataset
-    dat <- generate_data(L$n, L$alpha_3, L$distr_A, L$surv_true, L$sampling)
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$surv_true, L$sampling)
     
     # Obtain estimates
     ests <- est_curve(
-      dat = dat,
+      dat_orig = dat_orig,
       estimator = L$estimator$est,
       params = L$estimator$params,
       points = C$points
@@ -49,15 +49,16 @@ if (cfg$which_sim=="testing") {
   #' Run a single simulation (testing)
   #'
   #' @return A list that gives the result of the hypothesis test
-
+  
   one_simulation <- function() {
     
     # Generate dataset
-    dat <- generate_data(L$n, L$alpha_3, L$distr_A, L$surv_true, L$sampling)
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A,
+                              L$surv_true, L$sampling)
     
     # Perform hypothesis test
     reject <- use_method(L$test$type, list(
-      dat = dat,
+      dat_orig = dat_orig,
       alt_type = "incr",
       params = L$test$params
     ))

@@ -103,7 +103,6 @@ est_curve <- function(dat_orig, estimator, params, points) {
       Phi_n <- construct_Phi_n(dat_orig)
       Phi_n_inv <- construct_Phi_n(dat_orig, type="inverse")
       
-      
       # Construct dataframes of values to pre-compute functions on
       grid <- seq(0,1,0.01)
       vals_Gamma <- data.frame(a=c(dat$a, Phi_n_inv(grid)))
@@ -121,9 +120,8 @@ est_curve <- function(dat_orig, estimator, params, points) {
       g_n <- construct_g_n(vals_AW, f_aIw_n, f_a_n)
       omega_n <- construct_omega_n(vals=dat, S_n, Sc_n)
       Gamma_n <- construct_Gamma_n(dat_orig, vals_Gamma, omega_n, S_n, g_n)
-      # Psi_n <- function(x) { Gamma_n[[z(Phi_n_inv(x))]] }
       Psi_n <- Vectorize(function(x) {
-        val <- Gamma_n[[z(Phi_n_inv(x))]]
+        val <- Gamma_n(Phi_n_inv(x))
         if (is.null(val)) stop(paste("x:",x,"; Phi_n_inv(x):",Phi_n_inv(x)))
         return(val)
       })

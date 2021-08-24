@@ -38,61 +38,145 @@ deriv_logit <- function(x) {
 
 
 
-#' Helper function to create hash table keys
+#' #' Helper function to create hash table keys
+#' #' 
+#' #' @param ... A vector of function arguments
+#' #' @return Hashed environment key
+#' z <- function(...) {
+#'   paste(c(...), collapse=";")
+#' }
+
+
+
+#' #' Helper function to allow for vectorized access of hash table
+#' #' 
+#' #' @param fn The hash table (function) to access
+#' #' @param ... Function arguments, to construct hash table keys
+#' #' @return Function values
+#' # v <- function(fn, ...) {
+#' #   apply(
+#' #     X = cbind(...),
+#' #     MARGIN = 1,
+#' #     FUN = function(x) {
+#' #       key <- paste(c(x), collapse=";")
+#' #       val <- fn[[key]]
+#' #       return(val)
+#' #     }
+#' #   )
+#' # }
+#' v <- memoise(function(fn, ...) {
+#'   do.call("mapply", c(
+#'     FUN = function(...) {
+#'       key <- paste(c(...), collapse=";")
+#'       return(get(fn, envir=parent.frame(n=3))[[key]])
+#'     },
+#'     list(...)
+#'   ))
+#' })
+
+
+
+#' #' Helper function to create hash table from a function
+#' #' 
+#' #' @param fn The function to convert to a hash table
+#' #' @param vals Dataframe of values to run function on
+#' #' @return Hash table
+#' create_htab <- function(fn, vals) {
+#'   
+#'   # Create, populate, and return hash table
+#'   htab <- new.env()
+#'   for (i in 1:nrow(vals)) {
+#'     row <- vals[i,]
+#'     key <- paste(row, collapse=";")
+#'     htab[[key]] <- do.call(fn, as.list(as.numeric(row)))
+#'   }
+#'   return (htab)
+#'   
+#' }
+
+
+
+#' Construct a vectorized/memoized hash table
 #' 
-#' @param ... A vector of function arguments
-#' @return Hashed environment key
-z <- function(...) {
-  paste(c(...), collapse=";")
-}
-
-
-
-#' Helper function to allow for vectorized access of hash table
-#' 
-#' @param fn The hash table (function) to access
-#' @param ... Function arguments, to construct hash table keys
-#' @return Function values
-# v <- function(fn, ...) {
-#   apply(
-#     X = cbind(...),
-#     MARGIN = 1,
-#     FUN = function(x) {
-#       key <- paste(c(x), collapse=";")
-#       val <- fn[[key]]
-#       return(val)
-#     }
-#   )
-# }
-v <- memoise(function(fn, ...) {
-  do.call("mapply", c(
-    FUN = function(...) {
-      key <- paste(c(...), collapse=";")
-      return(get(fn, envir=parent.frame(n=3))[[key]])
-    },
-    list(...)
-  ))
-})
-
-
-
-#' Helper function to create hash table from a function
-#' 
-#' @param fn The function to convert to a hash table
-#' @param vals Dataframe of values to run function on
-#' @return Hash table
-create_htab <- function(fn, vals) {
+#' @param fn Function to evaluate
+#' @param vals A data frame of values to run the function on
+#' @param round_args If provided, a vector of length equal to the number of
+#'     columns in vals; all computations will be rounded accordingly.
+#' @param check_dupes NOT YET IMPLEMENTED; Logical; if TRUE, the values in
+#'     vals will not be double-computed if there are duplicates (including
+#'     duplicates after rounding)
+#' @return A vectorized/memoized hash table
+create_htab <- function(fn, vals, round_args=NA, check_dupes=FALSE) {
   
-  # Create, populate, and return hash table
+  rnd <- !(is.na(round_args[1]))
+  
+  if (rnd && length(df)!=length(round_args)) {
+    stop("length(df) must equal length(round_args)")
+  }
+  
+  # Create and populate hash table (for function values)
   htab <- new.env()
   for (i in 1:nrow(vals)) {
-    row <- vals[i,]
-    key <- paste(row, collapse=";")
-    htab[[key]] <- do.call(fn, as.list(as.numeric(row)))
+    # !!!!! Check keys in here for dupes; if (check_dupes) {...}
+    row <- as.numeric(vals[i,])
+    if (rnd) row <- round(row, round_args)
+    key <- rlang::hash(row)
+    htab[[key]] <- do.call(fn, as.list(row))
   }
-  return (htab)
+  rm(row)
+  rm(key)
   
+  # Create hash table (for vectorized evaluations; populated on the fly)
+  htab_v <- new.env()
+  
+  # Create function
+  return(function(...) {
+    
+    if (max(sapply(list(...), length))==1) {
+      if (!rnd) {
+        args <- as.numeric(list(...))
+      } else {
+        args <- round(as.numeric(list(...)), round_args)
+      }
+      key <- rlang::hash(args)
+      val <- htab[[key]]
+      if (is.null(val)) stop(paste0("Value corresponding to key '",key,
+                                    "' has not been set"))
+      return(val)
+    } else {
+      
+      # Memoize vectorized evaluations
+      if (!rnd) {
+        hsh <- rlang::hash(list(...))
+      } else {
+        lst <- lapply(
+          X = c(1:length(lst...)),
+          FUN = function(i) { round(lst...[[i]], round_args[i]) }
+        )
+        hsh <- rlang::hash(lst)
+      }
+      vec <- htab_v[[hsh]]
+      if (!is.null(vec)) {
+        return(vec)
+      } else {
+        vec <- do.call("mapply", c(
+          FUN = function(...) {
+            key <- rlang::hash(as.numeric(list(...)))
+            val <- htab[[key]]
+            if (is.null(val)) stop(paste0("Value corresponding to key '",key,
+                                          "' has not been set"))
+            return(val)
+          },
+          list(...)
+        ))
+        htab_v[[hsh]] <- vec
+        return(vec)
+      }
+    }
+  })
 }
+
+
 
 #' Probability of sampling
 #' 
@@ -202,15 +286,11 @@ construct_S_n <- function(dat, vals, type, csf=FALSE) {
       H_0[t+1] <- bh$hazard[index]
     }
     
-    # return(memoise(Vectorize(function(t, w1, w2, a){
-    #   return(exp(-1*H_0[t+1]*exp(c_1*w1+c_2*w2+c_3*a)))
-    # })))
     fn <- function(t, w1, w2, a){
       return(exp(-1*H_0[t+1]*exp(c_1*w1+c_2*w2+c_3*a)))
     }
     
-    # Run function on vals and return hash table
-    return (create_htab(fn, vals))
+    return (create_htab(fn, vals, round_args=c(0,1,0,1)))
     
   }
   
@@ -226,13 +306,11 @@ construct_S_n <- function(dat, vals, type, csf=FALSE) {
 #' @return G-computation estimator of theta_0
 construct_gcomp_n <- function(dat_orig, vals, S_n) {
   
-  # Declare function
   fn <- function(a) {
-    1 - mean(v("S_n",C$t_e,round(dat_orig$w1,1),dat_orig$w2,round(a,1)))
+    1 - mean(S_n(C$t_e,dat_orig$w1,dat_orig$w2,a))
   }
   
-  # Run function on vals and return hash table
-  return (create_htab(fn, vals))
+  return (create_htab(fn, vals, round_args=2))
   
 }
 
@@ -243,7 +321,7 @@ construct_gcomp_n <- function(dat_orig, vals, S_n) {
 #' @param gcomp_n G-comp estimator of theta_0 returned by construct_gcomp_n()
 construct_deriv_theta_n <- function(gcomp_n) {
   
-  deriv_theta_n <- function(a) {
+  fn <- function(a) {
     
     # Set derivative appx x-coordinates
     width <- 0.04
@@ -258,11 +336,11 @@ construct_deriv_theta_n <- function(gcomp_n) {
       p2 <- 1
     }
     
-    return( (gcomp_n[[z(round(p2,3))]]-gcomp_n[[z(round(p1,3))]])/width )
+    return( (gcomp_n(p2)-gcomp_n(p1))/width )
     
   }
   
-  return(memoise(Vectorize(deriv_theta_n)))
+  return(memoise(Vectorize(fn)))
 
 }
 
@@ -303,7 +381,7 @@ construct_gamma_n <- function(dat_orig, type, omega_n, f_aIw_n) {
   # Construct pseudo-outcomes
   dat_orig %<>% mutate(
     po = ifelse(is.na(a), 0, (
-      ( v("omega_n",w1,w2,a,y_star,delta_star)) * (weights/s) ) /
+      ( omega_n(w1,w2,a,y_star,delta_star)) * (weights/s) ) /
       f_aIw_n(a,w1,w2)
     )^2
   )
@@ -461,12 +539,10 @@ construct_f_aIw_n <- function(dat, type) {
 #' @return Density ratio estimator function
 construct_g_n <- function(vals, f_aIw_n, f_a_n) {
   
-  # Declare function
   fn <- function(a,w1,w2) {
     f_aIw_n(a,w1,w2) / f_a_n(a)
   }
   
-  # Run function on vals and return hash table
   return (create_htab(fn, vals))
 
 }
@@ -483,31 +559,27 @@ construct_g_n <- function(vals, f_aIw_n, f_a_n) {
 #' @return Estimator function of nuisance omega_0
 construct_omega_n <- function(vals, S_n, Sc_n, m=400) {
   
-  # Declare function
   fn <- function(w1,w2,a,y_star,delta_star) {
     
     i <- c(1:m)
     k <- min(y_star,C$t_e)
-    w1 <- round(w1,1)
-    a <- round(a,1)
     
     integral <- sum(
       (
-        v("S_n",round((i*k)/m),w1,w2,a) - v("S_n",round(((i-1)*k)/m),w1,w2,a)
+        S_n((i*k)/m,w1,w2,a) - S_n(((i-1)*k)/m,w1,w2,a)
       ) *
       (
-        (v("S_n",round((i*k)/m),w1,w2,a))^2 * v("Sc_n",round((i*k)/m),w1,w2,a)
+        (S_n((i*k)/m,w1,w2,a))^2 * Sc_n((i*k)/m,w1,w2,a)
       )^-1
     )
-    S_n[[z(C$t_e,w1,w2,a)]] * (
+    S_n(C$t_e,w1,w2,a) * (
       (delta_star * as.integer(y_star<=C$t_e)) /
-        (S_n[[z(round(k),w1,w2,a)]] * Sc_n[[z(round(k),w1,w2,a)]]) +
+        (S_n(k,w1,w2,a) * Sc_n(k,w1,w2,a)) +
         integral
     )
 
   }
   
-  # Run function on vals and return hash table
   return (create_htab(fn, vals))
   
 }
@@ -523,30 +595,20 @@ construct_omega_n <- function(vals, S_n, Sc_n, m=400) {
 #' @return Estimator function of nuisance eta_0
 construct_eta_n <- function(dat_orig, vals, S_n) {
   
-  # Prep
   s <- stab(dat_orig)
   n_orig <- nrow(dat_orig)
   dat <- dat_orig %>% filter(!is.na(a))
   weights <- wts(dat, scale="none")
   
-  # Declare temporary memoised version of v(S_n,...)
-  # v_mem <- memoise(function(w1,w2) {
-  #   v(S_n,C$t_e,round(w1,1),w2,round(dat$a,1))
-  # })
-  
-  # Declare function
   fn <- function(x,w1,w2) {
     sum(
       weights * as.integer(dat$a<=x) *
-        (1-v("S_n",C$t_e,round(w1,1),w2,round(dat$a,1)))
-        # (1-v_mem(w1,w2))
-        # (1-S_n(C$t_e,round(w1,1),w2,round(dat$a,1)))
+        (1-S_n(C$t_e,w1,w2,dat$a))
     ) /
       (n_orig*s)
   }
   
-  # Run function on vals and return hash table
-  return (create_htab(fn, vals))
+  return (create_htab(fn, vals, round_args=c(2,2,0)))
   
 }
 
@@ -587,7 +649,6 @@ lambda <- function(k, G, dat_orig) {
 #'     Carone 2020
 construct_Gamma_n <- function(dat_orig, vals, omega_n, S_n, g_n) {
   
-  # Prep
   dat <- dat_orig
   s <- stab(dat_orig)
   n_orig <- nrow(dat)
@@ -605,10 +666,10 @@ construct_Gamma_n <- function(dat_orig, vals, omega_n, S_n, g_n) {
   delta_star_j_long <- dat$delta_star[j_long]
   sampling <- attr(dat,"sampling")
   subpiece_1a <- ( 1 + (
-    v("omega_n",dat$w1,dat$w2,dat$a,dat$y_star,dat$delta_star) /
-    v("g_n",dat$a,dat$w1,dat$w2)
+    omega_n(dat$w1,dat$w2,dat$a,dat$y_star,dat$delta_star) /
+      g_n(dat$a,dat$w1,dat$w2)
   ) ) * ( weights / s )
-  subpiece_2a <- v("S_n",C$t_e,round(w1_j_long,1),w2_j_long,round(a_i_long,1)) /
+  subpiece_2a <- S_n(C$t_e,w1_j_long,w2_j_long,a_i_long) /
   (
     s^2 * Pi(sampling,delta_star_i_long,w1_i_long,w2_i_long) *
     Pi(sampling,delta_star_j_long,w1_j_long,w2_j_long)
@@ -750,11 +811,10 @@ construct_infl_fn_1 <- function(dat_orig, Gamma_n, Phi_n, xi_n, rho_n,
   return(memoise(Vectorize(function(w1,w2,y_star,delta_star,delta,a) {
     
     piece_1 <- (1/n_orig) * sum(
-      # (weights_j/s) * (xi_n(a,a_j)-rho_n(a)) * Gamma_n(a_j)
-      (weights_j/s) * (xi_n(a,a_j)) * v("Gamma_n",a_j)
+      (weights_j/s) * (xi_n(a,a_j)) * Gamma_n(a_j)
     )
     
-    piece_2 <- (lambda_2*(Phi_n(a)^2) - lambda_3*Phi_n(a)) * Gamma_n[[z(a)]]
+    piece_2 <- (lambda_2*(Phi_n(a)^2) - lambda_3*Phi_n(a)) * Gamma_n(a)
     
     return(
       (delta/(s*Pi(sampling, delta_star,w1,w2))) * (piece_1+piece_2)
@@ -779,11 +839,11 @@ construct_infl_fn_Gamma <- function(dat_orig, omega_n, g_n, gcomp_n, eta_n,
   return(memoise(Vectorize(function(x,w1,w2,y_star,delta_star,delta,a) {
     (delta/(s*Pi(sampling, delta_star,w1,w2))) * (
       as.integer(a<=x)*(
-        (omega_n[[z(w1,w2,a,y_star,delta_star)]]/g_n[[z(a,w1,w2)]]) +
-        gcomp_n[[z(round(a,3))]]
+        (omega_n(w1,w2,a,y_star,delta_star)/g_n(a,w1,w2)) +
+        gcomp_n(a)
       ) +
-        eta_n[[z(round(x,2),round(w1,2),w2)]] - 
-        2*Gamma_n[[z(x)]]
+        eta_n(x,w1,w2) - 
+        2*Gamma_n(x)
     )
   })))
   

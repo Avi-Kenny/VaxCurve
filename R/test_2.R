@@ -53,7 +53,7 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
         lambda_2*(G_n(dat$a))^2 -
         lambda_3*G_n(dat$a)
       ) *
-      (v("Gamma_n",dat$a))
+      (Gamma_n(dat$a))
     )
     
     # Estimate the test statistic variance

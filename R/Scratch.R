@@ -2,135 +2,100 @@
 # Rewriting v() function
 if (F) {
   
-  create_htab <- function(fn, vals) {
-    
-    # Create and populate hash table (for function values)
-    htab <- new.env()
-    for (i in 1:nrow(vals)) {
-      row <- vals[i,]
-      key <- paste(row, collapse=";")
-      htab[[key]] <- do.call(fn, as.list(as.numeric(row)))
-    }
-    
-    # Create hash table (for vectorized evaluations; populated on the fly)
-    htab_v <- new.env()
-    
-    # Create function
-    return(function(...) {
-      
-      if (max(sapply(list(...), length))==1) {
-        key <- paste(c(...), collapse=";")
-        val <- htab[[key]]
-        if (is.null(val)) stop(paste0("Value corresponding to key '",key,
-                                      "' has not been set"))
-        return(val)
-      } else {
-        
-        # Memoize vectorized evaluations
-        hsh <- rlang::hash(list(...))
-        vec <- htab_v[[hsh]]
-        if (!is.null(vec)) {
-          return(vec)
-        } else {
-          vec <- do.call("mapply", c(
-            FUN = function(...) {
-              key <- paste(c(...), collapse=";")
-              val <- htab[[key]]
-              if (is.null(val)) stop(paste0("Value corresponding to key '",key,
-                                            "' has not been set"))
-              return(val)
-            },
-            list(...)
-          ))
-          htab_v[[hsh]] <- vec
-          return(vec)
-        }
-      }
-    })
-  }
+  
+  
+  
+  l1 <- list(x=1, y=2)
+  l2 <- list(x=rnorm(100000),y=c(2,3,4))
+  microbenchmark({
+    max(sapply(l1, length))
+  }, times=10L)
+  microbenchmark({
+    max(sapply(l2, length))
+  }, times=10L)
+  microbenchmark({
+    x <- str(l1)
+  }, times=10L)
+  microbenchmark({
+    x <- str(l2)
+  }, times=10L)
+  
+  x <- rnorm(10)
+  y <- rnorm(100000)
+  microbenchmark({
+    max(sapply(list(x=x, y=c(1,2,3)), length))
+  }, times=10L)
+  microbenchmark({
+    max(sapply(list(x=c(1,2,3,4), y=y), length))
+  }, times=10L)
+  microbenchmark({
+    sapply(list(y=y), length)
+  }, times=10L)
+  microbenchmark({
+    (function(...) {
+      sapply(list(...), length)
+    })(1, 2)
+  }, times=10L)
+  
+  
+  (function(...) {
+    sapply(list(...), length)
+  })(c(1,2), c(3,4))
+  (function(...) {
+    sapply(list(...), length)
+  })(1, 2)
+  
   
   fn <- function(x,y) { x*y }
-  vals <- data.frame(x=c(1:100), y=c(2:101))
-  my_fun <- create_htab(fn, vals)
+  vals <- data.frame(x=rnorm(10000), y=rnorm(10000))
+  my_fun <- create_htab(fn, vals, round=c(1,1))
+  microbenchmark({
+    my_fun(vals[1:1000,1],vals[1:1000,2])
+  }, times=1L)
+  # microbenchmark({
+  #   my_fun(round(vals[1:1000,1],3),round(vals[1:1000,2],3))
+  # }, times=1L)
+  
+  
   my_fun(2,3)
   my_fun(7,8)
-  my_fun(c(1:100),c(2:101))
+  my_fun(c(2,7),c(3,8))
   #
+  
+  # Testing rounding
+  fn <- function(x,y) { x*y }
+  vals <- data.frame(x=c(1.111,2.222,3.333), y=c(6.666,7.777,8.888))
+  # my_fun <- create_htab(fn, vals)
+  my_fun <- create_htab(fn, vals, round_args=c(1,2))
+  my_fun(1.111,6.666)
+  my_fun(1.110,6.67)
+  my_fun(1.1,6.67)
+  my_fun(2.2,7.78)
+  my_fun(c(1.1,2.2),c(6.67,7.78))
+  my_fun(c(1.11111,2.21111),c(6.671111,7.781111))
+  
+  # Paste-based key: 40 microsecs
+  # Hash-based  key: 29 microsecs
+  microbenchmark({
+    my_fun(2,3)
+  }, times=1000L)
+  
+  # Before vec mem: mean 600 microsec
+  # After  vec mem: mean  26 microsec
+  microbenchmark({
+    my_fun(c(1:100),c(2:101))
+  }, times=100L)
+  
+  
+  microbenchmark({
+    my_fun(c(1.11111,2.21111),c(6.671111,7.781111))
+  }, times=100L)
+  
+  
+  
 
-  
-  
-  
-  
-  v <- memoise(function(fn, ...) {
-  })
-  
-  v2 <- (function() {
-    
-    htab <- new.env()
-    
-    # res <- 1
-    v <- function(fn, ...) {
-      
-      
-      rlang::hash
-      val <- htab[[as.character(x)]] # !!!!! get / parent.frame ?
-      if (!is.null(val)) {
-        return(val)
-      } else {
-        # Main function here
-        val <- (function(x) {
-          Sys.sleep(1)
-          val <- x^2
-        })(x)
-        htab[[as.character(x)]] <- val
-        return(val)
-      }
-    }
-    return(v)
-  })()
-  
-  hey <- 3
-  (function(x){print(substitute(x))})(hey)
-  
-  
-  
-  c(S_n[["10;0;1;0.5"]],S_n[["20;0;1;0.5"]])
-  v("S_n",c(10,20),0,1,0.5)
-  v2("S_n",c(10,20),0,1,0.5)
-  
-  # The problem is that we can't both memoise and pass in the entire object; have to memoise manually
-  
-  
-  
-  # Memoized function
-  ff <- (function() {
-    
-    htab <- new.env()
-    
-    # res <- 1
-    ff <- function(x) {
-      val <- htab[[as.character(x)]] # !!!!! get / parent.frame ?
-      if (!is.null(val)) {
-        return(val)
-      } else {
-        # Main function here
-        val <- (function(x) {
-          Sys.sleep(1)
-          val <- x^2
-        })(x)
-        htab[[as.character(x)]] <- val
-        return(val)
-      }
-    }
-    return(ff)
-  })()
-  ff(3)
-  ff(3)
-  ff(4)
-  ff(4)
-  #
-  
-  
+
+
   
   
   ff <- function(x,...) {

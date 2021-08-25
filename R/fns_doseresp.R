@@ -38,64 +38,6 @@ deriv_logit <- function(x) {
 
 
 
-#' #' Helper function to create hash table keys
-#' #' 
-#' #' @param ... A vector of function arguments
-#' #' @return Hashed environment key
-#' z <- function(...) {
-#'   paste(c(...), collapse=";")
-#' }
-
-
-
-#' #' Helper function to allow for vectorized access of hash table
-#' #' 
-#' #' @param fn The hash table (function) to access
-#' #' @param ... Function arguments, to construct hash table keys
-#' #' @return Function values
-#' # v <- function(fn, ...) {
-#' #   apply(
-#' #     X = cbind(...),
-#' #     MARGIN = 1,
-#' #     FUN = function(x) {
-#' #       key <- paste(c(x), collapse=";")
-#' #       val <- fn[[key]]
-#' #       return(val)
-#' #     }
-#' #   )
-#' # }
-#' v <- memoise(function(fn, ...) {
-#'   do.call("mapply", c(
-#'     FUN = function(...) {
-#'       key <- paste(c(...), collapse=";")
-#'       return(get(fn, envir=parent.frame(n=3))[[key]])
-#'     },
-#'     list(...)
-#'   ))
-#' })
-
-
-
-#' #' Helper function to create hash table from a function
-#' #' 
-#' #' @param fn The function to convert to a hash table
-#' #' @param vals Dataframe of values to run function on
-#' #' @return Hash table
-#' create_htab <- function(fn, vals) {
-#'   
-#'   # Create, populate, and return hash table
-#'   htab <- new.env()
-#'   for (i in 1:nrow(vals)) {
-#'     row <- vals[i,]
-#'     key <- paste(row, collapse=";")
-#'     htab[[key]] <- do.call(fn, as.list(as.numeric(row)))
-#'   }
-#'   return (htab)
-#'   
-#' }
-
-
-
 #' Construct a vectorized/memoized hash table
 #' 
 #' @param fn Function to evaluate
@@ -110,8 +52,8 @@ create_htab <- function(fn, vals, round_args=NA, check_dupes=FALSE) {
   
   rnd <- !(is.na(round_args[1]))
   
-  if (rnd && length(df)!=length(round_args)) {
-    stop("length(df) must equal length(round_args)")
+  if (rnd && length(vals)!=length(round_args)) {
+    stop("length(vals) must equal length(round_args)")
   }
   
   # Create and populate hash table (for function values)
@@ -132,29 +74,32 @@ create_htab <- function(fn, vals, round_args=NA, check_dupes=FALSE) {
   # Create function
   return(function(...) {
     
-    if (max(sapply(list(...), length))==1) {
-      if (!rnd) {
-        args <- as.numeric(list(...))
-      } else {
-        args <- round(as.numeric(list(...)), round_args)
-      }
-      key <- rlang::hash(args)
-      val <- htab[[key]]
-      if (is.null(val)) stop(paste0("Value corresponding to key '",key,
-                                    "' has not been set"))
-      return(val)
-    } else {
+    # if (max(sapply(list(...), length))==1) {
+    #   if (!rnd) {
+    #     args <- as.numeric(list(...))
+    #   } else {
+    #     args <- round(as.numeric(list(...)), round_args)
+    #   }
+    #   key <- rlang::hash(args)
+    #   val <- htab[[key]]
+    #   if (is.null(val)) {
+    #     stop(paste0("Value corresponding to arguments (",
+    #                 paste0(args, collapse=","),
+    #                 ") has not been set"))
+    #   }
+    #   return(val)
+    # } else {
       
       # Memoize vectorized evaluations
       if (!rnd) {
-        hsh <- rlang::hash(list(...))
+        lst <- list(...)
       } else {
         lst <- lapply(
-          X = c(1:length(lst...)),
-          FUN = function(i) { round(lst...[[i]], round_args[i]) }
+          X = c(1:length(list(...))),
+          FUN = function(i) { round(list(...)[[i]], round_args[i]) }
         )
-        hsh <- rlang::hash(lst)
       }
+      hsh <- rlang::hash(lst)
       vec <- htab_v[[hsh]]
       if (!is.null(vec)) {
         return(vec)
@@ -163,16 +108,19 @@ create_htab <- function(fn, vals, round_args=NA, check_dupes=FALSE) {
           FUN = function(...) {
             key <- rlang::hash(as.numeric(list(...)))
             val <- htab[[key]]
-            if (is.null(val)) stop(paste0("Value corresponding to key '",key,
-                                          "' has not been set"))
+            if (is.null(val)) {
+              stop(paste0("Value corresponding to arguments (",
+                          paste0(as.numeric(list(...)), collapse=","),
+                          ") has not been set"))
+            }
             return(val)
           },
-          list(...)
+          lst
         ))
         htab_v[[hsh]] <- vec
         return(vec)
       }
-    }
+    # }
   })
 }
 
@@ -290,7 +238,8 @@ construct_S_n <- function(dat, vals, type, csf=FALSE) {
       return(exp(-1*H_0[t+1]*exp(c_1*w1+c_2*w2+c_3*a)))
     }
     
-    return (create_htab(fn, vals, round_args=c(0,1,0,1)))
+    return (create_htab(fn, vals, round_args=c(0,1,0,2)))
+    # return (create_htab(fn, vals, round_args=c(-1,1,0,2)))
     
   }
   
@@ -324,7 +273,7 @@ construct_deriv_theta_n <- function(gcomp_n) {
   fn <- function(a) {
     
     # Set derivative appx x-coordinates
-    width <- 0.04
+    width <- 0.06
     p1 <- a - width/2
     p2 <- a + width/2
     if (p1<0) {
@@ -374,35 +323,40 @@ construct_tau_n <- function(deriv_theta_n, gamma_n, f_a_n) {
 #' @return gamma_n nuisance estimator function
 construct_gamma_n <- function(dat_orig, type, omega_n, f_aIw_n) {
   
+  # Estimate probability
+  sampling <- attr(dat_orig,"sampling")
+  prob <- mean(Pi(sampling,dat_orig$delta_star,dat_orig$w1,dat_orig$w2))
+  prob <- 1 - mean(is.na(dat_orig$a))
+  
   # Construct weights
   s <- stab(dat_orig)
-  dat_orig$weights <- wts(dat_orig, scale="none")
+  dat <- filter(dat_orig, !is.na(a))
+  dat$weights <- wts(dat, scale="none")
   
   # Construct pseudo-outcomes
-  dat_orig %<>% mutate(
-    po = ifelse(is.na(a), 0, (
-      ( omega_n(w1,w2,a,y_star,delta_star)) * (weights/s) ) /
-      f_aIw_n(a,w1,w2)
+  dat %<>% mutate(
+    po = (
+      (omega_n(w1,w2,a,y_star,delta_star)*(weights/s)) / f_aIw_n(a,w1,w2)
     )^2
   )
   
   # Run regression
   if (type=="linear") {
-    model <- lm(po~a, data=filter(dat_orig,!is.na(a)), weights=weights)
+    model <- lm(po~a, data=dat)
     coeff <- as.numeric(model$coefficients)
     
     return(Vectorize(function(x){
-      coeff[1] + coeff[2]*x
+      prob * ( coeff[1] + coeff[2]*x )
     }))
   }
   
   # Run regression
   if (type=="cubic") {
-    model <- lm(po~a+I(a^2)+I(a^3), data=filter(dat_orig,!is.na(a)), weights=weights)
+    model <- lm(po~a+I(a^2)+I(a^3), data=dat)
     coeff <- as.numeric(model$coefficients)
     
     return(Vectorize(function(x){
-      coeff[1] + coeff[2]*x + coeff[3]*(x^2) + coeff[4]*(x^3)
+      prob * ( coeff[1] + coeff[2]*x + coeff[3]*(x^2) + coeff[4]*(x^3) )
     }))
   }
   
@@ -555,28 +509,42 @@ construct_g_n <- function(vals, f_aIw_n, f_a_n) {
 #' @param S_n Conditional survival function estimator returned by construct_S_n
 #' @param Sc_n Conditional censoring survival function estimator returned by
 #'     construct_S_n
-#' @param m Number of partitions used for the integral approximation
 #' @return Estimator function of nuisance omega_0
-construct_omega_n <- function(vals, S_n, Sc_n, m=400) {
+construct_omega_n <- function(vals, S_n, Sc_n) {
   
   fn <- function(w1,w2,a,y_star,delta_star) {
     
-    i <- c(1:m)
-    k <- min(y_star,C$t_e)
+    k <- round(min(y_star,C$t_e))
+    if (k==0) k <- 1
+    i <- c(1:k)
+    # i <- c(1:m)
+    # k <- min(y_star,C$t_e)
     
     integral <- sum(
       (
-        S_n((i*k)/m,w1,w2,a) - S_n(((i-1)*k)/m,w1,w2,a)
+        S_n(i,w1,w2,a) - S_n(i-1,w1,w2,a)
+        # S_n((i*k)/m,w1,w2,a) - S_n(((i-1)*k)/m,w1,w2,a)
       ) *
       (
-        (S_n((i*k)/m,w1,w2,a))^2 * Sc_n((i*k)/m,w1,w2,a)
+        (S_n(i,w1,w2,a))^2 * Sc_n(i,w1,w2,a)
+        # (S_n((i*k)/m,w1,w2,a))^2 * Sc_n((i*k)/m,w1,w2,a)
       )^-1
     )
-    S_n(C$t_e,w1,w2,a) * (
+    
+    # # Trapezoidal correction to integral
+    # if (L$trap_correction & k>1) {
+    #   left_val <- 1
+    #   right_val <- S_n(k,w1,w2,a) * (
+    #     (S_n(k,w1,w2,a))^2 * Sc_n(k,w1,w2,a)
+    #   )^-1
+    #   integral <- integral + (1/2)*left_val - (1/2)*right_val
+    # }
+    
+    return(S_n(C$t_e,w1,w2,a) * (
       (delta_star * as.integer(y_star<=C$t_e)) /
         (S_n(k,w1,w2,a) * Sc_n(k,w1,w2,a)) +
         integral
-    )
+    ))
 
   }
   
@@ -641,6 +609,7 @@ lambda <- function(k, G, dat_orig) {
 #' 
 #' @param dat_orig Dataset returned by generate_data(); this must be the FULL
 #'     DATA, including the "missing" observations
+#' @param vals Dataframe of values to run function on
 #' @param omega_n A nuisance influence function returned by construct_omega_n()
 #' @param S_n A conditional survival function returned by construct_S_n()
 #' @param g_n A density ratio estimator function returned by construct_g_n()
@@ -667,15 +636,13 @@ construct_Gamma_n <- function(dat_orig, vals, omega_n, S_n, g_n) {
   sampling <- attr(dat,"sampling")
   subpiece_1a <- ( 1 + (
     omega_n(dat$w1,dat$w2,dat$a,dat$y_star,dat$delta_star) /
-      g_n(dat$a,dat$w1,dat$w2)
+    g_n(dat$a,dat$w1,dat$w2)
   ) ) * ( weights / s )
-  subpiece_2a <- S_n(C$t_e,w1_j_long,w2_j_long,a_i_long) /
-  (
+  subpiece_2a <- S_n(C$t_e,w1_j_long,w2_j_long,a_i_long) / (
     s^2 * Pi(sampling,delta_star_i_long,w1_i_long,w2_i_long) *
     Pi(sampling,delta_star_j_long,w1_j_long,w2_j_long)
   )
   
-  # Declare function
   fn <- function(x) {
     
     subpiece_1b <- as.integer(dat$a<=x)
@@ -688,8 +655,44 @@ construct_Gamma_n <- function(dat_orig, vals, omega_n, S_n, g_n) {
     
   }
   
-  # Run function on vals and return hash table
-  return (create_htab(fn, vals))
+  return (create_htab(fn, vals, round_args=2))
+  
+}
+
+
+
+
+
+
+#' Construct cross-fitted Gamma_n estimator
+#' 
+#' @param Gamma_ns A list of Gamma_n estimators, each returned by
+#'     construct_Gamma_n
+#' @param dat_train Training dataset, for cross-fitted version
+#' @param dat_test Testing dataset, for cross-fitted version
+#' @param vals Dataframe of values to run function on
+#' @return Cross-fitted Gamma_n estimator
+construct_Gamma_cf <- function(Gamma_ns, vals) {
+  
+  # !!!!! Redo all of this
+  
+  cf_folds <- length(Gamma_ns)
+  
+  if (cf_folds==1) {
+    
+    return(Gamma_ns[[1]])
+    
+  } else {
+    
+    fn <- function(x) {
+      return(mean(sapply(c(1:cf_folds), function(i) {
+        Gamma_ns[[i]](x)
+      })))
+    }
+    
+    return (create_htab(fn, vals, round_args=2))
+    
+  }
   
 }
 

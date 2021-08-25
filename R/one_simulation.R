@@ -23,7 +23,7 @@ if (cfg$which_sim=="estimation") {
     )
     
     # Return results
-    theta_true <- attr(dat, "theta_true")
+    theta_true <- attr(dat_orig, "theta_true")
     res_list <- list()
     for (i in 1:length(C$points)) {
       m <- format(C$points[i], nsmall=1)

@@ -4,9 +4,59 @@ if (F) {
   
   
   
+  
+  l1 <- list(x=1, y=2)
+  l2 <- list(x=rnorm(100000),y=c(2,3,4))
+  microbenchmark({
+    max(sapply(l1, length))
+  }, times=10L)
+  microbenchmark({
+    max(sapply(l2, length))
+  }, times=10L)
+  microbenchmark({
+    x <- str(l1)
+  }, times=10L)
+  microbenchmark({
+    x <- str(l2)
+  }, times=10L)
+  
+  x <- rnorm(10)
+  y <- rnorm(100000)
+  microbenchmark({
+    max(sapply(list(x=x, y=c(1,2,3)), length))
+  }, times=10L)
+  microbenchmark({
+    max(sapply(list(x=c(1,2,3,4), y=y), length))
+  }, times=10L)
+  microbenchmark({
+    sapply(list(y=y), length)
+  }, times=10L)
+  microbenchmark({
+    (function(...) {
+      sapply(list(...), length)
+    })(1, 2)
+  }, times=10L)
+  
+  
+  (function(...) {
+    sapply(list(...), length)
+  })(c(1,2), c(3,4))
+  (function(...) {
+    sapply(list(...), length)
+  })(1, 2)
+  
+  
   fn <- function(x,y) { x*y }
-  vals <- data.frame(x=c(1:100), y=c(2:101))
-  my_fun <- create_htab(fn, vals)
+  vals <- data.frame(x=rnorm(10000), y=rnorm(10000))
+  my_fun <- create_htab(fn, vals, round=c(1,1))
+  microbenchmark({
+    my_fun(vals[1:1000,1],vals[1:1000,2])
+  }, times=1L)
+  # microbenchmark({
+  #   my_fun(round(vals[1:1000,1],3),round(vals[1:1000,2],3))
+  # }, times=1L)
+  
+  
   my_fun(2,3)
   my_fun(7,8)
   my_fun(c(2,7),c(3,8))

@@ -5,21 +5,27 @@
 ##### CONFIG #####
 ##################.
 
+# devtools::install_github(
+#   repo = "tedwestling/CFsurvival",
+#   lib = "/home/akenny/R_lib",
+#   dependencies = TRUE
+# )
+
 # Set global config
 # devtools::install_github("tedwestling/ctsCausal")
 # devtools::install_github("zeehio/facetscales")
 cfg <- list(
-  which_sim = "testing", # estimation testing
-  level_set_which = "level_set_testing_1", # level_set_estimation_1 level_set_testing_1
+  which_sim = "estimation", # estimation testing
+  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
   run_or_update = "run",
-  num_sim = 1, # !!!!!
+  num_sim = 1000, # !!!!!
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
-           "randomForestSRC"), # "ctsCausal"
+           "randomForestSRC", "CFsurvival"), # "ctsCausal"
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
                      "data.table", "latex2exp", "tidyr"),
   parallel = "none",
-  stop_at_error = TRUE # !!!!!
+  stop_at_error = FALSE # !!!!!
 )
 
 # Set cluster config
@@ -82,14 +88,15 @@ if (FALSE) {
     surv_true = "Cox PH",
     sampling = "iid" # iid two-phase
   )
-
+  
   ests <- est_curve(
     dat_orig = dat_orig,
     estimator = "Generalized Grenander",
-    params = list(S_n_type="Cox PH", g_n_type="parametric", ci_type="logit"),
+    params = list(S_n_type="Cox PH", g_n_type="parametric", ci_type="logit",
+                  cf_folds=1),
     points = C$points
   )
-
+  
   reject <- test_2(
     dat_orig = dat_orig,
     alt_type = "incr",
@@ -97,7 +104,8 @@ if (FALSE) {
       var = "asymptotic",
       S_n_type = "Cox PH",
       g_n_type = "parametric",
-      est_known_nuis = FALSE
+      est_known_nuis = FALSE,
+      cf_folds = 1
     )
   )
 
@@ -116,26 +124,26 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
   level_set_estimation_1 <- list(
     n = 5000,
     alpha_3 = 0.75,
-    distr_A = "Mixture",
+    distr_A = "Unif(0,1)",
     # distr_A = c("Unif(0,1)", "Beta(0.9,1.1+0.4*w2)"), # "Beta(0.8+0.9*w1,0.8+0.4*w2)"
     surv_true = "Cox PH",
     # surv_true = c("Cox PH", "Complex"),
     sampling = "two-phase",
     estimator = list(
       # "G-comp" = list(
-      #   est = "G-comp",
+      #   est = "G-comp", cf_folds = 1,
       #   params = list(S_n_type="Cox PH", boot_reps=100)
       # ),
       "Grenander (parametric g_n)" = list(
-        est = "Generalized Grenander",
+        est = "Generalized Grenander", cf_folds = 1,
         params = list(S_n_type="Cox PH", g_n_type="parametric", ci_type="logit")
-      ),
-      "Grenander (binning g_n)" = list(
-        est = "Generalized Grenander",
-        params = list(S_n_type="Cox PH", g_n_type="binning", ci_type="logit")
       )
+      # "Grenander (binning g_n)" = list(
+      #   est = "Generalized Grenander", cf_folds = 1,
+      #   params = list(S_n_type="Cox PH", g_n_type="binning", ci_type="logit")
+      # )
       # "Grenander (split CIs, m=5)" = list(
-      #   est = "Generalized Grenander",
+      #   est = "Generalized Grenander", cf_folds = 1,
       #   params = list(S_n_type="Cox PH", g_n_type="parametric",
       #                 ci_type="sample split", m=5)
       # )
@@ -157,7 +165,7 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
     test = list(
       "Slope" = list(
         type = "test_2",
-        params = list(var="asymptotic", S_n_type="Cox PH",
+        params = list(var="asymptotic", S_n_type="Cox PH", cf_folds=1,
                       g_n_type="parametric", est_known_nuis=FALSE)
       )
     )
@@ -209,7 +217,7 @@ if (cfg$run_or_update=="run") {
         "deriv_expit", "deriv_logit", "est_curve", "expit", "generate_data",
         "lambda", "logit", "one_simulation", "Pi", "stab", "test_2","test_wald",
         "wts", "construct_infl_fn_1", "construct_infl_fn_2",
-        "construct_infl_fn_Gamma", "beta_n_var_hat", "v", "z"
+        "construct_infl_fn_Gamma", "beta_n_var_hat", "create_htab"
       )
       for (method in methods) {
         sim %<>% add_method(method, eval(as.name(method)))
@@ -321,7 +329,7 @@ if (FALSE) {
   cb_colors <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442",
                  "#0072B2", "#D55E00", "#CC79A7", "#999999")
   m_colors <- c(
-    `G-comp` = cb_colors[1],
+    # `G-comp` = cb_colors[1],
     `Grenander (logit CIs)` = cb_colors[2]
     # `Grenander (split CIs, m=5)` = cb_colors[3]
     # `Grenander (regular CIs)` = cb_colors[4],
@@ -353,6 +361,7 @@ if (FALSE) {
     geom_line() +
     facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(surv_true)) +
     scale_y_continuous(labels=percent, limits=c(0.75,1)) +
+    # scale_y_continuous(labels=percent) +
     scale_color_manual(values=m_colors) +
     labs(title="Coverage (%)", x="A", y=NULL, color="Estimator")
 
@@ -629,7 +638,8 @@ if (FALSE) {
     params = list(
       S_n_type = "Cox PH",
       g_n_type = "parametric",
-      ci_type = "logit" # none
+      ci_type = "logit", # none
+      cf_folds = 1
     ),
     points = C$points
   )

@@ -24,12 +24,12 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
     weights <- wts(dat, scale="none")
     
     # Construct dataframes of values to pre-compute functions on
-    vals_A <- data.frame(a=dat$a)
+    # vals_A <- data.frame(a=dat$a)
     vals_AW <- data.frame(a=dat$a, w1=dat$w1, w2=dat$w2)
-    vals_eta_n <- expand.grid(x=seq(0,1,0.01), w1=seq(0,1,0.01), w2=c(0,1))
+    vals_AW_grid <- expand.grid(a=seq(0,1,0.01), w1=seq(0,1,0.01), w2=c(0,1))
     vals_A_grid <- data.frame(a=seq(0,1,0.01))
-    vals_S_n <- expand.grid(t=c(0:C$t_e), w1=seq(0,1,0.1), w2=c(0,1),
-                            a=seq(0,1,0.1))
+    vals_S_n <- expand.grid(t=seq(0,C$t_e,1), w1=seq(0,1,0.1), w2=c(0,1),
+                            a=seq(0,1,0.01))
     
     # Construct component functions
     G_n <- construct_Phi_n(dat_orig)
@@ -39,9 +39,9 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
     S_n <- construct_S_n(dat, vals_S_n, type=params$S_n_type)
     Sc_n <- construct_S_n(dat, vals_S_n, type=params$S_n_type, csf=TRUE)
     omega_n <- construct_omega_n(vals=dat, S_n, Sc_n)
-    Gamma_n <- construct_Gamma_n(dat_orig, vals_A, omega_n, S_n, g_n)
+    Gamma_n <- construct_Gamma_n(dat_orig, vals_A_grid, omega_n, S_n, g_n)
     gcomp_n <- construct_gcomp_n(dat_orig, vals_A_grid, S_n)
-    eta_n <- construct_eta_n(dat_orig, vals_eta_n, S_n)
+    eta_n <- construct_eta_n(dat_orig, vals_AW_grid, S_n)
     xi_n <- construct_xi_n(Phi_n=G_n, lambda_2, lambda_3)
     rho_n <- construct_rho_n(dat_orig, Phi_n=G_n)
     lambda_2 <- lambda(2,G_n,dat_orig)

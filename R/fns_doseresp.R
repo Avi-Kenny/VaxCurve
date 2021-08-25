@@ -141,8 +141,8 @@ Pi <- function(sampling, delta_star, w1, w2) {
     
   } else if (sampling=="two-phase") {
     
-    pi <- function(w1,w2) { expit(w1+w2) }
-    return(delta_star + (1-delta_star)*pi(w1,w2))
+    pi_w <- function(w1,w2) { expit(w1+w2) }
+    return(delta_star + (1-delta_star)*pi_w(w1,w2))
     
   }
   
@@ -152,46 +152,32 @@ Pi <- function(sampling, delta_star, w1, w2) {
 
 #' Return IP weights
 #' 
-#' @param dat Dataset returned by generate_data()
-#' @param scale One of c("none", "sum 1", "mean 1")
+#' @param dat_orig Dataset returned by generate_data()
+#' @param scale One of c("none", "stabilized", "mean 1")
+#' @param s Weight stabilization factor
 #' @return A sum-to-one vector of weights
 #' @notes
 #'   - Pi is accessed globally
-wts <- function(dat, scale) {
+#'   - "Mean 1" weights are mean 1 EXCLUDING the zero weights
+wts <- function(dat_orig, scale="stabilized") {
   
-  weights <- 1 / Pi(attr(dat,"sampling"), dat$delta_star, dat$w1, dat$w2)
+  sampling <- attr(dat_orig,"sampling")
   
-  if (scale=="sum 1") {
-    weights <- weights / sum(weights)
-  }
+  weights <- dat_orig$delta /
+    Pi(sampling, dat_orig$delta_star, dat_orig$w1, dat_orig$w2)
   
-  if (scale=="mean 1") {
-    weights <- weights / mean(weights)
+  if (scale=="stabilized") {
+    if (sampling=="iid") {
+      s <- 1
+    } else if (sampling=="two-phase") {
+      s <- sum(weights) / nrow(dat_orig)
+    }
+    weights <- weights / s
+  } else if (scale=="mean 1") {
+    weights <- ( weights / sum(weights) ) * nrow(filter(dat_orig,!is.na(a)))
   }
   
   return(weights)
-  
-}
-
-
-
-#' Return IP weight stabilization factor
-#' 
-#' @param dat_orig Dataset returned by generate_data(); this must be the FULL
-#'     DATA, including the "missing" observations
-#' @return IP weight stabilization factor "s"
-#' @notes
-#'   - wts is accessed globally (and therefore so is Pi)
-stab <- function(dat_orig) {
-  
-  if (attr(dat_orig,"sampling")=="iid") {
-    return(1)
-  } else if (attr(dat_orig,"sampling")=="two-phase") {
-    n_orig <- nrow(dat_orig)
-    dat_orig %<>% filter(!is.na(a))
-    weights <- wts(dat_orig, scale="none")
-    return(sum(weights)/n_orig)
-  }
   
 }
 
@@ -325,13 +311,12 @@ construct_gamma_n <- function(dat_orig, type, omega_n, f_aIw_n) {
   
   # Estimate probability
   sampling <- attr(dat_orig,"sampling")
-  prob <- mean(Pi(sampling,dat_orig$delta_star,dat_orig$w1,dat_orig$w2))
-  prob <- 1 - mean(is.na(dat_orig$a))
+  prob <- 1 - mean(dat_orig$delta)
   
   # Construct weights
   s <- stab(dat_orig)
   dat <- filter(dat_orig, !is.na(a))
-  dat$weights <- wts(dat, scale="none")
+  dat$weights <- wts(dat)
   
   # Construct pseudo-outcomes
   dat %<>% mutate(
@@ -392,7 +377,7 @@ construct_f_aIw_n <- function(dat, type) {
   
   dat_trunc <- filter(dat, !is.na(a))
   n_trunc <- nrow(dat_trunc)
-  weights <- wts(dat_trunc, scale="none")
+  weights <- wts(dat_trunc)
   
   if (type=="parametric") {
     
@@ -566,7 +551,7 @@ construct_eta_n <- function(dat_orig, vals, S_n) {
   s <- stab(dat_orig)
   n_orig <- nrow(dat_orig)
   dat <- dat_orig %>% filter(!is.na(a))
-  weights <- wts(dat, scale="none")
+  weights <- wts(dat)
   
   fn <- function(x,w1,w2) {
     sum(
@@ -595,7 +580,7 @@ lambda <- function(k, G, dat_orig) {
   n_orig <- nrow(dat_orig)
   s <- stab(dat_orig)
   dat <- dat_orig %>% filter(!is.na(a))
-  weights <- wts(dat, scale="none")
+  weights <- wts(dat)
   lambda <- (1/n_orig) * sum(
     (weights/s) * (G(dat$a))^k
   )
@@ -618,12 +603,10 @@ lambda <- function(k, G, dat_orig) {
 #'     Carone 2020
 construct_Gamma_n <- function(dat_orig, vals, omega_n, S_n, g_n) {
   
-  dat <- dat_orig
-  s <- stab(dat_orig)
-  n_orig <- nrow(dat)
-  dat %<>% filter(!is.na(a))
+  dat_orig$weights <- wts(dat_orig)
+  n_orig <- nrow(dat_orig)
+  dat <- filter(dat_orig,!is.na(a))
   n <- nrow(dat)
-  weights <- wts(dat, scale="none")
   i_long <- rep(c(1:n), each=n)
   j_long <- rep(c(1:n), times=n)
   a_i_long <- dat$a[i_long]
@@ -633,14 +616,14 @@ construct_Gamma_n <- function(dat_orig, vals, omega_n, S_n, g_n) {
   w2_j_long <- dat$w2[j_long]
   delta_star_i_long <- dat$delta_star[i_long]
   delta_star_j_long <- dat$delta_star[j_long]
-  sampling <- attr(dat,"sampling")
-  subpiece_1a <- ( 1 + (
+  weights_i_long <- dat$weights[i_long]
+  weights_j_long <- dat$weights[j_long]
+  subpiece_1a <- dat$weights * ( 1 + (
     omega_n(dat$w1,dat$w2,dat$a,dat$y_star,dat$delta_star) /
     g_n(dat$a,dat$w1,dat$w2)
-  ) ) * ( weights / s )
-  subpiece_2a <- S_n(C$t_e,w1_j_long,w2_j_long,a_i_long) / (
-    s^2 * Pi(sampling,delta_star_i_long,w1_i_long,w2_i_long) *
-    Pi(sampling,delta_star_j_long,w1_j_long,w2_j_long)
+  ) )
+  subpiece_2a <- S_n(C$t_e,w1_j_long,w2_j_long,a_i_long) * (
+    weights_i_long * weights_j_long
   )
   
   fn <- function(x) {
@@ -711,7 +694,7 @@ construct_Phi_n <- function (dat_orig, type="ecdf") {
   
   dat <- dat_orig
   s <- stab(dat_orig)
-  dat <- cbind(dat, wts=wts(dat, scale="none"))
+  dat <- cbind(dat, wts=wts(dat))
   dat %<>% arrange(a)
   n_orig <- nrow(dat)
   dat %<>% filter(!is.na(a))
@@ -765,7 +748,7 @@ construct_rho_n <- function(dat_orig, Phi_n) {
   s <- stab(dat_orig)
   n_orig <- nrow(dat_orig)
   dat <- dat_orig %>% filter(!is.na(a))
-  weights_j <- wts(dat, scale="none")
+  weights_j <- wts(dat)
   a_j <- dat$a
   
   return(memoise(Vectorize(function(a) {
@@ -804,24 +787,21 @@ construct_xi_n <- function(Phi_n, lambda_2, lambda_3) {
 construct_infl_fn_1 <- function(dat_orig, Gamma_n, Phi_n, xi_n, rho_n,
                                 lambda_2, lambda_3) {
   
-  s <- stab(dat_orig)
   n_orig <- nrow(dat_orig)
+  dat_orig$weights_j <- wts(dat_orig)
   dat <- dat_orig %>% filter(!is.na(a))
-  weights_j <- wts(dat, scale="none")
+  weights_j <- dat$weights_j
   a_j <- dat$a
-  sampling <- attr(dat,"sampling")
   
-  return(memoise(Vectorize(function(w1,w2,y_star,delta_star,delta,a) {
+  return(memoise(Vectorize(function(w1,w2,y_star,delta_star,a) {
     
     piece_1 <- (1/n_orig) * sum(
-      (weights_j/s) * (xi_n(a,a_j)) * Gamma_n(a_j)
+      weights_j * (xi_n(a,a_j)) * Gamma_n(a_j)
     )
     
     piece_2 <- (lambda_2*(Phi_n(a)^2) - lambda_3*Phi_n(a)) * Gamma_n(a)
     
-    return(
-      (delta/(s*Pi(sampling, delta_star,w1,w2))) * (piece_1+piece_2)
-    )
+    return(piece_1+piece_2)
     
   })))
   
@@ -836,18 +816,13 @@ construct_infl_fn_1 <- function(dat_orig, Gamma_n, Phi_n, xi_n, rho_n,
 construct_infl_fn_Gamma <- function(dat_orig, omega_n, g_n, gcomp_n, eta_n,
                                     Gamma_n) {
   
-  s <- stab(dat_orig)
-  sampling <- attr(dat_orig,"sampling")
-  
-  return(memoise(Vectorize(function(x,w1,w2,y_star,delta_star,delta,a) {
-    (delta/(s*Pi(sampling, delta_star,w1,w2))) * (
-      as.integer(a<=x)*(
-        (omega_n(w1,w2,a,y_star,delta_star)/g_n(a,w1,w2)) +
+  return(memoise(Vectorize(function(x,w1,w2,y_star,delta_star,a) {
+    as.integer(a<=x)*(
+      (omega_n(w1,w2,a,y_star,delta_star)/g_n(a,w1,w2)) +
         gcomp_n(a)
-      ) +
-        eta_n(x,w1,w2) - 
-        2*Gamma_n(x)
-    )
+    ) +
+      eta_n(x,w1,w2) - 
+      2*Gamma_n(x)
   })))
   
 }
@@ -861,16 +836,16 @@ construct_infl_fn_Gamma <- function(dat_orig, omega_n, g_n, gcomp_n, eta_n,
 construct_infl_fn_2 <- function(dat_orig, Phi_n, infl_fn_Gamma, lambda_2,
                                 lambda_3) {
   
-  s <- stab(dat_orig)
   n_orig <- nrow(dat_orig)
+  dat_orig$weights <- wts(dat_orig)
   dat <- dat_orig %>% filter(!is.na(a))
-  weights_j <- wts(dat, scale="none")
+  weights_j <- dat$weights
   a_j <- dat$a
   
-  return(memoise(Vectorize(function(w1,w2,y_star,delta_star,delta,a) {
-    (1/n_orig) * sum((weights_j/s) * (
+  return(memoise(Vectorize(function(w1,w2,y_star,delta_star,a) {
+    (1/n_orig) * sum(weights_j * (
       ( lambda_2*(Phi_n(a_j)^2) - lambda_3*Phi_n(a_j) ) *
-        infl_fn_Gamma(a_j,w1,w2,y_star,delta_star,delta,a)
+        infl_fn_Gamma(a_j,w1,w2,y_star,delta_star,a)
     ))
   })))
   
@@ -885,17 +860,17 @@ construct_infl_fn_2 <- function(dat_orig, Phi_n, infl_fn_Gamma, lambda_2,
 beta_n_var_hat <- function(dat_orig, infl_fn_1, infl_fn_2) {
   
   n_orig <- nrow(dat_orig)
+  dat_orig$weights <- wts(dat_orig)
   dat <- dat_orig %>% filter(!is.na(a))
   
   b_sum <- 0
   for (i in c(1:nrow(dat))) {
-    s <- (
-      infl_fn_1(dat$w1[i], dat$w2[i], dat$y_star[i], dat$delta_star[i],
-                dat$delta[i], dat$a[i]) +
-      infl_fn_2(dat$w1[i], dat$w2[i], dat$y_star[i], dat$delta_star[i],
-                dat$delta[i], dat$a[i])
+    b_sum <- b_sum + (
+      dat$weights[i] * infl_fn_1(dat$w1[i], dat$w2[i], dat$y_star[i],
+                              dat$delta_star[i], dat$a[i]) +
+      dat$weights[i] * infl_fn_2(dat$w1[i], dat$w2[i], dat$y_star[i],
+                              dat$delta_star[i], dat$a[i])
     )^2
-    b_sum <- b_sum + s
   }
   
   return(

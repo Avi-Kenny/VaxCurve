@@ -69,8 +69,6 @@ est_curve <- function(dat_orig, estimator, params, points) {
     # Construct theta_n and tau_n, given a dataset
     construct_fns <- function(dat_orig, return_tau_n=T) {
       
-      if (is.null(params$cf_folds)) params$cf_folds <- 1
-      
       # Construct dataframes of values to pre-compute functions on
       dat <- dat_orig %>% filter(!is.na(a))
       grid <- seq(0,1,0.01)
@@ -78,44 +76,66 @@ est_curve <- function(dat_orig, estimator, params, points) {
       vals_A_grid <- data.frame(a=seq(0,1,0.01))
       vals_S_n <- expand.grid(t=seq(0,C$t_e,1), w1=seq(0,1,0.1), w2=c(0,1),
                               a=seq(0,1,0.01))
+      vals_omega <- subset(dat, select=-c(delta,weights))
       
-      # Prep for cross-fitting
-      Gamma_ns <- list()
-      n_orig <- nrow(dat_orig)
-      rows <- c(1:n_orig)
-      if (params$cf_folds!=1) {
-        folds <- sample(cut(rows, breaks=params$cf_folds, labels=FALSE))
-      }
-      
-      # Construct cross-fitted estimator
-      for (i in 1:params$cf_folds) {
-        
-        # Construct training set (bigger) and testing set (smaller)
-        if (params$cf_folds==1) {
-          dat_train <- dat_orig
-          dat_test <- dat_orig
-        } else {
-          dat_train <- dat_orig[-which(folds==i),]
-          dat_test <- dat_orig[which(folds==i),]
-        }
+      # Construct regular Gamma_0 estimator
+      if (is.null(params$cf_folds) || params$cf_folds==1) {
         
         # Construct component functions
-        Phi_n <- construct_Phi_n(dat_train)
-        Phi_n_inv <- construct_Phi_n(dat_train, type="inverse")
-        S_n <- construct_S_n(dat_train, vals_S_n, type=params$S_n_type)
-        Sc_n <- construct_S_n(dat_train, vals_S_n, type=params$S_n_type, csf=TRUE)
-        gcomp_n <- construct_gcomp_n(dat_train, vals_A_grid, S_n)
-        f_aIw_n <- construct_f_aIw_n(dat_train, type=params$g_n_type)
-        f_a_n <- construct_f_a_n(dat_train, f_aIw_n=f_aIw_n)
+        Phi_n <- construct_Phi_n(dat_orig)
+        Phi_n_inv <- construct_Phi_n(dat_orig, type="inverse")
+        S_n <- construct_S_n(dat_orig, vals_S_n, type=params$S_n_type)
+        Sc_n <- construct_S_n(dat_orig, vals_S_n, type=params$S_n_type, csf=TRUE)
+        gcomp_n <- construct_gcomp_n(dat_orig, vals_A_grid, S_n)
+        f_aIw_n <- construct_f_aIw_n(dat_orig, type=params$g_n_type)
+        f_a_n <- construct_f_a_n(dat_orig, f_aIw_n=f_aIw_n)
         g_n <- construct_g_n(vals_AW, f_aIw_n, f_a_n)
-        omega_n <- construct_omega_n(vals=dat_train, S_n, Sc_n)
+        omega_n <- construct_omega_n(vals_omega, S_n, Sc_n)
         
-        # Construct sub-Gamma_n functions
-        Gamma_ns[[i]] <- construct_Gamma_n(dat_train, dat_test, vals_A_grid,
+        # Construct Gamma_n
+        Gamma_n <- construct_Gamma_n(dat_train, dat_test, vals_A_grid,
                                            omega_n, S_n, g_n)
+        
+      # Construct cross-fitted Gamma_0 estimator
+      } else {
+        
+        # Prep for cross-fitting
+        Gamma_ns <- list()
+        n_orig <- nrow(dat_orig)
+        rows <- c(1:n_orig)
+        folds <- sample(cut(rows, breaks=params$cf_folds, labels=FALSE))
+        
+        # Loop through folds
+        for (k in 1:params$cf_folds) {
+          
+          dat_train <- dat_orig[-which(folds==k),]
+          dat_test <- dat_orig[which(folds==k),]
+          
+          # Construct component functions
+          Phi_n <- construct_Phi_n(dat_train)
+          Phi_n_inv <- construct_Phi_n(dat_train, type="inverse")
+          S_n <- construct_S_n(dat_train, vals_S_n, type=params$S_n_type)
+          Sc_n <- construct_S_n(dat_train, vals_S_n, type=params$S_n_type, csf=TRUE)
+          gcomp_n <- construct_gcomp_n(dat_train, vals_A_grid, S_n)
+          f_aIw_n <- construct_f_aIw_n(dat_train, type=params$g_n_type)
+          f_a_n <- construct_f_a_n(dat_train, f_aIw_n=f_aIw_n)
+          g_n <- construct_g_n(vals_AW, f_aIw_n, f_a_n)
+          omega_n <- construct_omega_n(vals_omega, S_n, Sc_n)
+          
+          # Construct K functions
+
+          
+          # Construct sub-Gamma_n functions
+          # Gamma_ns[[i]] <- construct_Gamma_cf(dat_train, dat_test, vals_A_grid,
+          #                                    omega_n, S_n, g_n)
+          
+        }
         
       }
       
+
+
+
       # Construct cross-fitted Gamma_n
       Gamma_n_cf <- construct_Gamma_cf(Gamma_ns, vals_A_grid)
       
@@ -160,7 +180,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
             gcomp_n <- construct_gcomp_n(dat_train, vals_A_grid, S_n)
             f_aIw_n <- construct_f_aIw_n(dat_train, type=params$g_n_type)
             f_a_n <- construct_f_a_n(dat_train, f_aIw_n=f_aIw_n)
-            omega_n <- construct_omega_n(vals=dat_train, S_n, Sc_n)
+            omega_n <- construct_omega_n(vals_omega, S_n, Sc_n)
           }
           
           deriv_theta_n <- construct_deriv_theta_n(gcomp_n)
@@ -175,38 +195,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
       
     }
     
-    # Construct the sample split estimator
-    if (params$ci_type=="sample split") {
-      
-      # !!!!! Need to check; haven't run this in a while
-      
-      # Construct data splits (discarding "extra rows" at end)
-      m <- params$m
-      splits <- matrix(NA, nrow=m, ncol=2)
-      split_size <- as.integer(n/m)
-      splits[,2] <- (1:m)*split_size
-      splits[,1] <- ((1:m)*split_size+1)-split_size
-      
-      # Construct estimate separately for each data split
-      ests <- c()
-      ses <- c()
-      for (point in points) {
-        split_ests <- sapply(c(1:m), function(x) {
-          dat_split <- dat_orig[c(splits[x,1]:splits[x,2]),]
-          theta_n <- construct_fns(dat_orig=dat_split, return_tau_n=F)$theta_n
-          return(theta_n(point))
-        })
-        
-        ests <- c(ests, mean(split_ests))
-        ses <- c(ses, sd(split_ests)/sqrt(m))
-      }
-
-      # Construct CIs
-      t_quant <- qt(1-(0.05/2), df=(m-1))
-      ci_lo <- ests - t_quant*ses
-      ci_hi <- ests + t_quant*ses
-      
-    } else {
+    if (params$ci_type!="sample split") {
       
       if (params$ci_type=="none") {
         
@@ -245,6 +234,36 @@ est_curve <- function(dat_orig, estimator, params, points) {
         }
         
       }
+      
+    } else {
+      
+      # !!!!! Need to check; haven't run this in a while
+      
+      # Construct data splits (discarding "extra rows" at end)
+      m <- params$m
+      splits <- matrix(NA, nrow=m, ncol=2)
+      split_size <- as.integer(n/m)
+      splits[,2] <- (1:m)*split_size
+      splits[,1] <- ((1:m)*split_size+1)-split_size
+      
+      # Construct estimate separately for each data split
+      ests <- c()
+      ses <- c()
+      for (point in points) {
+        split_ests <- sapply(c(1:m), function(x) {
+          dat_split <- dat_orig[c(splits[x,1]:splits[x,2]),]
+          theta_n <- construct_fns(dat_orig=dat_split, return_tau_n=F)$theta_n
+          return(theta_n(point))
+        })
+        
+        ests <- c(ests, mean(split_ests))
+        ses <- c(ses, sd(split_ests)/sqrt(m))
+      }
+      
+      # Construct CIs
+      t_quant <- qt(1-(0.05/2), df=(m-1))
+      ci_lo <- ests - t_quant*ses
+      ci_hi <- ests + t_quant*ses
       
     }
     

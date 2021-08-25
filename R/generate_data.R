@@ -70,14 +70,15 @@ generate_data <- function(n, alpha_3, distr_A, surv_true, sampling) {
   
   # IID sampling
   if (sampling=="iid") {
-    dat <- data.frame(w1=w1, w2=w2, a=a, y_star=y_star, delta_star=delta_star)
+    dat <- data.frame(w1=w1, w2=w2, a=a, delta=1, y_star=y_star,
+                      delta_star=delta_star)
   }
   
   # Two-phase sampling
   if (sampling=="two-phase") {
     Pi <- Pi("two-phase",delta_star,w1,w2)
     delta <- rbinom(n, size=1, prob=Pi)
-    dat <- data.frame(w1=w1, w2=w2, a=ifelse(delta==1,a,NA),
+    dat <- data.frame(w1=w1, w2=w2, a=ifelse(delta==1,a,NA), delta=delta,
                       y_star=y_star, delta_star=delta_star)
   }
 

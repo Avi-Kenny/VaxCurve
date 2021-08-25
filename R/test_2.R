@@ -18,10 +18,10 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
   if (params$var=="asymptotic") {
     
     # Prep
-    s <- stab(dat_orig)
     n_orig <- nrow(dat_orig)
+    dat_orig$weights <- wts(dat_orig)
     dat <- dat_orig %>% filter(!is.na(a))
-    weights <- wts(dat, scale="none")
+    weights <- dat$weights
     
     # Construct dataframes of values to pre-compute functions on
     # vals_A <- data.frame(a=dat$a)
@@ -30,6 +30,7 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
     vals_A_grid <- data.frame(a=seq(0,1,0.01))
     vals_S_n <- expand.grid(t=seq(0,C$t_e,1), w1=seq(0,1,0.1), w2=c(0,1),
                             a=seq(0,1,0.01))
+    vals_omega <- subset(dat, select=-c(delta,weights))
     
     # Construct component functions
     G_n <- construct_Phi_n(dat_orig)
@@ -38,7 +39,7 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
     g_n <- construct_g_n(vals_AW, f_aIw_n, f_a_n)
     S_n <- construct_S_n(dat, vals_S_n, type=params$S_n_type)
     Sc_n <- construct_S_n(dat, vals_S_n, type=params$S_n_type, csf=TRUE)
-    omega_n <- construct_omega_n(vals=dat, S_n, Sc_n)
+    omega_n <- construct_omega_n(vals_omega, S_n, Sc_n)
     Gamma_n <- construct_Gamma_n(dat_orig, vals_A_grid, omega_n, S_n, g_n)
     gcomp_n <- construct_gcomp_n(dat_orig, vals_A_grid, S_n)
     eta_n <- construct_eta_n(dat_orig, vals_AW_grid, S_n)
@@ -49,7 +50,7 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
     
     # Compute the test statistic
     beta_n <- (1/n_orig) * sum(
-      (weights/s) * (
+      weights * (
         lambda_2*(G_n(dat$a))^2 -
         lambda_3*G_n(dat$a)
       ) *
@@ -81,6 +82,8 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
   
   if (params$var=="boot") {
     
+    # !!!!! Update all of this
+    
     # Define the statistic to bootstrap
     bootstat <- function(dat_orig,indices) {
       
@@ -90,7 +93,7 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
       n_orig <- nrow(dat)
       dat_0 <- dat %>% filter(!is.na(a))
       n_0 <- nrow(dat_0)
-      weights_0 <- wts(dat_0, scale="none")
+      weights_0 <- wts(dat_0)
       G_0 <- construct_Phi_n(dat_orig)
       f_aIw_n <- construct_f_aIw_n(dat_0, type=params$g_n_type)
       f_a_n <- construct_f_a_n(dat_orig, f_aIw_n=f_aIw_n)
@@ -126,6 +129,8 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
   
   if (params$var=="mixed boot") {
     
+    # !!!!! Update all of this
+    
     # Pre-calculate non-bootstrapped pieces
     {
       dat_0_orig <- dat
@@ -133,7 +138,7 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
       n_orig <- nrow(dat_0_orig)
       dat_0 <- dat_0_orig %>% filter(!is.na(a))
       n_0 <- nrow(dat_0)
-      weights_0 <- wts(dat_0, scale="none")
+      weights_0 <- wts(dat_0)
       
       G_0 <- construct_Phi_n(dat_0_orig)
       S_0 <- construct_S_n(dat_0, type=params$S_n_type)
@@ -168,7 +173,7 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
       s_b <- stab(dat_b_orig)
       dat_b <- dat_b_orig %>% filter(!is.na(a))
       n_b <- nrow(dat_b)
-      weights_b <- wts(dat_b, scale="none")
+      weights_b <- wts(dat_b)
       G_n <- construct_Phi_n(dat_b_orig)
       
       piece_1 <- (1/n_orig) * sum(

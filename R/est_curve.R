@@ -19,135 +19,53 @@
 #'     list(list(point=1, est=1, se=1), list(...), ...)
 est_curve <- function(dat_orig, estimator, params, points) {
   
-  if (estimator=="G-comp") {
-    
-    # Prep
-    dat <- dat_orig %>% filter(!is.na(a))
-    
-    # Construct dataframes of values to pre-compute functions on
-    vals_S_n <- expand.grid(t=C$t_e, w1=seq(0,1,0.1), w2=c(0,1),
-                            a=seq(0,1,0.1))
-    vals_A_grid <- data.frame(a=seq(0,1,0.01))
-    
-    # Construct component functions
-    S_n <- construct_S_n(dat_orig, vals_S_n, type=params$S_n_type)
-    gcomp_n <- construct_gcomp_n(dat_orig, vals_A_grid, S_n)
-    
-    # Compute estimates
-    ests <- gcomp_n(points)
-    
-    # Run bootstrap for SEs
-    {
-      my_stat <- function(dat_orig,indices) {
-        d <- dat_orig[indices,]
-        S_n <- construct_S_n(d, vals_S_n, type=params$S_n_type)
-        gcomp_n <- construct_gcomp_n(d, vals_A_grid, S_n)
-        return (gcomp_n(points))
-      }
-      boot_obj <- boot(data=dat_orig, statistic=my_stat, R=params$boot_reps)
-    }
-
-    # Parse results object
-    # t_quant <- qt(1-(0.05/2), df=(params$boot_reps-1))
-    res <- list()
-    for (p in 1:length(points)) {
-      boot_sd <- sd(boot_obj$t[,p])
-      res[[p]] <- list(
-        point = points[p],
-        est = ests[p],
-        ci_lo = ests[p] - 1.96*boot_sd,
-        ci_hi = ests[p] + 1.96*boot_sd
-      )
-    }
-    
-    return (res)
-    
-  }
-  
-  if (estimator=="Generalized Grenander") {
+  if (estimator=="Grenander") {
     
     # Construct theta_n and tau_n, given a dataset
     construct_fns <- function(dat_orig, return_tau_n=T) {
       
-      # Construct dataframes of values to pre-compute functions on
+      # Prep
+      n_orig <- nrow(dat_orig)
+      dat_orig$weights <- wts(dat_orig)
       dat <- dat_orig %>% filter(!is.na(a))
-      grid <- seq(0,1,0.01)
-      vals_AW <- data.frame(a=dat$a, w1=dat$w1, w2=dat$w2)
-      vals_A_grid <- data.frame(a=seq(0,1,0.01))
-      vals_S_n <- expand.grid(t=seq(0,C$t_e,1), w1=seq(0,1,0.1), w2=c(0,1),
-                              a=seq(0,1,0.01))
-      vals_omega <- subset(dat, select=-c(delta,weights))
+      weights <- dat$weights
+      
+      # Construct dataframes of values to pre-compute functions on
+      vlist <- create_val_list(dat_orig, C$appx)
       
       # Construct regular Gamma_0 estimator
-      if (is.null(params$cf_folds) || params$cf_folds==1) {
+      if (params$cf_folds==1) {
         
         # Construct component functions
         Phi_n <- construct_Phi_n(dat_orig)
         Phi_n_inv <- construct_Phi_n(dat_orig, type="inverse")
-        S_n <- construct_S_n(dat_orig, vals_S_n, type=params$S_n_type)
-        Sc_n <- construct_S_n(dat_orig, vals_S_n, type=params$S_n_type, csf=TRUE)
-        gcomp_n <- construct_gcomp_n(dat_orig, vals_A_grid, S_n)
-        f_aIw_n <- construct_f_aIw_n(dat_orig, type=params$g_n_type)
-        f_a_n <- construct_f_a_n(dat_orig, f_aIw_n=f_aIw_n)
-        g_n <- construct_g_n(vals_AW, f_aIw_n, f_a_n)
-        omega_n <- construct_omega_n(vals_omega, S_n, Sc_n)
+        S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
+        Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type, csf=TRUE)
+        f_aIw_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid, type=params$g_n_type)
+        f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
+        g_n <- construct_g_n(vlist$AW_grid, f_aIw_n, f_a_n)
+        omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
         
         # Construct Gamma_n
-        Gamma_n <- construct_Gamma_n(dat_train, dat_test, vals_A_grid,
-                                           omega_n, S_n, g_n)
-        
-      # Construct cross-fitted Gamma_0 estimator
-      } else {
-        
-        # Prep for cross-fitting
-        Gamma_ns <- list()
-        n_orig <- nrow(dat_orig)
-        rows <- c(1:n_orig)
-        folds <- sample(cut(rows, breaks=params$cf_folds, labels=FALSE))
-        
-        # Loop through folds
-        for (k in 1:params$cf_folds) {
-          
-          dat_train <- dat_orig[-which(folds==k),]
-          dat_test <- dat_orig[which(folds==k),]
-          
-          # Construct component functions
-          Phi_n <- construct_Phi_n(dat_train)
-          Phi_n_inv <- construct_Phi_n(dat_train, type="inverse")
-          S_n <- construct_S_n(dat_train, vals_S_n, type=params$S_n_type)
-          Sc_n <- construct_S_n(dat_train, vals_S_n, type=params$S_n_type, csf=TRUE)
-          gcomp_n <- construct_gcomp_n(dat_train, vals_A_grid, S_n)
-          f_aIw_n <- construct_f_aIw_n(dat_train, type=params$g_n_type)
-          f_a_n <- construct_f_a_n(dat_train, f_aIw_n=f_aIw_n)
-          g_n <- construct_g_n(vals_AW, f_aIw_n, f_a_n)
-          omega_n <- construct_omega_n(vals_omega, S_n, Sc_n)
-          
-          # Construct K functions
-
-          
-          # Construct sub-Gamma_n functions
-          # Gamma_ns[[i]] <- construct_Gamma_cf(dat_train, dat_test, vals_A_grid,
-          #                                    omega_n, S_n, g_n)
-          
-        }
+        Gamma_n <- construct_Gamma_n(dat_orig, vlist$A_grid, omega_n, S_n, g_n)
         
       }
       
-
-
-
-      # Construct cross-fitted Gamma_n
-      Gamma_n_cf <- construct_Gamma_cf(Gamma_ns, vals_A_grid)
-      
-      # Recompute functions on full dataset
-      if (params$cf_folds!=1) {
+      # Construct cross-fitted Gamma_0 estimator
+      if (params$cf_folds>1) {
+        
+        Gamma_n <- construct_Gamma_cf(dat_orig, params, vlist)
+        
+        # Recompute functions on full dataset
         Phi_n <- construct_Phi_n(dat_orig)
         Phi_n_inv <- construct_Phi_n(dat_orig, type="inverse")
+        
       }
+      
       Psi_n <- Vectorize(function(x) {
-        return(Gamma_n_cf(Phi_n_inv(x)))
+        return(Gamma_n(Phi_n_inv(x)))
       })
-      gcm <- gcmlcm(x=grid, y=Psi_n(grid), type="gcm")
+      gcm <- gcmlcm(x=seq(0,1,0.01), y=Psi_n(seq(0,1,0.01)), type="gcm")
       dGCM <- Vectorize(function(x) {
         if (x==0) {
           index <- 1
@@ -173,16 +91,16 @@ est_curve <- function(dat_orig, estimator, params, points) {
         if (return_tau_n==T) {
           
           # Recompute functions on full dataset
-          if (params$cf_folds!=1) {
-            S_n <- construct_S_n(dat_train, vals_S_n, type=params$S_n_type)
-            Sc_n <- construct_S_n(dat_train, vals_S_n, type=params$S_n_type,
+          if (params$cf_folds>1) {
+            S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
+            Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type,
                                   csf=TRUE)
-            gcomp_n <- construct_gcomp_n(dat_train, vals_A_grid, S_n)
-            f_aIw_n <- construct_f_aIw_n(dat_train, type=params$g_n_type)
-            f_a_n <- construct_f_a_n(dat_train, f_aIw_n=f_aIw_n)
-            omega_n <- construct_omega_n(vals_omega, S_n, Sc_n)
+            f_aIw_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid, type=params$g_n_type)
+            f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
+            omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
           }
           
+          gcomp_n <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n)
           deriv_theta_n <- construct_deriv_theta_n(gcomp_n)
           gamma_n <- construct_gamma_n(dat_orig, type="cubic", omega_n, f_aIw_n)
           tau_n <- construct_tau_n(deriv_theta_n, gamma_n, f_a_n)
@@ -274,6 +192,48 @@ est_curve <- function(dat_orig, estimator, params, points) {
                        ci_lo=ci_lo[p], ci_hi=ci_hi[p])
     }
     return(res)
+    
+  }
+  
+  if (estimator=="G-comp") {
+    
+    # !!!!! May need to rewrite some of this
+    
+    # Prep
+    dat <- dat_orig %>% filter(!is.na(a))
+    
+    # Construct component functions
+    S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
+    gcomp_n <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n)
+    
+    # Compute estimates
+    ests <- gcomp_n(points)
+    
+    # Run bootstrap for SEs
+    {
+      my_stat <- function(dat_orig,indices) {
+        d <- dat_orig[indices,]
+        S_n <- construct_S_n(d, vlist$S_n, type=params$S_n_type)
+        gcomp_n <- construct_gcomp_n(d, vlist$A_grid, S_n)
+        return (gcomp_n(points))
+      }
+      boot_obj <- boot(data=dat_orig, statistic=my_stat, R=params$boot_reps)
+    }
+    
+    # Parse results object
+    # t_quant <- qt(1-(0.05/2), df=(params$boot_reps-1))
+    res <- list()
+    for (p in 1:length(points)) {
+      boot_sd <- sd(boot_obj$t[,p])
+      res[[p]] <- list(
+        point = points[p],
+        est = ests[p],
+        ci_lo = ests[p] - 1.96*boot_sd,
+        ci_hi = ests[p] + 1.96*boot_sd
+      )
+    }
+    
+    return (res)
     
   }
   

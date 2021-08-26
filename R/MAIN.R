@@ -5,27 +5,24 @@
 ##### CONFIG #####
 ##################.
 
-# devtools::install_github(
-#   repo = "tedwestling/CFsurvival",
-#   lib = "/home/akenny/R_lib",
-#   dependencies = TRUE
-# )
-
 # Set global config
-# devtools::install_github("tedwestling/ctsCausal")
-# devtools::install_github("zeehio/facetscales")
+# GitHub packages:
+#   - tedwestling/ctsCausal
+#   - tedwestling/CFsurvival
+#   - tedwestling/survSuperLearner
+#   - zeehio/facetscales
 cfg <- list(
-  which_sim = "estimation", # estimation testing
-  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
+  which_sim = "testing", # estimation testing
+  level_set_which = "level_set_testing_1", # level_set_estimation_1 level_set_testing_1
   run_or_update = "run",
-  num_sim = 1000, # !!!!!
+  num_sim = 1000,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
-           "randomForestSRC", "CFsurvival"), # "ctsCausal"
+           "randomForestSRC", "CFsurvival"),
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
                      "data.table", "latex2exp", "tidyr"),
   parallel = "none",
-  stop_at_error = FALSE # !!!!!
+  stop_at_error = FALSE
 )
 
 # Set cluster config
@@ -71,48 +68,6 @@ if (load_pkgs_local) {
 
 
 
-#############################################.
-##### TESTING: Dataset for testing code #####
-#############################################.
-
-if (FALSE) {
-  
-  params <- list(g_n_type="parametric", S_n_type="Cox PH")
-  C <- list(lambda=10^-4, v=1.5, lambda2=0.5*10^-4, v2=1.5,
-            points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
-
-  dat_orig <- generate_data(
-    n = 500, # 5000
-    alpha_3 = 0.7,
-    distr_A = "Unif(0,1)",
-    surv_true = "Cox PH",
-    sampling = "two-phase" # iid two-phase
-  )
-  
-  ests <- est_curve(
-    dat_orig = dat_orig,
-    estimator = "Generalized Grenander",
-    params = list(S_n_type="Cox PH", g_n_type="parametric", ci_type="logit",
-                  cf_folds=1),
-    points = C$points
-  )
-  
-  reject <- test_2(
-    dat_orig = dat_orig,
-    alt_type = "incr",
-    params = list(
-      var = "asymptotic",
-      S_n_type = "Cox PH",
-      g_n_type = "parametric",
-      est_known_nuis = FALSE,
-      cf_folds = 1
-    )
-  )
-
-}
-
-
-
 ##########################################################.
 ##### MAIN: Set level sets for different simulations #####
 ##########################################################.
@@ -135,15 +90,15 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
       #   params = list(S_n_type="Cox PH", boot_reps=100)
       # ),
       "Grenander (parametric g_n)" = list(
-        est = "Generalized Grenander", cf_folds = 1,
+        est = "Grenander", cf_folds = 1,
         params = list(S_n_type="Cox PH", g_n_type="parametric", ci_type="logit")
       )
       # "Grenander (binning g_n)" = list(
-      #   est = "Generalized Grenander", cf_folds = 1,
+      #   est = "Grenander", cf_folds = 1,
       #   params = list(S_n_type="Cox PH", g_n_type="binning", ci_type="logit")
       # )
       # "Grenander (split CIs, m=5)" = list(
-      #   est = "Generalized Grenander", cf_folds = 1,
+      #   est = "Grenander", cf_folds = 1,
       #   params = list(S_n_type="Cox PH", g_n_type="parametric",
       #                 ci_type="sample split", m=5)
       # )
@@ -153,21 +108,25 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
   # Testing: compare all methods
   # Not currently using (var="boot")
   level_set_testing_1 <- list(
-    n = 500,
-    # n = c(500,1000,2000,4000,8000),
+    n = c(1000,3000,5000),
     alpha_3 = 0,
     # alpha_3 = c(0,0.4,0.8),
     distr_A = "Unif(0,1)",
     # distr_A = c("Unif(0,1)", "Beta(0.9,1.1+0.4*w2)"), # "Beta(0.8+0.9*w1,0.8+0.4*w2)"
     surv_true = "Cox PH",
     # surv_true = c("Cox PH", "Complex"),
-    sampling = "two-phase", # iid two-phase
+    sampling = "two-phase",
     test = list(
-      "Slope" = list(
+      "Slope (one-step Gamma_n)" = list(
         type = "test_2",
         params = list(var="asymptotic", S_n_type="Cox PH", cf_folds=1,
                       g_n_type="parametric", est_known_nuis=FALSE)
       )
+      # "Slope (cross-fitted Gamma_n)" = list(
+      #   type = "test_2",
+      #   params = list(var="asymptotic", S_n_type="Cox PH", cf_folds=10,
+      #                 g_n_type="parametric", est_known_nuis=FALSE)
+      # )
     )
   )
   
@@ -210,14 +169,15 @@ if (cfg$run_or_update=="run") {
       # Add functions to simulation object
       sim %<>% add_creator(generate_data)
       methods <- c(
-        "construct_deriv_theta_n", "construct_eta_n", "construct_f_a_n",
-        "construct_f_aIw_n", "construct_g_n", "construct_gamma_n",
-        "construct_Gamma_n", "construct_gcomp_n", "construct_omega_n",
-        "construct_Phi_n", "construct_S_n", "construct_tau_n",
+        "beta_n_var_hat", "construct_deriv_theta_n", "construct_eta_n",
+        "construct_f_a_n", "construct_f_aIw_n", "construct_g_n",
+        "construct_gamma_n", "construct_Gamma_n", "construct_gcomp_n",
+        "construct_infl_fn_1", "construct_infl_fn_2", "construct_infl_fn_Gamma",
+        "construct_omega_n", "construct_Phi_n", "construct_rho_n",
+        "construct_S_n", "construct_tau_n", "construct_xi_n", "create_htab",
         "deriv_expit", "deriv_logit", "est_curve", "expit", "generate_data",
-        "lambda", "logit", "one_simulation", "Pi", "stab", "test_2","test_wald",
-        "wts", "construct_infl_fn_1", "construct_infl_fn_2",
-        "construct_infl_fn_Gamma", "beta_n_var_hat", "create_htab"
+        "lambda", "logit", "one_simulation", "Pi", "test_2", "wts",
+        "construct_Gamma_cf_k", "create_val_list", "construct_Gamma_cf"
       )
       for (method in methods) {
         sim %<>% add_method(method, eval(as.name(method)))
@@ -226,6 +186,7 @@ if (cfg$run_or_update=="run") {
       # Add constants
       # lambda and v are the Weibull parameters for the survival distribution
       # lambda2 and v2 are the Weibull parameters for the censoring distribution
+      # For the approximations, w1b is used for S_n and w1 is used elsewhere
       sim %<>% add_constants(
         lambda = 10^-4,
         v = 1.5,
@@ -234,7 +195,8 @@ if (cfg$run_or_update=="run") {
         points = seq(0,1,0.1),
         alpha_1 = 0.3,
         alpha_2 = 0.7,
-        t_e = 200
+        t_e = 200,
+        appx = list(t_e=1, w1=0.01, w1b=0.1, a=0.01)
       )
       
       # Simulation script

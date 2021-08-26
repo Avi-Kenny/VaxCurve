@@ -1,151 +1,55 @@
 
-# Rewriting v() function
+# Testing cross-fitting
 if (F) {
   
+  system.time({
+    ests_reg <- est_curve(
+      dat_orig = dat_tp,
+      estimator = "Grenander",
+      params = list(S_n_type=params$S_n_type, g_n_type=params$g_n_type, ci_type="logit",
+                    cf_folds=1),
+      points = C$points
+    )
+  })
   
+  system.time({
+    ests_cf <- est_curve(
+      dat_orig = dat_tp,
+      estimator = "Grenander",
+      params = list(S_n_type=params$S_n_type, g_n_type=params$g_n_type, ci_type="logit",
+                    cf_folds=3),
+      points = C$points
+    )
+  })
   
+  system.time({
+    reject_reg <- test_2(
+      dat_orig = dat_tp,
+      alt_type = "incr",
+      params = list(
+        var = "asymptotic",
+        S_n_type = params$S_n_type,
+        g_n_type = params$g_n_type,
+        est_known_nuis = FALSE,
+        cf_folds = 1
+      )
+    )
+  })
   
-  l1 <- list(x=1, y=2)
-  l2 <- list(x=rnorm(100000),y=c(2,3,4))
-  microbenchmark({
-    max(sapply(l1, length))
-  }, times=10L)
-  microbenchmark({
-    max(sapply(l2, length))
-  }, times=10L)
-  microbenchmark({
-    x <- str(l1)
-  }, times=10L)
-  microbenchmark({
-    x <- str(l2)
-  }, times=10L)
+  system.time({
+    reject_cf <- test_2(
+      dat_orig = dat_tp,
+      alt_type = "incr",
+      params = list(
+        var = "asymptotic",
+        S_n_type = params$S_n_type,
+        g_n_type = params$g_n_type,
+        est_known_nuis = FALSE,
+        cf_folds = 3
+      )
+    )
+  })
   
-  x <- rnorm(10)
-  y <- rnorm(100000)
-  microbenchmark({
-    max(sapply(list(x=x, y=c(1,2,3)), length))
-  }, times=10L)
-  microbenchmark({
-    max(sapply(list(x=c(1,2,3,4), y=y), length))
-  }, times=10L)
-  microbenchmark({
-    sapply(list(y=y), length)
-  }, times=10L)
-  microbenchmark({
-    (function(...) {
-      sapply(list(...), length)
-    })(1, 2)
-  }, times=10L)
-  
-  
-  (function(...) {
-    sapply(list(...), length)
-  })(c(1,2), c(3,4))
-  (function(...) {
-    sapply(list(...), length)
-  })(1, 2)
-  
-  
-  fn <- function(x,y) { x*y }
-  vals <- data.frame(x=rnorm(10000), y=rnorm(10000))
-  my_fun <- create_htab(fn, vals, round=c(1,1))
-  microbenchmark({
-    my_fun(vals[1:1000,1],vals[1:1000,2])
-  }, times=1L)
-  # microbenchmark({
-  #   my_fun(round(vals[1:1000,1],3),round(vals[1:1000,2],3))
-  # }, times=1L)
-  
-  
-  my_fun(2,3)
-  my_fun(7,8)
-  my_fun(c(2,7),c(3,8))
-  #
-  
-  # Testing rounding
-  fn <- function(x,y) { x*y }
-  vals <- data.frame(x=c(1.111,2.222,3.333), y=c(6.666,7.777,8.888))
-  # my_fun <- create_htab(fn, vals)
-  my_fun <- create_htab(fn, vals, round_args=c(1,2))
-  my_fun(1.111,6.666)
-  my_fun(1.110,6.67)
-  my_fun(1.1,6.67)
-  my_fun(2.2,7.78)
-  my_fun(c(1.1,2.2),c(6.67,7.78))
-  my_fun(c(1.11111,2.21111),c(6.671111,7.781111))
-  
-  # Paste-based key: 40 microsecs
-  # Hash-based  key: 29 microsecs
-  microbenchmark({
-    my_fun(2,3)
-  }, times=1000L)
-  
-  # Before vec mem: mean 600 microsec
-  # After  vec mem: mean  26 microsec
-  microbenchmark({
-    my_fun(c(1:100),c(2:101))
-  }, times=100L)
-  
-  
-  microbenchmark({
-    my_fun(c(1.11111,2.21111),c(6.671111,7.781111))
-  }, times=100L)
-  
-  
-  
-
-
-
-  
-  
-  ff <- function(x,...) {
-    mc <- match.call()
-    print(mc)
-    # encl <- parent.env(environment())
-    # print(encl)
-    called_args <- as.list(mc)[-1]
-    print(called_args)
-    # default_args <- encl$`_default_args`
-    # default_args <- default_args[setdiff(names(default_args), 
-    #                                      names(called_args))]
-    # called_args[encl$`_omit_args`] <- NULL
-    # args <- c(lapply(called_args, eval, parent.frame()), 
-    #           lapply(default_args, eval, envir = environment()))
-    # key <- encl$`_hash`(c(encl$`_f_hash`, args, lapply(encl$`_additional`, 
-    #                                                    function(x) eval(x[[2L]], environment(x)))))
-    # res <- encl$`_cache`$get(key)
-    # if (inherits(res, "key_missing")) {
-    #   mc[[1L]] <- encl$`_f`
-    #   res <- withVisible(eval(mc, parent.frame()))
-    #   encl$`_cache`$set(key, res)
-    # }
-    # if (res$visible) {
-    #   res$value
-    # }
-    # else {
-    #   invisible(res$value)
-    # }
-  }
-  formals(memo_f) <- f_formals
-  attr(memo_f, "memoised") <- TRUE
-  if (is.null(envir)) {
-    envir <- baseenv()
-  }
-  if (is_old_cache(cache)) {
-    hash <- cache$digest
-    cache <- wrap_old_cache(cache)
-  }
-  memo_f_env <- new.env(parent = envir)
-  memo_f_env$`_cache` <- cache
-  memo_f_env$`_f` <- f
-  memo_f_env$`_f_hash` <- rlang::hash(list(formals(f), as.character(body(f))))
-  memo_f_env$`_additional` <- additional
-  memo_f_env$`_omit_args` <- omit_args
-  memo_f_env$`_default_args` <- Filter(function(x) !identical(x, 
-                                                              quote(expr = )), f_formals)
-  environment(memo_f) <- memo_f_env
-  class(memo_f) <- c("memoised", "function")
-  memo_f
   
 }
 

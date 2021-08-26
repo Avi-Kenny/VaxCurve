@@ -2,6 +2,118 @@
 # !!!!! Right now, I'm collecting previous ad-hoc tests here. Need to make this
 #     more structured
 
+#################.
+##### Setup #####
+#################.
+
+{
+  
+  # 1. Run CONFIG and SETUP within MAIN.R
+  
+  # 2. Set global constants
+  params <- list(g_n_type="parametric", S_n_type="Cox PH")
+  C <- list(lambda=10^-4, v=1.5, lambda2=0.5*10^-4, v2=1.5,
+            points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200,
+            appx=list(t_e=10,w1=0.01,w1b=0.1,a=0.01))
+  
+}
+
+
+
+##########################.
+##### Code profiling #####
+##########################.
+
+{
+  
+  # Generate datasets
+  dat_iid <- generate_data(n=400, alpha_3=0.7, distr_A="Unif(0,1)",
+                      surv_true="Cox PH", sampling="iid")
+  dat_tp <- generate_data(n=400, alpha_3=0.7, distr_A="Unif(0,1)",
+                      surv_true="Cox PH", sampling="two-phase")
+  
+  # Estimation
+  ests <- est_curve(
+    dat_orig = dat_tp,
+    estimator = "Grenander",
+    params = list(
+      S_n_type = params$S_n_type,
+      g_n_type = params$g_n_type,
+      ci_type = "logit",
+      cf_folds = 1
+    ),
+    points = C$points
+  )
+  
+  # Testing
+  reject <- test_2(
+    dat_orig = dat_tp,
+    alt_type = "incr",
+    params = list(
+      var = "asymptotic",
+      S_n_type = params$S_n_type,
+      g_n_type = params$g_n_type,
+      est_known_nuis = FALSE,
+      cf_folds = 1
+    )
+  )
+  
+}
+
+
+
+#############################.
+##### Empirical cdf G_n #####
+#############################.
+
+{
+  
+  # Generate datasets
+  d1 <- generate_data(n=1000, alpha_3=0.7, distr_A="Unif(0,1)",
+                      surv_true="Cox PH", sampling="iid")
+  d2 <- generate_data(n=1000, alpha_3=0.7, distr_A="Unif(0,1)",
+                      surv_true="Cox PH", sampling="two-phase")
+  
+  for (dat_orig in list(d1,d2)) {
+    
+    # Curve 1: Phi_n
+    Phi_n <- construct_Phi_n(dat_orig)
+    Phi_0 <- function(x) {x}
+    
+    # Curve 2: Phi_n_inv
+    Phi_n_inv <- construct_Phi_n(dat_orig, type="inverse")
+    Phi_0_inv <- function(x) {x}
+    
+    # Plot true curves against estimated curve
+    grid <- seq(0,1,0.01)
+    curves <- c("Phi","Phi_inv")
+    estimators <- c("Estimate","True")
+    len <- length(grid)
+    n_curves <- length(curves)
+    n_estimators <- length(estimators)
+    df <- data.frame(
+      x = rep(grid, n_curves*n_estimators),
+      y = c(
+        Phi_n(grid),
+        Phi_0(grid),
+        Phi_n_inv(grid),
+        Phi_0_inv(grid)
+      ),
+      curve = rep(rep(curves, each=n_estimators*len)),
+      which = rep(rep(estimators, each=len), n_curves)
+    )
+    print(ggplot(df, aes(x=x, y=y, color=which)) +
+      geom_line() +
+      facet_wrap(~curve, ncol=2) +
+      labs(title="Estimation of empirical CDFs (and inverse ECDFs)",
+           color="Which"))
+
+  }
+  
+}
+
+
+
 ######################################################.
 ##### Checking the influence function of Gamma_n #####
 ######################################################.
@@ -9,20 +121,13 @@
 {
   
   # Set up data
-  {
-    # C <- list(lambda=10^-4, v=1.5, lambda2=0.3*10^-5, v2=1.5,
-    #           points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
-    C <- list(lambda=10^-4, v=1.5, lambda2=0.5*10^-4, v2=1.5,
-              points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
-    
-    dat <- generate_data(
-      n = 400, # 5000
-      alpha_3 = 0,
-      distr_A = "Unif(0,1)",
-      surv_true = "Cox PH",
-      sampling = "iid" # iid two-phase
-    )
-  }
+  dat <- generate_data(
+    n = 400, # 5000
+    alpha_3 = 0,
+    distr_A = "Unif(0,1)",
+    surv_true = "Cox PH",
+    sampling = "iid" # iid two-phase
+  )
   
   # Define the statistic to bootstrap
   bootstat <- function(dat_orig, indices) {
@@ -30,16 +135,16 @@
     dat_orig <- dat_orig[indices,]
     
     # Construct component functions
-    s <- stab(dat_orig)
     n_orig <- nrow(dat_orig)
+    dat_orig$weights <- wts(dat_orig)
     dat <- dat_orig %>% filter(!is.na(a))
-    weights <- wts(dat)
+    weights <- dat$weights
     G_n <- construct_Phi_n(dat_orig)
-    f_aIw_n <- construct_f_aIw_n(dat, type="parametric")
+    f_aIw_n <- construct_f_aIw_n(dat, type=params$g_n_type)
     f_a_n <- construct_f_a_n(dat_orig, f_aIw_n)
     g_n <- construct_g_n(f_aIw_n, f_a_n)
-    S_n <- construct_S_n(dat, type="Cox PH")
-    Sc_n <- construct_S_n(dat, type="Cox PH", csf=TRUE)
+    S_n <- construct_S_n(dat, type=params$S_n_type)
+    Sc_n <- construct_S_n(dat, type=params$S_n_type, csf=TRUE)
     omega_n <- construct_omega_n(S_n, Sc_n)
     Gamma_n <- construct_Gamma_n(dat_orig, omega_n, S_n, g_n)
     
@@ -71,17 +176,16 @@
   {
     
     # Construct component functions
-    dat_orig <- dat
-    s <- stab(dat_orig)
     n_orig <- nrow(dat_orig)
+    dat_orig$weights <- wts(dat_orig)
     dat <- dat_orig %>% filter(!is.na(a))
-    weights <- wts(dat)
+    weights <- dat$weights
     G_n <- construct_Phi_n(dat_orig)
-    f_aIw_n <- construct_f_aIw_n(dat, type="parametric")
+    f_aIw_n <- construct_f_aIw_n(dat, type=params$g_n_type)
     f_a_n <- construct_f_a_n(dat_orig, f_aIw_n)
     g_n <- construct_g_n(f_aIw_n, f_a_n)
-    S_n <- construct_S_n(dat, type="Cox PH")
-    Sc_n <- construct_S_n(dat, type="Cox PH", csf=TRUE)
+    S_n <- construct_S_n(dat, type=params$S_n_type)
+    Sc_n <- construct_S_n(dat, type=params$S_n_type, csf=TRUE)
     omega_n <- construct_omega_n(S_n, Sc_n)
     gcomp_n <- construct_gcomp_n(dat_orig, S_n)
     eta_n <- construct_eta_n(dat_orig, S_n)
@@ -151,23 +255,17 @@
   
 }
 
+
+
 #################################################.
 ##### New test statistic variance estimator #####
 #################################################.
 
 {
   
-  # Set up data
-  C <- list(lambda=10^-4, v=1.5, lambda2=0.5*10^-4, v2=1.5,
-            points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
-  
-  dat_orig <- generate_data(
-    n = 400, # 5000
-    alpha_3 = 0,
-    distr_A = "Unif(0,1)",
-    surv_true = "Cox PH",
-    sampling = "iid" # iid two-phase
-  )
+  # Generate data
+  dat_orig <- generate_data(n=400, alpha_3=0, distr_A="Unif(0,1)",
+                            surv_true="Cox PH",sampling="iid")
   
   # Define the test statistic
   test_stat <- function(dat_orig, indices) {
@@ -181,18 +279,20 @@
     weights <- dat$weights
     
     # Construct dataframes of values to pre-compute functions on
+    vals_A <- data.frame(a=dat$a)
     vals_AW <- data.frame(a=dat$a, w1=dat$w1, w2=dat$w2)
-    vals_AW_grid <- expand.grid(a=seq(0,1,0.01), w1=seq(0,1,0.01), w2=c(0,1))
-    vals_A_grid <- data.frame(a=seq(0,1,0.01))
-    vals_S_n <- expand.grid(t=seq(0,C$t_e,1), w1=seq(0,1,0.1), w2=c(0,1),
-                            a=seq(0,1,0.01))
+    vals_A_grid <- data.frame(a=seq(0,1,C$appx$a))
+    vals_AW_grid <- expand.grid(a=seq(0,1,C$appx$a), w1=seq(0,1,C$appx$w1),
+                                w2=c(0,1))
+    vals_S_n <- expand.grid(t=seq(0,C$t_e,C$appx$t_e), w1=seq(0,1,C$appx$w1b),
+                            w2=c(0,1), a=seq(0,1,C$appx$a))
     vals_omega <- subset(dat, select=-c(delta,weights))
     
     # Construct component functions
     G_n <- construct_Phi_n(dat_orig)
-    f_aIw_n <- construct_f_aIw_n(dat, type=params$g_n_type)
-    f_a_n <- construct_f_a_n(dat_orig, f_aIw_n)
-    g_n <- construct_g_n(vals_AW, f_aIw_n, f_a_n)
+    f_aIw_n <- construct_f_aIw_n(dat, vals_AW_grid, type=params$g_n_type)
+    f_a_n <- construct_f_a_n(dat_orig, vals_A_grid, f_aIw_n)
+    g_n <- construct_g_n(vals_AW_grid, f_aIw_n, f_a_n)
     S_n <- construct_S_n(dat, vals_S_n, type=params$S_n_type)
     Sc_n <- construct_S_n(dat, vals_S_n, type=params$S_n_type, csf=TRUE)
     omega_n <- construct_omega_n(vals_omega, S_n, Sc_n)
@@ -201,8 +301,8 @@
     eta_n <- construct_eta_n(dat_orig, vals_AW_grid, S_n)
     xi_n <- construct_xi_n(Phi_n=G_n, lambda_2, lambda_3)
     rho_n <- construct_rho_n(dat_orig, Phi_n=G_n)
-    lambda_2 <- lambda(2,G_n,dat_orig)
-    lambda_3 <- lambda(3,G_n,dat_orig)
+    lambda_2 <- lambda(dat_orig,2,G_n)
+    lambda_3 <- lambda(dat_orig,3,G_n)
     
     # Compute the test statistic
     beta_n <- (1/n_orig) * sum(
@@ -222,70 +322,57 @@
   betas <- c()
   for (i in 1:50) {
     
-    dat <- generate_data(
-      n = 400, # 5000
-      alpha_3 = 0,
-      distr_A = "Unif(0,1)",
-      surv_true = "Cox PH",
-      sampling = "iid" # iid two-phase
-    )
+    dat_orig <- generate_data(n=400, alpha_3=0, distr_A="Unif(0,1)",
+                              surv_true="Cox PH",sampling="iid")
     
-    beta_n <- bootstat(dat, c(1:nrow(dat)))
+    beta_n <- test_stat(dat_orig, c(1:nrow(dat_orig)))
     betas <- c(betas, beta_n)
+    
+    print(paste("i:",i))
     
   }
   
+  # Histogram of betas
+  ggplot(data.frame(x=betas), aes(x=x)) + geom_histogram()
   
   # New variance estimator
-  # 0.0003858254
   sd_hat <- test_2(
-    dat_orig = dat,
+    dat_orig = dat_orig,
     alt_type = "incr",
     params = list(
       var = "asymptotic",
-      S_n_type="Cox PH",
-      g_n_type = "parametric"
+      S_n_type = params$S_n_type,
+      g_n_type = params$g_n_type,
+      est_known_nuis = FALSE,
+      cf_folds = 1
     ),
     return_sd = TRUE
   )
   
+  # Empirical SE
+  # n=400: 0.0002369075
+  print(sd(betas))
+  
+  # New variance estimator
+  # n=400: 0.0002077375
+  # n=400: 0.000221076
+  print(sd_hat)
+  
   run_bootstrap <- FALSE
   if (run_bootstrap) {
     
-    # dat_backup <- dat
-    # With rho term
-    # > sd_hat
-    # [1] 0.0003745018
-    # 
-    # Without rho term
-    # > sd_hat
-    # [1] 0.0002074883
-    
+    # # Bootstrap SE
+    # # OLD: n=400: 0.0002719989
+    # # OLD: n=800: 0.0001763408
+    # print(sd(boot_obj$t))
     
     # Run bootstrap
     boot_obj <- boot(data=dat, statistic=test_stat, R=50)
     
   }
   
-  # Bootstrap SE
-  # OLD: n=400: 0.0002719989
-  # OLD: n=800: 0.0001763408
-  # n=400: 0.0003272367
-  print(sd(boot_obj$t))
-  
-  # Empirical SE
-  # OLD: n=400: 0.0002465471
-  # OLD: n=800: 0.0001991434
-  # n=400: 0.0002166801
-  print(sd(betas))
-  
-  # New variance estimator
-  # OLD: n=400: 0.0002176057
-  # OLD: n=800: 0.0001671064
-  # n=400: 0.0003858254
-  print(sd_hat)
-  
 }
+
 
 
 ####################################################.
@@ -295,19 +382,15 @@
 {
   
   # Generate data
-  {
-    C <- list(lambda=10^-4, v=1.5, lambda2=0.5*10^-4, v2=1.5,
-              points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
-    alpha_3 <- 0.7
-    surv_true <- "Complex"
-    dat <- generate_data(
-      n = 2000,
-      alpha_3 = alpha_3,
-      distr_A = "Unif(0,1)",
-      surv_true = surv_true,
-      sampling = "two-phase"
-    )
-  }
+  alpha_3 <- 0.7
+  surv_true <- "Complex"
+  dat <- generate_data(
+    n = 2000,
+    alpha_3 = alpha_3,
+    distr_A = "Unif(0,1)",
+    surv_true = surv_true,
+    sampling = "two-phase"
+  )
   
   S_n <- construct_S_n(dat, type="Cox PH")
   
@@ -391,18 +474,14 @@
 {
   
   # Generate data
-  {
-    C <- list(lambda=10^-4, v=1.5, lambda2=0.5*10^-4, v2=1.5,
-              points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
-    alpha_3 <- 0.7
-    dat <- generate_data(
-      n = 5000,
-      alpha_3 = alpha_3,
-      distr_A = "Unif(0,1)",
-      surv_true = "Cox PH",
-      sampling = "two-phase"
-    )
-  }
+  alpha_3 <- 0.7
+  dat <- generate_data(
+    n = 5000,
+    alpha_3 = alpha_3,
+    distr_A = "Unif(0,1)",
+    surv_true = "Cox PH",
+    sampling = "two-phase"
+  )
   
   Sc_n <- construct_S_n(dat, type="Cox PH", csf=TRUE)
   
@@ -446,25 +525,22 @@
 {
   
   # Generate data
-  {
-    C <- list(lambda=10^-4, v=1.5, lambda2=0.5*10^-4, v2=1.5,
-              points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
-    dat <- generate_data(
-      n = 1000,
-      alpha_3 = 0.7,
-      distr_A = "Unif(0,1)",
-      surv_true = "Cox PH",
-      sampling = "iid"
-    )
-  }
+  set.seed(1)
+  dat <- generate_data(
+    n = 1000,
+    alpha_3 = 0.7,
+    distr_A = "Unif(0,1)",
+    surv_true = "Cox PH",
+    sampling = "two-phase"
+  )
   
   # Obtain estimates
   ests <- est_curve(
     dat = dat,
-    estimator = "Generalized Grenander",
+    estimator = "Grenander",
     params = list(
-      S_n_type = "Cox PH",
-      g_n_type = "parametric",
+      S_n_type = params$S_n_type,
+      g_n_type = params$g_n_type,
       ci_type = "logit", # none
       cf_folds = 1
     ),
@@ -516,17 +592,13 @@
   sampling <- "two-phase"                     # iid two-phase
   
   # Generate data
-  {
-    C <- list(lambda=10^-4, v=1.5, lambda2=0.5*10^-4, v2=1.5,
-              points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200)
-    dat <- generate_data(
-      n = n,
-      alpha_3 = 0.7,
-      distr_A = distr_A,
-      surv_true = "Cox PH",
-      sampling = sampling
-    )
-  }
+  dat <- generate_data(
+    n = n,
+    alpha_3 = 0.7,
+    distr_A = distr_A,
+    surv_true = "Cox PH",
+    sampling = sampling
+  )
   
   # True conditional density function
   f_aIw_0 <- function(a,w1,w2) {

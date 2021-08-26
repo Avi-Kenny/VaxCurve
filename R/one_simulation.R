@@ -64,7 +64,7 @@ if (cfg$which_sim=="testing") {
     ))
     
     # Return results
-    return (list("reject"=reject))
+    return (list("reject"=reject$reject))
     
   }
   

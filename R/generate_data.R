@@ -81,6 +81,10 @@ generate_data <- function(n, alpha_3, distr_A, surv_true, sampling) {
     dat <- data.frame(w1=w1, w2=w2, a=ifelse(delta==1,a,NA), delta=delta,
                       y_star=y_star, delta_star=delta_star)
   }
+  
+  if (!(sampling %in% c("iid", "two-phase"))) {
+    stop("`sampling` incorrectly specified")
+  }
 
   # Set up function to calculate true regression values over C$points
   # These are Monte Carlo approximations

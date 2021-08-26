@@ -185,20 +185,22 @@ wts <- function(dat_orig, scale="stabilized") {
 
 #' Construct conditional survival estimator S_n
 #' 
-#' @param dat Dataset returned by generate_data(); accepts either full data or
-#'     truncated data
+#' @param dat_orig Dataset returned by generate_data()
 #' @param vals Dataframe of values to run function on
 #' @param type Currently only "Cox PH" is implemented
 #' @param csf Logical; if TRUE, estimate the conditional survival
 #'     function of the censoring distribution instead
 #' @return Conditional density estimator function
-construct_S_n <- function(dat, vals, type, csf=FALSE) {
+construct_S_n <- function(dat_orig, vals, type, csf=FALSE) {
   
   if (type=="Cox PH") {
     
-    weights <- wts(dat, scale="mean 1")
+    # Construct weights
+    n_orig <- nrow(dat_orig)
+    dat_orig$weights <- wts(dat_orig, scale="mean 1")
+    dat <- dat_orig %>% filter(!is.na(a))
     
-    if (csf) dat$delta_star <- 1-dat$delta_star
+    if (csf) { dat$delta_star <- 1 - dat$delta_star }
     
     # Fit Cox model
     model <- coxph(
@@ -206,9 +208,7 @@ construct_S_n <- function(dat, vals, type, csf=FALSE) {
       data = dat,
       weights = weights
     )
-    c_1 <- model$coefficients[[1]]
-    c_2 <- model$coefficients[[2]]
-    c_3 <- model$coefficients[[3]]
+    coeffs <- model$coefficients
     
     # Get cumulative hazard estimate
     bh <- basehaz(model, centered=FALSE)
@@ -221,11 +221,11 @@ construct_S_n <- function(dat, vals, type, csf=FALSE) {
     }
     
     fn <- function(t, w1, w2, a){
-      return(exp(-1*H_0[t+1]*exp(c_1*w1+c_2*w2+c_3*a)))
+      return(exp(-1*H_0[t+1]*exp(coeffs[[1]]*w1+coeffs[[2]]*w2+coeffs[[3]]*a)))
     }
     
-    return (create_htab(fn, vals, round_args=c(0,1,0,2)))
-    # return (create_htab(fn, vals, round_args=c(-1,1,0,2)))
+    round_args <- c(-log10(C$appx$t_e), -log10(C$appx$w1b), 0, -log10(C$appx$a))
+    return (create_htab(fn, vals, round_args=round_args))
     
   }
   
@@ -235,7 +235,7 @@ construct_S_n <- function(dat, vals, type, csf=FALSE) {
 
 #' Construct g-computation estimator function of theta_0
 #' 
-#' @param dat_orig Dataset returned by generate_data(); must be full data
+#' @param dat_orig Dataset returned by generate_data()
 #' @param vals Dataframe of values to run function on
 #' @param mu_n A regression estimator returned by construct_mu_n()
 #' @return G-computation estimator of theta_0
@@ -245,7 +245,7 @@ construct_gcomp_n <- function(dat_orig, vals, S_n) {
     1 - mean(S_n(C$t_e,dat_orig$w1,dat_orig$w2,a))
   }
   
-  return (create_htab(fn, vals, round_args=2))
+  return (create_htab(fn, vals, round_args=c(-log10(C$appx$a))))
   
 }
 
@@ -300,8 +300,7 @@ construct_tau_n <- function(deriv_theta_n, gamma_n, f_a_n) {
 
 #' Construct gamma_n nuisance estimator function
 #' 
-#' @param dat_orig Dataset returned by generate_data(); this must be the FULL
-#'     DATA, including the "missing" observations
+#' @param dat_orig Dataset returned by generate_data()
 #' @param type Type of regression; one of c("linear", "cubic")
 #' @param omega_n A nuisance influence function returned by construct_omega_n()
 #' @param f_aIw_n A conditional density estimator returned by
@@ -310,18 +309,18 @@ construct_tau_n <- function(deriv_theta_n, gamma_n, f_a_n) {
 construct_gamma_n <- function(dat_orig, type, omega_n, f_aIw_n) {
   
   # Estimate probability
-  sampling <- attr(dat_orig,"sampling")
   prob <- 1 - mean(dat_orig$delta)
   
   # Construct weights
-  s <- stab(dat_orig)
-  dat <- filter(dat_orig, !is.na(a))
-  dat$weights <- wts(dat)
+  n_orig <- nrow(dat_orig)
+  dat_orig$weights <- wts(dat_orig)
+  dat <- dat_orig %>% filter(!is.na(a))
+  weights <- dat$weights
   
   # Construct pseudo-outcomes
   dat %<>% mutate(
     po = (
-      (omega_n(w1,w2,a,y_star,delta_star)*(weights/s)) / f_aIw_n(a,w1,w2)
+      (weights*omega_n(w1,w2,a,y_star,delta_star)) / f_aIw_n(a,w1,w2)
     )^2
   )
   
@@ -351,43 +350,47 @@ construct_gamma_n <- function(dat_orig, type, omega_n, f_aIw_n) {
 
 #' Construct estimator of marginal density f_A
 #' 
-#' @param dat_orig Dataset returned by generate_data(); must be full data
+#' @param dat_orig Dataset returned by generate_data()
+#' @param vals Dataframe of values to run function on
 #' @param f_aIw_n A conditional density estimator returned by
 #'     construct_f_aIw_n()
 #' @return Marginal density estimator function
-construct_f_a_n <- function(dat_orig, f_aIw_n) {
+construct_f_a_n <- function(dat_orig, vals, f_aIw_n) {
   
-  return(memoise(Vectorize(function(a) {
+  fn <- function(a) {
     mean(f_aIw_n(a,dat_orig$w1,dat_orig$w2))
-  })))
-
+  }
+  
+  return (create_htab(fn, vals, round_args=-log10(C$appx$a)))
+  
 }
 
 
 
 #' Construct estimator of conditional density f_{A|W}
 #' 
-#' @param dat Dataset returned by generate_data(); accepts either full data or
-#'     truncated data
+#' @param dat_orig Dataset returned by generate_data()
+#' @param vals Dataframe of values to run function on
 #' @param type One of c("parametric", "binning")
 #' @return Conditional density estimator function
 #' @notes
 #'   - Assumes support of A is [0,1]
-construct_f_aIw_n <- function(dat, type) {
+construct_f_aIw_n <- function(dat_orig, vals, type) {
   
-  dat_trunc <- filter(dat, !is.na(a))
-  n_trunc <- nrow(dat_trunc)
-  weights <- wts(dat_trunc)
+  n_orig <- nrow(dat_orig)
+  dat_orig$weights <- wts(dat_orig)
+  dat <- dat_orig %>% filter(!is.na(a))
+  weights <- dat$weights
   
   if (type=="parametric") {
     
     # Set up weighted likelihood
     wlik <- function(par) {
       
-      sum_loglik <- sum(sapply(c(1:n_trunc), function(i) {
-        shape1 <- par[1] + par[2]*dat_trunc$w1[i]
-        shape2 <- par[3] + par[4]*dat_trunc$w2[i]
-        loglik <- dbeta(dat_trunc$a[i], shape1=shape1, shape2=shape2, log=TRUE)
+      sum_loglik <- sum(sapply(c(1:nrow(dat)), function(i) {
+        shape1 <- par[1] + par[2]*dat$w1[i]
+        shape2 <- par[3] + par[4]*dat$w2[i]
+        loglik <- dbeta(dat$a[i], shape1=shape1, shape2=shape2, log=TRUE)
         return(loglik*weights[i])
       }))
       
@@ -401,7 +404,9 @@ construct_f_aIw_n <- function(dat, type) {
       warning("construct_f_aIw_n: optim() did not converge")
     }
     
-    f_aIw_n <- function(a, w1, w2){
+    fn <- function(a, w1, w2){
+      if (a<0.01) a <- 0.01 # !!!!! Temporary hack
+      if (a>0.99) a <- 0.99 # !!!!! Temporary hack
       shape1 <- opt$par[1] + opt$par[2]*w1
       shape2 <- opt$par[3] + opt$par[4]*w2
       return(dbeta(a, shape1=shape1, shape2=shape2))
@@ -432,8 +437,8 @@ construct_f_aIw_n <- function(dat, type) {
     # Set up weighted likelihood
     wlik <- function(par) {
       
-      sum_loglik <- sum(sapply(c(1:n_trunc), function(i) {
-        lik <- dens(a=dat_trunc$a[i], w1=dat_trunc$w1[i], w2=dat_trunc$w2[i],
+      sum_loglik <- sum(sapply(c(1:nrow(dat)), function(i) {
+        lik <- dens(a=dat$a[i], w1=dat$w1[i], w2=dat$w2[i],
                     par)
         return(weights[i]*log(lik))
       }))
@@ -448,7 +453,7 @@ construct_f_aIw_n <- function(dat, type) {
       warning("construct_f_aIw_n: optim() did not converge")
     }
     
-    f_aIw_n <- function(a, w1, w2){
+    fn <- function(a, w1, w2){
       
       bin <- ifelse(a==1, k, which.min(a>=alphas)-1)
       par <- opt$par
@@ -464,7 +469,8 @@ construct_f_aIw_n <- function(dat, type) {
     
   }
   
-  return(memoise(Vectorize(f_aIw_n)))
+  round_args <- c(-log10(C$appx$a), -log10(C$appx$w1), 0)
+  return (create_htab(fn, vals, round_args=round_args))
   
 }
 
@@ -479,11 +485,14 @@ construct_f_aIw_n <- function(dat, type) {
 construct_g_n <- function(vals, f_aIw_n, f_a_n) {
   
   fn <- function(a,w1,w2) {
+    if (a<0.01) a <- 0.01 # !!!!! Temporary hack
+    if (a>0.99) a <- 0.99 # !!!!! Temporary hack
     f_aIw_n(a,w1,w2) / f_a_n(a)
   }
   
-  return (create_htab(fn, vals))
-
+  round_args <- c(-log10(C$appx$a), -log10(C$appx$w1), 0)
+  return (create_htab(fn, vals, round_args=round_args))
+  
 }
 
 
@@ -541,27 +550,26 @@ construct_omega_n <- function(vals, S_n, Sc_n) {
 
 #' Construct nuisance estimator eta_n
 #' 
-#' @param dat_orig Dataset returned by generate_data(); this must be the FULL
-#'     DATA, including the "missing" observations
+#' @param dat_orig Dataset returned by generate_data()
 #' @param vals Dataframe of values to run function on
 #' @param S_n Conditional survival function estimator returned by construct_S_n
 #' @return Estimator function of nuisance eta_0
 construct_eta_n <- function(dat_orig, vals, S_n) {
   
-  s <- stab(dat_orig)
   n_orig <- nrow(dat_orig)
+  dat_orig$weights <- wts(dat_orig)
   dat <- dat_orig %>% filter(!is.na(a))
-  weights <- wts(dat)
+  weights <- dat$weights
   
   fn <- function(x,w1,w2) {
-    sum(
+    (1/n_orig) * sum(
       weights * as.integer(dat$a<=x) *
         (1-S_n(C$t_e,w1,w2,dat$a))
-    ) /
-      (n_orig*s)
+    )
   }
   
-  return (create_htab(fn, vals, round_args=c(2,2,0)))
+  round_args <- c(-log10(C$appx$a), -log10(C$appx$w1), 0)
+  return (create_htab(fn, vals, round_args=round_args))
   
 }
 
@@ -569,20 +577,20 @@ construct_eta_n <- function(dat_orig, vals, S_n) {
 
 #' lambda estimator
 #' 
+#' @param dat_orig Dataset returned by generate_data()
 #' @param k Power k
 #' @param G Transformation function G; usually returned by a function
 #'     constructed by construct_Phi_n()
-#' @param dat_orig Dataset returned by generate_data(); this must be the FULL
-#'     DATA, including the "missing" observations
 #' @return Value of lambda
-lambda <- function(k, G, dat_orig) {
+lambda <- function(dat_orig, k, G) {
   
   n_orig <- nrow(dat_orig)
-  s <- stab(dat_orig)
+  dat_orig$weights <- wts(dat_orig)
   dat <- dat_orig %>% filter(!is.na(a))
-  weights <- wts(dat)
+  weights <- dat$weights
+  
   lambda <- (1/n_orig) * sum(
-    (weights/s) * (G(dat$a))^k
+    weights * (G(dat$a))^k
   )
   return(lambda)
   
@@ -592,8 +600,7 @@ lambda <- function(k, G, dat_orig) {
 
 #' Construct Gamma_n primitive one-step estimator
 #' 
-#' @param dat_orig Dataset returned by generate_data(); this must be the FULL
-#'     DATA, including the "missing" observations
+#' @param dat_orig Dataset returned by generate_data()
 #' @param vals Dataframe of values to run function on
 #' @param omega_n A nuisance influence function returned by construct_omega_n()
 #' @param S_n A conditional survival function returned by construct_S_n()
@@ -607,6 +614,7 @@ construct_Gamma_n <- function(dat_orig, vals, omega_n, S_n, g_n) {
   n_orig <- nrow(dat_orig)
   dat <- filter(dat_orig,!is.na(a))
   n <- nrow(dat)
+  
   i_long <- rep(c(1:n), each=n)
   j_long <- rep(c(1:n), times=n)
   a_i_long <- dat$a[i_long]
@@ -620,71 +628,35 @@ construct_Gamma_n <- function(dat_orig, vals, omega_n, S_n, g_n) {
   weights_j_long <- dat$weights[j_long]
   subpiece_1a <- dat$weights * ( 1 + (
     omega_n(dat$w1,dat$w2,dat$a,dat$y_star,dat$delta_star) /
-    g_n(dat$a,dat$w1,dat$w2)
+      g_n(dat$a,dat$w1,dat$w2)
   ) )
-  subpiece_2a <- S_n(C$t_e,w1_j_long,w2_j_long,a_i_long) * (
-    weights_i_long * weights_j_long
-  )
+  subpiece_2a <- (weights_i_long*weights_j_long) *
+    S_n(C$t_e,w1_j_long,w2_j_long,a_i_long)
   
   fn <- function(x) {
     
     subpiece_1b <- as.integer(dat$a<=x)
-    piece_1 <- sum(subpiece_1a*subpiece_1b) * (1/n_orig)
+    piece_1 <- (1/n_orig) * sum(subpiece_1a*subpiece_1b)
     
     subpiece_2b <- as.integer(a_i_long<=x)
-    piece_2 <- sum(subpiece_2a*subpiece_2b) * (1/(n_orig^2))
+    piece_2 <- (1/(n_orig^2)) * sum(subpiece_2a*subpiece_2b)
     
     return(piece_1-piece_2)
     
   }
   
-  return (create_htab(fn, vals, round_args=2))
+  return (create_htab(fn, vals, round_args=-log10(C$appx$a)))
   
 }
 
 
 
-
-
-
-#' Construct cross-fitted Gamma_n estimator
-#' 
-#' @param Gamma_ns A list of Gamma_n estimators, each returned by
-#'     construct_Gamma_n
-#' @param dat_train Training dataset, for cross-fitted version
-#' @param dat_test Testing dataset, for cross-fitted version
-#' @param vals Dataframe of values to run function on
-#' @return Cross-fitted Gamma_n estimator
-construct_Gamma_cf <- function(Gamma_ns, vals) {
-  
-  # !!!!! Redo all of this
-  
-  cf_folds <- length(Gamma_ns)
-  
-  if (cf_folds==1) {
-    
-    return(Gamma_ns[[1]])
-    
-  } else {
-    
-    fn <- function(x) {
-      return(mean(sapply(c(1:cf_folds), function(i) {
-        Gamma_ns[[i]](x)
-      })))
-    }
-    
-    return (create_htab(fn, vals, round_args=2))
-    
-  }
-  
-}
 
 
 
 #' Construct Phi_n and Phi_n^{-1}
 #' 
-#' @param dat_orig Dataset returned by generate_data(); this must be the FULL
-#'     DATA, including the "missing" observations
+#' @param dat_orig Dataset returned by generate_data()
 #' @param type One of c("ecdf", "inverse").
 #' @return CDF or inverse CDF estimator function
 #' @notes
@@ -692,19 +664,17 @@ construct_Gamma_cf <- function(Gamma_ns, vals) {
 #'   - This accesses wts() globally
 construct_Phi_n <- function (dat_orig, type="ecdf") {
   
-  dat <- dat_orig
-  s <- stab(dat_orig)
-  dat <- cbind(dat, wts=wts(dat))
+  n_orig <- nrow(dat_orig)
+  dat_orig$weights <- wts(dat_orig)
+  dat <- dat_orig %>% filter(!is.na(a))
   dat %<>% arrange(a)
-  n_orig <- nrow(dat)
-  dat %<>% filter(!is.na(a))
   vals_x <- unique(dat$a)
-  
   vals_y <- c()
+  
   for (j in 1:length(vals_x)) {
     indices <- which(dat$a==vals_x[j])
-    weights_j <- dat$wts[indices]
-    new_y_val <- sum(weights_j) / (n_orig*s)
+    weights_j <- dat$weights[indices]
+    new_y_val <- (1/n_orig) * sum(weights_j)
     vals_y <- c(vals_y, new_y_val)
   }
   vals_y <- cumsum(vals_y)
@@ -722,39 +692,22 @@ construct_Phi_n <- function (dat_orig, type="ecdf") {
 
 
 
-#' Hypothesis test based on logistic regression
-#' 
-#' @param dat Data returned by generate_data_dr()
-#' @param params Unused
-#' @return Binary; is null rejected (1) or not (0)
-test_wald <- function(dat, alt_type="incr", params) {
-  
-  model <- glm(y~w1+w2+a, data=dat, family="binomial")
-  one_sided_p <- pnorm(summary(model)$coefficients["a",3], lower.tail=F)
-  reject <- as.integer(one_sided_p<0.05)
-  
-  return (reject)
-  
-}
-
-
-
 #' !!!!! document
 #' 
 #' @param x x
 #' @return x
 construct_rho_n <- function(dat_orig, Phi_n) {
   
-  s <- stab(dat_orig)
   n_orig <- nrow(dat_orig)
+  dat_orig$weights <- wts(dat_orig)
   dat <- dat_orig %>% filter(!is.na(a))
-  weights_j <- wts(dat)
+  weights_j <- dat$weights
   a_j <- dat$a
   
   return(memoise(Vectorize(function(a) {
     
     return((1/n_orig) * sum(
-      (weights_j/s) * (Phi_n(a_j)^3) * (as.integer(a<=a_j) - Phi_n(a_j))
+      weights_j * (Phi_n(a_j)^3) * (as.integer(a<=a_j) - Phi_n(a_j))
     ))
     
   })))
@@ -788,9 +741,9 @@ construct_infl_fn_1 <- function(dat_orig, Gamma_n, Phi_n, xi_n, rho_n,
                                 lambda_2, lambda_3) {
   
   n_orig <- nrow(dat_orig)
-  dat_orig$weights_j <- wts(dat_orig)
+  dat_orig$weights <- wts(dat_orig)
   dat <- dat_orig %>% filter(!is.na(a))
-  weights_j <- dat$weights_j
+  weights_j <- dat$weights
   a_j <- dat$a
   
   return(memoise(Vectorize(function(w1,w2,y_star,delta_star,a) {
@@ -865,16 +818,134 @@ beta_n_var_hat <- function(dat_orig, infl_fn_1, infl_fn_2) {
   
   b_sum <- 0
   for (i in c(1:nrow(dat))) {
-    b_sum <- b_sum + (
-      dat$weights[i] * infl_fn_1(dat$w1[i], dat$w2[i], dat$y_star[i],
-                              dat$delta_star[i], dat$a[i]) +
-      dat$weights[i] * infl_fn_2(dat$w1[i], dat$w2[i], dat$y_star[i],
-                              dat$delta_star[i], dat$a[i])
-    )^2
+    b_sum <- b_sum + (dat$weights[i] * (
+      infl_fn_1(dat$w1[i], dat$w2[i], dat$y_star[i],
+                dat$delta_star[i], dat$a[i]) +
+        infl_fn_2(dat$w1[i], dat$w2[i], dat$y_star[i],
+                  dat$delta_star[i], dat$a[i])
+    ))^2
   }
   
-  return(
-    (1/n_orig) * sum(b_sum)
-  )
+  return( (1/n_orig)*sum(b_sum) )
+  
+}
+
+
+
+#' Construct dataframes of values to pre-compute functions on
+#' 
+#' @param dat_orig Dataset returned by generate_data()
+#' @param appx Approximation spec used for grids (stored in C$appx)
+#' @return A list of dataframes
+create_val_list <- function(dat_orig, appx) {
+  
+  dat <- dat_orig %>% filter(!is.na(a))
+  
+  return(list(
+    A = data.frame(a=dat$a),
+    AW = data.frame(a=dat$a, w1=dat$w1, w2=dat$w2),
+    A_grid = data.frame(a=seq(0,1,appx$a)),
+    AW_grid = expand.grid(a=seq(0,1,appx$a), w1=seq(0,1,appx$w1),
+                          w2=c(0,1)),
+    S_n = expand.grid(t=seq(0,C$t_e,appx$t_e), w1=seq(0,1,appx$w1b),
+                      w2=c(0,1), a=seq(0,1,appx$a)),
+    omega = subset(dat, select=-c(delta,weights))
+  ))
+  
+}
+
+
+
+#' !!!!! document
+#' 
+#' @param x x
+#' @return x
+construct_Gamma_cf_k <- function(dat_train, dat_test, vals, omega_n, g_n,
+                                 gcomp_n, eta_n) {
+  
+  n_test <- nrow(dat_test)
+  dat_test$weights <- wts(dat_test)
+  d1 <- dat_test %>% filter(!is.na(a))
+  weights_1 <- d1$weights
+  
+  n_train <- nrow(dat_train)
+  dat_train$weights <- wts(dat_train)
+  d2 <- dat_train %>% filter(!is.na(a))
+  weights_2 <- d2$weights
+  
+  fn <- function(x) {
+    
+    piece_1 <- (1/n_test) * sum(weights_1 * (
+      as.integer(d1$a<=x) *
+        (
+          (omega_n(d1$w1,d1$w2,d1$a,d1$y_star,d1$delta_star) /
+             g_n(d1$a,d1$w1,d1$w2)
+          ) +
+            gcomp_n(d1$a)
+        ) +
+        eta_n(x,d1$w1,d1$w2)
+    ))
+    
+    piece_2 <- (1/n_train) * sum(weights_2 * as.integer(d2$a<=x)*gcomp_n(d2$a))
+    
+    return(piece_1-piece_2)
+    
+  }
+  
+  return (create_htab(fn, vals, round_args=-log10(C$appx$a)))
+  
+}
+
+
+
+#' Construct cross-fitted Gamma_0 estimator
+#' 
+#' @param dat_orig Dataset returned by generate_data()
+#' @param params The same params object passed to est_curve
+#' @param vlist A list of dataframes returned by create_val_list()
+#' @return A cross-fitted Gamma_0 estimator
+construct_Gamma_cf <- function(dat_orig, params, vlist) {
+  
+  # Prep for cross-fitting
+  Gamma_cf_k <- list()
+  n_orig <- nrow(dat_orig)
+  rows <- c(1:n_orig)
+  folds <- sample(cut(rows, breaks=params$cf_folds, labels=FALSE))
+  
+  # Loop through folds
+  for (k in 1:params$cf_folds) {
+    
+    # Split data
+    dat_train <- dat_orig[-which(folds==k),]
+    dat_test <- dat_orig[which(folds==k),]
+    
+    # Construct component functions
+    Phi_n <- construct_Phi_n(dat_train)
+    Phi_n_inv <- construct_Phi_n(dat_train, type="inverse")
+    S_n <- construct_S_n(dat_train, vlist$S_n, type=params$S_n_type)
+    Sc_n <- construct_S_n(dat_train, vlist$S_n, type=params$S_n_type, csf=TRUE)
+    gcomp_n <- construct_gcomp_n(dat_train, vlist$A_grid, S_n)
+    eta_n <- construct_eta_n(dat_train, vlist$AW_grid, S_n)
+    f_aIw_n <- construct_f_aIw_n(dat_train, vlist$AW_grid, type=params$g_n_type)
+    f_a_n <- construct_f_a_n(dat_train, vlist$A_grid, f_aIw_n)
+    g_n <- construct_g_n(vlist$AW_grid, f_aIw_n, f_a_n)
+    omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
+    
+    # Construct K functions
+    Gamma_cf_k[[k]] <- construct_Gamma_cf_k(
+      dat_train, dat_test, vlist$A_grid, omega_n, g_n, gcomp_n, eta_n
+    )
+    
+    # Remove objects
+    rm(Phi_n,Phi_n_inv,S_n,Sc_n,gcomp_n,eta_n,f_aIw_n,f_a_n,g_n,omega_n)
+    
+  }
+  
+  # Construct cross-fitted Gamma_n
+  return(Vectorize(function(x) {
+    mean(sapply(c(1:params$cf_folds), function(k) {
+      Gamma_cf_k[[k]](x)
+    }))
+  }))
   
 }

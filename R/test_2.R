@@ -24,60 +24,69 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
     weights <- dat$weights
     
     # Construct dataframes of values to pre-compute functions on
-    # vals_A <- data.frame(a=dat$a)
-    vals_AW <- data.frame(a=dat$a, w1=dat$w1, w2=dat$w2)
-    vals_AW_grid <- expand.grid(a=seq(0,1,0.01), w1=seq(0,1,0.01), w2=c(0,1))
-    vals_A_grid <- data.frame(a=seq(0,1,0.01))
-    vals_S_n <- expand.grid(t=seq(0,C$t_e,1), w1=seq(0,1,0.1), w2=c(0,1),
-                            a=seq(0,1,0.01))
-    vals_omega <- subset(dat, select=-c(delta,weights))
+    vlist <- create_val_list(dat_orig, C$appx)
     
     # Construct component functions
-    G_n <- construct_Phi_n(dat_orig)
-    f_aIw_n <- construct_f_aIw_n(dat, type=params$g_n_type)
-    f_a_n <- construct_f_a_n(dat_orig, f_aIw_n)
-    g_n <- construct_g_n(vals_AW, f_aIw_n, f_a_n)
-    S_n <- construct_S_n(dat, vals_S_n, type=params$S_n_type)
-    Sc_n <- construct_S_n(dat, vals_S_n, type=params$S_n_type, csf=TRUE)
-    omega_n <- construct_omega_n(vals_omega, S_n, Sc_n)
-    Gamma_n <- construct_Gamma_n(dat_orig, vals_A_grid, omega_n, S_n, g_n)
-    gcomp_n <- construct_gcomp_n(dat_orig, vals_A_grid, S_n)
-    eta_n <- construct_eta_n(dat_orig, vals_AW_grid, S_n)
-    xi_n <- construct_xi_n(Phi_n=G_n, lambda_2, lambda_3)
-    rho_n <- construct_rho_n(dat_orig, Phi_n=G_n)
-    lambda_2 <- lambda(2,G_n,dat_orig)
-    lambda_3 <- lambda(3,G_n,dat_orig)
+    Phi_n <- construct_Phi_n(dat_orig)
+    lambda_2 <- lambda(dat_orig,2,Phi_n)
+    lambda_3 <- lambda(dat_orig,3,Phi_n)
+    
+    # Construct component functions
+    f_aIw_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid, type=params$g_n_type)
+    f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
+    g_n <- construct_g_n(vlist$AW_grid, f_aIw_n, f_a_n)
+    S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
+    Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type, csf=TRUE)
+    omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
+    Gamma_n <- construct_Gamma_n(dat_orig, vlist$A_grid, omega_n, S_n, g_n)
+    
+    # Construct regular Gamma_0 estimator
+    if (params$cf_folds==1) {
+      Gamma_n <- construct_Gamma_n(dat_orig, vlist$A_grid, omega_n, S_n, g_n)
+    }
+
+    # Construct cross-fitted Gamma_0 estimator
+    if (params$cf_folds>1) {
+      Gamma_n <- construct_Gamma_cf(dat_orig, params, vlist)
+    }
     
     # Compute the test statistic
     beta_n <- (1/n_orig) * sum(
       weights * (
-        lambda_2*(G_n(dat$a))^2 -
-        lambda_3*G_n(dat$a)
+        lambda_2*(Phi_n(dat$a))^2 -
+          lambda_3*Phi_n(dat$a)
       ) *
-      (Gamma_n(dat$a))
+        (Gamma_n(dat$a))
     )
     
-    # Estimate the test statistic variance
+    # Use known values of nuisances to estimate variance more accurately
     if (params$est_known_nuis==FALSE) {
       lambda_2 <- 1/3
       lambda_3 <- 1/4
       rho_n <- function(x) { 0 }
     }
-    infl_fn_1 <- construct_infl_fn_1(dat_orig, Gamma_n, Phi_n=G_n, xi_n, rho_n,
+    
+    # Construct additional component functions
+    gcomp_n <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n)
+    eta_n <- construct_eta_n(dat_orig, vlist$AW_grid, S_n)
+    xi_n <- construct_xi_n(Phi_n, lambda_2, lambda_3)
+    rho_n <- construct_rho_n(dat_orig, Phi_n)
+    infl_fn_1 <- construct_infl_fn_1(dat_orig, Gamma_n, Phi_n, xi_n, rho_n,
                                      lambda_2, lambda_3)
     infl_fn_Gamma <- construct_infl_fn_Gamma(dat_orig, omega_n, g_n, gcomp_n,
                                              eta_n, Gamma_n)
-    infl_fn_2 <- construct_infl_fn_2(dat_orig, Phi_n=G_n, infl_fn_Gamma,
+    infl_fn_2 <- construct_infl_fn_2(dat_orig, Phi_n, infl_fn_Gamma,
                                      lambda_2, lambda_3)
     
-    var_hat <- beta_n_var_hat(dat_orig, infl_fn_1, infl_fn_2) / nrow(dat_orig)
-    sd_hat <- sqrt(var_hat)
+    # Estimate variance
+    var_n <- beta_n_var_hat(dat_orig, infl_fn_1, infl_fn_2) / nrow(dat_orig)
+    sd_n <- sqrt(var_n)
     
-    if (return_sd) return(sd_hat)
+    if (return_sd) return(sd_n)
     
-    # Calculate critical value (for a one-sided test)
-    crit_val <- qnorm(0.05, mean=beta_n, sd=sd_hat)
-    
+    # Calculate P-value (for a one-sided test)
+    p_val <- pnorm(0, mean=beta_n, sd=sd_n)
+
   }
   
   if (params$var=="boot") {
@@ -88,8 +97,6 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
     bootstat <- function(dat_orig,indices) {
       
       dat <- dat_orig[indices,]
-      
-      s_0 <- stab(dat_orig)
       n_orig <- nrow(dat)
       dat_0 <- dat %>% filter(!is.na(a))
       n_0 <- nrow(dat_0)
@@ -104,10 +111,10 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
       Gamma_0 <- construct_Gamma_n(dat_orig, omega_0, S_0, g_0)
       
       beta_0 <- (1/n_orig) * sum(
-        (weights_0/s_0) *
+        weights_0 *
           (
-            lambda(2, G_0, dat_orig)*(G_0(dat_0$a))^2 -
-            lambda(3, G_0, dat_orig)*G_0(dat_0$a)
+            lambda(dat_orig,2,G_0)*(G_0(dat_0$a))^2 -
+              lambda(dat_orig,3,G_0)*G_0(dat_0$a)
           ) *
           (Gamma_0(dat_0$a))
       )
@@ -134,7 +141,6 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
     # Pre-calculate non-bootstrapped pieces
     {
       dat_0_orig <- dat
-      s_0 <- stab(dat_0_orig)
       n_orig <- nrow(dat_0_orig)
       dat_0 <- dat_0_orig %>% filter(!is.na(a))
       n_0 <- nrow(dat_0)
@@ -148,16 +154,16 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
       f_a_n <- construct_f_a_n(dat_0_orig, f_aIw_n=f_aIw_n)
       g_0 <- construct_g_n(f_aIw_n, f_a_n)
       Gamma_0 <- construct_Gamma_n(dat_0_orig, omega_0, S_0, g_0)
-      lambda_2 <- lambda(k=2, G_0, dat_0_orig)
-      lambda_3 <- lambda(k=3, G_0, dat_0_orig)
+      lambda_2 <- lambda(dat_0_orig, k=2, G_0)
+      lambda_3 <- lambda(dat_0_orig, k=3, G_0)
       eta_0 <- construct_eta_n(dat_0_orig, S_0)
       gcomp_0 <- construct_gcomp_n(dat_0_orig, S_0)
 
       beta_0 <- (1/n_orig) * sum(
-        (weights_0/s_0) *
+        weights_0 *
           (
-            lambda(2, G_0, dat_0_orig)*(G_0(dat_0$a))^2 -
-              lambda(3, G_0, dat_0_orig)*G_0(dat_0$a)
+            lambda(dat_0_orig,2,G_0)*(G_0(dat_0$a))^2 -
+              lambda(dat_0_orig,3,G_0)*G_0(dat_0$a)
           ) *
           (Gamma_0(dat_0$a))
       )
@@ -170,26 +176,25 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
     bootstat <- function(dat_orig,indices) {
       
       dat_b_orig <- dat_orig[indices,]
-      s_b <- stab(dat_b_orig)
       dat_b <- dat_b_orig %>% filter(!is.na(a))
       n_b <- nrow(dat_b)
       weights_b <- wts(dat_b)
-      G_n <- construct_Phi_n(dat_b_orig)
+      Phi_n <- construct_Phi_n(dat_b_orig)
       
       piece_1 <- (1/n_orig) * sum(
-        (weights_b/s_b) *
+        weights_b *
           (
-            lambda(k=2, G_0, dat_b_orig)*(G_0(dat_b$a))^2 -
-              lambda(k=3, G_0, dat_b_orig)*G_0(dat_b$a)
+            lambda(dat_b_orig,k=2,G_0)*(G_0(dat_b$a))^2 -
+              lambda(dat_b_orig,k=3,G_0)*G_0(dat_b$a)
           ) *
           (Gamma_0(dat_b$a))
       )
       
       piece_2 <- (1/n_orig) * sum(
-        (weights_0/s_0) *
+        weights_0 *
           (
-            lambda(2, G_n, dat_0_orig)*(G_n(dat_0$a))^2 -
-              lambda(3, G_n, dat_0_orig)*G_n(dat_0$a)
+            lambda(dat_0_orig,2,Phi_n)*(Phi_n(dat_0$a))^2 -
+              lambda(dat_0_orig,3,Phi_n)*Phi_n(dat_0$a)
           ) *
           Gamma_0(dat_0$a)
       )
@@ -205,7 +210,7 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
       weights_b_long <- weights_b[index_b]
       
       piece_4 <- (1/n_orig)^2 * sum(
-        (weights_0_long/s_0) * (weights_b_long/s_b) *
+        weights_0_long * weights_b_long *
           (
             (
               (as.integer(a_b_long<=a_0_long)) *
@@ -219,8 +224,8 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
               (2*Gamma_0(a_0_long))
           ) *
           (
-            lambda(2, G_0, dat_0_orig)*(G_0(a_0_long))^2 -
-              lambda(3, G_0, dat_0_orig)*G_0(a_0_long)
+            lambda(dat_0_orig,2,G_0)*(G_0(a_0_long))^2 -
+              lambda(dat_0_orig,3,G_0)*G_0(a_0_long)
           )
       )
       
@@ -236,6 +241,9 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
     
   }
   
-  return(as.integer(crit_val>0))
+  return(list(
+    reject = as.integer(p_val<0.05),
+    p_val = p_val
+  ))
   
 }

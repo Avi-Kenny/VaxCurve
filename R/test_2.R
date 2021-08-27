@@ -38,13 +38,12 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
     S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
     Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type, csf=TRUE)
     omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
-    Gamma_n <- construct_Gamma_n(dat_orig, vlist$A_grid, omega_n, S_n, g_n)
     
     # Construct regular Gamma_0 estimator
     if (params$cf_folds==1) {
       Gamma_n <- construct_Gamma_n(dat_orig, vlist$A_grid, omega_n, S_n, g_n)
     }
-
+    
     # Construct cross-fitted Gamma_0 estimator
     if (params$cf_folds>1) {
       Gamma_n <- construct_Gamma_cf(dat_orig, params, vlist)

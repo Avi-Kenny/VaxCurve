@@ -587,12 +587,12 @@
 {
   
   # Set levels here
-  n <- 5000
+  n <- 1000
   distr_A <- "Beta(0.8+0.9*w1,0.8+0.4*w2)"  # Unif(0,1) Beta(0.9,1.1+0.4*w2) Beta(0.8+0.9*w1,0.8+0.4*w2)
-  sampling <- "two-phase"                     # iid two-phase
+  sampling <- "iid"                     # iid two-phase
   
   # Generate data
-  dat <- generate_data(
+  dat_orig <- generate_data(
     n = n,
     alpha_3 = 0.7,
     distr_A = distr_A,
@@ -617,15 +617,17 @@
   
   # Parametric estimate
   {
-    dat_trunc <- filter(dat, !is.na(a))
-    n_trunc <- nrow(dat_trunc)
-    weights <- wts(dat_trunc)
+    n_orig <- nrow(dat_orig)
+    dat_orig$weights <- wts(dat_orig)
+    dat <- dat_orig %>% filter(!is.na(a))
+    weights <- dat$weights
+    
     wlik <- function(par) {
       
-      sum_loglik <- sum(sapply(c(1:n_trunc), function(i) {
-        shape1 <- par[1] + par[2]*dat_trunc$w1[i]
-        shape2 <- par[3] + par[4]*dat_trunc$w2[i]
-        loglik <- dbeta(dat_trunc$a[i], shape1=shape1, shape2=shape2, log=TRUE)
+      sum_loglik <- sum(sapply(c(1:nrow(dat)), function(i) {
+        shape1 <- par[1] + par[2]*dat$w1[i]
+        shape2 <- par[3] + par[4]*dat$w2[i]
+        loglik <- dbeta(dat$a[i], shape1=shape1, shape2=shape2, log=TRUE)
         return(loglik*weights[i])
       }))
       
@@ -642,14 +644,16 @@
   
   # Nonparametric estimate (adapted from Diaz & VDL)
   {
-    
+
     # k is the number of bins
-    construct_f_aIw_n_nonpar <- function(dat, k) {
-      
+    construct_f_aIw_n_nonpar <- function(dat_orig, k) {
+
       alphas <- seq(0, 1, length.out=k+1)
-      dat_trunc <- filter(dat, !is.na(a))
-      n_trunc <- nrow(dat_trunc)
-      weights <- wts(dat_trunc)
+      
+      n_orig <- nrow(dat_orig)
+      dat_orig$weights <- wts(dat_orig)
+      dat <- dat_orig %>% filter(!is.na(a))
+      weights <- dat$weights
       
       dens <- Vectorize(function(a, w1, w2, par) {
         bin <- ifelse(a==1, k, which.min(a>=alphas)-1)
@@ -661,28 +665,31 @@
         dens <- k*p1*p2
         return(dens)
       }, vectorize.args=c("a","w1","w2"))
-      
+
       wlik <- function(par) {
-        
+
         # par[1] through par[k-1] are the hazard components for bins 1 to k-1
         # par[k] and par[k+1] correspond to W1 and W2
-        sum_loglik <- sum(sapply(c(1:n_trunc), function(i) {
-          lik <- dens(a=dat_trunc$a[i], w1=dat_trunc$w1[i], w2=dat_trunc$w2[i],
-                      par)
-          return(weights[i]*log(lik))
-        }))
+        # sum_loglik <- sum(sapply(c(1:nrow(dat)), function(i) {
+        #   lik <- dens(a=dat$a[i], w1=dat$w1[i], w2=dat$w2[i],
+        #               par)
+        #   return(weights[i]*log(lik))
+        # }))
+        sum_loglik <- sum(weights * log(
+          dens(a=dat$a, w1=dat$w1, w2=dat$w2, par)
+        ))
         
         return(-1*sum_loglik)
-        
+
       }
-      
+
       opt <- optim(par=rep(0,k+1), fn=wlik, method="CG")
       if (opt$convergence!=0) {
         warning("Nonpar conditional density: optim() did not converge")
       }
-      
+
       return(Vectorize(memoise(function(a, w1, w2){
-        
+
         bin <- ifelse(a==1, k, which.min(a>=alphas)-1)
         par <- opt$par
         hz <- sapply(c(1:(k-1)), function(j) {
@@ -690,20 +697,90 @@
         })
         p1 <- ifelse(bin==k, 1, hz[bin])
         p2 <- ifelse(bin==1, 1, prod(1-hz[1:(bin-1)]))
-        
+
         return(k*p1*p2)
-        
+
       })))
-      
+
     }
+
+    f_aIw_n_nonpar <- construct_f_aIw_n_nonpar(dat_orig, k=10)
+
+  }
+  
+  # !!!!! Testing: haldensify
+  {
+    library(haldensify)
     
-    f_aIw_n_nonpar <- construct_f_aIw_n_nonpar(dat, k=10)
+    n_orig <- nrow(dat_orig)
+    dat_orig$weights <- wts(dat_orig)
+    dat <- dat_orig %>% filter(!is.na(a))
+    weights <- dat$weights
+    
+    haldensify_fit <- haldensify(
+      A = dat$a,
+      W = subset(dat, select=c(w1,w2)),
+      # wts = weights,
+      n_bins = 10, # c(10,25)
+      grid_type = "equal_range", # c("equal_range", "equal_mass")
+      lambda_seq = exp(seq(-1, -10, length = 50))
+      # arguments passed to hal9001::fit_hal()
+      # max_degree = 5,
+      # smoothness_orders = 0,
+      # num_knots = NULL,
+      # reduce_basis = 0.05
+    )
+    
+    grid <- seq(0.01,0.99,0.01)
+    new_A <- rep(grid, 4)
+    new_W <- data.frame(
+      w1 = rep(c(0.2,0.8,0.2,0.8), each=length(grid)),
+      w2 = rep(c(0,0,1,1), each=length(grid))
+    )
+    pred_haldensify <- predict(
+      haldensify_fit,
+      new_A = new_A,
+      new_W = rep(c(1,2,3,4), each=length(grid))
+    )
+
+  }
+  
+  # !!!!! Testing: kernel density estimator
+  {
+    
+    library(np)
+    
+    bw <- npcdensbw(a~w1+w2, data=dat)
+    grid <- seq(0.01,0.99,0.01)
+    fhat <- npcdens(
+      bws = bw,
+      eydat = data.frame(
+        a = rep(grid, 4)
+      ),
+      exdat = data.frame(
+        w1 = rep(c(0.2,0.8,0.2,0.8), each=length(grid)),
+        w2 = rep(c(0,0,1,1), each=length(grid))
+      )
+      # newdata = data.frame(
+      #   a = rep(grid, 4),
+      #   w1 = rep(c(0.2,0.8,0.2,0.8), each=length(grid)),
+      #   w2 = rep(c(0,0,1,1), each=length(grid))
+      # )
+    )
+    fhat$condens
+    
+    # > predict(fhat)[1:10]
+    # [1] 0.7324757 1.2702254 1.2157468 1.7770840 1.0554559
+    # [6] 0.8422052 1.6739409 1.1410945 1.0494324 1.0189126    
     
   }
   
+  # f_aIw_n_nonpar <- f_aIw_n_para # !!!!! TEMP
+  
   # Generate plot data
   grid <- seq(0.01,0.99,0.01)
-  f_aIw_models <- c("Truth", "Parametric", "Nonparametric")
+  f_aIw_models <- c("Truth", "Parametric", "npcdensbw")
+  # f_aIw_models <- c("Truth", "Parametric", "Nonparametric", "npcdensbw")
   n_models <- length(f_aIw_models)
   len <- length(grid)
   plot_data <- data.frame(
@@ -717,10 +794,12 @@
       sapply(grid, function(a) { f_aIw_n_para(a, w1=0.8, w2=0) }),
       sapply(grid, function(a) { f_aIw_n_para(a, w1=0.2, w2=1) }),
       sapply(grid, function(a) { f_aIw_n_para(a, w1=0.8, w2=1) }),
-      sapply(grid, function(a) { f_aIw_n_nonpar(a, w1=0.2, w2=0) }),
-      sapply(grid, function(a) { f_aIw_n_nonpar(a, w1=0.8, w2=0) }),
-      sapply(grid, function(a) { f_aIw_n_nonpar(a, w1=0.2, w2=1) }),
-      sapply(grid, function(a) { f_aIw_n_nonpar(a, w1=0.8, w2=1) })
+      # sapply(grid, function(a) { f_aIw_n_nonpar(a, w1=0.2, w2=0) }),
+      # sapply(grid, function(a) { f_aIw_n_nonpar(a, w1=0.8, w2=0) }),
+      # sapply(grid, function(a) { f_aIw_n_nonpar(a, w1=0.2, w2=1) }),
+      # sapply(grid, function(a) { f_aIw_n_nonpar(a, w1=0.8, w2=1) }),
+      # pred_haldensify,
+      fhat$condens
     ),
     which = rep(f_aIw_models, each=len*4),
     covariates = rep(c(

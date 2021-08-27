@@ -6,9 +6,9 @@ if (cfg$which_sim=="estimation") {
   
   #' Run a single simulation (estimation)
   #'
-  #' @return A list with the estimates and standard errors of the causal dose-
-  #'     response curve evaluated at the midpoint and the endpoint of the domain
-
+  #' @return A list with the estimates and CI limits of the causal dose-response
+  #'     curve evaluated at the midpoint and the endpoint of the domain
+  
   one_simulation <- function() {
     
     # Generate dataset
@@ -57,14 +57,17 @@ if (cfg$which_sim=="testing") {
                               L$surv_true, L$sampling)
     
     # Perform hypothesis test
-    reject <- use_method(L$test$type, list(
+    test_results <- use_method(L$test$type, list(
       dat_orig = dat_orig,
       alt_type = "incr",
       params = L$test$params
     ))
     
     # Return results
-    return (list("reject"=reject$reject))
+    return (list(
+      "reject" = test_results$reject,
+      "p_val" = test_results$p_val
+    ))
     
   }
   

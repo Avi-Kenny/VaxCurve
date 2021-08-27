@@ -12,17 +12,18 @@
 #   - tedwestling/survSuperLearner
 #   - zeehio/facetscales
 cfg <- list(
-  which_sim = "testing", # estimation testing
-  level_set_which = "level_set_testing_1", # level_set_estimation_1 level_set_testing_1
+  which_sim = "estimation", # estimation testing
+  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
   run_or_update = "run",
-  num_sim = 1000,
+  num_sim = 500,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival"),
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
                      "data.table", "latex2exp", "tidyr"),
   parallel = "none",
-  stop_at_error = FALSE
+  stop_at_error = FALSE,
+  appx = list(t_e=1, w1=0.01, w1b=0.1, a=0.01)
 )
 
 # Set cluster config
@@ -77,22 +78,28 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
   # Estimation: compare all methods
   # Not currently using (ci_type="sample split", m=5) or (ci_type="regular")
   level_set_estimation_1 <- list(
-    n = 5000,
+    n = c(2000,5000),
     alpha_3 = 0.75,
     distr_A = "Unif(0,1)",
     # distr_A = c("Unif(0,1)", "Beta(0.9,1.1+0.4*w2)"), # "Beta(0.8+0.9*w1,0.8+0.4*w2)"
     surv_true = "Cox PH",
     # surv_true = c("Cox PH", "Complex"),
-    sampling = "two-phase",
+    sampling = c("iid", "two-phase"),
     estimator = list(
       # "G-comp" = list(
       #   est = "G-comp", cf_folds = 1,
       #   params = list(S_n_type="Cox PH", boot_reps=100)
       # ),
-      "Grenander (parametric g_n)" = list(
-        est = "Grenander", cf_folds = 1,
-        params = list(S_n_type="Cox PH", g_n_type="parametric", ci_type="logit")
+      "Grenander (one-step Gamma_n)" = list(
+        est = "Grenander",
+        params = list(S_n_type="Cox PH", g_n_type="parametric",
+                      ci_type="logit", cf_folds=1)
       )
+      # "Grenander (cross-fitted Gamma_n)" = list(
+      #   est = "Grenander",
+      #   params = list(S_n_type="Cox PH", g_n_type="parametric",
+      #                 ci_type="logit", cf_folds=10)
+      # )
       # "Grenander (binning g_n)" = list(
       #   est = "Grenander", cf_folds = 1,
       #   params = list(S_n_type="Cox PH", g_n_type="binning", ci_type="logit")
@@ -196,7 +203,7 @@ if (cfg$run_or_update=="run") {
         alpha_1 = 0.3,
         alpha_2 = 0.7,
         t_e = 200,
-        appx = list(t_e=1, w1=0.01, w1b=0.1, a=0.01)
+        appx = cfg$appx
       )
       
       # Simulation script
@@ -309,7 +316,7 @@ if (FALSE) {
     facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(surv_true)) +
     scale_y_continuous(labels=percent, limits=c(-0.12,0.12)) +
     # scale_y_continuous(labels=percent) +
-    scale_color_manual(values=m_colors) +
+    # scale_color_manual(values=m_colors) +
     labs(title="Bias (%)", x="A", y=NULL, color="Estimator")
   
   # Coverage plot
@@ -322,9 +329,9 @@ if (FALSE) {
     geom_point() +
     geom_line() +
     facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(surv_true)) +
-    scale_y_continuous(labels=percent, limits=c(0.75,1)) +
-    # scale_y_continuous(labels=percent) +
-    scale_color_manual(values=m_colors) +
+    # scale_y_continuous(labels=percent, limits=c(0.75,1)) +
+    scale_y_continuous(labels=percent) +
+    # scale_color_manual(values=m_colors) +
     labs(title="Coverage (%)", x="A", y=NULL, color="Estimator")
 
   # MSE plot
@@ -336,7 +343,7 @@ if (FALSE) {
     geom_point() +
     geom_line() +
     facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(surv_true)) +
-    scale_color_manual(values=m_colors) +
+    # scale_color_manual(values=m_colors) +
     ylim(0,0.001) +
     labs(title="MSE", x="A", y=NULL, color="Estimator")
 

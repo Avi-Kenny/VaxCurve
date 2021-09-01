@@ -75,41 +75,77 @@ if (load_pkgs_local) {
 
 if (Sys.getenv("simba_run") %in% c("first", "")) {
   
+  # Level bank
+  if (F) {
+    level_bank <- list(
+      alpha_3 = c(0, 0.4, 0.8),
+      distr_A = c("Unif(0,1)", "Beta(1.5+w1,1.5+w2)"),
+      edge = c("none", "expit", "complex"),
+      surv_true = c("Cox PH", "complex"),
+      sampling = c("iid", "two-phase"),
+      estimator = list(
+        "G-comp" = list(
+          est = "G-comp", cf_folds = 1,
+          params = list(S_n_type="Cox PH", boot_reps=100)
+        ),
+        "Grenander (parametric g_n)" = list(
+          est = "Grenander",
+          params = list(S_n_type="Cox PH", g_n_type="parametric",
+                        ci_type="logit", cf_folds=1)
+        ),
+        "Grenander (binning g_n)" = list(
+          est = "Grenander",
+          params = list(S_n_type="Cox PH", g_n_type="binning",
+                        ci_type="logit", cf_folds=1)
+        ),
+        "Grenander (split CIs, m=5)" = list(
+          est = "Grenander", cf_folds = 1,
+          params = list(S_n_type="Cox PH", g_n_type="parametric",
+                        ci_type="sample split", m=5)
+        ),
+        "Grenander (cross-fitted Gamma_n)" = list(
+          est = "Grenander",
+          params = list(S_n_type="Cox PH", g_n_type="parametric",
+                        ci_type="logit", cf_folds=10)
+        )
+      ),
+      test = list(
+        "Slope (one-step Gamma_n)" = list(
+          type = "test_2",
+          params = list(var="asymptotic", S_n_type="Cox PH", cf_folds=1,
+                        g_n_type="parametric", est_known_nuis=FALSE)
+        ),
+        "Slope (cross-fitted Gamma_n)" = list(
+          type = "test_2",
+          params = list(var="asymptotic", S_n_type="Cox PH", cf_folds=10,
+                        g_n_type="parametric", est_known_nuis=FALSE)
+        )
+      )
+    )
+  }
+  
   # Estimation: compare all methods
   # Not currently using (ci_type="sample split", m=5) or (ci_type="regular")
   level_set_estimation_1 <- list(
-    n = c(2000,5000),
+    n = 2000,
     alpha_3 = 0.75,
-    distr_A = "Unif(0,1)",
-    # distr_A = c("Unif(0,1)", "Beta(0.9,1.1+0.4*w2)"), # "Beta(0.8+0.9*w1,0.8+0.4*w2)"
+    distr_A = c("Unif(0,1)", "Beta(1.5+w1,1.5+w2)"),
+    edge = c("none", "expit"),
     surv_true = "Cox PH",
-    # surv_true = c("Cox PH", "Complex"),
-    sampling = c("iid", "two-phase"),
+    sampling = "two-phase",
     estimator = list(
-      # "G-comp" = list(
-      #   est = "G-comp", cf_folds = 1,
-      #   params = list(S_n_type="Cox PH", boot_reps=100)
-      # ),
-      "Grenander (one-step Gamma_n)" = list(
+      "Grenander (parametric g_n)" = list(
         est = "Grenander",
         params = list(S_n_type="Cox PH", g_n_type="parametric",
                       ci_type="logit", cf_folds=1)
+      ),
+      "Grenander (binning g_n)" = list(
+        est = "Grenander",
+        params = list(S_n_type="Cox PH", g_n_type="binning",
+                      ci_type="logit", cf_folds=1)
       )
-      # "Grenander (cross-fitted Gamma_n)" = list(
-      #   est = "Grenander",
-      #   params = list(S_n_type="Cox PH", g_n_type="parametric",
-      #                 ci_type="logit", cf_folds=10)
-      # )
-      # "Grenander (binning g_n)" = list(
-      #   est = "Grenander", cf_folds = 1,
-      #   params = list(S_n_type="Cox PH", g_n_type="binning", ci_type="logit")
-      # )
-      # "Grenander (split CIs, m=5)" = list(
-      #   est = "Grenander", cf_folds = 1,
-      #   params = list(S_n_type="Cox PH", g_n_type="parametric",
-      #                 ci_type="sample split", m=5)
-      # )
-    )
+    ),
+    edge_corr = FALSE
   )
   
   # Testing: compare all methods
@@ -117,11 +153,9 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
   level_set_testing_1 <- list(
     n = c(1000,3000,5000),
     alpha_3 = 0,
-    # alpha_3 = c(0,0.4,0.8),
-    distr_A = "Unif(0,1)",
-    # distr_A = c("Unif(0,1)", "Beta(0.9,1.1+0.4*w2)"), # "Beta(0.8+0.9*w1,0.8+0.4*w2)"
+    distr_A = "Beta(1.5+w1,1.5+w2)",
+    edge = "none",
     surv_true = "Cox PH",
-    # surv_true = c("Cox PH", "Complex"),
     sampling = "two-phase",
     test = list(
       "Slope (one-step Gamma_n)" = list(
@@ -129,11 +163,6 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
         params = list(var="asymptotic", S_n_type="Cox PH", cf_folds=1,
                       g_n_type="parametric", est_known_nuis=FALSE)
       )
-      # "Slope (cross-fitted Gamma_n)" = list(
-      #   type = "test_2",
-      #   params = list(var="asymptotic", S_n_type="Cox PH", cf_folds=10,
-      #                 g_n_type="parametric", est_known_nuis=FALSE)
-      # )
     )
   )
   
@@ -290,7 +319,7 @@ if (FALSE) {
   
   p_data <- pivot_longer(
     data = summ,
-    cols = -c(level_id,n,alpha_3,distr_A,surv_true,sampling,Estimator),
+    cols = -c(level_id,n,alpha_3,distr_A,edge,surv_true,sampling,Estimator),
     names_to = c("stat","point"),
     names_sep = "_"
   )
@@ -313,7 +342,8 @@ if (FALSE) {
   ) +
     geom_point() +
     geom_line() +
-    facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(surv_true)) +
+    facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(edge)) +
+    # facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(surv_true)) +
     scale_y_continuous(labels=percent, limits=c(-0.12,0.12)) +
     # scale_y_continuous(labels=percent) +
     # scale_color_manual(values=m_colors) +
@@ -328,12 +358,13 @@ if (FALSE) {
     geom_hline(aes(yintercept=0.95), linetype="longdash", color="grey") +
     geom_point() +
     geom_line() +
-    facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(surv_true)) +
-    # scale_y_continuous(labels=percent, limits=c(0.75,1)) +
-    scale_y_continuous(labels=percent) +
+    facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(edge)) +
+    # facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(surv_true)) +
+    scale_y_continuous(labels=percent, limits=c(0.75,1)) +
+    # scale_y_continuous(labels=percent) +
     # scale_color_manual(values=m_colors) +
     labs(title="Coverage (%)", x="A", y=NULL, color="Estimator")
-
+  
   # MSE plot
   # Export: 8" x 5"
   ggplot(
@@ -382,7 +413,7 @@ if (FALSE) {
   )
   
   # Export: 7" x 4.5"
-  # distr_A_ <- "Beta(0.9,1.1+0.4*w2)" # Unif(0,1) Beta(0.9,1.1+0.4*w2)
+  # distr_A_ <- "Unif(0,1)" # "Beta(1.5+w1,1.5+w2)"
   ggplot(
     summ,
     aes(x=alpha_3, y=Power, color=factor(n))

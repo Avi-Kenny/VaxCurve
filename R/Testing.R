@@ -27,10 +27,9 @@
 {
   
   # Generate datasets
-  dat_iid <- generate_data(n=400, alpha_3=0.7, distr_A="Unif(0,1)",
-                      surv_true="Cox PH", sampling="iid")
-  dat_tp <- generate_data(n=400, alpha_3=0.7, distr_A="Unif(0,1)",
-                      surv_true="Cox PH", sampling="two-phase")
+  n <- 5000
+  dat_orig <- generate_data(n=n, alpha_3=0.7, distr_A="Unif(0,1)", edge="expit",
+                            surv_true="Cox PH", sampling="two-phase")
   
   # Estimation
   ests <- est_curve(
@@ -69,9 +68,9 @@
 {
   
   # Generate datasets
-  d1 <- generate_data(n=1000, alpha_3=0.7, distr_A="Unif(0,1)",
+  d1 <- generate_data(n=1000, alpha_3=0.7, distr_A="Unif(0,1)", edge="none",
                       surv_true="Cox PH", sampling="iid")
-  d2 <- generate_data(n=1000, alpha_3=0.7, distr_A="Unif(0,1)",
+  d2 <- generate_data(n=1000, alpha_3=0.7, distr_A="Unif(0,1)", edge="none",
                       surv_true="Cox PH", sampling="two-phase")
   
   for (dat_orig in list(d1,d2)) {
@@ -114,6 +113,78 @@
 
 
 
+#########################.
+##### deriv_theta_n #####
+#########################.
+
+{
+  
+  # Generate true deriv_thetas
+  {
+    library(numDeriv)
+    
+    surv_true <- "Cox PH"
+    m <- 10^5
+    w1 <- runif(m)
+    w2 <- rbinom(m, size=1, prob=0.5)
+    alpha_3 <- 0.75
+    
+    theta_true_f <- Vectorize(function(a) {
+      
+      lin <- function(w1,w2,a) {
+        if (surv_true=="Cox PH") {
+          C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
+        } else if (surv_true=="complex") {
+          ( C$alpha_1*w1 + (C$alpha_2*w2 * alpha_3*a) ) * w1
+        }
+      }
+      
+      S_0 <- function(t, w1, w2, a) {
+        exp( -1 * C$lambda * (t^C$v) * exp(lin(w1,w2,a)) )
+      }
+      
+      return(1 - mean(S_0(C$t_e, w1, w2, a)))
+      
+    })
+    
+    deriv_theta_0 <- function (x) { grad(func=theta_true_f, x=x) }
+  }
+  
+  # Esimate deriv_theta_n n_samples times
+  C$appx=list(t_e=10,w1=0.01,w1b=0.1,a=0.01)
+  vlist <- create_val_list(dat_orig, C$appx)
+  n_samples <- 50
+  deriv_ests <- c()
+  grid <- seq(0,1,0.1)
+  for (i in 1:n_samples) {
+    
+    distr_A <- "Beta(1.5+w1,1.5+w2)" # "Unif(0,1)"
+    dat_orig <- generate_data(n=1000, alpha_3=0.75, distr_A=distr_A,
+                              edge="none", surv_true="Cox PH",
+                              sampling="two-phase")
+    S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
+    gcomp_n <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n)
+    deriv_theta_n <- construct_deriv_theta_n(gcomp_n)
+    deriv_ests <- c(deriv_ests, deriv_theta_n(grid))
+    
+  }
+  
+  # Plot true curves against estimated curve
+  len <- length(grid)
+  df <- data.frame(
+    x = rep(grid, n_samples+1),
+    y = c(deriv_ests, deriv_theta_0(grid)),
+    which = c(rep("Estimate", len*n_samples), rep("True", len))
+  )
+  ggplot(df, aes(x=x, y=y, color=which)) +
+    geom_point() +
+    labs(title="Estimation of derivative of theta",
+         color="Which")
+  
+}
+
+
+
 ######################################################.
 ##### Checking the influence function of Gamma_n #####
 ######################################################.
@@ -125,6 +196,7 @@
     n = 400, # 5000
     alpha_3 = 0,
     distr_A = "Unif(0,1)",
+    edge = "none",
     surv_true = "Cox PH",
     sampling = "iid" # iid two-phase
   )
@@ -164,6 +236,7 @@
       n = 400, # 5000
       alpha_3 = 0,
       distr_A = "Unif(0,1)",
+      edge = "none",
       surv_true = "Cox PH",
       sampling = "iid" # iid two-phase
     )
@@ -264,7 +337,7 @@
 {
   
   # Generate data
-  dat_orig <- generate_data(n=400, alpha_3=0, distr_A="Unif(0,1)",
+  dat_orig <- generate_data(n=400, alpha_3=0, distr_A="Unif(0,1)", edge="none",
                             surv_true="Cox PH",sampling="iid")
   
   # Define the test statistic
@@ -323,7 +396,7 @@
   for (i in 1:50) {
     
     dat_orig <- generate_data(n=400, alpha_3=0, distr_A="Unif(0,1)",
-                              surv_true="Cox PH",sampling="iid")
+                              edge="none", surv_true="Cox PH", sampling="iid")
     
     beta_n <- test_stat(dat_orig, c(1:nrow(dat_orig)))
     betas <- c(betas, beta_n)
@@ -383,11 +456,12 @@
   
   # Generate data
   alpha_3 <- 0.7
-  surv_true <- "Complex"
+  surv_true <- "complex"
   dat <- generate_data(
     n = 2000,
     alpha_3 = alpha_3,
     distr_A = "Unif(0,1)",
+    edge = "none",
     surv_true = surv_true,
     sampling = "two-phase"
   )
@@ -398,7 +472,7 @@
     if (surv_true=="Cox PH") {
       lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
       return(exp(-1*C$lambda*(t^C$v)*exp(lin)))
-    } else if (surv_true=="Complex") {
+    } else if (surv_true=="complex") {
       # lin <- C$alpha_2*w2*as.numeric(abs(w1-0.5)<0.2) + alpha_3*w1*a
       lin <- w2*w1*a
       return(exp(-1*C$lambda*(t^C$v)*exp(lin)))
@@ -479,6 +553,7 @@
     n = 5000,
     alpha_3 = alpha_3,
     distr_A = "Unif(0,1)",
+    edge = "none",
     surv_true = "Cox PH",
     sampling = "two-phase"
   )
@@ -526,17 +601,18 @@
   
   # Generate data
   set.seed(1)
-  dat <- generate_data(
+  dat_orig <- generate_data(
     n = 1000,
     alpha_3 = 0.7,
     distr_A = "Unif(0,1)",
+    edge = "none",
     surv_true = "Cox PH",
-    sampling = "two-phase"
+    sampling = "iid"
   )
   
   # Obtain estimates
   ests <- est_curve(
-    dat = dat,
+    dat_orig = dat_orig,
     estimator = "Grenander",
     params = list(
       S_n_type = params$S_n_type,
@@ -548,7 +624,7 @@
   )
   
   # Return results
-  theta_true <- attr(dat, "theta_true")
+  theta_true <- attr(dat_orig, "theta_true")
   theta_ests <- c()
   ci_lo <- c()
   ci_hi <- c()
@@ -588,14 +664,16 @@
   
   # Set levels here
   n <- 1000
-  distr_A <- "Beta(0.8+0.9*w1,0.8+0.4*w2)"  # Unif(0,1) Beta(0.9,1.1+0.4*w2) Beta(0.8+0.9*w1,0.8+0.4*w2)
-  sampling <- "iid"                     # iid two-phase
+  distr_A <- "Beta(1.5+w1,1.5+w2)"
+  edge <- "none"
+  sampling <- "two-phase"
   
   # Generate data
   dat_orig <- generate_data(
     n = n,
     alpha_3 = 0.7,
     distr_A = distr_A,
+    edge = edge,
     surv_true = "Cox PH",
     sampling = sampling
   )
@@ -604,183 +682,21 @@
   f_aIw_0 <- function(a,w1,w2) {
     if (distr_A=="Unif(0,1)") {
       return(1)
-    } else if (distr_A=="Beta(0.9,1.1+0.4*w2)") {
-      shape1 <- 0.9
-      shape2 <- 1.1 + 0.4*w2
-      return(dbeta(a, shape1=shape1, shape2=shape2))
-    } else if (distr_A=="Beta(0.8+0.9*w1,0.8+0.4*w2)") {
-      shape1 <- 0.8 + 0.9*w1
-      shape2 <- 0.8 + 0.4*w2
-      return(dbeta(a, shape1=shape1, shape2=shape2))
+    } else if (distr_A=="Beta(1.5+w1,1.5+w2)") {
+      return(dbeta(a, shape1=1.5+w1, shape2=1.5+w2))
     }
   }
   
   # Parametric estimate
-  {
-    n_orig <- nrow(dat_orig)
-    dat_orig$weights <- wts(dat_orig)
-    dat <- dat_orig %>% filter(!is.na(a))
-    weights <- dat$weights
-    
-    wlik <- function(par) {
-      
-      sum_loglik <- sum(sapply(c(1:nrow(dat)), function(i) {
-        shape1 <- par[1] + par[2]*dat$w1[i]
-        shape2 <- par[3] + par[4]*dat$w2[i]
-        loglik <- dbeta(dat$a[i], shape1=shape1, shape2=shape2, log=TRUE)
-        return(loglik*weights[i])
-      }))
-      
-      return(-1*sum_loglik)
-      
-    }
-    opt <- optim(par=c(a1=0.5, a2=0.1, a3=0.5, a4=0.1), fn=wlik)
-    f_aIw_n_para <- Vectorize(function(a, w1, w2){
-      shape1 <- opt$par[1] + opt$par[2]*w1
-      shape2 <- opt$par[3] + opt$par[4]*w2
-      return(dbeta(a, shape1=shape1, shape2=shape2))
-    })
-  }
-  
-  # Nonparametric estimate (adapted from Diaz & VDL)
-  {
-
-    # k is the number of bins
-    construct_f_aIw_n_nonpar <- function(dat_orig, k) {
-
-      alphas <- seq(0, 1, length.out=k+1)
-      
-      n_orig <- nrow(dat_orig)
-      dat_orig$weights <- wts(dat_orig)
-      dat <- dat_orig %>% filter(!is.na(a))
-      weights <- dat$weights
-      
-      dens <- Vectorize(function(a, w1, w2, par) {
-        bin <- ifelse(a==1, k, which.min(a>=alphas)-1)
-        hz <- sapply(c(1:(ifelse(bin==k,k-1,bin))), function(j) {
-          expit(par[j] + par[k]*w1 + par[k+1]*w2)
-        })
-        p1 <- ifelse(bin==k, 1, hz[bin])
-        p2 <- ifelse(bin==1, 1, prod(1-hz[1:(bin-1)]))
-        dens <- k*p1*p2
-        return(dens)
-      }, vectorize.args=c("a","w1","w2"))
-
-      wlik <- function(par) {
-
-        # par[1] through par[k-1] are the hazard components for bins 1 to k-1
-        # par[k] and par[k+1] correspond to W1 and W2
-        # sum_loglik <- sum(sapply(c(1:nrow(dat)), function(i) {
-        #   lik <- dens(a=dat$a[i], w1=dat$w1[i], w2=dat$w2[i],
-        #               par)
-        #   return(weights[i]*log(lik))
-        # }))
-        sum_loglik <- sum(weights * log(
-          dens(a=dat$a, w1=dat$w1, w2=dat$w2, par)
-        ))
-        
-        return(-1*sum_loglik)
-
-      }
-
-      opt <- optim(par=rep(0,k+1), fn=wlik, method="CG")
-      if (opt$convergence!=0) {
-        warning("Nonpar conditional density: optim() did not converge")
-      }
-
-      return(Vectorize(memoise(function(a, w1, w2){
-
-        bin <- ifelse(a==1, k, which.min(a>=alphas)-1)
-        par <- opt$par
-        hz <- sapply(c(1:(k-1)), function(j) {
-          expit(par[j] + par[k]*w1 + par[k+1]*w2)
-        })
-        p1 <- ifelse(bin==k, 1, hz[bin])
-        p2 <- ifelse(bin==1, 1, prod(1-hz[1:(bin-1)]))
-
-        return(k*p1*p2)
-
-      })))
-
-    }
-
-    f_aIw_n_nonpar <- construct_f_aIw_n_nonpar(dat_orig, k=10)
-
-  }
-  
-  # !!!!! Testing: haldensify
-  {
-    library(haldensify)
-    
-    n_orig <- nrow(dat_orig)
-    dat_orig$weights <- wts(dat_orig)
-    dat <- dat_orig %>% filter(!is.na(a))
-    weights <- dat$weights
-    
-    haldensify_fit <- haldensify(
-      A = dat$a,
-      W = subset(dat, select=c(w1,w2)),
-      # wts = weights,
-      n_bins = 10, # c(10,25)
-      grid_type = "equal_range", # c("equal_range", "equal_mass")
-      lambda_seq = exp(seq(-1, -10, length = 50))
-      # arguments passed to hal9001::fit_hal()
-      # max_degree = 5,
-      # smoothness_orders = 0,
-      # num_knots = NULL,
-      # reduce_basis = 0.05
-    )
-    
-    grid <- seq(0.01,0.99,0.01)
-    new_A <- rep(grid, 4)
-    new_W <- data.frame(
-      w1 = rep(c(0.2,0.8,0.2,0.8), each=length(grid)),
-      w2 = rep(c(0,0,1,1), each=length(grid))
-    )
-    pred_haldensify <- predict(
-      haldensify_fit,
-      new_A = new_A,
-      new_W = rep(c(1,2,3,4), each=length(grid))
-    )
-
-  }
-  
-  # !!!!! Testing: kernel density estimator
-  {
-    
-    library(np)
-    
-    bw <- npcdensbw(a~w1+w2, data=dat)
-    grid <- seq(0.01,0.99,0.01)
-    fhat <- npcdens(
-      bws = bw,
-      eydat = data.frame(
-        a = rep(grid, 4)
-      ),
-      exdat = data.frame(
-        w1 = rep(c(0.2,0.8,0.2,0.8), each=length(grid)),
-        w2 = rep(c(0,0,1,1), each=length(grid))
-      )
-      # newdata = data.frame(
-      #   a = rep(grid, 4),
-      #   w1 = rep(c(0.2,0.8,0.2,0.8), each=length(grid)),
-      #   w2 = rep(c(0,0,1,1), each=length(grid))
-      # )
-    )
-    fhat$condens
-    
-    # > predict(fhat)[1:10]
-    # [1] 0.7324757 1.2702254 1.2157468 1.7770840 1.0554559
-    # [6] 0.8422052 1.6739409 1.1410945 1.0494324 1.0189126    
-    
-  }
-  
-  # f_aIw_n_nonpar <- f_aIw_n_para # !!!!! TEMP
+  vlist <- create_val_list(dat_orig, C$appx)
+  f_aIw_n_para <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
+                                    type="parametric")
+  f_aIw_n_nonpar <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
+                                    type="binning")
   
   # Generate plot data
   grid <- seq(0.01,0.99,0.01)
-  f_aIw_models <- c("Truth", "Parametric", "npcdensbw")
-  # f_aIw_models <- c("Truth", "Parametric", "Nonparametric", "npcdensbw")
+  f_aIw_models <- c("Truth", "Parametric", "Semiparametric")
   n_models <- length(f_aIw_models)
   len <- length(grid)
   plot_data <- data.frame(
@@ -794,12 +710,10 @@
       sapply(grid, function(a) { f_aIw_n_para(a, w1=0.8, w2=0) }),
       sapply(grid, function(a) { f_aIw_n_para(a, w1=0.2, w2=1) }),
       sapply(grid, function(a) { f_aIw_n_para(a, w1=0.8, w2=1) }),
-      # sapply(grid, function(a) { f_aIw_n_nonpar(a, w1=0.2, w2=0) }),
-      # sapply(grid, function(a) { f_aIw_n_nonpar(a, w1=0.8, w2=0) }),
-      # sapply(grid, function(a) { f_aIw_n_nonpar(a, w1=0.2, w2=1) }),
-      # sapply(grid, function(a) { f_aIw_n_nonpar(a, w1=0.8, w2=1) }),
-      # pred_haldensify,
-      fhat$condens
+      sapply(grid, function(a) { f_aIw_n_nonpar(a, w1=0.2, w2=0) }),
+      sapply(grid, function(a) { f_aIw_n_nonpar(a, w1=0.8, w2=0) }),
+      sapply(grid, function(a) { f_aIw_n_nonpar(a, w1=0.2, w2=1) }),
+      sapply(grid, function(a) { f_aIw_n_nonpar(a, w1=0.8, w2=1) })
     ),
     which = rep(f_aIw_models, each=len*4),
     covariates = rep(c(
@@ -815,5 +729,76 @@
     theme(legend.position="bottom") +
     labs(color="Estimator", title="Estimation of conditional density: f(A|W)") +
     ylim(c(0,NA))
+  
+  # !!!!! Check marginal density also
+  
+}
+
+
+
+#######################################.
+##### Propensity score estimators #####
+#######################################.
+
+{
+  
+  # Set levels here
+  n <- 1000
+  edge <- "expit"
+  
+  # Generate data
+  dat_orig <- generate_data(
+    n = n,
+    alpha_3 = 0.7,
+    distr_A = "Beta(1.5+w1,1.5+w2)",
+    edge = edge,
+    surv_true = "Cox PH",
+    sampling = "two-phase"
+  )
+  
+  # True propensity score function
+  pi_0 <- function(w1,w2) {
+    if (edge=="expit") {
+      return(expit(w1+w2-3.3))
+    } else if (edge=="complex") {
+      return(w2*as.integer(abs(w1-0.5)<0.11))
+    }
+  }
+  
+  # Construct estimators
+  vlist <- create_val_list(dat_orig, C$appx)
+  pi_n_logistic <- construct_pi_n(dat_orig, vlist$W_grid, type="logistic")
+  
+  # Curve 1: W2=0
+  pi_0_0 <- function(w1) { pi_0(w1,w2=0) }
+  pi_n_0 <- function(w1) { pi_n_logistic(w1,w2=0) }
+  
+  # Curve 2: W2=1
+  pi_0_1 <- function(w1) { pi_0(w1,w2=1) }
+  pi_n_1 <- function(w1) { pi_n_logistic(w1,w2=1) }
+  
+  # Plot true curves against estimated curve
+  grid <- seq(0,1,0.01)
+  curves <- c("W2=0","W2=1")
+  estimators <- c("Estimate","True")
+  len <- length(grid)
+  n_curves <- length(curves)
+  n_estimators <- length(estimators)
+  df <- data.frame(
+    x = rep(grid, n_curves*n_estimators),
+    y = c(
+      pi_n_0(grid),
+      pi_0_0(grid),
+      pi_n_1(grid),
+      pi_0_1(grid)
+    ),
+    curve = rep(rep(curves, each=n_estimators*len)),
+    which = rep(rep(estimators, each=len), n_curves)
+  )
+  print(ggplot(df, aes(x=x, y=y, color=which)) +
+          geom_line() +
+          facet_wrap(~curve, ncol=2) +
+          labs(title="Estimation of propensity score function",
+               color="Which"))
   
 }

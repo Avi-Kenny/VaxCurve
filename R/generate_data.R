@@ -2,36 +2,42 @@
 #' 
 #' @param n Sample size
 #' @param alpha_3 Dose-response "relationship strength" parameter
-#' @param distr_A Distribution of A; possibly dependent on covariates. One of
-#'     c("Unif(0,1)", "Beta(0.9,1.1+0.4*w2)", "Beta(0.8+0.9*w1,0.8+0.4*w2)")
+#' @param distr_A Distribution of A, possibly dependent on covariates; one of
+#'     c("Unif(0,1)", "Beta(1.5+w1,1.5+w2)")
+#' @param edge Propensity mechanism for point mass at edge. The distribution of
+#'     A will be (1-pi(w))*distr_A. One of the following: "none" (no point mass
+#'     at the edge), "expit" (expit propensity model), "complex" (non-logit
+#'     propensity model). Both "expit" and "complex" put roughly 10% of the mass
+#'     on the edge.s
 #' @param surv_true True form of the survival function; one c("Cox PH",
-#'     "Complex")
-#' @param sampling A list. One of c("iid","two-phase")
+#'     "complex")
+#' @param sampling Two-phase sampling mechanism; one of c("iid","two-phase")
 #' @return A dataframe representing the study population
-generate_data <- function(n, alpha_3, distr_A, surv_true, sampling) {
+generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sampling) {
   
   # Sample baseline covariates
   w1 <- runif(n)
   w2 <- rbinom(n, size=1, prob=0.5)
   
-  # Sample A
+  # Sample A (before point mass)
   if (distr_A=="Unif(0,1)") {
     a <- runif(n)
-  } else if (distr_A=="Beta(0.9,1.1+0.4*w2)") {
-    shape1 <- 0.9
-    shape2 <- 1.1 + 0.4*w2
-    a <- rbeta(n, shape1=shape1, shape2=shape2)
-  } else if (distr_A=="Beta(0.8+0.9*w1,0.8+0.4*w2)") {
-    shape1 <- 0.8 + 0.9*w1
-    shape2 <- 0.8 + 0.4*w2
-    a <- rbeta(n, shape1=shape1, shape2=shape2)
-  } else if (distr_A=="Mixture") {
-    mix <- rbinom(n, size=1, prob=0.9)
-    unif <- runif(n)
-    a <- mix*unif
+  } else if (distr_A=="Beta(1.5+w1,1.5+w2)") {
+    a <- rbeta(n, shape1=1.5+w1, shape2=1.5+w2)
   } else {
     stop("distr_A incorrectly specified")
   }
+  
+  # Adjust A for point mass at the edge
+  if (edge=="expit") {
+    edge_probs <- expit(w1+w2-3.3)
+  } else if (edge=="complex") {
+    edge_probs <- w2*as.integer(abs(w1-0.5)<0.11)
+  } else if (edge=="none") {
+    edge_probs <- 0
+  }
+  edge <- rbinom(n, size=1, prob=edge_probs)
+  a <- (1-edge)*a
   
   # Generate event times
   {
@@ -42,7 +48,7 @@ generate_data <- function(n, alpha_3, distr_A, surv_true, sampling) {
     }
     if (surv_true=="Cox PH") {
       lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
-    } else if (surv_true=="Complex") {
+    } else if (surv_true=="complex") {
       # lin <- C$alpha_2*w2*as.numeric(abs(w1-0.5)<0.2) + alpha_3*w1*a
       lin <- w2*w1*a
     }
@@ -56,7 +62,7 @@ generate_data <- function(n, alpha_3, distr_A, surv_true, sampling) {
     }
     if (surv_true=="Cox PH") {
       lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
-    } else if (surv_true=="Complex") {
+    } else if (surv_true=="complex") {
       lin <- C$alpha_2*w2*as.numeric(abs(w1-0.5)<0.2) + alpha_3*w1*a
     }
     c <- H_0_inv2(-1*log(U)*exp(-1*lin))
@@ -98,7 +104,7 @@ generate_data <- function(n, alpha_3, distr_A, surv_true, sampling) {
       lin <- function(w1,w2,a) {
         if (surv_true=="Cox PH") {
           C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
-        } else if (surv_true=="Complex") {
+        } else if (surv_true=="complex") {
           ( C$alpha_1*w1 + (C$alpha_2*w2 * alpha_3*a) ) * w1
         }
       }

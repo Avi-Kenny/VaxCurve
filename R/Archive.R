@@ -1,4 +1,77 @@
 
+# Alternative conditional density estimators
+if (F) {
+  
+  # !!!!! Testing: haldensify
+  {
+    library(haldensify)
+
+    n_orig <- nrow(dat_orig)
+    dat_orig$weights <- wts(dat_orig)
+    dat <- dat_orig %>% filter(!is.na(a))
+    weights <- dat$weights
+
+    haldensify_fit <- haldensify(
+      A = dat$a,
+      W = subset(dat, select=c(w1,w2)),
+      wts = weights,
+      n_bins = 10, # c(10,25)
+      grid_type = "equal_range", # c("equal_range", "equal_mass")
+      lambda_seq = exp(seq(-1, -10, length = 50))
+      # arguments passed to hal9001::fit_hal()
+      # max_degree = 5,
+      # smoothness_orders = 0,
+      # num_knots = NULL,
+      # reduce_basis = 0.05
+    )
+
+    grid <- seq(0.01,0.99,0.01)
+    new_A <- rep(grid, 4)
+    new_W <- data.frame(
+      w1 = rep(c(0.2,0.8,0.2,0.8), each=length(grid)),
+      w2 = rep(c(0,0,1,1), each=length(grid))
+    )
+    pred_haldensify <- predict(
+      haldensify_fit,
+      new_A = new_A,
+      new_W = rep(c(1,2,3,4), each=length(grid))
+    )
+
+  }
+  
+  # !!!!! Testing: kernel density estimator
+  {
+    
+    library(np)
+    
+    bw <- npcdensbw(a~w1+w2, data=dat)
+    grid <- seq(0.01,0.99,0.01)
+    fhat <- npcdens(
+      bws = bw,
+      eydat = data.frame(
+        a = rep(grid, 4)
+      ),
+      exdat = data.frame(
+        w1 = rep(c(0.2,0.8,0.2,0.8), each=length(grid)),
+        w2 = rep(c(0,0,1,1), each=length(grid))
+      )
+      # newdata = data.frame(
+      #   a = rep(grid, 4),
+      #   w1 = rep(c(0.2,0.8,0.2,0.8), each=length(grid)),
+      #   w2 = rep(c(0,0,1,1), each=length(grid))
+      # )
+    )
+    fhat$condens
+    
+    # > predict(fhat)[1:10]
+    # [1] 0.7324757 1.2702254 1.2157468 1.7770840 1.0554559
+    # [6] 0.8422052 1.6739409 1.1410945 1.0494324 1.0189126
+    
+  }
+  
+  
+}
+
 # Wald comparator test
 if (F) {
   
@@ -41,7 +114,7 @@ if (F) {
 if (F) {
   
   # Export: 6" x 4"
-  distr_A_ <- "Beta(0.9,1.1+0.4*w2)" # Unif(0,1) Beta(0.9,1.1+0.4*w2)
+  distr_A_ <- "Beta(1.5+w1,1.5+w2)"
   estimand_ <- "Midpoint" # Midpoint Endpoint
   ggplot(
     filter(p_data, distr_A==distr_A_ & estimand==estimand_),
@@ -69,7 +142,7 @@ if (F) {
   
   
   # !!!!! Temp (export 7.5 x 4.5)
-  distr_A_ <- "Beta(0.9,1.1+0.4*w2)" # Unif(0,1) Beta(0.9,1.1+0.4*w2)
+  distr_A_ <- "Beta(1.5+w1,1.5+w2)"
   estimand_ <- "Endpoint" # Midpoint Endpoint
   ggplot(
     filter(p_data, distr_A==distr_A_ & estimand==estimand_),
@@ -115,7 +188,8 @@ if (F) {
     dat <- generate_data(
       n = n,
       alpha_3 = 0.7,
-      distr_A = "Unif(0,1)", # Unif(0,1) Beta(0.9,1.1+0.4*w2)
+      distr_A = "Unif(0,1)", # Unif(0,1) Beta(1.5+w1,1.5+w2)
+      edge = "none",
       reg_true = reg_true,
       sampling = sampling
     )
@@ -458,7 +532,7 @@ if (F) {
     
     # !!!!! Testing
     {
-      # Beta(0.9,1.1+0.4*w2)
+      # Beta(1.5+w1,1.5+w2)
       # Generate true marginal distribution of A
       n <- 10000
       beta_samp_1 <- rbeta(n, shape1=0.9, shape2=1.1)

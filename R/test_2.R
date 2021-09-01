@@ -69,7 +69,7 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
     gcomp_n <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n)
     eta_n <- construct_eta_n(dat_orig, vlist$AW_grid, S_n)
     xi_n <- construct_xi_n(Phi_n, lambda_2, lambda_3)
-    rho_n <- construct_rho_n(dat_orig, Phi_n)
+    # rho_n <- construct_rho_n(dat_orig, Phi_n)
     infl_fn_1 <- construct_infl_fn_1(dat_orig, Gamma_n, Phi_n, xi_n, rho_n,
                                      lambda_2, lambda_3)
     infl_fn_Gamma <- construct_infl_fn_Gamma(dat_orig, omega_n, g_n, gcomp_n,

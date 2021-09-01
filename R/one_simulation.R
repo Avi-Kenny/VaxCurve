@@ -12,14 +12,16 @@ if (cfg$which_sim=="estimation") {
   one_simulation <- function() {
     
     # Generate dataset
-    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$surv_true, L$sampling)
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
+                              L$surv_true, L$sampling)
     
     # Obtain estimates
     ests <- est_curve(
       dat_orig = dat_orig,
       estimator = L$estimator$est,
       params = L$estimator$params,
-      points = C$points
+      points = C$points,
+      edge_corr = L$edge_corr
     )
     
     # Return results
@@ -53,7 +55,7 @@ if (cfg$which_sim=="testing") {
   one_simulation <- function() {
     
     # Generate dataset
-    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A,
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
                               L$surv_true, L$sampling)
     
     # Perform hypothesis test

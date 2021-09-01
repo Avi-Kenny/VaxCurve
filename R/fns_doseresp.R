@@ -237,7 +237,7 @@ construct_S_n <- function(dat_orig, vals, type, csf=FALSE) {
 #' 
 #' @param dat_orig Dataset returned by generate_data()
 #' @param vals Dataframe of values to run function on
-#' @param mu_n A regression estimator returned by construct_mu_n()
+#' @param S_n Conditional survival function estimator returned by construct_S_n
 #' @return G-computation estimator of theta_0
 construct_gcomp_n <- function(dat_orig, vals, S_n) {
   
@@ -306,10 +306,11 @@ construct_tau_n <- function(deriv_theta_n, gamma_n, f_a_n) {
 #' @param f_aIw_n A conditional density estimator returned by
 #'     construct_f_aIw_n()
 #' @return gamma_n nuisance estimator function
-construct_gamma_n <- function(dat_orig, type, omega_n, f_aIw_n) {
+construct_gamma_n <- function(dat_orig, type, omega_n, f_aIw_n, f_a_n,
+                              f_a_delta1_n) {
   
-  # Estimate probability
-  prob <- 1 - mean(dat_orig$delta)
+  # Estimate marginal delta probability
+  delta_prob <- mean(dat_orig$delta)
   
   # Construct weights
   n_orig <- nrow(dat_orig)
@@ -330,7 +331,7 @@ construct_gamma_n <- function(dat_orig, type, omega_n, f_aIw_n) {
     coeff <- as.numeric(model$coefficients)
     
     return(Vectorize(function(x){
-      prob * ( coeff[1] + coeff[2]*x )
+      delta_prob*(f_a_delta1_n(x)/f_a_n(x)) * ( coeff[1] + coeff[2]*x )
     }))
   }
   
@@ -340,28 +341,11 @@ construct_gamma_n <- function(dat_orig, type, omega_n, f_aIw_n) {
     coeff <- as.numeric(model$coefficients)
     
     return(Vectorize(function(x){
-      prob * ( coeff[1] + coeff[2]*x + coeff[3]*(x^2) + coeff[4]*(x^3) )
+      delta_prob*(f_a_delta1_n(x)/f_a_n(x)) * (
+        coeff[1] + coeff[2]*x + coeff[3]*(x^2) + coeff[4]*(x^3)
+      )
     }))
   }
-  
-}
-
-
-
-#' Construct estimator of marginal density f_A
-#' 
-#' @param dat_orig Dataset returned by generate_data()
-#' @param vals Dataframe of values to run function on
-#' @param f_aIw_n A conditional density estimator returned by
-#'     construct_f_aIw_n()
-#' @return Marginal density estimator function
-construct_f_a_n <- function(dat_orig, vals, f_aIw_n) {
-  
-  fn <- function(a) {
-    mean(f_aIw_n(a,dat_orig$w1,dat_orig$w2))
-  }
-  
-  return (create_htab(fn, vals, round_args=-log10(C$appx$a)))
   
 }
 
@@ -372,15 +356,20 @@ construct_f_a_n <- function(dat_orig, vals, f_aIw_n) {
 #' @param dat_orig Dataset returned by generate_data()
 #' @param vals Dataframe of values to run function on
 #' @param type One of c("parametric", "binning")
+#' @param delta1 Compute the density conditional on Delta=1
 #' @return Conditional density estimator function
 #' @notes
 #'   - Assumes support of A is [0,1]
-construct_f_aIw_n <- function(dat_orig, vals, type) {
+construct_f_aIw_n <- function(dat_orig, vals, type, delta1=FALSE) {
   
   n_orig <- nrow(dat_orig)
   dat_orig$weights <- wts(dat_orig)
   dat <- dat_orig %>% filter(!is.na(a))
-  weights <- dat$weights
+  if (delta1) {
+    weights <- rep(1, nrow(dat))
+  } else {
+    weights <- dat$weights
+  }
   
   if (type=="parametric") {
     
@@ -390,7 +379,8 @@ construct_f_aIw_n <- function(dat_orig, vals, type) {
       sum_loglik <- sum(sapply(c(1:nrow(dat)), function(i) {
         shape1 <- par[1] + par[2]*dat$w1[i]
         shape2 <- par[3] + par[4]*dat$w2[i]
-        loglik <- dbeta(dat$a[i], shape1=shape1, shape2=shape2, log=TRUE)
+        loglik <- dbeta(ifelse(dat$a[i]==0,1e-4,dat$a[i]),
+                        shape1=shape1, shape2=shape2, log=TRUE)
         return(loglik*weights[i])
       }))
       
@@ -399,14 +389,12 @@ construct_f_aIw_n <- function(dat_orig, vals, type) {
     }
     
     # Run optimizer
-    opt <- optim(par=c(a1=0.5, a2=0.1, a3=0.5, a4=0.1), fn=wlik)
+    opt <- optim(par=c(a1=1, a2=0.1, a3=1, a4=0.1), fn=wlik)
     if (opt$convergence!=0) {
       warning("construct_f_aIw_n: optim() did not converge")
     }
     
     fn <- function(a, w1, w2){
-      if (a<0.01) a <- 0.01 # !!!!! Temporary hack
-      if (a>0.99) a <- 0.99 # !!!!! Temporary hack
       shape1 <- opt$par[1] + opt$par[2]*w1
       shape2 <- opt$par[3] + opt$par[4]*w2
       return(dbeta(a, shape1=shape1, shape2=shape2))
@@ -471,6 +459,25 @@ construct_f_aIw_n <- function(dat_orig, vals, type) {
   
   round_args <- c(-log10(C$appx$a), -log10(C$appx$w1), 0)
   return (create_htab(fn, vals, round_args=round_args))
+  
+}
+
+
+
+#' Construct estimator of marginal density f_A
+#' 
+#' @param dat_orig Dataset returned by generate_data()
+#' @param vals Dataframe of values to run function on
+#' @param f_aIw_n A conditional density estimator returned by
+#'     construct_f_aIw_n()
+#' @return Marginal density estimator function
+construct_f_a_n <- function(dat_orig, vals, f_aIw_n) {
+  
+  fn <- function(a) {
+    mean(f_aIw_n(a,dat_orig$w1,dat_orig$w2))
+  }
+  
+  return (create_htab(fn, vals, round_args=-log10(C$appx$a)))
   
 }
 
@@ -841,15 +848,21 @@ create_val_list <- function(dat_orig, appx) {
   
   dat <- dat_orig %>% filter(!is.na(a))
   
+  omega <- subset(dat, select=c(w1,w2,a,y_star,delta_star))
+  omega_copy <- omega
+  omega_copy$a <- 0
+  omega <- rbind(omega, omega_copy)
+  
   return(list(
     A = data.frame(a=dat$a),
     AW = data.frame(a=dat$a, w1=dat$w1, w2=dat$w2),
     A_grid = data.frame(a=seq(0,1,appx$a)),
+    W_grid = expand.grid(w1=seq(0,1,appx$w1), w2=c(0,1)),
     AW_grid = expand.grid(a=seq(0,1,appx$a), w1=seq(0,1,appx$w1),
                           w2=c(0,1)),
     S_n = expand.grid(t=seq(0,C$t_e,appx$t_e), w1=seq(0,1,appx$w1b),
                       w2=c(0,1), a=seq(0,1,appx$a)),
-    omega = subset(dat, select=-c(delta,weights))
+    omega = omega
   ))
   
 }
@@ -949,3 +962,110 @@ construct_Gamma_cf <- function(dat_orig, params, vlist) {
   }))
   
 }
+
+
+
+#' Construct propensity score estimator of pi_0 = P(A=0|W=w)
+#' 
+#' @param dat_orig Dataset returned by generate_data()
+#' @param vals Dataframe of values to run function on
+#' @param type One of c("logistic","")
+#' @return Propensity score estimator of pi_0
+construct_pi_n <- function(dat_orig, vals, type) {
+  
+  # Construct weights
+  n_orig <- nrow(dat_orig)
+  dat_orig$weights <- wts(dat_orig)
+  dat <- dat_orig %>% filter(!is.na(a))
+  weights <- dat$weights
+  
+  # Construct indicator I{A=0}
+  dat$ind_A0 <- as.integer(dat$a==0)
+  
+  if (type=="logistic") {
+    
+    suppressWarnings({
+      model <- glm(
+        ind_A0~w1+w2,
+        data = dat,
+        family = "binomial",
+        weights = weights
+      )
+    })
+    coeffs <- model$coefficients
+    
+    fn <- function(w1,w2) {
+      expit( coeffs[[1]] + coeffs[[2]]*w1 + coeffs[[3]]*w2 )
+    }
+    
+  }
+  
+  # !!!!! Implement other types
+  
+  return (create_htab(fn, vals, round_args=c(-log10(C$appx$w1), 0)))
+  
+}
+
+
+
+#' COmpute one-step estimator of counterfactual survival at A=0
+#' 
+#' @param dat_orig Dataset returned by generate_data()
+#' @param vals Dataframe of values to run function on
+#' @param pi_n Propensity score estimator returned by construct_pi_n()
+#' @param S_n Conditional survival function estimator returned by construct_S_n
+#' @param omega_n A nuisance influence function returned by construct_omega_n()
+#' @return Value of one-step estiamtor
+theta_os_n <- function(dat_orig, pi_n, S_n, omega_n) {
+  
+  # Construct weights
+  n_orig <- nrow(dat_orig)
+  dat_orig$weights <- wts(dat_orig)
+  dat <- dat_orig %>% filter(!is.na(a))
+  weights <- dat$weights
+  
+  # Return estimate
+  return(
+    1 - (1/n_orig) * sum(weights * (
+      S_n(C$t_e,dat$w1,dat$w2,a=0) - (
+        (as.integer(dat$a==0)/pi_n(dat$w1,dat$w2)) *
+          omega_n(dat$w1,dat$w2,a=0,dat$y_star,dat$delta_star)
+      )
+    ))
+  )
+  
+}
+
+
+
+#' Compute asymptotic variance of one-step estimator theta_os_n
+#' 
+#' @param dat_orig Dataset returned by generate_data()
+#' @param vals Dataframe of values to run function on
+#' @param pi_n Propensity score estimator returned by construct_pi_n()
+#' @param S_n Conditional survival function estimator returned by construct_S_n
+#' @param omega_n A nuisance influence function returned by construct_omega_n()
+#' @param theta_os_n_est Estimate returned by one-step estimator theta_os_n()
+#' @return Asymptotic variance estimate
+sigma2_os_n <- function(dat_orig, pi_n, S_n, omega_n, theta_os_n_est) {
+  
+  # Construct weights
+  n_orig <- nrow(dat_orig)
+  dat_orig$weights <- wts(dat_orig)
+  dat <- dat_orig %>% filter(!is.na(a))
+  weights <- dat$weights
+  
+  # Return estimate
+  return(
+    (1/n_orig) * sum((weights * (
+      S_n(C$t_e,dat$w1,dat$w2,a=0) - (
+        (as.integer(dat$a==0)/pi_n(dat$w1,dat$w2)) *
+          omega_n(dat$w1,dat$w2,a=0,dat$y_star,dat$delta_star)
+      ) -
+        theta_os_n_est
+    ))^2)
+  )
+  
+}
+
+

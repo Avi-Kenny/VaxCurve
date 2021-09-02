@@ -185,6 +185,179 @@
 
 
 
+###################.
+##### omega_n #####
+###################.
+
+{
+  
+  # Generate datasets
+  alpha_3 <- 0.7
+  dat_orig <- generate_data(
+    n = 1000,
+    alpha_3 = alpha_3,
+    distr_A = "Unif(0,1)",
+    edge = "none",
+    surv_true = "Cox PH",
+    sampling = "iid"
+  )
+  
+  # True omega_0
+  omega_0 <- Vectorize(function(w1,w2,a,y_star,delta_star) {
+    
+    L <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
+    
+    piece_1 <- exp(-1*C$lambda*(C$t_e^C$v)*exp(L))
+    
+    piece_2 <- (delta_star*as.integer(y_star<=C$t_e)) /
+      exp(-exp(L)*(C$lambda*y_star^C$v+C$lambda2*y_star^C$v2))
+    
+    integral <- integrate(
+      function(t) {
+        t^(C$v-1) * exp(L+exp(L)*(C$lambda*t^C$v+C$lambda2*t^C$v2))
+      },
+      lower = 0,
+      upper = min(C$t_e,y_star)
+    )$value
+    
+    piece_3 <- C$lambda*C$v*integral
+    
+    return(piece_1*(piece_2-piece_3))
+    
+  })
+  
+  # Construct omega_n
+  vlist <- create_val_list(dat_orig, C$appx)
+  S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
+  Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type, csf=TRUE)
+  omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
+  
+  omegas_est <- c()
+  omegas_true <- c()
+  for (i in 1:nrow(dat_orig)) {
+    omegas_est <- c(omegas_est, do.call(omega_0, as.list(vlist$omega[i,])))
+    omegas_true <- c(omegas_true, do.call(omega_n, as.list(vlist$omega[i,])))
+  }
+
+  # Scatterplot of estimated vs true
+  ggplot(data.frame(x=omegas_true, y=omegas_est), aes(x=x, y=y)) +
+    geom_abline(slope=1, intercept=0, color="green") +
+    geom_point(alpha=0.2) +
+    labs(title="omega_n vs omega_0", x="omega_0", y="omega_n")
+  
+}
+
+
+
+###################.
+##### gamma_n #####
+###################.
+
+{
+  
+  # Generate datasets
+  alpha_3 <- 0.7
+  distr_A <- "Beta(1.5+w1,1.5+w2)" # "Unif(0,1)"
+  dat_orig <- generate_data(
+    n = 2000,
+    alpha_3 = alpha_3,
+    distr_A = distr_A,
+    edge = "none",
+    surv_true = "Cox PH",
+    sampling = "two-phase"
+  )
+  
+  # True omega_0
+  omega_0 <- Vectorize(function(w1,w2,a,y_star,delta_star) {
+    
+    L <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
+    
+    piece_1 <- exp(-1*C$lambda*(C$t_e^C$v)*exp(L))
+    
+    piece_2 <- (delta_star*as.integer(y_star<=C$t_e)) /
+      exp(-exp(L)*(C$lambda*y_star^C$v+C$lambda2*y_star^C$v2))
+    
+    integral <- integrate(
+      function(t) {
+        t^(C$v-1) * exp(L+exp(L)*(C$lambda*t^C$v+C$lambda2*t^C$v2))
+      },
+      lower = 0,
+      upper = min(C$t_e,y_star)
+    )$value
+    
+    piece_3 <- C$lambda*C$v*integral
+    
+    return(piece_1*(piece_2-piece_3))
+    
+  })
+  
+  # Approximate true gamma_0
+  construct_gamma_0 <- function() {
+    
+    epsilon <- 0.02
+    
+    dat_mc <- generate_data(
+      n = 50000,
+      alpha_3 = alpha_3,
+      distr_A = distr_A,
+      edge = "none",
+      surv_true = "Cox PH",
+      sampling = "iid"
+    )
+    
+    f_aIw_0 <- function(a,w1,w2) {
+      if (distr_A=="Unif(0,1)") {
+        return(1)
+      } else if (distr_A=="Beta(1.5+w1,1.5+w2)") {
+        return(dbeta(a, shape1=1.5+w1, shape2=1.5+w2))
+      }
+    }
+    
+    return(Vectorize(function(x) {
+      dat_mc %<>% filter(abs(a-x)<=epsilon)
+      d <- dat_mc
+      return(mean(
+        (omega_0(d$w1,d$w2,d$a,d$y_star,d$delta_star) /
+           f_aIw_0(d$a,d$w1,d$w2))^2
+      ))
+    }))
+    
+    
+  }
+  gamma_0 <- construct_gamma_0()
+  
+  # Construct gamma_n
+  vlist <- create_val_list(dat_orig, C$appx)
+  S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
+  Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type, csf=TRUE)
+  omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
+  f_aIw_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
+                               type=params$g_n_type)
+  f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
+  f_aIw_delta1_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
+                                      type=params$g_n_type, delta1=TRUE)
+  f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid,
+                                  f_aIw_delta1_n)
+  gamma_n <- construct_gamma_n(dat_orig, vlist$A_grid, type="kernel",
+                               omega_n, f_aIw_n, f_a_n, f_a_delta1_n)
+  
+  # Plot true curves against estimated curve
+  grid <- seq(0,1,0.05)
+  df <- data.frame(
+    x = rep(grid, 2),
+    y = c(gamma_n(grid), gamma_0(grid)),
+    which = rep(c("Estimate","Truth"), each=length(grid))
+  )
+  ggplot(df, aes(x=x, y=y, color=which)) +
+    geom_line() +
+    ylim(c(0,10)) +
+    labs(title=paste("Estimation of gamma_0; distr_A:",distr_A),
+         color="Which")
+  
+}
+
+
+
 ######################################################.
 ##### Checking the influence function of Gamma_n #####
 ######################################################.
@@ -456,9 +629,9 @@
   
   # Generate data
   alpha_3 <- 0.7
-  surv_true <- "complex"
-  dat <- generate_data(
-    n = 2000,
+  surv_true <- "complex" # Cox PH
+  dat_orig <- generate_data(
+    n = 1000,
     alpha_3 = alpha_3,
     distr_A = "Unif(0,1)",
     edge = "none",
@@ -466,69 +639,50 @@
     sampling = "two-phase"
   )
   
-  S_n <- construct_S_n(dat, type="Cox PH")
+  system.time({
+    S_n_CoxPH <- construct_S_n(dat_orig, vlist$S_n, type="Cox PH")
+  })
+  system.time({
+    S_n_KM <- construct_S_n(dat_orig, vlist$S_n, type="KM")
+  })
+  system.time({
+    S_n_RF <- construct_S_n(dat_orig, vlist$S_n, type="Random Forest")
+  })
   
   S_0 <- Vectorize(function(t, w1, w2, a) {
     if (surv_true=="Cox PH") {
       lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
       return(exp(-1*C$lambda*(t^C$v)*exp(lin)))
     } else if (surv_true=="complex") {
-      # lin <- C$alpha_2*w2*as.numeric(abs(w1-0.5)<0.2) + alpha_3*w1*a
       lin <- w2*w1*a
       return(exp(-1*C$lambda*(t^C$v)*exp(lin)))
     }
   })
   
-  # !!!!!
-  {
-    # survlistWrappers()
-    dat2 <- filter(dat, !is.na(a))
-    weights <- wts(dat2)
-    newX <- expand.grid(w1=c(0,1), w2=c(1), a=c(0,1))
-    # sl_library <- c("survSL.coxph", "survSL.weibreg", "survSL.rfsrc", "survSL.km")
-    sl_library <- c("survSL.coxph", "survSL.km", "survSL.rfsrc")
-    
-    # [1] "survSL.coxph"     "survSL.expreg"    ""      
-    # [4] "survSL.km"        "survSL.loglogreg" "survSL.pchreg"   
-    # [7] "survSL.pchSL"     "survSL.require"   ""    
-    # [10] "survSL.template"  "survSL.weibreg"    
-    
-    srv <- survSuperLearner(
-      time = dat2$y_star,
-      event = dat2$delta_star,
-      X = subset(dat2,select=c(w1,w2,a)),
-      newX = newX,
-      new.times = c(1:200),
-      # event.SL.library = c("survSL.coxph"),
-      # cens.SL.library = c("survSL.coxph"),
-      event.SL.library = sl_library,
-      cens.SL.library = sl_library,
-      control = list(max.SL.iter=20),
-      obsWeights = weights
-    )
-    
-  }
-  
   # Plot true curve against estimated curve
   times <- c(1:200)
   df <- data.frame(
-    time = rep(times, 12),
+    time = rep(times, 16),
     survival = c(
-      S_n(t=times, w1=0, w2=1, a=0),
-      S_n(t=times, w1=1, w2=1, a=0),
-      S_n(t=times, w1=0, w2=1, a=1),
-      S_n(t=times, w1=1, w2=1, a=1),
-      srv$event.SL.predict[1,],
-      srv$event.SL.predict[2,],
-      srv$event.SL.predict[3,],
-      srv$event.SL.predict[4,],
+      S_n_CoxPH(t=times, w1=0, w2=1, a=0),
+      S_n_CoxPH(t=times, w1=1, w2=1, a=0),
+      S_n_CoxPH(t=times, w1=0, w2=1, a=1),
+      S_n_CoxPH(t=times, w1=1, w2=1, a=1),
+      S_n_KM(t=times, w1=0, w2=1, a=0),
+      S_n_KM(t=times, w1=1, w2=1, a=0),
+      S_n_KM(t=times, w1=0, w2=1, a=1),
+      S_n_KM(t=times, w1=1, w2=1, a=1),
+      S_n_RF(t=times, w1=0, w2=1, a=0),
+      S_n_RF(t=times, w1=1, w2=1, a=0),
+      S_n_RF(t=times, w1=0, w2=1, a=1),
+      S_n_RF(t=times, w1=1, w2=1, a=1),
       S_0(t=times, w1=0, w2=1, a=0),
       S_0(t=times, w1=1, w2=1, a=0),
       S_0(t=times, w1=0, w2=1, a=1),
       S_0(t=times, w1=1, w2=1, a=1)
     ),
-    which = rep(c("Cox PH","SL","True S_0"), each=4*length(times)),
-    covs = rep(rep(c("w1=0,a=0","w1=1,a=0","w1=0,a=1","w1=1,a=1"),3),
+    which = rep(c("Cox PH","KM","RF","True S_0"), each=4*length(times)),
+    covs = rep(rep(c("w1=0,a=0","w1=1,a=0","w1=0,a=1","w1=1,a=1"),4),
                each=length(times))
   )
   ggplot(df, aes(x=time, y=survival, color=which)) +

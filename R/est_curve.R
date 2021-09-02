@@ -129,13 +129,14 @@ est_curve <- function(dat_orig, estimator, params, points, edge_corr=FALSE) {
                                               type=params$g_n_type, delta1=TRUE)
           f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid,
                                           f_aIw_delta1_n)
-          gamma_n <- construct_gamma_n(dat_orig, type="cubic", omega_n, f_aIw_n,
-                                       f_a_n, f_a_delta1_n)
+          gamma_n <- construct_gamma_n(dat_orig, vlist$A_grid, type="kernel",
+                                       omega_n, f_aIw_n, f_a_n, f_a_delta1_n)
           tau_n <- construct_tau_n(deriv_theta_n, gamma_n, f_a_n)
           
         }
         
-        return(list(theta_n=theta_n, tau_n=tau_n))
+        return(list(theta_n=theta_n, tau_n=tau_n,
+                    sigma2_os_n_est=sigma2_os_n_est))
         
       }
       
@@ -183,6 +184,7 @@ est_curve <- function(dat_orig, estimator, params, points, edge_corr=FALSE) {
         # Edge correction
         if (edge_corr && sum(points==0)>0) {
           index <- which(points==0)
+          sigma2_os_n_est <- fns$sigma2_os_n_est
           ci_lo[index] <- ests[index] - 1.96*sqrt(sigma2_os_n_est/n_orig)
           ci_hi[index] <- ests[index] + 1.96*sqrt(sigma2_os_n_est/n_orig)
         }

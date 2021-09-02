@@ -145,7 +145,7 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
                       ci_type="logit", cf_folds=1)
       )
     ),
-    edge_corr = FALSE
+    edge_corr = TRUE
   )
   
   # Testing: compare all methods
@@ -205,15 +205,18 @@ if (cfg$run_or_update=="run") {
       # Add functions to simulation object
       sim %<>% add_creator(generate_data)
       methods <- c(
-        "beta_n_var_hat", "construct_deriv_theta_n", "construct_eta_n",
-        "construct_f_a_n", "construct_f_aIw_n", "construct_g_n",
-        "construct_gamma_n", "construct_Gamma_n", "construct_gcomp_n",
-        "construct_infl_fn_1", "construct_infl_fn_2", "construct_infl_fn_Gamma",
-        "construct_omega_n", "construct_Phi_n", "construct_rho_n",
-        "construct_S_n", "construct_tau_n", "construct_xi_n", "create_htab",
-        "deriv_expit", "deriv_logit", "est_curve", "expit", "generate_data",
-        "lambda", "logit", "one_simulation", "Pi", "test_2", "wts",
-        "construct_Gamma_cf_k", "create_val_list", "construct_Gamma_cf"
+        "logit", "expit", "deriv_logit", "deriv_expit", "create_htab", "Pi",
+        "wts", "construct_S_n", "construct_gcomp_n", "construct_deriv_theta_n",
+        "construct_tau_n", "construct_gamma_n", "construct_f_aIw_n",
+        "construct_f_a_n", "construct_g_n", "construct_omega_n",
+        "construct_eta_n", "construct_Gamma_n", "construct_Phi_n",
+        "construct_rho_n", "construct_xi_n", "construct_infl_fn_1",
+        "construct_infl_fn_Gamma", "construct_infl_fn_2", "beta_n_var_hat",
+        "create_val_list", "construct_Gamma_cf_k", "construct_Gamma_cf",
+        "construct_pi_n", "theta_os_n", "sigma2_os_n",
+        
+        "est_curve", "generate_data",
+        "lambda", "one_simulation", "test_2"
       )
       for (method in methods) {
         sim %<>% add_method(method, eval(as.name(method)))
@@ -375,7 +378,7 @@ if (FALSE) {
     geom_line() +
     facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(surv_true)) +
     # scale_color_manual(values=m_colors) +
-    ylim(0,0.001) +
+    ylim(0,0.002) +
     labs(title="MSE", x="A", y=NULL, color="Estimator")
 
 }

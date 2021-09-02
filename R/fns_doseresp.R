@@ -193,14 +193,14 @@ wts <- function(dat_orig, scale="stabilized") {
 #' @return Conditional density estimator function
 construct_S_n <- function(dat_orig, vals, type, csf=FALSE) {
   
+  # Construct weights
+  n_orig <- nrow(dat_orig)
+  dat_orig$weights <- wts(dat_orig, scale="mean 1")
+  dat <- dat_orig %>% filter(!is.na(a))
+  
+  if (csf) { dat$delta_star <- 1 - dat$delta_star }
+  
   if (type=="Cox PH") {
-    
-    # Construct weights
-    n_orig <- nrow(dat_orig)
-    dat_orig$weights <- wts(dat_orig, scale="mean 1")
-    dat <- dat_orig %>% filter(!is.na(a))
-    
-    if (csf) { dat$delta_star <- 1 - dat$delta_star }
     
     # Fit Cox model
     model <- coxph(
@@ -224,10 +224,70 @@ construct_S_n <- function(dat_orig, vals, type, csf=FALSE) {
       return(exp(-1*H_0[t+1]*exp(coeffs[[1]]*w1+coeffs[[2]]*w2+coeffs[[3]]*a)))
     }
     
-    round_args <- c(-log10(C$appx$t_e), -log10(C$appx$w1b), 0, -log10(C$appx$a))
-    return (create_htab(fn, vals, round_args=round_args))
+  } else if (type=="KM") {
+    
+    # survlistWrappers()
+    
+    newX <- subset(filter(vals, t==0), select=-c(t))
+    new.times <- unique(vals$t)
+    
+    srv <- survSuperLearner(
+      time = dat$y_star,
+      event = dat$delta_star,
+      X = subset(dat, select=c(w1,w2,a)),
+      newX = newX,
+      new.times = new.times,
+      event.SL.library = c("survSL.km"),
+      cens.SL.library = c("survSL.km"),
+      obsWeights = dat$weights,
+      control = list(
+        initWeightAlg = "survSL.km",
+        max.SL.iter = 10
+      )
+    )
+    
+    fn <- function(t, w1, w2, a) {
+      r1 <- which(w1==newX$w1)
+      r2 <- which(w2==newX$w2)
+      r3 <- which(a==newX$a)
+      row <- intersect(r1,intersect(r2,r3))
+      col <- which(t==new.times)
+      return(srv$event.SL.predict[row,col])
+    }
+    
+  } else if (type=="Random Forest") {
+    
+    newX <- subset(filter(vals, t==0), select=-c(t))
+    new.times <- unique(vals$t)
+    
+    srv <- survSuperLearner(
+      time = dat$y_star,
+      event = dat$delta_star,
+      X = subset(dat, select=c(w1,w2,a)),
+      newX = newX,
+      new.times = new.times,
+      event.SL.library = c("survSL.rfsrc"),
+      cens.SL.library = c("survSL.rfsrc"),
+      obsWeights = dat$weights,
+      control = list(
+        initWeightAlg = "survSL.rfsrc",
+        max.SL.iter = 10
+      )
+    )
+    
+    fn <- function(t, w1, w2, a) {
+      r1 <- which(w1==newX$w1)
+      r2 <- which(w2==newX$w2)
+      r3 <- which(a==newX$a)
+      row <- intersect(r1,intersect(r2,r3))
+      col <- which(t==new.times)
+      return(srv$event.SL.predict[row,col])
+    }
     
   }
+  
+  round_args <- c(-log10(C$appx$t_e), -log10(C$appx$w1b), 0, -log10(C$appx$a))
+  return (create_htab(fn, vals, round_args=round_args))
   
 }
 
@@ -301,12 +361,13 @@ construct_tau_n <- function(deriv_theta_n, gamma_n, f_a_n) {
 #' Construct gamma_n nuisance estimator function
 #' 
 #' @param dat_orig Dataset returned by generate_data()
+#' @param vals Dataframe of values to run function on
 #' @param type Type of regression; one of c("linear", "cubic")
 #' @param omega_n A nuisance influence function returned by construct_omega_n()
 #' @param f_aIw_n A conditional density estimator returned by
 #'     construct_f_aIw_n()
 #' @return gamma_n nuisance estimator function
-construct_gamma_n <- function(dat_orig, type, omega_n, f_aIw_n, f_a_n,
+construct_gamma_n <- function(dat_orig, vals, type, omega_n, f_aIw_n, f_a_n,
                               f_a_delta1_n) {
   
   # Estimate marginal delta probability
@@ -324,28 +385,39 @@ construct_gamma_n <- function(dat_orig, type, omega_n, f_aIw_n, f_a_n,
       (weights*omega_n(w1,w2,a,y_star,delta_star)) / f_aIw_n(a,w1,w2)
     )^2
   )
-  
-  # Run regression
-  if (type=="linear") {
-    model <- lm(po~a, data=dat)
-    coeff <- as.numeric(model$coefficients)
-    
-    return(Vectorize(function(x){
-      delta_prob*(f_a_delta1_n(x)/f_a_n(x)) * ( coeff[1] + coeff[2]*x )
-    }))
-  }
+  dat %<>% filter(is.finite(po))
   
   # Run regression
   if (type=="cubic") {
+
     model <- lm(po~a+I(a^2)+I(a^3), data=dat)
     coeff <- as.numeric(model$coefficients)
     
-    return(Vectorize(function(x){
+    fn <- function(x) {
       delta_prob*(f_a_delta1_n(x)/f_a_n(x)) * (
         coeff[1] + coeff[2]*x + coeff[3]*(x^2) + coeff[4]*(x^3)
       )
-    }))
+    }
+    
+  } else if (type=="kernel") {
+    
+    ks <- ksmooth(
+      x = dat$a,
+      y = dat$po,
+      kernel = "normal",
+      bandwidth = 0.1, # !!!!! Later select via CV
+      range.x = vals$a,
+      x.points = seq(0,1,0.01)
+    )
+    
+    fn <- function(x) {
+      index <- which.min(abs(x-ks$x))
+      return(ks$y[index])
+    }
+    
   }
+  
+  return (create_htab(fn, vals, round_args=-log10(C$appx$a)))
   
 }
 

@@ -15,7 +15,7 @@ cfg <- list(
   which_sim = "estimation", # estimation testing
   level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
   run_or_update = "run",
-  num_sim = 500,
+  num_sim = 10,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival"),
@@ -57,9 +57,9 @@ if (load_pkgs_local) {
   }
 }
 
-# Load simba + functions
+# Load SimEngine + functions
 {
-  library(simba)
+  library(SimEngine)
   source("one_simulation.R", local=TRUE)
   source("generate_data.R", local=TRUE)
   source("est_curve.R", local=TRUE)
@@ -73,7 +73,7 @@ if (load_pkgs_local) {
 ##### MAIN: Set level sets for different simulations #####
 ##########################################################.
 
-if (Sys.getenv("simba_run") %in% c("first", "")) {
+if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Level bank
   if (F) {
@@ -181,9 +181,9 @@ if (Sys.getenv("simba_run") %in% c("first", "")) {
 ##########################################.
 
 # Use these commands to run on Slurm:
-# sbatch --export=simba_run='first',cluster='bionic',type='R',project='z.VaxCurve' -e ./io/slurm-%A_%a.out -o ./io/slurm-%A_%a.out --constraint=gizmok run_r.sh
-# sbatch --depend=afterok:11 --array=1-1200 --export=simba_run='main',cluster='bionic',type='R',project='z.VaxCurve' -e ./io/slurm-%A_%a.out -o ./io/slurm-%A_%a.out --constraint=gizmok run_r.sh
-# sbatch --depend=afterok:12 --export=simba_run='last',cluster='bionic',type='R',project='z.VaxCurve' -e ./io/slurm-%A_%a.out -o ./io/slurm-%A_%a.out --constraint=gizmok run_r.sh
+# sbatch --export=sim_run='first',cluster='bionic',type='R',project='z.VaxCurve' -e ./io/slurm-%A_%a.out -o ./io/slurm-%A_%a.out --constraint=gizmok run_r.sh
+# sbatch --depend=afterok:11 --array=1-1200 --export=sim_run='main',cluster='bionic',type='R',project='z.VaxCurve' -e ./io/slurm-%A_%a.out -o ./io/slurm-%A_%a.out --constraint=gizmok run_r.sh
+# sbatch --depend=afterok:12 --export=sim_run='last',cluster='bionic',type='R',project='z.VaxCurve' -e ./io/slurm-%A_%a.out -o ./io/slurm-%A_%a.out --constraint=gizmok run_r.sh
 
 if (cfg$run_or_update=="run") {
 
@@ -264,7 +264,7 @@ if (cfg$run_or_update=="update") {
   update_sim_on_cluster(
     
     first = {
-      sim <- readRDS('/home/akenny/z.VaxCurve/sim.simba')
+      sim <- readRDS('/home/akenny/z.VaxCurve/sim.rds')
       sim <- do.call(set_levels, c(list(sim), level_set))
     },
     
@@ -289,7 +289,7 @@ if (cfg$run_or_update=="update") {
 if (FALSE) {
   
   # Read in simulation object
-  sim <- readRDS("../simba.out/sim_est_20210819.simba")
+  sim <- readRDS("../SimEngine.out/sim_est_20210819.rds")
   
   # Summarize results
   # !!!!! Count the number of NAs in coverage
@@ -392,7 +392,7 @@ if (FALSE) {
 if (FALSE) {
   
   # # Read in simulation object
-  sim <- readRDS("../simba.out/sim_testing_20210820.simba")
+  sim <- readRDS("../SimEngine.out/sim_testing_20210820.rds")
   
   # !!!!! Modify everything below
   #   color should be n-value

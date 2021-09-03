@@ -15,7 +15,7 @@ cfg <- list(
   which_sim = "estimation", # estimation testing
   level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
   run_or_update = "run",
-  num_sim = 10,
+  num_sim = 1,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival"),
@@ -88,37 +88,26 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
           est = "G-comp", cf_folds = 1,
           params = list(S_n_type="Cox PH", boot_reps=100)
         ),
-        "Grenander (parametric g_n)" = list(
+        "Grenander" = list(
           est = "Grenander",
-          params = list(S_n_type="Cox PH", g_n_type="parametric",
-                        ci_type="logit", cf_folds=1)
-        ),
-        "Grenander (binning g_n)" = list(
-          est = "Grenander",
-          params = list(S_n_type="Cox PH", g_n_type="binning",
-                        ci_type="logit", cf_folds=1)
-        ),
-        "Grenander (split CIs, m=5)" = list(
-          est = "Grenander", cf_folds = 1,
-          params = list(S_n_type="Cox PH", g_n_type="parametric",
-                        ci_type="sample split", m=5)
-        ),
-        "Grenander (cross-fitted Gamma_n)" = list(
-          est = "Grenander",
-          params = list(S_n_type="Cox PH", g_n_type="parametric",
-                        ci_type="logit", cf_folds=10)
+          params = list(
+            ci_type = c("regular", "logit", "sample split", "none"),
+            cf_folds = c(1,10),
+            S_n_type = c("Cox PH", "Random Forest"),
+            g_n_type = c("parametric", "binning")
+          )
         )
       ),
       test = list(
         "Slope (one-step Gamma_n)" = list(
           type = "test_2",
-          params = list(var="asymptotic", S_n_type="Cox PH", cf_folds=1,
-                        g_n_type="parametric", est_known_nuis=FALSE)
-        ),
-        "Slope (cross-fitted Gamma_n)" = list(
-          type = "test_2",
-          params = list(var="asymptotic", S_n_type="Cox PH", cf_folds=10,
-                        g_n_type="parametric", est_known_nuis=FALSE)
+          params = list(
+            var = "asymptotic",
+            cf_folds = c(1,10),
+            S_n_type = c("Cox PH", "Random Forest"),
+            g_n_type = c("parametric", "binning"),
+            est_known_nuis = c(TRUE,FALSE)
+          )
         )
       )
     )
@@ -128,32 +117,32 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   # Not currently using (ci_type="sample split", m=5) or (ci_type="regular")
   level_set_estimation_1 <- list(
     n = 2000,
-    alpha_3 = 0.75,
+    alpha_3 = 0.8,
     distr_A = c("Unif(0,1)", "Beta(1.5+w1,1.5+w2)"),
     edge = c("none", "expit"),
-    surv_true = "Cox PH",
+    surv_true = c("Cox PH", "complex"),
     sampling = "two-phase",
     estimator = list(
-      "Grenander (parametric g_n)" = list(
-        est = "Grenander",
-        params = list(S_n_type="Cox PH", g_n_type="parametric",
-                      ci_type="logit", cf_folds=1)
-      ),
-      "Grenander (binning g_n)" = list(
+      "Grenander (Cox PH)" = list(
         est = "Grenander",
         params = list(S_n_type="Cox PH", g_n_type="binning",
                       ci_type="logit", cf_folds=1)
+      ),
+      "Grenander (Random Forest)" = list(
+        est = "Grenander",
+        params = list(S_n_type="Random Forest", g_n_type="binning",
+                      ci_type="logit", cf_folds=1)
       )
     ),
-    edge_corr = TRUE
+    edge_corr = c("none","point")
   )
   
   # Testing: compare all methods
   # Not currently using (var="boot")
   level_set_testing_1 <- list(
-    n = c(1000,3000,5000),
-    alpha_3 = 0,
-    distr_A = "Beta(1.5+w1,1.5+w2)",
+    n = c(1000,2000),
+    alpha_3 = c(0,0.3,0.6),
+    distr_A = c("Unif(0,1)","Beta(1.5+w1,1.5+w2)"),
     edge = "none",
     surv_true = "Cox PH",
     sampling = "two-phase",

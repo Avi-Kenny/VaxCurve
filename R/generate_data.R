@@ -49,8 +49,7 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sampling) {
     if (surv_true=="Cox PH") {
       lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
     } else if (surv_true=="complex") {
-      # lin <- C$alpha_2*w2*as.numeric(abs(w1-0.5)<0.2) + alpha_3*w1*a
-      lin <- w2*w1*a
+      lin <- as.numeric(abs(w1-0.5)<0.2) + as.numeric(abs(a-0.5)<0.2)
     }
     t <- H_0_inv(-1*log(U)*exp(-1*lin))
     
@@ -63,7 +62,7 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sampling) {
     if (surv_true=="Cox PH") {
       lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
     } else if (surv_true=="complex") {
-      lin <- C$alpha_2*w2*as.numeric(abs(w1-0.5)<0.2) + alpha_3*w1*a
+      lin <- as.numeric(abs(w1-0.5)<0.2) + as.numeric(abs(a-0.5)<0.2)
     }
     c <- H_0_inv2(-1*log(U)*exp(-1*lin))
     # c <- pmin(c,t_study_end)

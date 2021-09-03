@@ -224,38 +224,9 @@ construct_S_n <- function(dat_orig, vals, type, csf=FALSE) {
       return(exp(-1*H_0[t+1]*exp(coeffs[[1]]*w1+coeffs[[2]]*w2+coeffs[[3]]*a)))
     }
     
-  } else if (type=="KM") {
+  } else if (type %in% c("KM", "Random Forest")) {
     
-    # survlistWrappers()
-    
-    newX <- subset(filter(vals, t==0), select=-c(t))
-    new.times <- unique(vals$t)
-    
-    srv <- survSuperLearner(
-      time = dat$y_star,
-      event = dat$delta_star,
-      X = subset(dat, select=c(w1,w2,a)),
-      newX = newX,
-      new.times = new.times,
-      event.SL.library = c("survSL.km"),
-      cens.SL.library = c("survSL.km"),
-      obsWeights = dat$weights,
-      control = list(
-        initWeightAlg = "survSL.km",
-        max.SL.iter = 10
-      )
-    )
-    
-    fn <- function(t, w1, w2, a) {
-      r1 <- which(w1==newX$w1)
-      r2 <- which(w2==newX$w2)
-      r3 <- which(a==newX$a)
-      row <- intersect(r1,intersect(r2,r3))
-      col <- which(t==new.times)
-      return(srv$event.SL.predict[row,col])
-    }
-    
-  } else if (type=="Random Forest") {
+    method <- ifelse(type=="KM", "survSL.km", "survSL.rfsrc")
     
     newX <- subset(filter(vals, t==0), select=-c(t))
     new.times <- unique(vals$t)
@@ -266,19 +237,19 @@ construct_S_n <- function(dat_orig, vals, type, csf=FALSE) {
       X = subset(dat, select=c(w1,w2,a)),
       newX = newX,
       new.times = new.times,
-      event.SL.library = c("survSL.rfsrc"),
-      cens.SL.library = c("survSL.rfsrc"),
+      event.SL.library = c(method),
+      cens.SL.library = c(method),
       obsWeights = dat$weights,
       control = list(
-        initWeightAlg = "survSL.rfsrc",
+        initWeightAlg = method,
         max.SL.iter = 10
       )
     )
     
     fn <- function(t, w1, w2, a) {
-      r1 <- which(w1==newX$w1)
-      r2 <- which(w2==newX$w2)
-      r3 <- which(a==newX$a)
+      r1 <- which(abs(w1-newX$w1)<1e-10)
+      r2 <- which(abs(w2-newX$w2)<1e-10)
+      r3 <- which(abs(a-newX$a)<1e-10)
       row <- intersect(r1,intersect(r2,r3))
       col <- which(t==new.times)
       return(srv$event.SL.predict[row,col])
@@ -1072,7 +1043,26 @@ construct_pi_n <- function(dat_orig, vals, type) {
     
   }
   
-  # !!!!! Implement other types
+  if (type=="SL") {
+    
+    sl <- SuperLearner(
+      Y = dat$ind_A0,
+      X = subset(dat, select=c(w1,w2)),
+      newX = vals,
+      family = binomial(),
+      SL.library = c("SL.earth"), # SL.glm SL.gbm SL.ranger SL.earth
+      obsWeights = weights,
+      control = list(saveFitLibrary=FALSE)
+    )
+    
+    fn <- function(w1, w2) {
+      r1 <- which(abs(w1-vals$w1)<1e-10)
+      r2 <- which(abs(w2-vals$w2)<1e-10)
+      index <- intersect(r1,r2)
+      return(sl$SL.predict[index])
+    }
+    
+  }
   
   return (create_htab(fn, vals, round_args=c(-log10(C$appx$w1), 0)))
   

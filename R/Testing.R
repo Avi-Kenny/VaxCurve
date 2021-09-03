@@ -631,13 +631,14 @@
   alpha_3 <- 0.7
   surv_true <- "complex" # Cox PH
   dat_orig <- generate_data(
-    n = 1000,
+    n = 2000,
     alpha_3 = alpha_3,
     distr_A = "Unif(0,1)",
     edge = "none",
     surv_true = surv_true,
     sampling = "two-phase"
   )
+  vlist <- create_val_list(dat_orig, C$appx)
   
   system.time({
     S_n_CoxPH <- construct_S_n(dat_orig, vlist$S_n, type="Cox PH")
@@ -654,7 +655,7 @@
       lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
       return(exp(-1*C$lambda*(t^C$v)*exp(lin)))
     } else if (surv_true=="complex") {
-      lin <- w2*w1*a
+      lin <- as.numeric(abs(w1-0.5)<0.2) + as.numeric(abs(a-0.5)<0.2)
       return(exp(-1*C$lambda*(t^C$v)*exp(lin)))
     }
   })
@@ -922,28 +923,33 @@
   # Construct estimators
   vlist <- create_val_list(dat_orig, C$appx)
   pi_n_logistic <- construct_pi_n(dat_orig, vlist$W_grid, type="logistic")
+  pi_n_SL <- construct_pi_n(dat_orig, vlist$W_grid, type="SL")
   
   # Curve 1: W2=0
+  pi_n_log_0 <- function(w1) { pi_n_logistic(w1,w2=0) }
+  pi_n_SL_0 <- function(w1) { pi_n_SL(w1,w2=0) }
   pi_0_0 <- function(w1) { pi_0(w1,w2=0) }
-  pi_n_0 <- function(w1) { pi_n_logistic(w1,w2=0) }
   
   # Curve 2: W2=1
+  pi_n_log_1 <- function(w1) { pi_n_logistic(w1,w2=1) }
+  pi_n_SL_1 <- function(w1) { pi_n_SL(w1,w2=1) }
   pi_0_1 <- function(w1) { pi_0(w1,w2=1) }
-  pi_n_1 <- function(w1) { pi_n_logistic(w1,w2=1) }
   
   # Plot true curves against estimated curve
   grid <- seq(0,1,0.01)
   curves <- c("W2=0","W2=1")
-  estimators <- c("Estimate","True")
+  estimators <- c("Logistic","SL","True")
   len <- length(grid)
   n_curves <- length(curves)
   n_estimators <- length(estimators)
   df <- data.frame(
     x = rep(grid, n_curves*n_estimators),
     y = c(
-      pi_n_0(grid),
+      pi_n_log_0(grid),
+      pi_n_SL_0(grid),
       pi_0_0(grid),
-      pi_n_1(grid),
+      pi_n_log_1(grid),
+      pi_n_SL_1(grid),
       pi_0_1(grid)
     ),
     curve = rep(rep(curves, each=n_estimators*len)),

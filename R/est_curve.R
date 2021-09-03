@@ -15,11 +15,12 @@
 #'   - `cf_folds` Number of cross-fitting folds; 1 for no cross-fitting
 #'   - `m` If params$ci_type=="sample split", the number of splits
 #' @param points A vector representing the points to estimate
-#' @param edge_corr Boolean; if TRUE, perform the edge correction; only doable
-#'     when the marginal distribution of A puts mass at zero
+#' @param edge_corr One of c("none", "point", "max"); "point" only adjusts the
+#'     leftmost point, whereas "max" possibly also adjusts points to the right;
+#'     only doable when the marginal distribution of A puts mass at zero
 #' @return A list of lists of the form:
 #'     list(list(point=1, est=1, se=1), list(...), ...)
-est_curve <- function(dat_orig, estimator, params, points, edge_corr=FALSE) {
+est_curve <- function(dat_orig, estimator, params, points, edge_corr="none") {
   
   if (estimator=="Grenander") {
     
@@ -52,7 +53,7 @@ est_curve <- function(dat_orig, estimator, params, points, edge_corr=FALSE) {
         Gamma_n <- construct_Gamma_n(dat_orig, vlist$A_grid, omega_n, S_n, g_n)
         
         # Construct one-step edge estimator
-        if (edge_corr) {
+        if (edge_corr!="none") {
           pi_n <- construct_pi_n(dat_orig, vlist$W_grid, type="logistic")
           theta_os_n_est <- theta_os_n(dat_orig, pi_n, S_n, omega_n)
           sigma2_os_n_est <- sigma2_os_n(dat_orig, pi_n, S_n, omega_n,
@@ -92,7 +93,7 @@ est_curve <- function(dat_orig, estimator, params, points, edge_corr=FALSE) {
       }
       
       # Edge correction
-      if (edge_corr) {
+      if (edge_corr=="point") {
         theta_n_copy <- theta_n
         theta_n <- function(x) {
           if(x==0) {
@@ -101,6 +102,15 @@ est_curve <- function(dat_orig, estimator, params, points, edge_corr=FALSE) {
             theta_n_copy(x)
           }
         }
+      } else if (edge_corr=="max") {
+        # theta_n_copy <- theta_n
+        # theta_n <- function(x) {
+        #   if(x==0) {
+        #     theta_os_n_est
+        #   } else {
+        #     theta_n_copy(x)
+        #   }
+        # }
       }
       
       if (return_tau_n==F) {
@@ -182,7 +192,7 @@ est_curve <- function(dat_orig, estimator, params, points, edge_corr=FALSE) {
         }
         
         # Edge correction
-        if (edge_corr && sum(points==0)>0) {
+        if (edge_corr!="none" && sum(points==0)>0) {
           index <- which(points==0)
           sigma2_os_n_est <- fns$sigma2_os_n_est
           ci_lo[index] <- ests[index] - 1.96*sqrt(sigma2_os_n_est/n_orig)

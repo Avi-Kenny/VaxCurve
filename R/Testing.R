@@ -111,7 +111,6 @@
   
   # Esimate deriv_theta_n n_samples times
   C$appx=list(t_e=10,w1=0.01,w1b=0.1,a=0.01)
-  vlist <- create_val_list(dat_orig, C$appx)
   n_samples <- 50
   deriv_ests <- c()
   grid <- seq(0,1,0.1)
@@ -121,9 +120,35 @@
     dat_orig <- generate_data(n=1000, alpha_3=0.75, distr_A=distr_A,
                               edge="none", surv_true="Cox PH",
                               sampling="two-phase")
+    vlist <- create_val_list(dat_orig, C$appx)
+    
+    Phi_n <- construct_Phi_n(dat_orig)
+    Phi_n_inv <- construct_Phi_n(dat_orig, type="inverse")
     S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
-    gcomp_n <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n)
-    deriv_theta_n <- construct_deriv_theta_n(gcomp_n)
+    Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type,
+                          csf=TRUE)
+    f_aIw_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
+                                 type=params$g_n_type, k=15)
+    f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
+    g_n <- construct_g_n(vlist$AW_grid, f_aIw_n, f_a_n)
+    omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
+    Gamma_n <- construct_Gamma_n(dat_orig, vlist$A_grid, omega_n, S_n, g_n)
+    
+    Psi_n <- Vectorize(function(x) { return(Gamma_n(Phi_n_inv(x))) })
+    gcm <- gcmlcm(x=seq(0,1,0.01), y=Psi_n(seq(0,1,0.01)), type="gcm")
+    dGCM <- Vectorize(function(x) {
+      if (x==0) {
+        index <- 1
+      } else {
+        index <- which(x<=gcm$x.knots)[1]-1
+      }
+      return(gcm$slope.knots[index])
+    })
+    theta_n <- function(x) {
+      x_trans <- Phi_n(x)
+      return(dGCM(x_trans))
+    }
+    deriv_theta_n <- construct_deriv_theta_n(theta_n)
     deriv_ests <- c(deriv_ests, deriv_theta_n(grid))
     
   }

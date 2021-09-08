@@ -15,7 +15,7 @@ cfg <- list(
   which_sim = "estimation", # estimation testing
   level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
   run_or_update = "run",
-  num_sim = 1,
+  num_sim = 1000,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp"),
@@ -117,7 +117,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   # Estimation: compare all methods
   # Not currently using (ci_type="sample split", m=5) or (ci_type="regular")
   level_set_estimation_1 <- list(
-    n = 1000, # !!!!! 2000
+    n = 2000,
     alpha_3 = 0.8,
     distr_A = c("Unif(0,1)", "Beta(1.5+w1,1.5+w2)"),
     edge = c("none", "expit"),

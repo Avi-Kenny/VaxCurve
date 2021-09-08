@@ -433,38 +433,25 @@ if (F) {
 # Old deriv_theta_n estimator
 if (F) {
   
-  # Estimate entire function on grid
-  theta_ns <- sapply(grid, theta_n)
-  if (theta_ns[1]==theta_ns[length(grid)]) {
-    stop("theta_n is flat")
-  }
-  
-  grid_width <- grid[2] - grid[1]
-  points_x <- c(grid[1])
-  points_y <- c(theta_ns[1])
-  for (i in 2:length(grid)) {
-    if (theta_ns[i]-theta_ns[i-1]!=0) {
-      points_x <- c(points_x, grid[i]-(grid_width/2))
-      points_y <- c(points_y, mean(c(theta_ns[i],theta_ns[i-1])))
+  fnc <- function(a) {
+    
+    # Set derivative appx x-coordinates
+    width <- 0.1
+    p1 <- a - width/2
+    p2 <- a + width/2
+    if (p1<0) {
+      p2 <- p2 - p1
+      p1 <- 0
     }
-  }
-  points_x <- c(points_x, grid[length(grid)])
-  points_y <- c(points_y, theta_ns[length(grid)])
-  points_sl <- c()
-  for (i in 2:length(points_x)) {
-    slope <- (points_y[i]-points_y[i-1]) /
-      (points_x[i]-points_x[i-1])
-    points_sl <- c(points_sl, slope)
-  }
-  
-  deriv_theta_n <- Vectorize(function(x) {
-    if (x==0) {
-      index <- 1
-    } else {
-      index <- which(x<=points_x)[1]-1
+    if (p2>1) {
+      p1 <- p1 - p2 + 1
+      p2 <- 1
     }
-    points_sl[index]
-  })
+    c(p1,p2)
+    
+    return( (gcomp_n(p2)-gcomp_n(p1))/width )
+    
+  }
   
 }
 

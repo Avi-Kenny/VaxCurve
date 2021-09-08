@@ -1,4 +1,94 @@
 
+# Variance of one-step edge estimator
+if (F) {
+  
+  ##### Edge mass #####
+  
+  n_reps <- 30
+  edge <- "expit"
+  ests <- c()
+  sigma2s <- c()
+  
+  for (i in 1:n_reps) {
+    
+    # Generate data
+    dat_orig <- generate_data(
+      n = 1000,
+      alpha_3 = 0.7,
+      distr_A = "Beta(1.5+w1,1.5+w2)",
+      edge = edge,
+      surv_true = "Cox PH",
+      sampling = "two-phase"
+    )
+    
+    n_orig <- nrow(dat_orig)
+    vlist <- create_val_list(dat_orig, C$appx)
+    
+    S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
+    Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type,
+                          csf=TRUE)
+    omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
+    pi_n <- construct_pi_n(dat_orig, vlist$W_grid, type="logistic")
+    theta_os_n_est <- theta_os_n(dat_orig, pi_n, S_n, omega_n)
+    sigma2_os_n_est <- sigma2_os_n(dat_orig, pi_n, S_n, omega_n,
+                                   theta_os_n_est)
+    
+    ests <- c(ests, theta_os_n_est)
+    sigma2s <- c(sigma2s, sigma2_os_n_est/n_orig)
+    
+  }
+  
+  v1 <- var(ests)
+  m1 <- mean(sigma2s)
+  
+  ##### Edge mass #####
+  
+  n_reps <- 30
+  edge <- "none"
+  ests <- c()
+  sigma2s <- c()
+  
+  for (i in 1:n_reps) {
+    
+    # Generate data
+    dat_orig <- generate_data(
+      n = 1000,
+      alpha_3 = 0.7,
+      distr_A = "Beta(1.5+w1,1.5+w2)",
+      edge = edge,
+      surv_true = "Cox PH",
+      sampling = "two-phase"
+    )
+    
+    n_orig <- nrow(dat_orig)
+    vlist <- create_val_list(dat_orig, C$appx)
+    
+    S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
+    Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type,
+                          csf=TRUE)
+    omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
+    pi_n <- construct_pi_n(dat_orig, vlist$W_grid, type="logistic")
+    theta_os_n_est <- theta_os_n(dat_orig, pi_n, S_n, omega_n)
+    sigma2_os_n_est <- sigma2_os_n(dat_orig, pi_n, S_n, omega_n,
+                                   theta_os_n_est)
+    
+    ests <- c(ests, theta_os_n_est)
+    sigma2s <- c(sigma2s, sigma2_os_n_est/n_orig)
+    
+  }
+  
+  v2 <- var(ests)
+  m2 <- mean(sigma2s)
+  
+  print("Edge mass")
+  print(v1)
+  print(m1)
+  print("No edge mass")
+  print(v2)
+  print(m2)
+
+}
+
 # Testing cross-fitting
 if (F) {
   

@@ -11,51 +11,10 @@
   # 1. Run CONFIG and SETUP within MAIN.R
   
   # 2. Set global constants
-  params <- list(g_n_type="parametric", S_n_type="Cox PH")
+  params <- list(g_n_type="binning", S_n_type="Cox PH")
   C <- list(lambda=10^-4, v=1.5, lambda2=0.5*10^-4, v2=1.5,
             points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200,
             appx=list(t_e=10,w1=0.01,w1b=0.1,a=0.01))
-  
-}
-
-
-
-##########################.
-##### Code profiling #####
-##########################.
-
-{
-  
-  # Generate datasets
-  n <- 5000
-  dat_orig <- generate_data(n=n, alpha_3=0.7, distr_A="Unif(0,1)", edge="expit",
-                            surv_true="Cox PH", sampling="two-phase")
-  
-  # Estimation
-  ests <- est_curve(
-    dat_orig = dat_tp,
-    estimator = "Grenander",
-    params = list(
-      S_n_type = params$S_n_type,
-      g_n_type = params$g_n_type,
-      ci_type = "logit",
-      cf_folds = 1
-    ),
-    points = C$points
-  )
-  
-  # Testing
-  reject <- test_2(
-    dat_orig = dat_tp,
-    alt_type = "incr",
-    params = list(
-      var = "asymptotic",
-      S_n_type = params$S_n_type,
-      g_n_type = params$g_n_type,
-      est_known_nuis = FALSE,
-      cf_folds = 1
-    )
-  )
   
 }
 
@@ -332,10 +291,10 @@
   Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type, csf=TRUE)
   omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
   f_aIw_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
-                               type=params$g_n_type)
+                               type=params$g_n_type, k=15)
   f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
   f_aIw_delta1_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
-                                      type=params$g_n_type, delta1=TRUE)
+                                      type=params$g_n_type, delta1=TRUE, k=15)
   f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid,
                                   f_aIw_delta1_n)
   gamma_n <- construct_gamma_n(dat_orig, vlist$A_grid, type="kernel",
@@ -385,7 +344,7 @@
     dat <- dat_orig %>% filter(!is.na(a))
     weights <- dat$weights
     G_n <- construct_Phi_n(dat_orig)
-    f_aIw_n <- construct_f_aIw_n(dat, type=params$g_n_type)
+    f_aIw_n <- construct_f_aIw_n(dat, type=params$g_n_type, k=15)
     f_a_n <- construct_f_a_n(dat_orig, f_aIw_n)
     g_n <- construct_g_n(f_aIw_n, f_a_n)
     S_n <- construct_S_n(dat, type=params$S_n_type)
@@ -427,7 +386,7 @@
     dat <- dat_orig %>% filter(!is.na(a))
     weights <- dat$weights
     G_n <- construct_Phi_n(dat_orig)
-    f_aIw_n <- construct_f_aIw_n(dat, type=params$g_n_type)
+    f_aIw_n <- construct_f_aIw_n(dat, type=params$g_n_type, k=15)
     f_a_n <- construct_f_a_n(dat_orig, f_aIw_n)
     g_n <- construct_g_n(f_aIw_n, f_a_n)
     S_n <- construct_S_n(dat, type=params$S_n_type)
@@ -536,7 +495,7 @@
     
     # Construct component functions
     G_n <- construct_Phi_n(dat_orig)
-    f_aIw_n <- construct_f_aIw_n(dat, vals_AW_grid, type=params$g_n_type)
+    f_aIw_n <- construct_f_aIw_n(dat, vals_AW_grid, type=params$g_n_type, k=15)
     f_a_n <- construct_f_a_n(dat_orig, vals_A_grid, f_aIw_n)
     g_n <- construct_g_n(vals_AW_grid, f_aIw_n, f_a_n)
     S_n <- construct_S_n(dat, vals_S_n, type=params$S_n_type)
@@ -640,25 +599,43 @@
   )
   vlist <- create_val_list(dat_orig, C$appx)
   
-  system.time({
-    S_n_CoxPH <- construct_S_n(dat_orig, vlist$S_n, type="Cox PH")
-  })
-  system.time({
-    S_n_KM <- construct_S_n(dat_orig, vlist$S_n, type="KM")
-  })
-  system.time({
-    S_n_RF <- construct_S_n(dat_orig, vlist$S_n, type="Random Forest")
-  })
+  S_n_CoxPH <- construct_S_n(dat_orig, vlist$S_n, type="Cox PH")
+  S_n_KM <- construct_S_n(dat_orig, vlist$S_n, type="KM")
+  S_n_RF <- construct_S_n(dat_orig, vlist$S_n, type="Random Forest")
   
   S_0 <- Vectorize(function(t, w1, w2, a) {
     if (surv_true=="Cox PH") {
       lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
       return(exp(-1*C$lambda*(t^C$v)*exp(lin)))
     } else if (surv_true=="complex") {
-      lin <- as.numeric(abs(w1-0.5)<0.2) + as.numeric(abs(a-0.5)<0.2)
+      lin <- as.numeric(abs(w1-0.5)<0.2) + alpha_3*w2*a
       return(exp(-1*C$lambda*(t^C$v)*exp(lin)))
     }
   })
+  
+  # !!!!!
+  times <- c(1:200)
+  df <- data.frame(
+    time = rep(times, 8),
+    survival = c(
+      S_n_CoxPH(t=times, w1=0, w2=0, a=0),
+      S_n_CoxPH(t=times, w1=1, w2=0, a=0),
+      S_n_CoxPH(t=times, w1=0, w2=0, a=1),
+      S_n_CoxPH(t=times, w1=1, w2=0, a=1),
+      S_0(t=times, w1=0, w2=0, a=0),
+      S_0(t=times, w1=1, w2=0, a=0),
+      S_0(t=times, w1=0, w2=0, a=1),
+      S_0(t=times, w1=1, w2=0, a=1)
+    ),
+    which = rep(c("Cox PH","True S_0"), each=4*length(times)),
+    covs = rep(rep(c("w1=0,a=0","w1=1,a=0","w1=0,a=1","w1=1,a=1"),2),
+               each=length(times))
+  )
+  ggplot(df, aes(x=time, y=survival, color=which)) +
+    geom_line() +
+    facet_wrap(~covs, ncol=2) +
+    labs(title="Estimation of conditional survival: S_0[t|W,A]",
+         color="Estimator")
   
   # Plot true curve against estimated curve
   times <- c(1:200)
@@ -755,14 +732,14 @@
 {
   
   # Generate data
-  set.seed(1)
+  set.seed(4)
   dat_orig <- generate_data(
-    n = 1000,
+    n = 2000,
     alpha_3 = 0.7,
     distr_A = "Unif(0,1)",
-    edge = "none",
+    edge = "expit",
     surv_true = "Cox PH",
-    sampling = "iid"
+    sampling = "two-phase"
   )
   
   # Obtain estimates
@@ -773,7 +750,8 @@
       S_n_type = params$S_n_type,
       g_n_type = params$g_n_type,
       ci_type = "logit", # none
-      cf_folds = 1
+      cf_folds = 1,
+      edge_corr = "none"
     ),
     points = C$points
   )
@@ -820,7 +798,7 @@
   # Set levels here
   n <- 1000
   distr_A <- "Beta(1.5+w1,1.5+w2)"
-  edge <- "none"
+  edge <- "expit"
   sampling <- "two-phase"
   
   # Generate data
@@ -845,9 +823,9 @@
   # Parametric estimate
   vlist <- create_val_list(dat_orig, C$appx)
   f_aIw_n_para <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
-                                    type="parametric")
+                                    type="parametric", k=0)
   f_aIw_n_nonpar <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
-                                    type="binning")
+                                    type="binning", k=0)
   
   # Generate plot data
   grid <- seq(0.01,0.99,0.01)

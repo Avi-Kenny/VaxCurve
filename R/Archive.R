@@ -1,4 +1,84 @@
 
+# Sample split CI estimates (est_curve.R)
+if (F) {
+  
+  # !!!!! Need to check; haven't run this in a while
+  
+  # Construct data splits (discarding "extra rows" at end)
+  m <- params$m
+  splits <- matrix(NA, nrow=m, ncol=2)
+  split_size <- as.integer(n/m)
+  splits[,2] <- (1:m)*split_size
+  splits[,1] <- ((1:m)*split_size+1)-split_size
+  
+  # Construct estimate separately for each data split
+  ests <- c()
+  ses <- c()
+  for (point in points) {
+    split_ests <- sapply(c(1:m), function(x) {
+      dat_split <- dat_orig[c(splits[x,1]:splits[x,2]),]
+      theta_n <- construct_fns(dat_orig=dat_split, return_tau_n=F)$theta_n
+      return(theta_n(point))
+    })
+    
+    ests <- c(ests, mean(split_ests))
+    ses <- c(ses, sd(split_ests)/sqrt(m))
+  }
+  
+  # Construct CIs
+  t_quant <- qt(1-(0.05/2), df=(m-1))
+  ci_lo <- ests - t_quant*ses
+  ci_hi <- ests + t_quant*ses
+  
+}
+
+# G-comp estimator (est_curve.R)
+if (F) {
+  
+  if (estimator=="G-comp") {
+    
+    # !!!!! May need to rewrite some of this
+    
+    # Prep
+    dat <- dat_orig %>% filter(!is.na(a))
+    
+    # Construct component functions
+    S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
+    gcomp_n <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n)
+    
+    # Compute estimates
+    ests <- gcomp_n(points)
+    
+    # Run bootstrap for SEs
+    {
+      my_stat <- function(dat_orig,indices) {
+        d <- dat_orig[indices,]
+        S_n <- construct_S_n(d, vlist$S_n, type=params$S_n_type)
+        gcomp_n <- construct_gcomp_n(d, vlist$A_grid, S_n)
+        return (gcomp_n(points))
+      }
+      boot_obj <- boot(data=dat_orig, statistic=my_stat, R=params$boot_reps)
+    }
+    
+    # Parse results object
+    # t_quant <- qt(1-(0.05/2), df=(params$boot_reps-1))
+    res <- list()
+    for (p in 1:length(points)) {
+      boot_sd <- sd(boot_obj$t[,p])
+      res[[p]] <- list(
+        point = points[p],
+        est = ests[p],
+        ci_lo = ests[p] - 1.96*boot_sd,
+        ci_hi = ests[p] + 1.96*boot_sd
+      )
+    }
+    
+    return (res)
+    
+  }
+  
+}
+
 # Alternative conditional density estimators
 if (F) {
   

@@ -36,9 +36,9 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sampling) {
   } else if (edge=="none") {
     edge_probs <- 0
   }
-  edge <- rbinom(n, size=1, prob=edge_probs)
-  a <- (1-edge)*a
-  
+  edge_val <- rbinom(n, size=1, prob=edge_probs)
+  a <- (1-edge_val)*a
+    
   # Generate event times
   {
     # Generate survival times (Weibull)
@@ -62,7 +62,7 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sampling) {
     if (surv_true=="Cox PH") {
       lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
     } else if (surv_true=="complex") {
-      lin <- as.numeric(abs(w1-0.5)<0.2) + as.numeric(abs(a-0.5)<0.2)
+      lin <- as.numeric(abs(w1-0.5)<0.2) + alpha_3*w2*a
     }
     c <- H_0_inv2(-1*log(U)*exp(-1*lin))
     # c <- pmin(c,t_study_end)
@@ -81,8 +81,7 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sampling) {
   
   # Two-phase sampling
   if (sampling=="two-phase") {
-    Pi <- Pi("two-phase",delta_star,w1,w2)
-    delta <- rbinom(n, size=1, prob=Pi)
+    delta <- rbinom(n, size=1, prob=Pi("two-phase",delta_star,w1,w2))
     dat <- data.frame(w1=w1, w2=w2, a=ifelse(delta==1,a,NA), delta=delta,
                       y_star=y_star, delta_star=delta_star)
   }
@@ -104,7 +103,7 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sampling) {
         if (surv_true=="Cox PH") {
           C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
         } else if (surv_true=="complex") {
-          ( C$alpha_1*w1 + (C$alpha_2*w2 * alpha_3*a) ) * w1
+          as.numeric(abs(w1-0.5)<0.2) + alpha_3*w2*a
         }
       }
       

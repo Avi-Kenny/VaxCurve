@@ -20,8 +20,7 @@ if (cfg$which_sim=="estimation") {
       dat_orig = dat_orig,
       estimator = L$estimator$est,
       params = L$estimator$params,
-      points = C$points,
-      edge_corr = L$edge_corr
+      points = C$points
     )
     
     # Return results
@@ -34,6 +33,7 @@ if (cfg$which_sim=="estimation") {
       res_list[paste0("ci_lo_",m)] <- ests[[i]]$ci_lo
       res_list[paste0("ci_hi_",m)] <- ests[[i]]$ci_hi
     }
+    res_list[[".complex"]] <- dat_orig # !!!!!
     return(res_list)
 
   }

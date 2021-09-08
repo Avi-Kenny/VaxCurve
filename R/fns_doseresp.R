@@ -40,7 +40,7 @@ deriv_logit <- function(x) {
 
 #' Construct a vectorized/memoized hash table
 #' 
-#' @param fn Function to evaluate
+#' @param fnc Function to evaluate
 #' @param vals A data frame of values to run the function on
 #' @param round_args If provided, a vector of length equal to the number of
 #'     columns in vals; all computations will be rounded accordingly.
@@ -48,7 +48,7 @@ deriv_logit <- function(x) {
 #'     vals will not be double-computed if there are duplicates (including
 #'     duplicates after rounding)
 #' @return A vectorized/memoized hash table
-create_htab <- function(fn, vals, round_args=NA, check_dupes=FALSE) {
+create_htab <- function(fnc, vals, round_args=NA, check_dupes=FALSE) {
   
   rnd <- !(is.na(round_args[1]))
   
@@ -63,7 +63,7 @@ create_htab <- function(fn, vals, round_args=NA, check_dupes=FALSE) {
     row <- as.numeric(vals[i,])
     if (rnd) row <- round(row, round_args)
     key <- rlang::hash(row)
-    htab[[key]] <- do.call(fn, as.list(row))
+    htab[[key]] <- do.call(fnc, as.list(row))
   }
   rm(row)
   rm(key)
@@ -187,7 +187,7 @@ wts <- function(dat_orig, scale="stabilized") {
 #' 
 #' @param dat_orig Dataset returned by generate_data()
 #' @param vals Dataframe of values to run function on
-#' @param type Currently only "Cox PH" is implemented
+#' @param type One of c("Cox PH", "KM", "Random Forest")
 #' @param csf Logical; if TRUE, estimate the conditional survival
 #'     function of the censoring distribution instead
 #' @return Conditional density estimator function
@@ -220,7 +220,7 @@ construct_S_n <- function(dat_orig, vals, type, csf=FALSE) {
       H_0[t+1] <- bh$hazard[index]
     }
     
-    fn <- function(t, w1, w2, a){
+    fnc <- function(t, w1, w2, a){
       return(exp(-1*H_0[t+1]*exp(coeffs[[1]]*w1+coeffs[[2]]*w2+coeffs[[3]]*a)))
     }
     
@@ -246,7 +246,7 @@ construct_S_n <- function(dat_orig, vals, type, csf=FALSE) {
       )
     )
     
-    fn <- function(t, w1, w2, a) {
+    fnc <- function(t, w1, w2, a) {
       r1 <- which(abs(w1-newX$w1)<1e-10)
       r2 <- which(abs(w2-newX$w2)<1e-10)
       r3 <- which(abs(a-newX$a)<1e-10)
@@ -258,7 +258,7 @@ construct_S_n <- function(dat_orig, vals, type, csf=FALSE) {
   }
   
   round_args <- c(-log10(C$appx$t_e), -log10(C$appx$w1b), 0, -log10(C$appx$a))
-  return (create_htab(fn, vals, round_args=round_args))
+  return (create_htab(fnc, vals, round_args=round_args))
   
 }
 
@@ -272,11 +272,11 @@ construct_S_n <- function(dat_orig, vals, type, csf=FALSE) {
 #' @return G-computation estimator of theta_0
 construct_gcomp_n <- function(dat_orig, vals, S_n) {
   
-  fn <- function(a) {
+  fnc <- function(a) {
     1 - mean(S_n(C$t_e,dat_orig$w1,dat_orig$w2,a))
   }
   
-  return (create_htab(fn, vals, round_args=c(-log10(C$appx$a))))
+  return (create_htab(fnc, vals, round_args=c(-log10(C$appx$a))))
   
 }
 
@@ -284,13 +284,16 @@ construct_gcomp_n <- function(dat_orig, vals, S_n) {
 
 #' Construct derivative estimator theta'_n
 #' 
-#' @param gcomp_n G-comp estimator of theta_0 returned by construct_gcomp_n()
-construct_deriv_theta_n <- function(gcomp_n) {
+#' 
+#' @param theta_n An estimator of theta_0
+construct_deriv_theta_n <- function(theta_n) {
   
-  fn <- function(a) {
+  # First, perform smoothing of theta_n
+  
+  fnc <- function(a) {
     
     # Set derivative appx x-coordinates
-    width <- 0.06
+    width <- 0.1
     p1 <- a - width/2
     p2 <- a + width/2
     if (p1<0) {
@@ -301,12 +304,13 @@ construct_deriv_theta_n <- function(gcomp_n) {
       p1 <- p1 - p2 + 1
       p2 <- 1
     }
+    c(p1,p2)
     
     return( (gcomp_n(p2)-gcomp_n(p1))/width )
     
   }
   
-  return(memoise(Vectorize(fn)))
+  return(memoise(Vectorize(fnc)))
 
 }
 
@@ -364,7 +368,7 @@ construct_gamma_n <- function(dat_orig, vals, type, omega_n, f_aIw_n, f_a_n,
     model <- lm(po~a+I(a^2)+I(a^3), data=dat)
     coeff <- as.numeric(model$coefficients)
     
-    fn <- function(x) {
+    fnc <- function(x) {
       delta_prob*(f_a_delta1_n(x)/f_a_n(x)) * (
         coeff[1] + coeff[2]*x + coeff[3]*(x^2) + coeff[4]*(x^3)
       )
@@ -381,14 +385,14 @@ construct_gamma_n <- function(dat_orig, vals, type, omega_n, f_aIw_n, f_a_n,
       x.points = seq(0,1,0.01)
     )
     
-    fn <- function(x) {
+    fnc <- function(x) {
       index <- which.min(abs(x-ks$x))
       return(ks$y[index])
     }
     
   }
   
-  return (create_htab(fn, vals, round_args=-log10(C$appx$a)))
+  return (create_htab(fnc, vals, round_args=-log10(C$appx$a)))
   
 }
 
@@ -399,19 +403,20 @@ construct_gamma_n <- function(dat_orig, vals, type, omega_n, f_aIw_n, f_a_n,
 #' @param dat_orig Dataset returned by generate_data()
 #' @param vals Dataframe of values to run function on
 #' @param type One of c("parametric", "binning")
+#' @param k Number of bins for the binning estimator (if k=0, then the number of
+#'     bins will be selected via cross-validation); ignored for the parametric
+#'     estimator
 #' @param delta1 Compute the density conditional on Delta=1
 #' @return Conditional density estimator function
 #' @notes
 #'   - Assumes support of A is [0,1]
-construct_f_aIw_n <- function(dat_orig, vals, type, delta1=FALSE) {
+construct_f_aIw_n <- function(dat_orig, vals, type, k=0, delta1=FALSE) {
   
   n_orig <- nrow(dat_orig)
   dat_orig$weights <- wts(dat_orig)
   dat <- dat_orig %>% filter(!is.na(a))
   if (delta1) {
-    weights <- rep(1, nrow(dat))
-  } else {
-    weights <- dat$weights
+    dat$weights <- rep(1, nrow(dat))
   }
   
   if (type=="parametric") {
@@ -424,7 +429,7 @@ construct_f_aIw_n <- function(dat_orig, vals, type, delta1=FALSE) {
         shape2 <- par[3] + par[4]*dat$w2[i]
         loglik <- dbeta(ifelse(dat$a[i]==0,1e-4,dat$a[i]),
                         shape1=shape1, shape2=shape2, log=TRUE)
-        return(loglik*weights[i])
+        return(loglik*dat$weights[i])
       }))
       
       return(-1*sum_loglik)
@@ -437,7 +442,7 @@ construct_f_aIw_n <- function(dat_orig, vals, type, delta1=FALSE) {
       warning("construct_f_aIw_n: optim() did not converge")
     }
     
-    fn <- function(a, w1, w2){
+    fnc <- function(a, w1, w2){
       shape1 <- opt$par[1] + opt$par[2]*w1
       shape2 <- opt$par[3] + opt$par[4]*w2
       return(dbeta(a, shape1=shape1, shape2=shape2))
@@ -447,61 +452,96 @@ construct_f_aIw_n <- function(dat_orig, vals, type, delta1=FALSE) {
   
   if (type=="binning") {
     
-    # k is fixed for now; later choose via cross-validation
-    k <- 10
-    alphas <- seq(0, 1, length.out=k+1)
-    
     # Set up binning density (based on Diaz and Van Der Laan 2011)
     # par[1] through par[k-1] are the hazard components for the bins 1 to k-1
     # par[k] and par[k+1] are the coefficients for W1 and W2
-    dens <- Vectorize(function(a, w1, w2, par) {
-      bin <- ifelse(a==1, k, which.min(a>=alphas)-1)
-      hz <- sapply(c(1:(ifelse(bin==k,k-1,bin))), function(j) {
-        expit(par[j] + par[k]*w1 + par[k+1]*w2)
+    create_dens <- function(k) {
+      
+      # Cut points
+      alphas <- seq(0, 1, length.out=k+1)
+      
+      # Density for a single observation
+      dens <- Vectorize(function(a, w1, w2, par) {
+        bin <- ifelse(a==1, k, which.min(a>=alphas)-1)
+        hz <- expit(
+          par[c(1:(ifelse(bin==k,k-1,bin)))] + par[k]*w1 + par[k+1]*w2
+        )
+        p1 <- ifelse(bin==k, 1, hz[bin])
+        p2 <- ifelse(bin==1, 1, prod(1-hz[1:(bin-1)]))
+        dens <- k*p1*p2
+        return(dens)
+      }, vectorize.args=c("a","w1","w2"))
+      
+      # Set up weighted likelihood
+      wlik <- function(par) {
+        -1 * sum(dat$weights *
+                   log(pmax(dens(a=dat$a, w1=dat$w1, w2=dat$w2, par), 1e-8)))
+      }
+      
+      # Run optimizer
+      opt <- solnp(
+        pars = rep(0.001,k+1),
+        fun = wlik
+      )
+      if (opt$convergence!=0) {
+        warning("construct_f_aIw_n: solnp() did not converge")
+      }
+      
+      fnc <- Vectorize(function(a, w1, w2){
+        
+        bin <- ifelse(a==1, k, which.min(a>=alphas)-1)
+        par <- opt$pars
+        hz <- sapply(c(1:(k-1)), function(j) {
+          expit(par[j] + par[k]*w1 + par[k+1]*w2)
+        })
+        p1 <- ifelse(bin==k, 1, hz[bin])
+        p2 <- ifelse(bin==1, 1, prod(1-hz[1:(bin-1)]))
+        
+        return(k*p1*p2)
+        
       })
-      p1 <- ifelse(bin==k, 1, hz[bin])
-      p2 <- ifelse(bin==1, 1, prod(1-hz[1:(bin-1)]))
-      dens <- k*p1*p2
-      return(dens)
-    }, vectorize.args=c("a","w1","w2"))
-    
-    # Set up weighted likelihood
-    wlik <- function(par) {
-      
-      sum_loglik <- sum(sapply(c(1:nrow(dat)), function(i) {
-        lik <- dens(a=dat$a[i], w1=dat$w1[i], w2=dat$w2[i],
-                    par)
-        return(weights[i]*log(lik))
-      }))
-      
-      return(-1*sum_loglik)
       
     }
     
-    # Run optimizer
-    opt <- optim(par=rep(0,k+1), fn=wlik, method="CG")
-    if (opt$convergence!=0) {
-      warning("construct_f_aIw_n: optim() did not converge")
+    # Select k via cross-validation
+    if (k==0) {
+      
+      # Prep
+      n_folds <- 5
+      folds <- sample(cut(c(1:length(dat)), breaks=n_folds, labels=FALSE))
+      ks <- c(5,10,15,20,25)
+      best <- list(k=999, max_log_lik=999)
+      
+      # Cross-validation
+      for (k in ks) {
+        
+        sum_log_lik <- 0
+        for (i in c(1:n_folds)) {
+          dat_train <- dat[-which(folds==i),]
+          dat_test <- dat[which(folds==i),]
+          dens <- create_dens(k)
+          sum_log_lik <- sum_log_lik + sum(log(
+            dens(dat_test$a, dat_test$w1, dat_test$w2)
+          ))
+        }
+        
+        if (sum_log_lik>best$max_log_lik || best$max_log_lik==999) {
+          best$k <- k
+          best$max_log_lik <- sum_log_lik
+        }
+        
+      }
+      
+      k <- best$k
+      
     }
     
-    fn <- function(a, w1, w2){
-      
-      bin <- ifelse(a==1, k, which.min(a>=alphas)-1)
-      par <- opt$par
-      hz <- sapply(c(1:(k-1)), function(j) {
-        expit(par[j] + par[k]*w1 + par[k+1]*w2)
-      })
-      p1 <- ifelse(bin==k, 1, hz[bin])
-      p2 <- ifelse(bin==1, 1, prod(1-hz[1:(bin-1)]))
-      
-      return(k*p1*p2)
-      
-    }
+    fnc <- create_dens(k)
     
   }
   
   round_args <- c(-log10(C$appx$a), -log10(C$appx$w1), 0)
-  return (create_htab(fn, vals, round_args=round_args))
+  return (create_htab(fnc, vals, round_args=round_args))
   
 }
 
@@ -516,11 +556,11 @@ construct_f_aIw_n <- function(dat_orig, vals, type, delta1=FALSE) {
 #' @return Marginal density estimator function
 construct_f_a_n <- function(dat_orig, vals, f_aIw_n) {
   
-  fn <- function(a) {
+  fnc <- function(a) {
     mean(f_aIw_n(a,dat_orig$w1,dat_orig$w2))
   }
   
-  return (create_htab(fn, vals, round_args=-log10(C$appx$a)))
+  return (create_htab(fnc, vals, round_args=-log10(C$appx$a)))
   
 }
 
@@ -534,14 +574,14 @@ construct_f_a_n <- function(dat_orig, vals, f_aIw_n) {
 #' @return Density ratio estimator function
 construct_g_n <- function(vals, f_aIw_n, f_a_n) {
   
-  fn <- function(a,w1,w2) {
+  fnc <- function(a,w1,w2) {
     if (a<0.01) a <- 0.01 # !!!!! Temporary hack
     if (a>0.99) a <- 0.99 # !!!!! Temporary hack
     f_aIw_n(a,w1,w2) / f_a_n(a)
   }
   
   round_args <- c(-log10(C$appx$a), -log10(C$appx$w1), 0)
-  return (create_htab(fn, vals, round_args=round_args))
+  return (create_htab(fnc, vals, round_args=round_args))
   
 }
 
@@ -556,7 +596,7 @@ construct_g_n <- function(vals, f_aIw_n, f_a_n) {
 #' @return Estimator function of nuisance omega_0
 construct_omega_n <- function(vals, S_n, Sc_n) {
   
-  fn <- function(w1,w2,a,y_star,delta_star) {
+  fnc <- function(w1,w2,a,y_star,delta_star) {
     
     k <- round(min(y_star,C$t_e))
     if (k==0) k <- 1
@@ -592,7 +632,7 @@ construct_omega_n <- function(vals, S_n, Sc_n) {
 
   }
   
-  return (create_htab(fn, vals))
+  return (create_htab(fnc, vals))
   
 }
 
@@ -611,7 +651,7 @@ construct_eta_n <- function(dat_orig, vals, S_n) {
   dat <- dat_orig %>% filter(!is.na(a))
   weights <- dat$weights
   
-  fn <- function(x,w1,w2) {
+  fnc <- function(x,w1,w2) {
     (1/n_orig) * sum(
       weights * as.integer(dat$a<=x) *
         (1-S_n(C$t_e,w1,w2,dat$a))
@@ -619,7 +659,7 @@ construct_eta_n <- function(dat_orig, vals, S_n) {
   }
   
   round_args <- c(-log10(C$appx$a), -log10(C$appx$w1), 0)
-  return (create_htab(fn, vals, round_args=round_args))
+  return (create_htab(fnc, vals, round_args=round_args))
   
 }
 
@@ -683,7 +723,7 @@ construct_Gamma_n <- function(dat_orig, vals, omega_n, S_n, g_n) {
   subpiece_2a <- (weights_i_long*weights_j_long) *
     S_n(C$t_e,w1_j_long,w2_j_long,a_i_long)
   
-  fn <- function(x) {
+  fnc <- function(x) {
     
     subpiece_1b <- as.integer(dat$a<=x)
     piece_1 <- (1/n_orig) * sum(subpiece_1a*subpiece_1b)
@@ -695,7 +735,7 @@ construct_Gamma_n <- function(dat_orig, vals, omega_n, S_n, g_n) {
     
   }
   
-  return (create_htab(fn, vals, round_args=-log10(C$appx$a)))
+  return (create_htab(fnc, vals, round_args=-log10(C$appx$a)))
   
 }
 
@@ -929,7 +969,7 @@ construct_Gamma_cf_k <- function(dat_train, dat_test, vals, omega_n, g_n,
   d2 <- dat_train %>% filter(!is.na(a))
   weights_2 <- d2$weights
   
-  fn <- function(x) {
+  fnc <- function(x) {
     
     piece_1 <- (1/n_test) * sum(weights_1 * (
       as.integer(d1$a<=x) *
@@ -948,7 +988,7 @@ construct_Gamma_cf_k <- function(dat_train, dat_test, vals, omega_n, g_n,
     
   }
   
-  return (create_htab(fn, vals, round_args=-log10(C$appx$a)))
+  return (create_htab(fnc, vals, round_args=-log10(C$appx$a)))
   
 }
 
@@ -982,7 +1022,8 @@ construct_Gamma_cf <- function(dat_orig, params, vlist) {
     Sc_n <- construct_S_n(dat_train, vlist$S_n, type=params$S_n_type, csf=TRUE)
     gcomp_n <- construct_gcomp_n(dat_train, vlist$A_grid, S_n)
     eta_n <- construct_eta_n(dat_train, vlist$AW_grid, S_n)
-    f_aIw_n <- construct_f_aIw_n(dat_train, vlist$AW_grid, type=params$g_n_type)
+    f_aIw_n <- construct_f_aIw_n(dat_train, vlist$AW_grid, type=params$g_n_type,
+                                 k=15)
     f_a_n <- construct_f_a_n(dat_train, vlist$A_grid, f_aIw_n)
     g_n <- construct_g_n(vlist$AW_grid, f_aIw_n, f_a_n)
     omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
@@ -1037,7 +1078,7 @@ construct_pi_n <- function(dat_orig, vals, type) {
     })
     coeffs <- model$coefficients
     
-    fn <- function(w1,w2) {
+    fnc <- function(w1,w2) {
       expit( coeffs[[1]] + coeffs[[2]]*w1 + coeffs[[3]]*w2 )
     }
     
@@ -1050,12 +1091,14 @@ construct_pi_n <- function(dat_orig, vals, type) {
       X = subset(dat, select=c(w1,w2)),
       newX = vals,
       family = binomial(),
-      SL.library = c("SL.earth"), # SL.glm SL.gbm SL.ranger SL.earth
+      SL.library = "SL.earth", # SL.glm SL.gbm SL.ranger SL.earth
+      # SL.library = c("SL.earth", "SL.gam", "SL.ranger"), # SL.glm SL.gbm SL.ranger SL.earth
       obsWeights = weights,
       control = list(saveFitLibrary=FALSE)
     )
+    assign("sl", sl, envir=.GlobalEnv)
     
-    fn <- function(w1, w2) {
+    fnc <- function(w1, w2) {
       r1 <- which(abs(w1-vals$w1)<1e-10)
       r2 <- which(abs(w2-vals$w2)<1e-10)
       index <- intersect(r1,r2)
@@ -1064,7 +1107,7 @@ construct_pi_n <- function(dat_orig, vals, type) {
     
   }
   
-  return (create_htab(fn, vals, round_args=c(-log10(C$appx$w1), 0)))
+  return (create_htab(fnc, vals, round_args=c(-log10(C$appx$w1), 0)))
   
 }
 

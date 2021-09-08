@@ -18,7 +18,7 @@ cfg <- list(
   num_sim = 1,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
-           "randomForestSRC", "CFsurvival"),
+           "randomForestSRC", "CFsurvival", "Rsolnp"),
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
                      "data.table", "latex2exp", "tidyr"),
   parallel = "none",
@@ -94,7 +94,8 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
             ci_type = c("regular", "logit", "sample split", "none"),
             cf_folds = c(1,10),
             S_n_type = c("Cox PH", "Random Forest"),
-            g_n_type = c("parametric", "binning")
+            g_n_type = c("parametric", "binning"),
+            edge_corr = c("none", "point", "weighted")
           )
         )
       ),
@@ -116,25 +117,44 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   # Estimation: compare all methods
   # Not currently using (ci_type="sample split", m=5) or (ci_type="regular")
   level_set_estimation_1 <- list(
-    n = 2000,
+    n = 1000, # !!!!! 2000
     alpha_3 = 0.8,
     distr_A = c("Unif(0,1)", "Beta(1.5+w1,1.5+w2)"),
     edge = c("none", "expit"),
     surv_true = c("Cox PH", "complex"),
     sampling = "two-phase",
     estimator = list(
-      "Grenander (Cox PH)" = list(
+      "Grenander (none; Cox)" = list(
         est = "Grenander",
         params = list(S_n_type="Cox PH", g_n_type="binning",
-                      ci_type="logit", cf_folds=1)
+                      ci_type="logit", cf_folds=1, edge_corr="none")
       ),
-      "Grenander (Random Forest)" = list(
+      "Grenander (spread; Cox)" = list(
+        est = "Grenander",
+        params = list(S_n_type="Cox PH", g_n_type="binning",
+                      ci_type="logit", cf_folds=1, edge_corr="spread")
+      ),
+      "Grenander (max; Cox)" = list(
+        est = "Grenander",
+        params = list(S_n_type="Cox PH", g_n_type="binning",
+                      ci_type="logit", cf_folds=1, edge_corr="max")
+      ),
+      "Grenander (none; RF)" = list(
         est = "Grenander",
         params = list(S_n_type="Random Forest", g_n_type="binning",
-                      ci_type="logit", cf_folds=1)
+                      ci_type="logit", cf_folds=1, edge_corr="none")
+      ),
+      "Grenander (spread; RF)" = list(
+        est = "Grenander",
+        params = list(S_n_type="Random Forest", g_n_type="binning",
+                      ci_type="logit", cf_folds=1, edge_corr="spread")
+      ),
+      "Grenander (max; RF)" = list(
+        est = "Grenander",
+        params = list(S_n_type="Random Forest", g_n_type="binning",
+                      ci_type="logit", cf_folds=1, edge_corr="max")
       )
-    ),
-    edge_corr = c("none","point")
+    )
   )
   
   # Testing: compare all methods
@@ -220,7 +240,7 @@ if (cfg$run_or_update=="run") {
         v = 1.5,
         lambda2 = 0.5 * 10^-4,
         v2 = 1.5,
-        points = seq(0,1,0.1),
+        points = seq(0,1,0.02),
         alpha_1 = 0.3,
         alpha_2 = 0.7,
         t_e = 200,
@@ -285,8 +305,8 @@ if (FALSE) {
   summ_bias <- list()
   summ_mse <- list()
   summ_cov <- list()
-  for (i in c(1:11)) {
-    m <- format(round(i/10-0.1,1), nsmall=1)
+  for (i in c(1:51)) { # for (i in c(1:11)) {
+    m <- format(round(i/50-0.02,2), nsmall=1) # m <- format(round(i/10-0.1,1), nsmall=1)
     summ_bias[[i]] <- list(
       name = paste0("bias_",m),
       estimate = paste0("est_",m),
@@ -309,12 +329,15 @@ if (FALSE) {
   
   summ %<>% rename("Estimator"=estimator)
   
+  summ %<>% filter(n==1000) # !!!!!
+  
   p_data <- pivot_longer(
     data = summ,
     cols = -c(level_id,n,alpha_3,distr_A,edge,surv_true,sampling,Estimator),
     names_to = c("stat","point"),
     names_sep = "_"
   )
+  p_data %<>% mutate(point = as.numeric(point))
   
   cb_colors <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442",
                  "#0072B2", "#D55E00", "#CC79A7", "#999999")
@@ -332,11 +355,12 @@ if (FALSE) {
     filter(p_data, stat=="bias"),
     aes(x=point, y=value, color=Estimator, group=Estimator)
   ) +
-    geom_point() +
+    # geom_point() +
     geom_line() +
     facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(edge)) +
     # facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(surv_true)) +
-    scale_y_continuous(labels=percent, limits=c(-0.12,0.12)) +
+    scale_y_continuous(labels=percent, limits=c(-0.4,0.4)) +
+    # scale_y_continuous(labels=percent, limits=c(-0.12,0.12)) +
     # scale_y_continuous(labels=percent) +
     # scale_color_manual(values=m_colors) +
     labs(title="Bias (%)", x="A", y=NULL, color="Estimator")
@@ -348,7 +372,7 @@ if (FALSE) {
     aes(x=point, y=value, color=Estimator, group=Estimator)
   ) +
     geom_hline(aes(yintercept=0.95), linetype="longdash", color="grey") +
-    geom_point() +
+    # geom_point() +
     geom_line() +
     facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(edge)) +
     # facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(surv_true)) +
@@ -363,13 +387,14 @@ if (FALSE) {
     filter(p_data, stat=="mse"),
     aes(x=point, y=value, color=Estimator, group=Estimator)
   ) +
-    geom_point() +
+    # geom_point() +
     geom_line() +
-    facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(surv_true)) +
+    facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(edge)) +
+    # facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(surv_true)) +
     # scale_color_manual(values=m_colors) +
-    ylim(0,0.002) +
+    ylim(0,0.003) +
     labs(title="MSE", x="A", y=NULL, color="Estimator")
-
+  
 }
 
 

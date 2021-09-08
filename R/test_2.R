@@ -32,7 +32,8 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
     lambda_3 <- lambda(dat_orig,3,Phi_n)
     
     # Construct component functions
-    f_aIw_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid, type=params$g_n_type)
+    f_aIw_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid, type=params$g_n_type,
+                                 k=15)
     f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
     g_n <- construct_g_n(vlist$AW_grid, f_aIw_n, f_a_n)
     S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
@@ -101,7 +102,7 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
       n_0 <- nrow(dat_0)
       weights_0 <- wts(dat_0)
       G_0 <- construct_Phi_n(dat_orig)
-      f_aIw_n <- construct_f_aIw_n(dat_0, type=params$g_n_type)
+      f_aIw_n <- construct_f_aIw_n(dat_0, type=params$g_n_type, k=15)
       f_a_n <- construct_f_a_n(dat_orig, f_aIw_n=f_aIw_n)
       g_0 <- construct_g_n(f_aIw_n, f_a_n)
       S_0 <- construct_S_n(dat, type=params$S_n_type)
@@ -149,7 +150,7 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
       S_0 <- construct_S_n(dat_0, type=params$S_n_type)
       Sc_0 <- construct_S_n(dat_0, type=params$S_n_type, csf=TRUE)
       omega_0 <- construct_omega_n(S_0, Sc_0)
-      f_aIw_n <- construct_f_aIw_n(dat_0, type=params$g_n_type)
+      f_aIw_n <- construct_f_aIw_n(dat_0, type=params$g_n_type, k=15)
       f_a_n <- construct_f_a_n(dat_0_orig, f_aIw_n=f_aIw_n)
       g_0 <- construct_g_n(f_aIw_n, f_a_n)
       Gamma_0 <- construct_Gamma_n(dat_0_orig, omega_0, S_0, g_0)

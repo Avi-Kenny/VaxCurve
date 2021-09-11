@@ -173,7 +173,11 @@ est_curve <- function(dat_orig, estimator, params, points) {
     }
     
     # Construct variance scale factor
-    deriv_theta_n <- construct_deriv_theta_n(theta_n)
+    if (L$deriv_type=="linear") {
+      deriv_theta_n <- construct_deriv_theta_n(theta_n, type="linear")
+    } else if (L$deriv_type=="gcomp") {
+      deriv_theta_n <- construct_deriv_theta_n(gcomp_n, type="gcomp")
+    }
     tau_n <- construct_tau_n(deriv_theta_n, gamma_n, f_a_n)
     
     # Generate estimates for each point
@@ -226,6 +230,13 @@ est_curve <- function(dat_orig, estimator, params, points) {
       res[[p]] <- list(point=points[p], est=ests[p],
                        ci_lo=ci_lo[p], ci_hi=ci_hi[p])
     }
+    
+    # Add extra return data
+    res[["ex_S_n"]] <- S_n(C$t_e, w1=0.5, w2=1, a=0.5)
+    res[["ex_gamma_n"]] <- gamma_n(0.5)
+    res[["ex_deriv_theta_n"]] <- deriv_theta_n(0.5)
+    res[["ex_tau_n"]] <- tau_n(0.5)
+    
     return(res)
     
   }

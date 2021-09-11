@@ -33,7 +33,14 @@ if (cfg$which_sim=="estimation") {
       res_list[paste0("ci_lo_",m)] <- ests[[i]]$ci_lo
       res_list[paste0("ci_hi_",m)] <- ests[[i]]$ci_hi
     }
-    res_list[[".complex"]] <- dat_orig # !!!!!
+    
+    # # Return extra results
+    res_list[["ex_S_n"]] <- ests$ex_S_n
+    res_list[["ex_gamma_n"]] <- ests$ex_gamma_n
+    res_list[["ex_deriv_theta_n"]] <- ests$ex_deriv_theta_n
+    res_list[["ex_tau_n"]] <- ests$ex_tau_n
+    # res_list[[".complex"]] <- dat_orig
+    
     return(res_list)
 
   }

@@ -49,7 +49,7 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sampling) {
     if (surv_true=="Cox PH") {
       lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
     } else if (surv_true=="complex") {
-      lin <- as.numeric(abs(w1-0.5)<0.2) + as.numeric(abs(a-0.5)<0.2)
+      lin <- as.numeric(abs(w1-0.5)<0.2) + alpha_3*w2*a
     }
     t <- H_0_inv(-1*log(U)*exp(-1*lin))
     
@@ -89,7 +89,7 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sampling) {
   if (!(sampling %in% c("iid", "two-phase"))) {
     stop("`sampling` incorrectly specified")
   }
-
+  
   # Set up function to calculate true regression values over C$points
   # These are Monte Carlo approximations
   {

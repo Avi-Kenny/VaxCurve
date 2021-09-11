@@ -204,7 +204,7 @@ construct_S_n <- function(dat_orig, vals, type, csf=FALSE) {
     
     # Fit Cox model
     model <- coxph(
-      Surv(y_star, delta_star)~w1+w2+a,
+      Surv(y_star,delta_star)~w1+w2+a,
       data = dat,
       weights = weights
     )
@@ -224,13 +224,39 @@ construct_S_n <- function(dat_orig, vals, type, csf=FALSE) {
       return(exp(-1*H_0[t+1]*exp(coeffs[[1]]*w1+coeffs[[2]]*w2+coeffs[[3]]*a)))
     }
     
-  } else if (type %in% c("KM", "Random Forest")) {
+  } else if (type=="Random Forest") {
     
-    method <- ifelse(type=="KM", "survSL.km", "survSL.rfsrc")
+    model <- rfsrc(
+      Surv(y_star,delta_star)~w1+w2+a,
+      data = dat,
+      ntree = 500,
+      mtry = 2,
+      nodesize = 100,
+      splitrule = "logrank", # logrank bs.gradient logrankscore
+      nsplit = 0,
+      case.wt = dat$weights
+      # samptype = "swr"
+    )
+    
+    newX <- subset(filter(vals, t==0), select=-c(t))
+    pred <- predict(model, newdata=newX)
+    
+    fnc <- function(t, w1, w2, a) {
+      r1 <- which(abs(w1-newX$w1)<1e-10)
+      r2 <- which(abs(w2-newX$w2)<1e-10)
+      r3 <- which(abs(a-newX$a)<1e-10)
+      row <- intersect(r1,intersect(r2,r3))
+      col <- which.min(abs(t-pred$time.interest))
+      return(pred$survival[row,col])
+    }
+    
+  } else if (type=="Random Forest Ted") {
+    
+    method <- "survSL.rfsrc"
     
     newX <- subset(filter(vals, t==0), select=-c(t))
     new.times <- unique(vals$t)
-    
+
     srv <- survSuperLearner(
       time = dat$y_star,
       event = dat$delta_star,
@@ -245,7 +271,7 @@ construct_S_n <- function(dat_orig, vals, type, csf=FALSE) {
         max.SL.iter = 10
       )
     )
-    
+
     fnc <- function(t, w1, w2, a) {
       r1 <- which(abs(w1-newX$w1)<1e-10)
       r2 <- which(abs(w2-newX$w2)<1e-10)
@@ -285,39 +311,76 @@ construct_gcomp_n <- function(dat_orig, vals, S_n) {
 #' Construct derivative estimator theta'_n
 #' 
 #' 
-#' @param theta_n An estimator of theta_0
-construct_deriv_theta_n <- function(theta_n) {
+#' @param theta_n An estimator of theta_0 (usually theta_n or gcomp_n)
+#' @param type One of c("gcomp", "linear")
+construct_deriv_theta_n <- function(theta_n, type) {
   
-  # Estimate entire function on grid
-  grid <- seq(0,1,0.01)
-  theta_ns <- sapply(grid, theta_n)
-  if (theta_ns[1]==theta_ns[length(grid)]) { stop("theta_n is flat") }
-  
-  grid_width <- grid[2] - grid[1]
-  points_x <- c(grid[1])
-  points_y <- c(theta_ns[1])
-  for (i in 2:length(grid)) {
-    if (theta_ns[i]-theta_ns[i-1]!=0) {
-      points_x <- c(points_x, grid[i]-(grid_width/2))
-      points_y <- c(points_y, mean(c(theta_ns[i],theta_ns[i-1])))
+  if (theta_n(0)<theta_n(1)) {
+    
+    if (type=="linear") {
+      
+      # Estimate entire function on grid
+      grid <- seq(0,1,0.01)
+      theta_ns <- sapply(grid, theta_n)
+      
+      grid_width <- grid[2] - grid[1]
+      points_x <- c(grid[1])
+      points_y <- c(theta_ns[1])
+      for (i in 2:length(grid)) {
+        if (theta_ns[i]-theta_ns[i-1]!=0) {
+          points_x <- c(points_x, grid[i]-(grid_width/2))
+          points_y <- c(points_y, mean(c(theta_ns[i],theta_ns[i-1])))
+        }
+      }
+      points_x <- c(points_x, grid[length(grid)])
+      points_y <- c(points_y, theta_ns[length(grid)])
+      points_sl <- c()
+      for (i in 2:length(points_x)) {
+        slope <- (points_y[i]-points_y[i-1]) /
+          (points_x[i]-points_x[i-1])
+        points_sl <- c(points_sl, slope)
+      }
+      
+      fnc <- function(x) {
+        if (x==0) {
+          index <- 1
+        } else {
+          index <- which(x<=points_x)[1]-1
+        }
+        points_sl[index]
+      }
+      
     }
-  }
-  points_x <- c(points_x, grid[length(grid)])
-  points_y <- c(points_y, theta_ns[length(grid)])
-  points_sl <- c()
-  for (i in 2:length(points_x)) {
-    slope <- (points_y[i]-points_y[i-1]) /
-      (points_x[i]-points_x[i-1])
-    points_sl <- c(points_sl, slope)
-  }
-  
-  fnc <- function(x) {
-    if (x==0) {
-      index <- 1
-    } else {
-      index <- which(x<=points_x)[1]-1
+    
+    if (type=="gcomp") {
+      
+      fnc <- function(a) {
+        
+        # Set derivative appx x-coordinates
+        width <- 0.1
+        p1 <- a - width/2
+        p2 <- a + width/2
+        if (p1<0) {
+          p2 <- p2 - p1
+          p1 <- 0
+        }
+        if (p2>1) {
+          p1 <- p1 - p2 + 1
+          p2 <- 1
+        }
+        c(p1,p2)
+        
+        return( (theta_n(p2)-theta_n(p1))/width )
+        
+      }
+      
     }
-    points_sl[index]
+    
+  } else {
+    
+    fnc <- function(x) { 0 }
+    warning("theta_n is flat/negative")
+    
   }
   
   return(memoise(Vectorize(fnc)))
@@ -338,7 +401,7 @@ construct_tau_n <- function(deriv_theta_n, gamma_n, f_a_n) {
   return(memoise(Vectorize(function(x){
     (4*deriv_theta_n(x)*f_a_n(x)*gamma_n(x))^(1/3)
   })))
-
+  
 }
 
 
@@ -465,7 +528,7 @@ construct_f_aIw_n <- function(dat_orig, vals, type, k=0, delta1=FALSE) {
     # Set up binning density (based on Diaz and Van Der Laan 2011)
     # par[1] through par[k-1] are the hazard components for the bins 1 to k-1
     # par[k] and par[k+1] are the coefficients for W1 and W2
-    create_dens <- function(k) {
+    create_dens <- function(k, dat) {
       
       # Cut points
       alphas <- seq(0, 1, length.out=k+1)
@@ -529,7 +592,7 @@ construct_f_aIw_n <- function(dat_orig, vals, type, k=0, delta1=FALSE) {
         for (i in c(1:n_folds)) {
           dat_train <- dat[-which(folds==i),]
           dat_test <- dat[which(folds==i),]
-          dens <- create_dens(k)
+          dens <- create_dens(k, dat_train)
           sum_log_lik <- sum_log_lik + sum(log(
             dens(dat_test$a, dat_test$w1, dat_test$w2)
           ))
@@ -546,7 +609,7 @@ construct_f_aIw_n <- function(dat_orig, vals, type, k=0, delta1=FALSE) {
       
     }
     
-    fnc <- create_dens(k)
+    fnc <- create_dens(k, dat)
     
   }
   

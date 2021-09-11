@@ -94,7 +94,7 @@
         if (surv_true=="Cox PH") {
           C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
         } else if (surv_true=="complex") {
-          ( C$alpha_1*w1 + (C$alpha_2*w2 * alpha_3*a) ) * w1
+          as.numeric(abs(w1-0.5)<0.2) + alpha_3*w2*a
         }
       }
       
@@ -111,7 +111,7 @@
   
   # Esimate deriv_theta_n n_samples times
   C$appx=list(t_e=10,w1=0.01,w1b=0.1,a=0.01)
-  n_samples <- 50
+  n_samples <- 20
   deriv_ests <- c()
   grid <- seq(0,1,0.1)
   for (i in 1:n_samples) {
@@ -124,9 +124,12 @@
     
     Phi_n <- construct_Phi_n(dat_orig)
     Phi_n_inv <- construct_Phi_n(dat_orig, type="inverse")
-    S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
-    Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type,
+    S_n <- construct_S_n(dat_orig, vlist$S_n, type="Random Forest")
+    Sc_n <- construct_S_n(dat_orig, vlist$S_n, type="Random Forest",
                           csf=TRUE)
+    # S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
+    # Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type,
+    #                       csf=TRUE)
     f_aIw_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
                                  type=params$g_n_type, k=15)
     f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
@@ -148,7 +151,7 @@
       x_trans <- Phi_n(x)
       return(dGCM(x_trans))
     }
-    deriv_theta_n <- construct_deriv_theta_n(theta_n)
+    deriv_theta_n <- construct_deriv_theta_n(theta_n, type="gcomp")
     deriv_ests <- c(deriv_ests, deriv_theta_n(grid))
     
   }
@@ -162,7 +165,8 @@
   )
   ggplot(df, aes(x=x, y=y, color=which)) +
     geom_point() +
-    labs(title="Estimation of derivative of theta",
+    ylim(c(0,1)) +
+    labs(title="Estimation of derivative of theta (RF)",
          color="Which")
   
 }
@@ -241,13 +245,13 @@
   
   # Generate datasets
   alpha_3 <- 0.7
-  distr_A <- "Beta(1.5+w1,1.5+w2)" # "Unif(0,1)"
+  distr_A <- "Unif(0,1)" # "Unif(0,1)" "Beta(1.5+w1,1.5+w2)"
   dat_orig <- generate_data(
     n = 2000,
     alpha_3 = alpha_3,
     distr_A = distr_A,
     edge = "none",
-    surv_true = "Cox PH",
+    surv_true = "complex",
     sampling = "two-phase"
   )
   
@@ -312,8 +316,10 @@
   
   # Construct gamma_n
   vlist <- create_val_list(dat_orig, C$appx)
-  S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
-  Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type, csf=TRUE)
+  S_n <- construct_S_n(dat_orig, vlist$S_n, type="Random Forest")
+  Sc_n <- construct_S_n(dat_orig, vlist$S_n, type="Random Forest", csf=TRUE)
+  # S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
+  # Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type, csf=TRUE)
   omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
   f_aIw_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
                                type=params$g_n_type, k=15)
@@ -334,7 +340,7 @@
   )
   ggplot(df, aes(x=x, y=y, color=which)) +
     geom_line() +
-    ylim(c(0,10)) +
+    # ylim(c(0,10)) +
     labs(title=paste("Estimation of gamma_0; distr_A:",distr_A),
          color="Which")
   
@@ -613,19 +619,18 @@
   
   # Generate data
   alpha_3 <- 0.7
-  surv_true <- "complex" # Cox PH
+  surv_true <- "Cox PH" # "Cox PH" "complex"
   dat_orig <- generate_data(
-    n = 2000,
+    n = 5000,
     alpha_3 = alpha_3,
     distr_A = "Unif(0,1)",
     edge = "none",
     surv_true = surv_true,
-    sampling = "two-phase"
+    sampling = "two-phase" # two-phase iid
   )
   vlist <- create_val_list(dat_orig, C$appx)
   
   S_n_CoxPH <- construct_S_n(dat_orig, vlist$S_n, type="Cox PH")
-  S_n_KM <- construct_S_n(dat_orig, vlist$S_n, type="KM")
   S_n_RF <- construct_S_n(dat_orig, vlist$S_n, type="Random Forest")
   
   S_0 <- Vectorize(function(t, w1, w2, a) {
@@ -638,55 +643,27 @@
     }
   })
   
-  # !!!!!
-  times <- c(1:200)
-  df <- data.frame(
-    time = rep(times, 8),
-    survival = c(
-      S_n_CoxPH(t=times, w1=0, w2=0, a=0),
-      S_n_CoxPH(t=times, w1=1, w2=0, a=0),
-      S_n_CoxPH(t=times, w1=0, w2=0, a=1),
-      S_n_CoxPH(t=times, w1=1, w2=0, a=1),
-      S_0(t=times, w1=0, w2=0, a=0),
-      S_0(t=times, w1=1, w2=0, a=0),
-      S_0(t=times, w1=0, w2=0, a=1),
-      S_0(t=times, w1=1, w2=0, a=1)
-    ),
-    which = rep(c("Cox PH","True S_0"), each=4*length(times)),
-    covs = rep(rep(c("w1=0,a=0","w1=1,a=0","w1=0,a=1","w1=1,a=1"),2),
-               each=length(times))
-  )
-  ggplot(df, aes(x=time, y=survival, color=which)) +
-    geom_line() +
-    facet_wrap(~covs, ncol=2) +
-    labs(title="Estimation of conditional survival: S_0[t|W,A]",
-         color="Estimator")
-  
   # Plot true curve against estimated curve
   times <- c(1:200)
   df <- data.frame(
-    time = rep(times, 16),
+    time = rep(times, 12),
     survival = c(
-      S_n_CoxPH(t=times, w1=0, w2=1, a=0),
-      S_n_CoxPH(t=times, w1=1, w2=1, a=0),
-      S_n_CoxPH(t=times, w1=0, w2=1, a=1),
-      S_n_CoxPH(t=times, w1=1, w2=1, a=1),
-      S_n_KM(t=times, w1=0, w2=1, a=0),
-      S_n_KM(t=times, w1=1, w2=1, a=0),
-      S_n_KM(t=times, w1=0, w2=1, a=1),
-      S_n_KM(t=times, w1=1, w2=1, a=1),
-      S_n_RF(t=times, w1=0, w2=1, a=0),
-      S_n_RF(t=times, w1=1, w2=1, a=0),
-      S_n_RF(t=times, w1=0, w2=1, a=1),
-      S_n_RF(t=times, w1=1, w2=1, a=1),
-      S_0(t=times, w1=0, w2=1, a=0),
-      S_0(t=times, w1=1, w2=1, a=0),
-      S_0(t=times, w1=0, w2=1, a=1),
-      S_0(t=times, w1=1, w2=1, a=1)
+      S_n_CoxPH(t=times, w1=0.2, w2=1, a=0.2),
+      S_n_CoxPH(t=times, w1=0.8, w2=1, a=0.2),
+      S_n_CoxPH(t=times, w1=0.2, w2=1, a=0.8),
+      S_n_CoxPH(t=times, w1=0.8, w2=1, a=0.8),
+      S_n_RF(t=times, w1=0.2, w2=1, a=0.2),
+      S_n_RF(t=times, w1=0.8, w2=1, a=0.2),
+      S_n_RF(t=times, w1=0.2, w2=1, a=0.8),
+      S_n_RF(t=times, w1=0.8, w2=1, a=0.8),
+      S_0(t=times, w1=0.2, w2=1, a=0.2),
+      S_0(t=times, w1=0.8, w2=1, a=0.2),
+      S_0(t=times, w1=0.2, w2=1, a=0.8),
+      S_0(t=times, w1=0.8, w2=1, a=0.8)
     ),
-    which = rep(c("Cox PH","KM","RF","True S_0"), each=4*length(times)),
-    covs = rep(rep(c("w1=0,a=0","w1=1,a=0","w1=0,a=1","w1=1,a=1"),4),
-               each=length(times))
+    which = rep(c("Cox PH","RF","True S_0"), each=4*length(times)),
+    covs = rep(rep(c("w1=0.2,w2=1,a=0.2","w1=0.8,w2=1,a=0.2",
+                     "w1=0.2,w2=1,a=0.8","w1=0.8,w2=1,a=0.8"),3), each=length(times))
   )
   ggplot(df, aes(x=time, y=survival, color=which)) +
     geom_line() +
@@ -822,8 +799,9 @@
   
   # Set levels here
   n <- 1000
-  distr_A <- "Beta(1.5+w1,1.5+w2)"
-  edge <- "expit"
+  distr_A <- "Unif(0,1)"
+  # distr_A <- "Beta(1.5+w1,1.5+w2)"
+  edge <- "none"
   sampling <- "two-phase"
   
   # Generate data
@@ -849,7 +827,8 @@
   vlist <- create_val_list(dat_orig, C$appx)
   f_aIw_n_para <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
                                     type="parametric", k=0)
-  f_aIw_n_nonpar <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
+  f_aIw_n_semi <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
+                                    # type="binning", k=15)
                                     type="binning", k=0)
   
   # Generate plot data
@@ -868,10 +847,10 @@
       sapply(grid, function(a) { f_aIw_n_para(a, w1=0.8, w2=0) }),
       sapply(grid, function(a) { f_aIw_n_para(a, w1=0.2, w2=1) }),
       sapply(grid, function(a) { f_aIw_n_para(a, w1=0.8, w2=1) }),
-      sapply(grid, function(a) { f_aIw_n_nonpar(a, w1=0.2, w2=0) }),
-      sapply(grid, function(a) { f_aIw_n_nonpar(a, w1=0.8, w2=0) }),
-      sapply(grid, function(a) { f_aIw_n_nonpar(a, w1=0.2, w2=1) }),
-      sapply(grid, function(a) { f_aIw_n_nonpar(a, w1=0.8, w2=1) })
+      sapply(grid, function(a) { f_aIw_n_semi(a, w1=0.2, w2=0) }),
+      sapply(grid, function(a) { f_aIw_n_semi(a, w1=0.8, w2=0) }),
+      sapply(grid, function(a) { f_aIw_n_semi(a, w1=0.2, w2=1) }),
+      sapply(grid, function(a) { f_aIw_n_semi(a, w1=0.8, w2=1) })
     ),
     which = rep(f_aIw_models, each=len*4),
     covariates = rep(c(
@@ -888,7 +867,24 @@
     labs(color="Estimator", title="Estimation of conditional density: f(A|W)") +
     ylim(c(0,NA))
   
-  # !!!!! Check marginal density also
+  # Check marginal density
+  f_a_0 <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_0)
+  f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n_semi)
+  
+  # Generate plot data
+  grid <- seq(0.01,0.99,0.01)
+  f_a_models <- c("Truth", "Semiparametric")
+  len <- length(grid)
+  plot_data <- data.frame(
+    a = rep(grid, 2),
+    density = c(f_a_0(grid),f_a_n(grid)),
+    which = rep(f_a_models, each=len)
+  )
+  ggplot(plot_data, aes(x=a, y=density, color=factor(which))) +
+    geom_line() +
+    theme(legend.position="bottom") +
+    labs(color="Estimator", title="Estimation of marginal density: f(A)") +
+    ylim(c(0,NA))
   
 }
 

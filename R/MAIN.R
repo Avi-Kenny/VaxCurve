@@ -23,7 +23,7 @@ cfg <- list(
                      "data.table", "latex2exp", "tidyr"),
   parallel = "none",
   stop_at_error = FALSE,
-  appx = list(t_e=1, w1=0.01, w1b=0.1, a=0.01)
+  appx = list(t_e=1, w1=0.01, w1b=0.1, a=0.001)
 )
 
 # Set cluster config
@@ -83,6 +83,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       edge = c("none", "expit", "complex"),
       surv_true = c("Cox PH", "complex"),
       sampling = c("iid", "two-phase"),
+      deriv_type = c("linear", "gcomp", "spline"),
       estimator = list(
         "G-comp" = list(
           est = "G-comp", cf_folds = 1,
@@ -123,21 +124,20 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     # distr_A = c("Unif(0,1)", "Beta(1.5+w1,1.5+w2)"),
     edge = "none",
     # edge = c("none", "expit"),
-    surv_true = "Cox PH",
-    # surv_true = c("Cox PH", "complex"),
+    surv_true = c("Cox PH", "complex"),
     sampling = "two-phase",
-    deriv_type = c("linear", "gcomp"), # c("linear", "gcomp"),
+    deriv_type = "spline",
     estimator = list(
       "Grenander (none; Cox; cf-1)" = list(
         est = "Grenander",
         params = list(S_n_type="Cox PH", g_n_type="binning",
-                      ci_type="logit", cf_folds=1, edge_corr="none")
+                      ci_type="regular", cf_folds=1, edge_corr="none")
       ),
-      "Grenander (none; Cox; cf-5)" = list(
-        est = "Grenander",
-        params = list(S_n_type="Cox PH", g_n_type="binning",
-                      ci_type="logit", cf_folds=5, edge_corr="none")
-      ),
+      # "Grenander (none; Cox; cf-5)" = list(
+      #   est = "Grenander",
+      #   params = list(S_n_type="Cox PH", g_n_type="binning",
+      #                 ci_type="regular", cf_folds=5, edge_corr="none")
+      # ),
       # "Grenander (max; Cox)" = list(
       #   est = "Grenander",
       #   params = list(S_n_type="Cox PH", g_n_type="binning",
@@ -146,13 +146,13 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       "Grenander (none; RF; cf-1)" = list(
         est = "Grenander",
         params = list(S_n_type="Random Forest", g_n_type="binning",
-                      ci_type="logit", cf_folds=1, edge_corr="none")
-      ),
-      "Grenander (none; RF; cf-5)" = list(
-        est = "Grenander",
-        params = list(S_n_type="Random Forest", g_n_type="binning",
-                      ci_type="logit", cf_folds=5, edge_corr="none")
+                      ci_type="regular", cf_folds=1, edge_corr="none")
       )
+      # "Grenander (none; RF; cf-5)" = list(
+      #   est = "Grenander",
+      #   params = list(S_n_type="Random Forest", g_n_type="binning",
+      #                 ci_type="regular", cf_folds=5, edge_corr="none")
+      # )
       # "Grenander (max; RF)" = list(
       #   est = "Grenander",
       #   params = list(S_n_type="Random Forest", g_n_type="binning",
@@ -210,7 +210,7 @@ if (cfg$run_or_update=="run") {
         num_sim = cfg$num_sim,
         parallel = cfg$parallel,
         stop_at_error = cfg$stop_at_error,
-        seed = 4,
+        seed = 5,
         packages = cfg$pkgs
       )
       sim <- do.call(set_levels, c(list(sim), level_set))
@@ -363,7 +363,7 @@ if (FALSE) {
   ) +
     # geom_point() +
     geom_line() +
-    facet_grid(rows=dplyr::vars(surv_true), cols=dplyr::vars(edge)) +
+    facet_grid(rows=dplyr::vars(surv_true), cols=dplyr::vars(deriv_type)) +
     scale_y_continuous(labels=percent, limits=c(-0.4,0.4)) +
     # scale_y_continuous(labels=percent, limits=c(-0.12,0.12)) +
     # scale_y_continuous(labels=percent) +
@@ -379,7 +379,7 @@ if (FALSE) {
     geom_hline(aes(yintercept=0.95), linetype="longdash", color="grey") +
     # geom_point() +
     geom_line() +
-    facet_grid(rows=dplyr::vars(surv_true), cols=dplyr::vars(edge)) +
+    facet_grid(rows=dplyr::vars(surv_true), cols=dplyr::vars(deriv_type)) +
     scale_y_continuous(labels=percent, limits=c(0.75,1)) +
     # scale_y_continuous(labels=percent) +
     # scale_color_manual(values=m_colors) +
@@ -393,7 +393,7 @@ if (FALSE) {
   ) +
     # geom_point() +
     geom_line() +
-    facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(edge)) +
+    facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(deriv_type)) +
     # scale_color_manual(values=m_colors) +
     ylim(0,0.003) +
     labs(title="MSE", x="A", y=NULL, color="Estimator")

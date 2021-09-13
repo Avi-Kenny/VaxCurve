@@ -181,28 +181,33 @@
   
   # Generate datasets
   alpha_3 <- 0.7
+  surv_true <- "Cox PH"
   dat_orig <- generate_data(
     n = 1000,
     alpha_3 = alpha_3,
     distr_A = "Unif(0,1)",
     edge = "none",
-    surv_true = "Cox PH",
+    surv_true = surv_true,
     sampling = "iid"
   )
   
   # True omega_0
   omega_0 <- Vectorize(function(w1,w2,a,y_star,delta_star) {
     
-    L <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
-    
-    piece_1 <- exp(-1*C$lambda*(C$t_e^C$v)*exp(L))
+    if (surv_true=="Cox PH") {
+      lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
+    } else if (surv_true=="complex") {
+      lin <- as.numeric(abs(w1-0.5)<0.2) + alpha_3*w2*a
+    }
+
+    piece_1 <- exp(-1*C$lambda*(C$t_e^C$v)*exp(lin))
     
     piece_2 <- (delta_star*as.integer(y_star<=C$t_e)) /
-      exp(-exp(L)*(C$lambda*y_star^C$v+C$lambda2*y_star^C$v2))
+      exp(-exp(lin)*(C$lambda*y_star^C$v+C$lambda2*y_star^C$v2))
     
     integral <- integrate(
       function(t) {
-        t^(C$v-1) * exp(L+exp(L)*(C$lambda*t^C$v+C$lambda2*t^C$v2))
+        t^(C$v-1) * exp(lin+exp(lin)*(C$lambda*t^C$v+C$lambda2*t^C$v2))
       },
       lower = 0,
       upper = min(C$t_e,y_star)
@@ -246,28 +251,33 @@
   # Generate datasets
   alpha_3 <- 0.7
   distr_A <- "Unif(0,1)" # "Unif(0,1)" "Beta(1.5+w1,1.5+w2)"
+  surv_true <- "Cox PH"
   dat_orig <- generate_data(
     n = 2000,
     alpha_3 = alpha_3,
     distr_A = distr_A,
     edge = "none",
-    surv_true = "complex",
+    surv_true = surv_true,
     sampling = "two-phase"
   )
   
   # True omega_0
   omega_0 <- Vectorize(function(w1,w2,a,y_star,delta_star) {
     
-    L <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
+    if (surv_true=="Cox PH") {
+      lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
+    } else if (surv_true=="complex") {
+      lin <- as.numeric(abs(w1-0.5)<0.2) + alpha_3*w2*a
+    }
     
-    piece_1 <- exp(-1*C$lambda*(C$t_e^C$v)*exp(L))
+    piece_1 <- exp(-1*C$lambda*(C$t_e^C$v)*exp(lin))
     
     piece_2 <- (delta_star*as.integer(y_star<=C$t_e)) /
-      exp(-exp(L)*(C$lambda*y_star^C$v+C$lambda2*y_star^C$v2))
+      exp(-exp(lin)*(C$lambda*y_star^C$v+C$lambda2*y_star^C$v2))
     
     integral <- integrate(
       function(t) {
-        t^(C$v-1) * exp(L+exp(L)*(C$lambda*t^C$v+C$lambda2*t^C$v2))
+        t^(C$v-1) * exp(lin+exp(lin)*(C$lambda*t^C$v+C$lambda2*t^C$v2))
       },
       lower = 0,
       upper = min(C$t_e,y_star)

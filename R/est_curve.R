@@ -177,11 +177,13 @@ est_curve <- function(dat_orig, estimator, params, points) {
       deriv_theta_n <- construct_deriv_theta_n(theta_n, type="linear")
     } else if (L$deriv_type=="gcomp") {
       deriv_theta_n <- construct_deriv_theta_n(gcomp_n, type="gcomp")
+    } else if (L$deriv_type=="spline") {
+      deriv_theta_n <- construct_deriv_theta_n(theta_n, type="spline")
     }
     tau_n <- construct_tau_n(deriv_theta_n, gamma_n, f_a_n)
     
     # Generate estimates for each point
-    # The pmax() corrects for when estimates are negative
+    # The pmax() prevents errors when estimates are negative
     ests <- pmax(sapply(points, theta_n),0)
     
     # Generate confidence limits
@@ -198,7 +200,8 @@ est_curve <- function(dat_orig, estimator, params, points) {
       # Construct CIs
       # The 0.975 quantile of the Chernoff distribution occurs at roughly 1.00
       # The Normal approximation would use qnorm(0.975, sd=0.52) instead
-      qnt <- 1.00
+      # qnt <- 1.00
+      qnt <- qnorm(0.975, sd=0.52)
       if (params$ci_type=="regular") {
         ci_lo <- ests - (qnt*tau_ns)/(n_orig^(1/3))
         ci_hi <- ests + (qnt*tau_ns)/(n_orig^(1/3))

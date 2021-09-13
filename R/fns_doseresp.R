@@ -312,74 +312,92 @@ construct_gcomp_n <- function(dat_orig, vals, S_n) {
 #' 
 #' 
 #' @param theta_n An estimator of theta_0 (usually theta_n or gcomp_n)
-#' @param type One of c("gcomp", "linear")
+#' @param type One of c("gcomp", "linear", "spline")
 construct_deriv_theta_n <- function(theta_n, type) {
   
-  if (theta_n(0)<theta_n(1)) {
+  if (type=="linear") {
     
-    if (type=="linear") {
-      
-      # Estimate entire function on grid
-      grid <- seq(0,1,0.01)
-      theta_ns <- sapply(grid, theta_n)
-      
-      grid_width <- grid[2] - grid[1]
-      points_x <- c(grid[1])
-      points_y <- c(theta_ns[1])
-      for (i in 2:length(grid)) {
-        if (theta_ns[i]-theta_ns[i-1]!=0) {
-          points_x <- c(points_x, grid[i]-(grid_width/2))
-          points_y <- c(points_y, mean(c(theta_ns[i],theta_ns[i-1])))
-        }
+    # Estimate entire function on grid
+    grid <- seq(0,1,0.01)
+    theta_ns <- theta_n(grid)
+    
+    grid_width <- grid[2] - grid[1]
+    points_x <- c(grid[1])
+    points_y <- c(theta_ns[1])
+    for (i in 2:length(grid)) {
+      if (theta_ns[i]-theta_ns[i-1]!=0) {
+        points_x <- c(points_x, grid[i]-(grid_width/2))
+        points_y <- c(points_y, mean(c(theta_ns[i],theta_ns[i-1])))
       }
-      points_x <- c(points_x, grid[length(grid)])
-      points_y <- c(points_y, theta_ns[length(grid)])
-      points_sl <- c()
-      for (i in 2:length(points_x)) {
-        slope <- (points_y[i]-points_y[i-1]) /
-          (points_x[i]-points_x[i-1])
-        points_sl <- c(points_sl, slope)
-      }
-      
-      fnc <- function(x) {
-        if (x==0) {
-          index <- 1
-        } else {
-          index <- which(x<=points_x)[1]-1
-        }
-        points_sl[index]
-      }
-      
+    }
+    points_x <- c(points_x, grid[length(grid)])
+    points_y <- c(points_y, theta_ns[length(grid)])
+    points_sl <- c()
+    for (i in 2:length(points_x)) {
+      slope <- (points_y[i]-points_y[i-1]) /
+        (points_x[i]-points_x[i-1])
+      points_sl <- c(points_sl, slope)
     }
     
-    if (type=="gcomp") {
-      
-      fnc <- function(a) {
-        
-        # Set derivative appx x-coordinates
-        width <- 0.1
-        p1 <- a - width/2
-        p2 <- a + width/2
-        if (p1<0) {
-          p2 <- p2 - p1
-          p1 <- 0
-        }
-        if (p2>1) {
-          p1 <- p1 - p2 + 1
-          p2 <- 1
-        }
-        c(p1,p2)
-        
-        return( (theta_n(p2)-theta_n(p1))/width )
-        
+    fnc <- function(x) {
+      if (x==0) {
+        index <- 1
+      } else {
+        index <- which(x<=points_x)[1]-1
       }
-      
+      return(max(points_sl[index],0))
     }
     
-  } else {
+  } else if (type=="spline") {
     
-    fnc <- function(x) { 0 }
-    warning("theta_n is flat/negative")
+    # Estimate entire function on grid
+    grid <- seq(0,1,0.01)
+    theta_ns <- theta_n(grid)
+    
+    # Identify jump points of step function
+    jump_points <- c(0)
+    for (i in 2:length(grid)) {
+      if (theta_ns[i]!=theta_ns[i-1]) {
+        jump_points <- c(jump_points, mean(c(grid[i],grid[i-1])))
+      }
+    }
+    jump_points <- c(jump_points,grid[length(grid)])
+    
+    # Identify midpoints of jump points
+    midpoints <- jump_points[1:(length(jump_points)-1)]+(diff(jump_points)/2)
+    
+    # Fit cubic smoothing spline
+    theta_n_smoothed <- smooth.spline(x=midpoints, y=theta_n(midpoints))
+    
+    # Construct derivative function
+    fnc <- function(x) {
+      width <- 0.2
+      y1 <- predict(theta_n_smoothed, x=(x-width/2))$y
+      y2 <- predict(theta_n_smoothed, x=(x+width/2))$y
+      return(max((y2-y1)/width,0))
+    }
+    
+  } else if (type=="gcomp") {
+    
+    fnc <- function(x) {
+      
+      # Set derivative appx x-coordinates
+      width <- 0.2
+      p1 <- x - width/2
+      p2 <- x + width/2
+      if (p1<0) {
+        p2 <- p2 - p1
+        p1 <- 0
+      }
+      if (p2>1) {
+        p1 <- p1 - p2 + 1
+        p2 <- 1
+      }
+      c(p1,p2)
+      
+      return(max((theta_n(p2)-theta_n(p1))/width,0))
+      
+    }
     
   }
   

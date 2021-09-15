@@ -1,4 +1,28 @@
 
+# Precision-weighted edge correction
+if (F) {
+  
+  if (params$edge_corr=="weighted") {
+    
+    sigma2_Gr <- ( 0.52 * (n_orig^(-1/3)) * tau_n(0) )^2
+    sigma2_OS <- sigma2_os_n_est / n_orig
+
+    wt <- sigma2_Gr / (sigma2_OS + sigma2_Gr)
+    theta_n_weighted <- wt*theta_os_n_est + (1-wt)*theta_n_Gr(0)
+
+    theta_n <- function(x) {
+      max(theta_n_weighted, theta_n_Gr(x))
+    }
+
+    gren_ests <- sapply(points, theta_n_Gr)
+    gren_points <- sapply(points, function(x) {
+      as.numeric(gren_ests>theta_n_weighted)
+    })
+    gren_points[1] <- 0
+    
+  }  
+}
+
 # Sample split CI estimates (est_curve.R)
 if (F) {
   

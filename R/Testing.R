@@ -764,59 +764,43 @@
     n = 2000,
     alpha_3 = 0.7,
     distr_A = "Unif(0,1)",
-    edge = "none",
-    surv_true = "Cox PH",
+    edge = "expit",
+    surv_true = "complex",
     sampling = "two-phase"
   )
   
   # Obtain estimates
-  ests_Cox <- est_curve(
-    dat_orig = dat_orig,
-    estimator = "Grenander",
-    params = list(S_n_type="Cox PH", g_n_type=params$g_n_type,
-                  deriv_type="spline", ci_type="regular", cf_folds=1,
-                  edge_corr="none"),
-    points = C$points
-  )
   ests_RF <- est_curve(
     dat_orig = dat_orig,
     estimator = "Grenander",
     params = list(S_n_type="Random Forest", g_n_type=params$g_n_type,
-                  deriv_type="spline", ci_type="regular", cf_folds=1,
-                  edge_corr="none"),
+                  deriv_type="line", ci_type="regular", cf_folds=1,
+                  edge_corr="max"),
     points = C$points
   )
   
   # Return results
   theta_true <- attr(dat_orig, "theta_true")
-  theta_ests_Cox <- c()
   theta_ests_RF <- c()
-  ci_lo_Cox <- c()
   ci_lo_RF <- c()
-  ci_hi_Cox <- c()
   ci_hi_RF <- c()
   len <- length(C$points)
-  for (i in 1:len) {
-    theta_ests_Cox <- c(theta_ests_Cox, ests_Cox[[i]]$est)
-    ci_lo_Cox <- c(ci_lo_Cox, ests_Cox[[i]]$ci_lo)
-    ci_hi_Cox <- c(ci_hi_Cox, ests_Cox[[i]]$ci_hi)
-  }
   for (i in 1:len) {
     theta_ests_RF <- c(theta_ests_RF, ests_RF[[i]]$est)
     ci_lo_RF <- c(ci_lo_RF, ests_RF[[i]]$ci_lo)
     ci_hi_RF <- c(ci_hi_RF, ests_RF[[i]]$ci_hi)
   }
   plot_data <- data.frame(
-    x = rep(C$points, 3),
-    theta = c(theta_ests_Cox, theta_ests_RF, theta_true),
-    which = rep(c("Est (Cox)","Est (RF)","Truth"), each=len),
-    ci_lo = c(ci_lo_Cox, ci_lo_RF, theta_true),
-    ci_hi = c(ci_hi_Cox, ci_hi_RF, theta_true)
+    x = rep(C$points, 2),
+    theta = c(theta_ests_RF, theta_true),
+    which = rep(c("Est (RF)","Truth"), each=len),
+    ci_lo = c(ci_lo_RF, theta_true),
+    ci_hi = c(ci_hi_RF, theta_true)
   )
   ggplot(plot_data, aes(x=x, y=theta, color=factor(which))) +
     geom_line() +
     labs(color="Which") +
-    ylim(c(0.3,0.7)) +
+    # ylim(c(0.3,0.7)) +
     geom_ribbon(
       aes(ymin=ci_lo, ymax=ci_hi),
       alpha = 0.2,

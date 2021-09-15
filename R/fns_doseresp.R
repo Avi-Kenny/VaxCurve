@@ -403,11 +403,25 @@ construct_deriv_theta_n <- function(theta_n, type) {
     
     # Construct derivative function
     fnc <- function(x) {
-      width <- 0.2
-      # width <- 0.4
-      y1 <- predict(theta_n_smoothed, x=(x-width/2))$y
-      y2 <- predict(theta_n_smoothed, x=(x+width/2))$y
+      
+      width <- 0.4
+      x1 <- x - width/2
+      x2 <- x + width/2
+      
+      if (x1<0) {
+        x2 <- x2 - x1
+        x1 <- 0
+      }
+      if (x2>1) {
+        x1 <- x1 - x2 + 1
+        x2 <- 1
+      }
+      
+      y1 <- predict(theta_n_smoothed, x=x1)$y
+      y2 <- predict(theta_n_smoothed, x=x2)$y
+      
       return(max((y2-y1)/width,0))
+      
     }
     
   } else if (type=="gcomp") {

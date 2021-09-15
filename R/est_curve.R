@@ -118,7 +118,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
     }
     
     # Compute new functions
-    gcomp_n <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n)
+    # gcomp_n <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n)
     f_aIw_delta1_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
                                         type=params$g_n_type, k=15, delta1=TRUE)
     f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid,
@@ -141,48 +141,22 @@ est_curve <- function(dat_orig, estimator, params, points) {
         }
       }
       
-    } else if (params$edge_corr=="weighted") {
-      
-      # sigma2_Gr <- ( 0.52 * (n_orig^(-1/3)) * tau_n(0) )^2
-      # sigma2_OS <- sigma2_os_n_est / n_orig
-      # 
-      # wt <- sigma2_Gr / (sigma2_OS + sigma2_Gr)
-      # theta_n_weighted <- wt*theta_os_n_est + (1-wt)*theta_n_Gr(0)
-      # 
-      # theta_n <- function(x) {
-      #   max(theta_n_weighted, theta_n_Gr(x))
-      # }
-      # 
-      # gren_ests <- sapply(points, theta_n_Gr)
-      # gren_points <- sapply(points, function(x) {
-      #   as.numeric(gren_ests>theta_n_weighted)
-      # })
-      # gren_points[1] <- 0
-      
     } else if (params$edge_corr=="max") {
       
-      theta_n <- function(x) {
+      theta_n <- Vectorize(function(x) {
         max(theta_os_n_est, theta_n_Gr(x))
-      }
+      })
       
-      gren_ests <- sapply(points, theta_n_Gr)
-      gren_points <- sapply(points, function(x) {
-        as.numeric(gren_ests>theta_os_n_est)
+      gren_ests <- theta_n_Gr(points)
+      gren_points <- sapply(c(1:length(points)), function(i) {
+        as.numeric(gren_ests[i]>theta_os_n_est)
       })
       gren_points[1] <- 0
       
     }
     
     # Construct variance scale factor
-    if (params$deriv_type=="linear") {
-      deriv_theta_n <- construct_deriv_theta_n(theta_n, type="linear")
-    } else if (params$deriv_type=="line") {
-      deriv_theta_n <- construct_deriv_theta_n(theta_n, type="line")
-    } else if (params$deriv_type=="gcomp") {
-      deriv_theta_n <- construct_deriv_theta_n(gcomp_n, type="gcomp")
-    } else if (params$deriv_type=="spline") {
-      deriv_theta_n <- construct_deriv_theta_n(theta_n, type="spline")
-    }
+    deriv_theta_n <- construct_deriv_theta_n(theta_n, type=params$deriv_type)
     tau_n <- construct_tau_n(deriv_theta_n, gamma_n, f_a_n)
     
     # Generate estimates for each point

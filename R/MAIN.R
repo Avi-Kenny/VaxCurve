@@ -97,7 +97,8 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
             cf_folds = c(1,10),
             S_n_type = c("Cox PH", "Random Forest"),
             g_n_type = c("parametric", "binning"),
-            edge_corr = c("none", "point", "spread")
+            edge_corr = c("none", "point", "spread", "max"),
+            deriv_type = c("line", "spline", "linear", "gcomp")
           )
         )
       ),
@@ -121,22 +122,24 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   level_set_estimation_1 <- list(
     n = 5000,
     alpha_3 = 0.8,
-    distr_A = c("Unif(0,1)", "Beta(1.5+w1,1.5+w2)"),
+    distr_A = "Beta(1.5+w1,1.5+w2)",
+    # distr_A = c("Unif(0,1)", "Beta(1.5+w1,1.5+w2)"),
     edge = "none",
     # edge = c("none", "expit"),
-    surv_true = c("Cox PH", "complex"),
+    surv_true = "complex",
+    # surv_true = c("Cox PH", "complex"),
     sampling = "two-phase",
     estimator = list(
-      "Grenander (S_n:true)" = list(
-        est = "Grenander",
-        params = list(S_n_type="true", g_n_type="binning",
-                      ci_type="regular", cf_folds=1, edge_corr="none",
-                      deriv_type="line")
-      ),
-      "Grenander (S_n:RF)" = list(
+      "Grenander (spline)" = list(
         est = "Grenander",
         params = list(S_n_type="Random Forest", g_n_type="binning",
-                      ci_type="regular", cf_folds=1, edge_corr="none",
+                      ci_type="regular", cf_folds=1, edge_corr="max",
+                      deriv_type="spline")
+      ),
+      "Grenander (line)" = list(
+        est = "Grenander",
+        params = list(S_n_type="Random Forest", g_n_type="binning",
+                      ci_type="regular", cf_folds=1, edge_corr="max",
                       deriv_type="line")
       )
     )

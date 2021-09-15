@@ -50,6 +50,7 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sampling) {
       lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
     } else if (surv_true=="complex") {
       lin <- as.numeric(abs(w1-0.5)<0.2) + alpha_3*w2*a
+      # lin <- pmax(0,2-8*abs(w1-0.5)) + alpha_3*w2*a
     }
     t <- H_0_inv(-1*log(U)*exp(-1*lin))
     
@@ -63,6 +64,7 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sampling) {
       lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
     } else if (surv_true=="complex") {
       lin <- as.numeric(abs(w1-0.5)<0.2) + alpha_3*w2*a
+      # lin <- pmax(0,2-8*abs(w1-0.5)) + alpha_3*w2*a
     }
     c <- H_0_inv2(-1*log(U)*exp(-1*lin))
     # c <- pmin(c,t_study_end)
@@ -104,6 +106,7 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sampling) {
           C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
         } else if (surv_true=="complex") {
           as.numeric(abs(w1-0.5)<0.2) + alpha_3*w2*a
+          # pmax(0,2-8*abs(w1-0.5)) + alpha_3*w2*a
         }
       }
       

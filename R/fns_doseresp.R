@@ -187,7 +187,7 @@ wts <- function(dat_orig, scale="stabilized") {
 #' 
 #' @param dat_orig Dataset returned by generate_data()
 #' @param vals Dataframe of values to run function on
-#' @param type One of c("Cox PH", "KM", "Random Forest")
+#' @param type One of c("true", "Cox PH", "KM", "Random Forest")
 #' @param csf Logical; if TRUE, estimate the conditional survival
 #'     function of the censoring distribution instead
 #' @return Conditional density estimator function
@@ -195,18 +195,41 @@ construct_S_n <- function(dat_orig, vals, type, csf=FALSE) {
   
   # Construct weights
   n_orig <- nrow(dat_orig)
-  dat_orig$weights <- wts(dat_orig, scale="mean 1")
+  dat_orig$weights_m1 <- wts(dat_orig, scale="mean 1")
+  dat_orig$weights <- wts(dat_orig)
   dat <- dat_orig %>% filter(!is.na(a))
   
   if (csf) { dat$delta_star <- 1 - dat$delta_star }
   
-  if (type=="Cox PH") {
+  if (type=="true") {
+    
+    surv_true <- L$surv_true
+    alpha_3 <- L$alpha_3
+    if (csf) {
+      lambda <- C$lambda2
+      v <- C$v2
+    } else {
+      lambda <- C$lambda
+      v <- C$v
+    }
+    
+    fnc <- function(t, w1, w2, a) {
+      if (L$surv_true=="Cox PH") {
+        lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
+        return(exp(-1*lambda*(t^v)*exp(lin)))
+      } else if (L$surv_true=="complex") {
+        lin <- as.numeric(abs(w1-0.5)<0.2) + alpha_3*w2*a
+        return(exp(-1*lambda*(t^v)*exp(lin)))
+      }
+    }
+    
+  } else if (type=="Cox PH") {
     
     # Fit Cox model
     model <- coxph(
       Surv(y_star,delta_star)~w1+w2+a,
       data = dat,
-      weights = weights
+      weights = weights_m1
     )
     coeffs <- model$coefficients
     
@@ -220,7 +243,7 @@ construct_S_n <- function(dat_orig, vals, type, csf=FALSE) {
       H_0[t+1] <- bh$hazard[index]
     }
     
-    fnc <- function(t, w1, w2, a){
+    fnc <- function(t, w1, w2, a) {
       return(exp(-1*H_0[t+1]*exp(coeffs[[1]]*w1+coeffs[[2]]*w2+coeffs[[3]]*a)))
     }
     
@@ -232,7 +255,7 @@ construct_S_n <- function(dat_orig, vals, type, csf=FALSE) {
       ntree = 500,
       mtry = 2,
       nodesize = 100,
-      splitrule = "logrank", # logrank bs.gradient logrankscore
+      splitrule = "logrank",
       nsplit = 0,
       case.wt = dat$weights
       # samptype = "swr"
@@ -348,6 +371,15 @@ construct_deriv_theta_n <- function(theta_n, type) {
       return(max(points_sl[index],0))
     }
     
+  } else if (type=="line") {
+    
+    theta_n_left <- theta_n(0.1)
+    theta_n_right <- theta_n(0.9)
+    
+    fnc <- function(x) {
+      (theta_n_right-theta_n_left)/0.8
+    }
+    
   } else if (type=="spline") {
     
     # Estimate entire function on grid
@@ -372,6 +404,7 @@ construct_deriv_theta_n <- function(theta_n, type) {
     # Construct derivative function
     fnc <- function(x) {
       width <- 0.2
+      # width <- 0.4
       y1 <- predict(theta_n_smoothed, x=(x-width/2))$y
       y2 <- predict(theta_n_smoothed, x=(x+width/2))$y
       return(max((y2-y1)/width,0))
@@ -690,37 +723,46 @@ construct_omega_n <- function(vals, S_n, Sc_n) {
   fnc <- function(w1,w2,a,y_star,delta_star) {
     
     k <- round(min(y_star,C$t_e))
-    if (k==0) k <- 1
-    i <- c(1:k)
-    # i <- c(1:m)
-    # k <- min(y_star,C$t_e)
-    
-    integral <- sum(
-      (
-        S_n(i,w1,w2,a) - S_n(i-1,w1,w2,a)
-        # S_n((i*k)/m,w1,w2,a) - S_n(((i-1)*k)/m,w1,w2,a)
-      ) *
-      (
-        (S_n(i,w1,w2,a))^2 * Sc_n(i,w1,w2,a)
-        # (S_n((i*k)/m,w1,w2,a))^2 * Sc_n((i*k)/m,w1,w2,a)
-      )^-1
-    )
-    
-    # # Trapezoidal correction to integral
-    # if (L$trap_correction & k>1) {
-    #   left_val <- 1
-    #   right_val <- S_n(k,w1,w2,a) * (
-    #     (S_n(k,w1,w2,a))^2 * Sc_n(k,w1,w2,a)
-    #   )^-1
-    #   integral <- integral + (1/2)*left_val - (1/2)*right_val
-    # }
+    if (k==0) {
+      integral <- 0
+    } else {
+      i <- c(1:k)
+      # i <- c(1:m)
+      # k <- min(y_star,C$t_e)
+      
+      integral <- 0.5 * sum(
+        ( S_n(i,w1,w2,a) - S_n(i-1,w1,w2,a) ) * (
+          (S_n(i,w1,w2,a))^-2 * (Sc_n(i,w1,w2,a))^-1 +
+            (S_n(i-1,w1,w2,a))^-2 * (Sc_n(i-1,w1,w2,a))^-1
+        )
+      )
+      
+      # integral_righthand <- sum(
+      #   (
+      #     S_n(i,w1,w2,a) - S_n(i-1,w1,w2,a)
+      #     # S_n((i*k)/m,w1,w2,a) - S_n(((i-1)*k)/m,w1,w2,a)
+      #   ) *
+      #     (
+      #       (S_n(i,w1,w2,a))^2 * Sc_n(i,w1,w2,a)
+      #       # (S_n((i*k)/m,w1,w2,a))^2 * Sc_n((i*k)/m,w1,w2,a)
+      #     )^-1
+      # )
+      
+      # integral_diffgrid <- 0.5 * sum(
+      #   ( S_n((i*k)/m,w1,w2,a) - S_n(((i-1)*k)/m,w1,w2,a) ) * (
+      #     (S_n((i*k)/m,w1,w2,a))^-2 * (Sc_n((i*k)/m,w1,w2,a))^-1 +
+      #       (S_n(((i-1)*k)/m,w1,w2,a))^-2 * (Sc_n(((i-1)*k)/m,w1,w2,a))^-1
+      #   )
+      # )
+      
+    }
     
     return(S_n(C$t_e,w1,w2,a) * (
       (delta_star * as.integer(y_star<=C$t_e)) /
         (S_n(k,w1,w2,a) * Sc_n(k,w1,w2,a)) +
         integral
     ))
-
+    
   }
   
   return (create_htab(fnc, vals))

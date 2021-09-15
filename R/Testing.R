@@ -11,10 +11,12 @@
   # 1. Run CONFIG and SETUP within MAIN.R
   
   # 2. Set global constants
-  params <- list(g_n_type="binning", S_n_type="Cox PH")
+  params <- list(g_n_type="binning", S_n_type="Cox PH",
+                 deriv_type="spline")
   C <- list(lambda=10^-4, v=1.5, lambda2=0.5*10^-4, v2=1.5,
-            points=seq(0,1,0.1), alpha_1=0.3, alpha_2=0.7, t_e=200,
+            points=seq(0,1,0.02), alpha_1=0.3, alpha_2=0.7, t_e=200,
             appx=list(t_e=10,w1=0.01,w1b=0.1,a=0.01))
+            # appx=list(t_e=1,w1=0.01,w1b=0.1,a=0.01))
   
 }
 
@@ -179,27 +181,34 @@
 
 {
   
-  # Generate datasets
-  alpha_3 <- 0.7
-  surv_true <- "Cox PH"
+  # Note: this check only works for surv_true=="Cox PH"
+  
+  # Generate data
+  L <- list(
+    alpha_3 = 0.7,
+    surv_true = "Cox PH"
+  )
   dat_orig <- generate_data(
-    n = 1000,
-    alpha_3 = alpha_3,
+    n = 3000,
+    alpha_3 = L$alpha_3,
     distr_A = "Unif(0,1)",
     edge = "none",
-    surv_true = surv_true,
-    sampling = "iid"
+    surv_true = L$surv_true,
+    sampling = "two-phase" # two-phase iid
   )
+  vlist <- create_val_list(dat_orig, C$appx)
   
   # True omega_0
+  S_0 <- construct_S_n(dat_orig, vlist$S_n, type="true")
+  Sc_0 <- construct_S_n(dat_orig, vlist$S_n, type="true", csf=TRUE)
   omega_0 <- Vectorize(function(w1,w2,a,y_star,delta_star) {
     
-    if (surv_true=="Cox PH") {
-      lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
-    } else if (surv_true=="complex") {
-      lin <- as.numeric(abs(w1-0.5)<0.2) + alpha_3*w2*a
+    if (L$surv_true=="Cox PH") {
+      lin <- C$alpha_1*w1 + C$alpha_2*w2 + L$alpha_3*a
+    } else if (L$surv_true=="complex") {
+      lin <- as.numeric(abs(w1-0.5)<0.2) + L$alpha_3*w2*a
     }
-
+    
     piece_1 <- exp(-1*C$lambda*(C$t_e^C$v)*exp(lin))
     
     piece_2 <- (delta_star*as.integer(y_star<=C$t_e)) /
@@ -220,9 +229,8 @@
   })
   
   # Construct omega_n
-  vlist <- create_val_list(dat_orig, C$appx)
-  S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
-  Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type, csf=TRUE)
+  S_n <- construct_S_n(dat_orig, vlist$S_n, type="Random Forest")
+  Sc_n <- construct_S_n(dat_orig, vlist$S_n, type="Random Forest", csf=TRUE)
   omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
   
   omegas_est <- c()
@@ -231,11 +239,22 @@
     omegas_est <- c(omegas_est, do.call(omega_0, as.list(vlist$omega[i,])))
     omegas_true <- c(omegas_true, do.call(omega_n, as.list(vlist$omega[i,])))
   }
-
+  
+  for (i in 1:500) {
+    est <- do.call(omega_0, as.list(vlist$omega[i,]))
+    true <- do.call(omega_n, as.list(vlist$omega[i,]))
+    if (abs(est-true)>0.4) {
+      print(paste("i:",i))
+      print(vlist$omega[i,])
+      print(paste("Est:",est))
+      print(paste("True:",true))
+    }
+  }
+  
   # Scatterplot of estimated vs true
   ggplot(data.frame(x=omegas_true, y=omegas_est), aes(x=x, y=y)) +
     geom_abline(slope=1, intercept=0, color="green") +
-    geom_point(alpha=0.2) +
+    geom_point(alpha=0.1) +
     labs(title="omega_n vs omega_0", x="omega_0", y="omega_n")
   
 }
@@ -299,8 +318,8 @@
       alpha_3 = alpha_3,
       distr_A = distr_A,
       edge = "none",
-      surv_true = "Cox PH",
-      sampling = "iid"
+      surv_true = surv_true,
+      sampling = "two-phase"
     )
     
     f_aIw_0 <- function(a,w1,w2) {
@@ -328,8 +347,6 @@
   vlist <- create_val_list(dat_orig, C$appx)
   S_n <- construct_S_n(dat_orig, vlist$S_n, type="Random Forest")
   Sc_n <- construct_S_n(dat_orig, vlist$S_n, type="Random Forest", csf=TRUE)
-  # S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
-  # Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type, csf=TRUE)
   omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
   f_aIw_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
                                type=params$g_n_type, k=15)
@@ -628,30 +645,23 @@
 {
   
   # Generate data
-  alpha_3 <- 0.7
-  surv_true <- "Cox PH" # "Cox PH" "complex"
+  L <- list(
+    alpha_3 = 0.7,
+    surv_true = "complex" # "Cox PH" "complex"
+  )
   dat_orig <- generate_data(
-    n = 5000,
-    alpha_3 = alpha_3,
+    n = 3000,
+    alpha_3 = L$alpha_3,
     distr_A = "Unif(0,1)",
     edge = "none",
-    surv_true = surv_true,
+    surv_true = L$surv_true,
     sampling = "two-phase" # two-phase iid
   )
   vlist <- create_val_list(dat_orig, C$appx)
   
   S_n_CoxPH <- construct_S_n(dat_orig, vlist$S_n, type="Cox PH")
   S_n_RF <- construct_S_n(dat_orig, vlist$S_n, type="Random Forest")
-  
-  S_0 <- Vectorize(function(t, w1, w2, a) {
-    if (surv_true=="Cox PH") {
-      lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
-      return(exp(-1*C$lambda*(t^C$v)*exp(lin)))
-    } else if (surv_true=="complex") {
-      lin <- as.numeric(abs(w1-0.5)<0.2) + alpha_3*w2*a
-      return(exp(-1*C$lambda*(t^C$v)*exp(lin)))
-    }
-  })
+  S_0 <- construct_S_n(dat_orig, vlist$S_n, type="true")
   
   # Plot true curve against estimated curve
   times <- c(1:200)
@@ -659,21 +669,21 @@
     time = rep(times, 12),
     survival = c(
       S_n_CoxPH(t=times, w1=0.2, w2=1, a=0.2),
-      S_n_CoxPH(t=times, w1=0.8, w2=1, a=0.2),
+      S_n_CoxPH(t=times, w1=0.1, w2=1, a=0.2),
       S_n_CoxPH(t=times, w1=0.2, w2=1, a=0.8),
-      S_n_CoxPH(t=times, w1=0.8, w2=1, a=0.8),
+      S_n_CoxPH(t=times, w1=0.1, w2=1, a=0.8),
       S_n_RF(t=times, w1=0.2, w2=1, a=0.2),
-      S_n_RF(t=times, w1=0.8, w2=1, a=0.2),
+      S_n_RF(t=times, w1=0.1, w2=1, a=0.2),
       S_n_RF(t=times, w1=0.2, w2=1, a=0.8),
-      S_n_RF(t=times, w1=0.8, w2=1, a=0.8),
+      S_n_RF(t=times, w1=0.1, w2=1, a=0.8),
       S_0(t=times, w1=0.2, w2=1, a=0.2),
-      S_0(t=times, w1=0.8, w2=1, a=0.2),
+      S_0(t=times, w1=0.1, w2=1, a=0.2),
       S_0(t=times, w1=0.2, w2=1, a=0.8),
-      S_0(t=times, w1=0.8, w2=1, a=0.8)
+      S_0(t=times, w1=0.1, w2=1, a=0.8)
     ),
     which = rep(c("Cox PH","RF","True S_0"), each=4*length(times)),
-    covs = rep(rep(c("w1=0.2,w2=1,a=0.2","w1=0.8,w2=1,a=0.2",
-                     "w1=0.2,w2=1,a=0.8","w1=0.8,w2=1,a=0.8"),3), each=length(times))
+    covs = rep(rep(c("w1=0.2,w2=1,a=0.2","w1=0.5,w2=1,a=0.2",
+                     "w1=0.2,w2=1,a=0.8","w1=0.5,w2=1,a=0.8"),3), each=length(times))
   )
   ggplot(df, aes(x=time, y=survival, color=which)) +
     geom_line() +
@@ -692,45 +702,50 @@
 {
   
   # Generate data
-  alpha_3 <- 0.7
-  dat <- generate_data(
-    n = 5000,
-    alpha_3 = alpha_3,
+  L <- list(
+    alpha_3 = 0.7,
+    surv_true = "complex" # "Cox PH" "complex"
+  )
+  dat_orig <- generate_data(
+    n = 3000,
+    alpha_3 = L$alpha_3,
     distr_A = "Unif(0,1)",
     edge = "none",
-    surv_true = "Cox PH",
-    sampling = "two-phase"
+    surv_true = L$surv_true,
+    sampling = "two-phase" # two-phase iid
   )
+  vlist <- create_val_list(dat_orig, C$appx)
   
-  Sc_n <- construct_S_n(dat, type="Cox PH", csf=TRUE)
-  
-  Sc_0 <- Vectorize(function(t, w1, w2, a) {
-    lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
-    return(exp(-1*C$lambda2*(t^C$v2)*exp(lin)))
-  })
+  Sc_n_CoxPH <- construct_S_n(dat_orig, vlist$S_n, type="Cox PH", csf=TRUE)
+  Sc_n_RF <- construct_S_n(dat_orig, vlist$S_n, type="Random Forest", csf=TRUE)
+  Sc_0 <- construct_S_n(dat_orig, vlist$S_n, type="true", csf=TRUE)
   
   # Plot true curve against estimated curve
   times <- c(1:200)
   df <- data.frame(
-    time = rep(times, 8),
+    time = rep(times, 12),
     survival = c(
-      Sc_n(t=times, w1=0, w2=1, a=0),
-      Sc_n(t=times, w1=1, w2=1, a=0),
-      Sc_n(t=times, w1=0, w2=1, a=1),
-      Sc_n(t=times, w1=1, w2=1, a=1),
-      Sc_0(t=times, w1=0, w2=1, a=0),
-      Sc_0(t=times, w1=1, w2=1, a=0),
-      Sc_0(t=times, w1=0, w2=1, a=1),
-      Sc_0(t=times, w1=1, w2=1, a=1)
+      Sc_n_CoxPH(t=times, w1=0.2, w2=1, a=0.2),
+      Sc_n_CoxPH(t=times, w1=0.1, w2=1, a=0.2),
+      Sc_n_CoxPH(t=times, w1=0.2, w2=1, a=0.8),
+      Sc_n_CoxPH(t=times, w1=0.1, w2=1, a=0.8),
+      Sc_n_RF(t=times, w1=0.2, w2=1, a=0.2),
+      Sc_n_RF(t=times, w1=0.1, w2=1, a=0.2),
+      Sc_n_RF(t=times, w1=0.2, w2=1, a=0.8),
+      Sc_n_RF(t=times, w1=0.1, w2=1, a=0.8),
+      Sc_0(t=times, w1=0.2, w2=1, a=0.2),
+      Sc_0(t=times, w1=0.1, w2=1, a=0.2),
+      Sc_0(t=times, w1=0.2, w2=1, a=0.8),
+      Sc_0(t=times, w1=0.1, w2=1, a=0.8)
     ),
-    which = rep(c("Cox PH","True S^C_0"), each=4*length(times)),
-    covs = rep(rep(c("w1=0,a=0","w1=1,a=0","w1=0,a=1","w1=1,a=1"),2),
-               each=length(times))
+    which = rep(c("Cox PH","RF","True Sc_0"), each=4*length(times)),
+    covs = rep(rep(c("w1=0.2,w2=1,a=0.2","w1=0.5,w2=1,a=0.2",
+                     "w1=0.2,w2=1,a=0.8","w1=0.5,w2=1,a=0.8"),3), each=length(times))
   )
   ggplot(df, aes(x=time, y=survival, color=which)) +
     geom_line() +
     facet_wrap(~covs, ncol=2) +
-    labs(title="Estimation of conditional survival: S_0[t|W,A]",
+    labs(title="Estimation of conditional (censoring) survival: Sc_0[t|W,A]",
          color="Estimator")
   
 }
@@ -744,56 +759,68 @@
 {
   
   # Generate data
-  set.seed(4)
+  set.seed(8)
   dat_orig <- generate_data(
     n = 2000,
     alpha_3 = 0.7,
     distr_A = "Unif(0,1)",
-    edge = "expit",
+    edge = "none",
     surv_true = "Cox PH",
     sampling = "two-phase"
   )
   
   # Obtain estimates
-  ests <- est_curve(
+  ests_Cox <- est_curve(
     dat_orig = dat_orig,
     estimator = "Grenander",
-    params = list(
-      S_n_type = params$S_n_type,
-      g_n_type = params$g_n_type,
-      ci_type = "logit", # none
-      cf_folds = 1,
-      edge_corr = "none"
-    ),
+    params = list(S_n_type="Cox PH", g_n_type=params$g_n_type,
+                  deriv_type="spline", ci_type="regular", cf_folds=1,
+                  edge_corr="none"),
+    points = C$points
+  )
+  ests_RF <- est_curve(
+    dat_orig = dat_orig,
+    estimator = "Grenander",
+    params = list(S_n_type="Random Forest", g_n_type=params$g_n_type,
+                  deriv_type="spline", ci_type="regular", cf_folds=1,
+                  edge_corr="none"),
     points = C$points
   )
   
   # Return results
   theta_true <- attr(dat_orig, "theta_true")
-  theta_ests <- c()
-  ci_lo <- c()
-  ci_hi <- c()
+  theta_ests_Cox <- c()
+  theta_ests_RF <- c()
+  ci_lo_Cox <- c()
+  ci_lo_RF <- c()
+  ci_hi_Cox <- c()
+  ci_hi_RF <- c()
   len <- length(C$points)
   for (i in 1:len) {
-    theta_ests <- c(theta_ests, ests[[i]]$est)
-    ci_lo <- c(ci_lo, ests[[i]]$ci_lo)
-    ci_hi <- c(ci_hi, ests[[i]]$ci_hi)
+    theta_ests_Cox <- c(theta_ests_Cox, ests_Cox[[i]]$est)
+    ci_lo_Cox <- c(ci_lo_Cox, ests_Cox[[i]]$ci_lo)
+    ci_hi_Cox <- c(ci_hi_Cox, ests_Cox[[i]]$ci_hi)
   }
-  
+  for (i in 1:len) {
+    theta_ests_RF <- c(theta_ests_RF, ests_RF[[i]]$est)
+    ci_lo_RF <- c(ci_lo_RF, ests_RF[[i]]$ci_lo)
+    ci_hi_RF <- c(ci_hi_RF, ests_RF[[i]]$ci_hi)
+  }
   plot_data <- data.frame(
-    x = rep(C$points, 2),
-    theta = c(theta_ests, theta_true),
-    which = rep(c("Estimate","Truth"), each=len),
-    ci_lo = c(ci_lo, theta_true),
-    ci_hi = c(ci_hi, theta_true)
+    x = rep(C$points, 3),
+    theta = c(theta_ests_Cox, theta_ests_RF, theta_true),
+    which = rep(c("Est (Cox)","Est (RF)","Truth"), each=len),
+    ci_lo = c(ci_lo_Cox, ci_lo_RF, theta_true),
+    ci_hi = c(ci_hi_Cox, ci_hi_RF, theta_true)
   )
   ggplot(plot_data, aes(x=x, y=theta, color=factor(which))) +
     geom_line() +
-    ylim(c(0,1)) +
-    labs(color="Which", fill="Which") +
+    labs(color="Which") +
+    ylim(c(0.3,0.7)) +
     geom_ribbon(
-      aes(ymin=ci_lo, ymax=ci_hi, fill=factor(which)),
+      aes(ymin=ci_lo, ymax=ci_hi),
       alpha = 0.2,
+      fill = NA,
       linetype = "dotted"
     )
   

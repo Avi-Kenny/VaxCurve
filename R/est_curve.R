@@ -7,7 +7,8 @@
 #'     construct_S_n(type=...)
 #'   - `g_n_type` Type of conditional density ratio estimator; corresponds to
 #'     construct_f_aIw_n(type...)
-#'     c("parametric", "binning")
+#'   - `deriv_type` Type of derivative estimator; corresponds to
+#'     construct_deriv_theta_n(type=...)
 #'   - `boot_reps` Used for G-comp; number of bootstrap replicates
 #'   - `ci_type` One of c("regular", "logit", "sample split", "none"). "regular"
 #'     is the standard approach. "logit" transforms the CIs so that the bounds
@@ -89,7 +90,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
     Psi_n <- Vectorize(function(x) {
       return(Gamma_n(Phi_n_inv(x)))
     })
-    gcm <- gcmlcm(x=seq(0,1,0.01), y=Psi_n(seq(0,1,0.01)), type="gcm")
+    gcm <- gcmlcm(x=seq(0,1,0.0001), y=Psi_n(seq(0,1,0.0001)), type="gcm")
     dGCM <- Vectorize(function(x) {
       if (x==0) {
         index <- 1
@@ -173,18 +174,20 @@ est_curve <- function(dat_orig, estimator, params, points) {
     }
     
     # Construct variance scale factor
-    if (L$deriv_type=="linear") {
+    if (params$deriv_type=="linear") {
       deriv_theta_n <- construct_deriv_theta_n(theta_n, type="linear")
-    } else if (L$deriv_type=="gcomp") {
+    } else if (params$deriv_type=="line") {
+      deriv_theta_n <- construct_deriv_theta_n(theta_n, type="line")
+    } else if (params$deriv_type=="gcomp") {
       deriv_theta_n <- construct_deriv_theta_n(gcomp_n, type="gcomp")
-    } else if (L$deriv_type=="spline") {
+    } else if (params$deriv_type=="spline") {
       deriv_theta_n <- construct_deriv_theta_n(theta_n, type="spline")
     }
     tau_n <- construct_tau_n(deriv_theta_n, gamma_n, f_a_n)
     
     # Generate estimates for each point
     # The pmax() prevents errors when estimates are negative
-    ests <- pmax(sapply(points, theta_n),0)
+    ests <- pmax(theta_n(points),0)
     
     # Generate confidence limits
     if (params$ci_type=="none") {
@@ -195,7 +198,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
     } else {
       
       # Generate variance scale factor for each point
-      tau_ns <- sapply(points, tau_n)
+      tau_ns <- tau_n(points)
       
       # Construct CIs
       # The 0.975 quantile of the Chernoff distribution occurs at roughly 1.00

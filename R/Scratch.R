@@ -1,4 +1,15 @@
 
+#
+if (F) {
+  
+  ff <- function(w1) { as.numeric(abs(w1-0.5)<0.2) }
+  ggplot(data.frame(x=seq(0,1,0.01)), aes(x=x)) + stat_function(fun=ff)
+  
+  ff2 <- function(w1) { pmax(0,2-8*abs(w1-0.5)) }
+  ggplot(data.frame(x=seq(0,1,0.01)), aes(x=x)) + stat_function(fun=ff2)
+  
+}
+
 # Variance of one-step edge estimator
 if (F) {
   

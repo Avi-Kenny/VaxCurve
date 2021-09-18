@@ -206,7 +206,7 @@ construct_S_n <- function(dat_orig, vals, type, csf=FALSE) {
     surv_true <- L$surv_true
     alpha_3 <- L$alpha_3
     if (csf) {
-      lambda <- C$lambda2
+      lambda <- L$lambda2
       v <- C$v2
     } else {
       lambda <- C$lambda
@@ -387,13 +387,14 @@ construct_deriv_theta_n <- function(theta_n, type) {
     theta_ns <- theta_n(grid)
     
     # Identify jump points of step function
-    jump_points <- c(0)
+    # jump_points <- c(0)
+    jump_points <- c()
     for (i in 2:length(grid)) {
       if (theta_ns[i]!=theta_ns[i-1]) {
         jump_points <- c(jump_points, mean(c(grid[i],grid[i-1])))
       }
     }
-    jump_points <- c(jump_points,grid[length(grid)])
+    # jump_points <- c(jump_points,grid[length(grid)])
     
     # Identify midpoints of jump points
     midpoints <- jump_points[1:(length(jump_points)-1)]+(diff(jump_points)/2)
@@ -404,7 +405,7 @@ construct_deriv_theta_n <- function(theta_n, type) {
     # Construct derivative function
     fnc <- function(x) {
       
-      width <- 0.4
+      width <- 0.6
       x1 <- x - width/2
       x2 <- x + width/2
       
@@ -557,7 +558,29 @@ construct_f_aIw_n <- function(dat_orig, vals, type, k=0, delta1=FALSE) {
     dat$weights <- rep(1, nrow(dat))
   }
   
-  if (type=="parametric") {
+  if (type=="true") {
+    
+    # Note: this is not accurate if edge!="none"
+    
+    if (L$distr_A=="Unif(0,1)") {
+      par_1 <- 1
+      par_2 <- 0
+      par_3 <- 1
+      par_4 <- 0
+    } else if (L$distr_A=="Beta(1.5+w1,1.5+w2)") {
+      par_1 <- 1.5
+      par_2 <- 1
+      par_3 <- 1.5
+      par_4 <- 1
+    }
+    
+    fnc <- function(a, w1, w2){
+      shape1 <- par_1 + par_2*w1
+      shape2 <- par_3 + par_4*w2
+      return(dbeta(a, shape1=shape1, shape2=shape2))
+    }
+    
+  } else if (type=="parametric") {
     
     # Set up weighted likelihood
     wlik <- function(par) {
@@ -586,9 +609,7 @@ construct_f_aIw_n <- function(dat_orig, vals, type, k=0, delta1=FALSE) {
       return(dbeta(a, shape1=shape1, shape2=shape2))
     }
     
-  }
-  
-  if (type=="binning") {
+  } else if (type=="binning") {
     
     # Set up binning density (based on Diaz and Van Der Laan 2011)
     # par[1] through par[k-1] are the hazard components for the bins 1 to k-1
@@ -713,9 +734,14 @@ construct_f_a_n <- function(dat_orig, vals, f_aIw_n) {
 construct_g_n <- function(vals, f_aIw_n, f_a_n) {
   
   fnc <- function(a,w1,w2) {
-    if (a<0.01) a <- 0.01 # !!!!! Temporary hack
-    if (a>0.99) a <- 0.99 # !!!!! Temporary hack
+    
+    # Avoid divide by zero errors
+    if (a<0.01) a <- 0.01
+    if (a>0.99) a <- 0.99
+    
+    # Return density ratio
     f_aIw_n(a,w1,w2) / f_a_n(a)
+    
   }
   
   round_args <- c(-log10(C$appx$a), -log10(C$appx$w1), 0)
@@ -734,6 +760,11 @@ construct_g_n <- function(vals, f_aIw_n, f_a_n) {
 #' @return Estimator function of nuisance omega_0
 construct_omega_n <- function(vals, S_n, Sc_n) {
   
+  # First, construct cumulative hazard estimator
+  H_n <- function(t, w1, w2, a) {
+    -1 * log(S_n(t, w1, w2, a))
+  }
+  
   fnc <- function(w1,w2,a,y_star,delta_star) {
     
     k <- round(min(y_star,C$t_e))
@@ -745,9 +776,9 @@ construct_omega_n <- function(vals, S_n, Sc_n) {
       # k <- min(y_star,C$t_e)
       
       integral <- 0.5 * sum(
-        ( S_n(i,w1,w2,a) - S_n(i-1,w1,w2,a) ) * (
-          (S_n(i,w1,w2,a))^-2 * (Sc_n(i,w1,w2,a))^-1 +
-            (S_n(i-1,w1,w2,a))^-2 * (Sc_n(i-1,w1,w2,a))^-1
+        ( H_n(i,w1,w2,a) - H_n(i-1,w1,w2,a) ) * (
+          ( S_n(i,w1,w2,a) * Sc_n(i,w1,w2,a) )^-1 +
+            ( S_n(i-1,w1,w2,a) * Sc_n(i-1,w1,w2,a))^-1
         )
       )
       
@@ -874,11 +905,19 @@ construct_Gamma_n <- function(dat_orig, vals, omega_n, S_n, g_n) {
     
     subpiece_1b <- as.integer(dat$a<=x)
     piece_1 <- (1/n_orig) * sum(subpiece_1a*subpiece_1b)
-    
+
     subpiece_2b <- as.integer(a_i_long<=x)
     piece_2 <- (1/(n_orig^2)) * sum(subpiece_2a*subpiece_2b)
-    
+
     return(piece_1-piece_2)
+    
+    # return(
+    #   (1/n_orig^2) * sum(
+    #     (weights_i_long*weights_j_long) *
+    #       as.integer(a_i_long<=x) *
+    #       (1 - S_n(C$t_e,w1_j_long,w2_j_long,a_i_long))
+    #   )
+    # )
     
   }
   

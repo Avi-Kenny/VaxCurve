@@ -120,27 +120,29 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   # Estimation: compare all methods
   # Not currently using (ci_type="sample split", m=5) or (ci_type="regular")
   level_set_estimation_1 <- list(
-    n = 5000,
+    n = 2000,
     alpha_3 = 0.8,
+    # lambda2 = c(0.0001, 0.0003, 0.0005), # This set for "complex"
+    lambda2 = c(0.0001, 0.001), # This set for "Cox PH"
     distr_A = "Beta(1.5+w1,1.5+w2)",
     # distr_A = c("Unif(0,1)", "Beta(1.5+w1,1.5+w2)"),
     edge = "none",
     # edge = c("none", "expit"),
-    surv_true = "complex",
+    surv_true = "Cox PH",
     # surv_true = c("Cox PH", "complex"),
     sampling = "two-phase",
     estimator = list(
-      "Grenander (spline)" = list(
+      # "Grenander (RF; g_n)" = list(
+      #   est = "Grenander",
+      #   params = list(S_n_type="Random Forest", g_n_type="binning",
+      #                 ci_type="regular", cf_folds=1, edge_corr="none",
+      #                 deriv_type="spline")
+      # ),
+      "Grenander (true; g_0)" = list(
         est = "Grenander",
-        params = list(S_n_type="Random Forest", g_n_type="binning",
-                      ci_type="regular", cf_folds=1, edge_corr="max",
+        params = list(S_n_type="true", g_n_type="true",
+                      ci_type="regular", cf_folds=1, edge_corr="none",
                       deriv_type="spline")
-      ),
-      "Grenander (line)" = list(
-        est = "Grenander",
-        params = list(S_n_type="Random Forest", g_n_type="binning",
-                      ci_type="regular", cf_folds=1, edge_corr="max",
-                      deriv_type="line")
       )
     )
   )
@@ -194,7 +196,6 @@ if (cfg$run_or_update=="run") {
         num_sim = cfg$num_sim,
         parallel = cfg$parallel,
         stop_at_error = cfg$stop_at_error,
-        seed = 5,
         packages = cfg$pkgs
       )
       sim <- do.call(set_levels, c(list(sim), level_set))
@@ -226,7 +227,8 @@ if (cfg$run_or_update=="run") {
       sim %<>% add_constants(
         lambda = 10^-4,
         v = 1.5,
-        lambda2 = 0.5 * 10^-4,
+        # lambda2 = 0.5 * 10^-4, # original (some censoring; biased)
+        # lambda2 = 0.5 * 10^-7, # new (no censoring; unbiased)
         v2 = 1.5,
         points = seq(0,1,0.02),
         alpha_1 = 0.3,
@@ -322,7 +324,8 @@ if (FALSE) {
   
   p_data <- pivot_longer(
     data = summ,
-    cols = -c(level_id,n,alpha_3,distr_A,edge,surv_true,sampling,Estimator),
+    cols = -c(level_id,n,alpha_3,lambda2,distr_A,edge,
+              surv_true,sampling,Estimator),
     # cols = -c(level_id,n,alpha_3,distr_A,edge,surv_true,sampling,Estimator),
     names_to = c("stat","point"),
     names_sep = "_"
@@ -343,13 +346,12 @@ if (FALSE) {
   # p_data %<>% filter(sampling=="two-phase") # !!!!!
   ggplot(
     filter(p_data, stat=="bias"),
-    aes(x=point, y=value, color=Estimator, group=Estimator)
+    aes(x=point, y=value, color=factor(lambda2), group=factor(lambda2))
   ) +
     # geom_point() +
     geom_line() +
     facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(surv_true)) +
-    # scale_y_continuous(labels=percent, limits=c(-0.4,0.4)) +
-    scale_y_continuous(labels=percent, limits=c(-0.1,0.1)) +
+    scale_y_continuous(labels=percent, limits=c(-0.5,0.5)) +
     # scale_y_continuous(labels=percent) +
     # scale_color_manual(values=m_colors) +
     labs(title="Bias (%)", x="A", y=NULL, color="Estimator")
@@ -358,7 +360,7 @@ if (FALSE) {
   # Export: 8" x 5"
   ggplot(
     filter(p_data, stat=="cov"),
-    aes(x=point, y=value, color=Estimator, group=Estimator)
+    aes(x=point, y=value, color=lambda2, group=lambda2)
   ) +
     geom_hline(aes(yintercept=0.95), linetype="longdash", color="grey") +
     # geom_point() +
@@ -373,7 +375,7 @@ if (FALSE) {
   # Export: 8" x 5"
   ggplot(
     filter(p_data, stat=="mse"),
-    aes(x=point, y=value, color=Estimator, group=Estimator)
+    aes(x=point, y=value, color=lambda2, group=lambda2)
   ) +
     # geom_point() +
     geom_line() +

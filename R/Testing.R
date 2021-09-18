@@ -17,6 +17,12 @@
             points=seq(0,1,0.02), alpha_1=0.3, alpha_2=0.7, t_e=200,
             appx=list(t_e=10,w1=0.01,w1b=0.1,a=0.01))
             # appx=list(t_e=1,w1=0.01,w1b=0.1,a=0.01))
+  L <- list(
+    alpha_3 = 0.7,
+    lambda2 = 0.001,
+    surv_true = "Cox PH",
+    distr_A = "Beta(1.5+w1,1.5+w2)"
+  )
   
 }
 
@@ -29,9 +35,10 @@
 {
   
   # Generate datasets
-  d1 <- generate_data(n=1000, alpha_3=0.7, distr_A="Unif(0,1)", edge="none",
+  distr_A <- "Unif(0,1)"
+  d1 <- generate_data(n=1000, alpha_3=0.7, distr_A=distr_A, edge="none",
                       surv_true="Cox PH", sampling="iid")
-  d2 <- generate_data(n=1000, alpha_3=0.7, distr_A="Unif(0,1)", edge="none",
+  d2 <- generate_data(n=1000, alpha_3=0.7, distr_A=distr_A, edge="none",
                       surv_true="Cox PH", sampling="two-phase")
   
   for (dat_orig in list(d1,d2)) {
@@ -184,14 +191,10 @@
   # Note: this check only works for surv_true=="Cox PH"
   
   # Generate data
-  L <- list(
-    alpha_3 = 0.7,
-    surv_true = "Cox PH"
-  )
   dat_orig <- generate_data(
     n = 3000,
     alpha_3 = L$alpha_3,
-    distr_A = "Unif(0,1)",
+    distr_A = "Beta(1.5+w1,1.5+w2)", # "Unif(0,1)" "Beta(1.5+w1,1.5+w2)"
     edge = "none",
     surv_true = L$surv_true,
     sampling = "two-phase" # two-phase iid
@@ -212,11 +215,11 @@
     piece_1 <- exp(-1*C$lambda*(C$t_e^C$v)*exp(lin))
     
     piece_2 <- (delta_star*as.integer(y_star<=C$t_e)) /
-      exp(-exp(lin)*(C$lambda*y_star^C$v+C$lambda2*y_star^C$v2))
+      exp(-exp(lin)*(C$lambda*y_star^C$v+L$lambda2*y_star^C$v2))
     
     integral <- integrate(
       function(t) {
-        t^(C$v-1) * exp(lin+exp(lin)*(C$lambda*t^C$v+C$lambda2*t^C$v2))
+        t^(C$v-1) * exp(lin+exp(lin)*(C$lambda*t^C$v+L$lambda2*t^C$v2))
       },
       lower = 0,
       upper = min(C$t_e,y_star)
@@ -292,11 +295,11 @@
     piece_1 <- exp(-1*C$lambda*(C$t_e^C$v)*exp(lin))
     
     piece_2 <- (delta_star*as.integer(y_star<=C$t_e)) /
-      exp(-exp(lin)*(C$lambda*y_star^C$v+C$lambda2*y_star^C$v2))
+      exp(-exp(lin)*(C$lambda*y_star^C$v+L$lambda2*y_star^C$v2))
     
     integral <- integrate(
       function(t) {
-        t^(C$v-1) * exp(lin+exp(lin)*(C$lambda*t^C$v+C$lambda2*t^C$v2))
+        t^(C$v-1) * exp(lin+exp(lin)*(C$lambda*t^C$v+L$lambda2*t^C$v2))
       },
       lower = 0,
       upper = min(C$t_e,y_star)
@@ -645,10 +648,6 @@
 {
   
   # Generate data
-  L <- list(
-    alpha_3 = 0.7,
-    surv_true = "complex" # "Cox PH" "complex"
-  )
   dat_orig <- generate_data(
     n = 3000,
     alpha_3 = L$alpha_3,
@@ -702,14 +701,10 @@
 {
   
   # Generate data
-  L <- list(
-    alpha_3 = 0.7,
-    surv_true = "complex" # "Cox PH" "complex"
-  )
   dat_orig <- generate_data(
     n = 3000,
     alpha_3 = L$alpha_3,
-    distr_A = "Unif(0,1)",
+    distr_A = "Beta(1.5+w1,1.5+w2)", # "Unif(0,1)" "Beta(1.5+w1,1.5+w2)"
     edge = "none",
     surv_true = L$surv_true,
     sampling = "two-phase" # two-phase iid
@@ -759,43 +754,43 @@
 {
   
   # Generate data
-  set.seed(8)
+  set.seed(10)
   dat_orig <- generate_data(
     n = 2000,
     alpha_3 = 0.7,
-    distr_A = "Unif(0,1)",
-    edge = "expit",
-    surv_true = "complex",
+    distr_A = "Beta(1.5+w1,1.5+w2)", # "Unif(0,1)" "Beta(1.5+w1,1.5+w2)"
+    edge = "none",
+    surv_true = "Cox PH",
     sampling = "two-phase"
   )
   
   # Obtain estimates
-  ests_RF <- est_curve(
+  ests <- est_curve(
     dat_orig = dat_orig,
     estimator = "Grenander",
-    params = list(S_n_type="Random Forest", g_n_type=params$g_n_type,
-                  deriv_type="line", ci_type="regular", cf_folds=1,
-                  edge_corr="max"),
+    params = list(S_n_type="true", g_n_type="true",
+                  deriv_type="spline", ci_type="regular", cf_folds=1,
+                  edge_corr="none"),
     points = C$points
   )
   
   # Return results
   theta_true <- attr(dat_orig, "theta_true")
-  theta_ests_RF <- c()
-  ci_lo_RF <- c()
-  ci_hi_RF <- c()
+  theta_ests <- c()
+  ci_lo <- c()
+  ci_hi <- c()
   len <- length(C$points)
   for (i in 1:len) {
-    theta_ests_RF <- c(theta_ests_RF, ests_RF[[i]]$est)
-    ci_lo_RF <- c(ci_lo_RF, ests_RF[[i]]$ci_lo)
-    ci_hi_RF <- c(ci_hi_RF, ests_RF[[i]]$ci_hi)
+    theta_ests <- c(theta_ests, ests[[i]]$est)
+    ci_lo <- c(ci_lo, ests[[i]]$ci_lo)
+    ci_hi <- c(ci_hi, ests[[i]]$ci_hi)
   }
   plot_data <- data.frame(
     x = rep(C$points, 2),
-    theta = c(theta_ests_RF, theta_true),
+    theta = c(theta_ests, theta_true),
     which = rep(c("Est (RF)","Truth"), each=len),
-    ci_lo = c(ci_lo_RF, theta_true),
-    ci_hi = c(ci_hi_RF, theta_true)
+    ci_lo = c(ci_lo, theta_true),
+    ci_hi = c(ci_hi, theta_true)
   )
   ggplot(plot_data, aes(x=x, y=theta, color=factor(which))) +
     geom_line() +
@@ -819,9 +814,9 @@
 {
   
   # Set levels here
-  n <- 1000
-  distr_A <- "Unif(0,1)"
-  # distr_A <- "Beta(1.5+w1,1.5+w2)"
+  n <- 2000
+  # distr_A <- "Unif(0,1)"
+  distr_A <- "Beta(1.5+w1,1.5+w2)"
   edge <- "none"
   sampling <- "two-phase"
   

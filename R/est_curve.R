@@ -33,7 +33,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
       dat_orig$noise <- runif(nrow(dat_orig))*0.05
       dat_orig %<>% mutate(a = ifelse(a==0, noise, a))
     }
-    
+
     # Prep
     n_orig <- nrow(dat_orig)
     dat_orig$weights <- wts(dat_orig)
@@ -57,13 +57,14 @@ est_curve <- function(dat_orig, estimator, params, points) {
       f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
       g_n <- construct_g_n(vlist$AW_grid, f_aIw_n, f_a_n)
       omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
-      
+
       # Construct Gamma_n
       Gamma_n <- construct_Gamma_n(dat_orig, vlist$A_grid, omega_n, S_n, g_n)
-      
+
       # Construct one-step edge estimator
       if (params$edge_corr!="none") {
-        pi_n <- construct_pi_n(dat_orig, vlist$W_grid, type="logistic")
+        # pi_n <- construct_pi_n(dat_orig, vlist$W_grid, type="logistic")
+        pi_n <- construct_pi_n(dat_orig, vlist$W_grid, type="true")
         theta_os_n_est <- theta_os_n(dat_orig, pi_n, S_n, omega_n)
         sigma2_os_n_est <- sigma2_os_n(dat_orig, pi_n, S_n, omega_n,
                                        theta_os_n_est)
@@ -86,7 +87,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
       }
       
     }
-    
+
     Psi_n <- Vectorize(function(x) {
       return(Gamma_n(Phi_n_inv(x)))
     })
@@ -95,7 +96,8 @@ est_curve <- function(dat_orig, estimator, params, points) {
       if (x==0) {
         index <- 1
       } else {
-        index <- which(x<=gcm$x.knots)[1]-1
+        # The round deals with a floating point issue
+        index <- which(round(x,6)<=gcm$x.knots)[1]-1
       }
       return(gcm$slope.knots[index])
     })
@@ -105,7 +107,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
       x_trans <- Phi_n(x)
       return(dGCM(x_trans))
     }
-    
+
     # Recompute functions on full dataset
     if (params$cf_folds>1) {
       S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
@@ -118,14 +120,13 @@ est_curve <- function(dat_orig, estimator, params, points) {
     }
     
     # Compute new functions
-    # gcomp_n <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n)
     f_aIw_delta1_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
                                         type=params$g_n_type, k=15, delta1=TRUE)
     f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid,
                                     f_aIw_delta1_n)
     gamma_n <- construct_gamma_n(dat_orig, vlist$A_grid, type="kernel",
                                  omega_n, f_aIw_n, f_a_n, f_a_delta1_n)
-    
+
     # Edge correction
     if (params$edge_corr %in% c("none", "spread")) {
       
@@ -158,10 +159,11 @@ est_curve <- function(dat_orig, estimator, params, points) {
     # Construct variance scale factor
     deriv_theta_n <- construct_deriv_theta_n(theta_n, type=params$deriv_type)
     tau_n <- construct_tau_n(deriv_theta_n, gamma_n, f_a_n)
-    
+
     # Generate estimates for each point
     # The pmax() prevents errors when estimates are negative
-    ests <- pmax(theta_n(points),0)
+    # ests <- pmax(theta_n(points),0)
+    ests <- theta_n(points)
     
     # Generate confidence limits
     if (params$ci_type=="none") {
@@ -170,15 +172,15 @@ est_curve <- function(dat_orig, estimator, params, points) {
       ci_hi <- rep(0, length(ests))
       
     } else {
-      
+
       # Generate variance scale factor for each point
-      tau_ns <- tau_n(points)
+      tau_ns <- tau_n(points) # !!!!! this is the problematic line
       
       # Construct CIs
       # The 0.975 quantile of the Chernoff distribution occurs at roughly 1.00
       # The Normal approximation would use qnorm(0.975, sd=0.52) instead
-      # qnt <- 1.00
-      qnt <- qnorm(0.975, sd=0.52)
+      qnt <- 1.00
+      # qnt <- qnorm(0.975, sd=0.52)
       if (params$ci_type=="regular") {
         ci_lo <- ests - (qnt*tau_ns)/(n_orig^(1/3))
         ci_hi <- ests + (qnt*tau_ns)/(n_orig^(1/3))
@@ -193,17 +195,17 @@ est_curve <- function(dat_orig, estimator, params, points) {
       
       # Edge correction
       if (params$edge_corr=="point") {
-        ci_lo[1] <- ests[1] - 1.96*sqrt(sigma2_os_n_est/n_orig) # !!!!! logit transform here as well
-        ci_hi[1] <- ests[1] + 1.96*sqrt(sigma2_os_n_est/n_orig) # !!!!! logit transform here as well
+        ci_lo[1] <- ests[1] - 1.96*sqrt(sigma2_os_n_est/n_orig)
+        ci_hi[1] <- ests[1] + 1.96*sqrt(sigma2_os_n_est/n_orig)
       } else if (params$edge_corr %in% c("weighted","max")) {
-        ci_lo2 <- ests - 1.96*sqrt(sigma2_os_n_est/n_orig) # !!!!! logit transform here as well
-        ci_hi2 <- ests + 1.96*sqrt(sigma2_os_n_est/n_orig) # !!!!! logit transform here as well
+        ci_lo2 <- ests - 1.96*sqrt(sigma2_os_n_est/n_orig)
+        ci_hi2 <- ests + 1.96*sqrt(sigma2_os_n_est/n_orig)
         ci_lo <- (1-gren_points)*pmin(ci_lo,ci_lo2) + gren_points*ci_lo
         ci_hi <- (1-gren_points)*pmax(ci_hi,ci_hi2) + gren_points*ci_hi
       }
       
     }
-    
+
     # Parse and return results
     res <- list()
     for (p in 1:length(points)) {
@@ -216,7 +218,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
     res[["ex_gamma_n"]] <- gamma_n(0.5)
     res[["ex_deriv_theta_n"]] <- deriv_theta_n(0.5)
     res[["ex_tau_n"]] <- tau_n(0.5)
-    
+
     return(res)
     
   }

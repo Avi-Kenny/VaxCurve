@@ -34,7 +34,7 @@ if (cfg$which_sim=="estimation") {
       res_list[paste0("ci_hi_",m)] <- ests[[i]]$ci_hi
     }
     
-    # # Return extra results
+    # Return extra results
     res_list[["ex_S_n"]] <- ests$ex_S_n
     res_list[["ex_gamma_n"]] <- ests$ex_gamma_n
     res_list[["ex_deriv_theta_n"]] <- ests$ex_deriv_theta_n
@@ -42,7 +42,57 @@ if (cfg$which_sim=="estimation") {
     # res_list[[".complex"]] <- dat_orig
     
     return(res_list)
+    
+  }
+  
+}
 
+
+
+########################################.
+##### Estimation (edge value only) #####
+########################################.
+
+if (cfg$which_sim=="edge") {
+  
+  #' Run a single simulation (estimation; only the portions related to the edge)
+  #'
+  #' @return A list with edge estimates
+
+  one_simulation <- function() {
+    
+    # Generate dataset
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
+                              L$surv_true, L$sampling)
+    
+    # Prep
+    n_orig <- nrow(dat_orig)
+    dat_orig$weights <- wts(dat_orig)
+    dat <- dat_orig %>% filter(!is.na(a))
+    weights <- dat$weights
+    
+    # Construct dataframes of values to pre-compute functions on
+    vlist <- create_val_list(dat_orig, C$appx)
+    
+    # Construct component functions
+    S_n <- construct_S_n(dat_orig, vlist$S_n, type=L$estimator$params$S_n_type)
+    Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=L$estimator$params$S_n_type,
+                          csf=TRUE)
+    omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
+    # pi_n <- construct_pi_n(dat_orig, vlist$W_grid, type="logistic")
+    pi_n <- construct_pi_n(dat_orig, vlist$W_grid, type="true")
+    theta_os_n_est <- theta_os_n(dat_orig, pi_n, S_n, omega_n)
+    sigma2_os_n_est <- sigma2_os_n(dat_orig, pi_n, S_n, omega_n,
+                                   theta_os_n_est)
+    
+    # Return results
+    return(list(
+      theta_true = attr(dat_orig, "theta_true")[1],
+      theta_est = theta_os_n_est,
+      ci_lo = theta_os_n_est - 1.96*sqrt(sigma2_os_n_est/n_orig),
+      ci_hi = theta_os_n_est + 1.96*sqrt(sigma2_os_n_est/n_orig)
+    ))
+    
   }
   
 }

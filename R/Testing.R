@@ -1,28 +1,19 @@
 
-# !!!!! Right now, I'm collecting previous ad-hoc tests here. Need to make this
-#     more structured
-
 #################.
 ##### Setup #####
 #################.
 
 {
   
-  # 1. Run CONFIG and SETUP within MAIN.R
+  # 1. Run beginning of MAIN.R
   
   # 2. Set global constants
-  params <- list(g_n_type="binning", S_n_type="Cox PH",
-                 deriv_type="spline")
-  C <- list(lambda=10^-4, v=1.5, lambda2=0.5*10^-4, v2=1.5,
-            points=seq(0,1,0.02), alpha_1=0.3, alpha_2=0.7, t_e=200,
-            appx=list(t_e=10,w1=0.01,w1b=0.1,a=0.01))
-            # appx=list(t_e=1,w1=0.01,w1b=0.1,a=0.01))
-  L <- list(
-    alpha_3 = 0.7,
-    lambda2 = 0.001,
-    surv_true = "Cox PH",
-    distr_A = "Beta(1.5+w1,1.5+w2)"
-  )
+  params <- list(S_n_type="true", g_n_type="true", ci_type="regular",
+                 cf_folds=1, edge_corr="none", deriv_type="spline")
+  C <- sim$constants
+  L <- list(n=1000, alpha_3=0.8, lambda2=0.0001, distr_A="N(0.5,0.01)",
+            edge="none", surv_true="complex", sampling="two-phase")
+  L$estimator <- list(est="Grenander", params=params)
   
 }
 
@@ -101,9 +92,9 @@
       
       lin <- function(w1,w2,a) {
         if (surv_true=="Cox PH") {
-          C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
+          C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1
         } else if (surv_true=="complex") {
-          as.numeric(abs(w1-0.5)<0.2) + alpha_3*w2*a
+          C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + alpha_3*w2*a - 1
         }
       }
       
@@ -207,9 +198,9 @@
   omega_0 <- Vectorize(function(w1,w2,a,y_star,delta_star) {
     
     if (L$surv_true=="Cox PH") {
-      lin <- C$alpha_1*w1 + C$alpha_2*w2 + L$alpha_3*a
+      lin <- C$alpha_1*w1 + C$alpha_2*w2 + L$alpha_3*a - 1
     } else if (L$surv_true=="complex") {
-      lin <- as.numeric(abs(w1-0.5)<0.2) + L$alpha_3*w2*a
+      lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + L$alpha_3*w2*a - 1
     }
     
     piece_1 <- exp(-1*C$lambda*(C$t_e^C$v)*exp(lin))
@@ -287,9 +278,9 @@
   omega_0 <- Vectorize(function(w1,w2,a,y_star,delta_star) {
     
     if (surv_true=="Cox PH") {
-      lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
+      lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1
     } else if (surv_true=="complex") {
-      lin <- as.numeric(abs(w1-0.5)<0.2) + alpha_3*w2*a
+      lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + alpha_3*w2*a - 1
     }
     
     piece_1 <- exp(-1*C$lambda*(C$t_e^C$v)*exp(lin))
@@ -457,7 +448,6 @@
     eta_n <- construct_eta_n(dat_orig, S_n)
     Gamma_n <- construct_Gamma_n(dat_orig, omega_n, S_n, g_n)
     
-    # !!!!!
     if (F) {
       
       plot1 <- ggplot(dat_orig, aes(x=a, y=po)) + geom_point() +
@@ -481,14 +471,9 @@
         }, color="turquoise")
       }, plot3$layers)
       
-      
       plot1
       plot2
       plot3
-      #
-      
-      
-      
       
     }
     
@@ -651,16 +636,18 @@
   dat_orig <- generate_data(
     n = 3000,
     alpha_3 = L$alpha_3,
-    distr_A = "Unif(0,1)",
-    edge = "none",
+    distr_A = L$distr_A,
+    edge = L$edge,
     surv_true = L$surv_true,
-    sampling = "two-phase" # two-phase iid
+    sampling = L$sampling
   )
   vlist <- create_val_list(dat_orig, C$appx)
   
-  S_n_CoxPH <- construct_S_n(dat_orig, vlist$S_n, type="Cox PH")
-  S_n_RF <- construct_S_n(dat_orig, vlist$S_n, type="Random Forest")
+  # S_n_CoxPH <- construct_S_n(dat_orig, vlist$S_n, type="Cox PH")
+  # S_n_RF <- construct_S_n(dat_orig, vlist$S_n, type="Random Forest")
   S_0 <- construct_S_n(dat_orig, vlist$S_n, type="true")
+  S_n_CoxPH <- S_0
+  S_n_RF <- S_0
   
   # Plot true curve against estimated curve
   times <- c(1:200)
@@ -668,17 +655,17 @@
     time = rep(times, 12),
     survival = c(
       S_n_CoxPH(t=times, w1=0.2, w2=1, a=0.2),
-      S_n_CoxPH(t=times, w1=0.1, w2=1, a=0.2),
+      S_n_CoxPH(t=times, w1=0.5, w2=1, a=0.2),
       S_n_CoxPH(t=times, w1=0.2, w2=1, a=0.8),
-      S_n_CoxPH(t=times, w1=0.1, w2=1, a=0.8),
+      S_n_CoxPH(t=times, w1=0.5, w2=1, a=0.8),
       S_n_RF(t=times, w1=0.2, w2=1, a=0.2),
-      S_n_RF(t=times, w1=0.1, w2=1, a=0.2),
+      S_n_RF(t=times, w1=0.5, w2=1, a=0.2),
       S_n_RF(t=times, w1=0.2, w2=1, a=0.8),
-      S_n_RF(t=times, w1=0.1, w2=1, a=0.8),
+      S_n_RF(t=times, w1=0.5, w2=1, a=0.8),
       S_0(t=times, w1=0.2, w2=1, a=0.2),
-      S_0(t=times, w1=0.1, w2=1, a=0.2),
+      S_0(t=times, w1=0.5, w2=1, a=0.2),
       S_0(t=times, w1=0.2, w2=1, a=0.8),
-      S_0(t=times, w1=0.1, w2=1, a=0.8)
+      S_0(t=times, w1=0.5, w2=1, a=0.8)
     ),
     which = rep(c("Cox PH","RF","True S_0"), each=4*length(times)),
     covs = rep(rep(c("w1=0.2,w2=1,a=0.2","w1=0.5,w2=1,a=0.2",
@@ -704,16 +691,18 @@
   dat_orig <- generate_data(
     n = 3000,
     alpha_3 = L$alpha_3,
-    distr_A = "Beta(1.5+w1,1.5+w2)", # "Unif(0,1)" "Beta(1.5+w1,1.5+w2)"
-    edge = "none",
+    distr_A = L$distr_A,
+    edge = L$edge,
     surv_true = L$surv_true,
-    sampling = "two-phase" # two-phase iid
+    sampling = L$sampling
   )
   vlist <- create_val_list(dat_orig, C$appx)
   
-  Sc_n_CoxPH <- construct_S_n(dat_orig, vlist$S_n, type="Cox PH", csf=TRUE)
-  Sc_n_RF <- construct_S_n(dat_orig, vlist$S_n, type="Random Forest", csf=TRUE)
+  # Sc_n_CoxPH <- construct_S_n(dat_orig, vlist$S_n, type="Cox PH", csf=TRUE)
+  # Sc_n_RF <- construct_S_n(dat_orig, vlist$S_n, type="Random Forest", csf=TRUE)
   Sc_0 <- construct_S_n(dat_orig, vlist$S_n, type="true", csf=TRUE)
+  Sc_n_CoxPH <- Sc_0
+  Sc_n_RF <- Sc_0
   
   # Plot true curve against estimated curve
   times <- c(1:200)
@@ -815,8 +804,8 @@
   
   # Set levels here
   n <- 2000
-  # distr_A <- "Unif(0,1)"
-  distr_A <- "Beta(1.5+w1,1.5+w2)"
+  distr_A <- "Unif(0,1)"
+  # distr_A <- "Beta(1.5+w1,1.5+w2)"
   edge <- "none"
   sampling <- "two-phase"
   
@@ -848,7 +837,7 @@
                                     type="binning", k=0)
   
   # Generate plot data
-  grid <- seq(0.01,0.99,0.01)
+  grid <- seq(0,1,0.01)
   f_aIw_models <- c("Truth", "Parametric", "Semiparametric")
   n_models <- length(f_aIw_models)
   len <- length(grid)
@@ -888,7 +877,7 @@
   f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n_semi)
   
   # Generate plot data
-  grid <- seq(0.01,0.99,0.01)
+  grid <- seq(0,1,0.01)
   f_a_models <- c("Truth", "Semiparametric")
   len <- length(grid)
   plot_data <- data.frame(
@@ -931,7 +920,7 @@
     if (edge=="expit") {
       return(expit(w1+w2-3.3))
     } else if (edge=="complex") {
-      return(w2*as.integer(abs(w1-0.5)<0.11))
+      return(0.84*w2*pmax(0,1-4*abs(w1-0.5)))
     }
   }
   

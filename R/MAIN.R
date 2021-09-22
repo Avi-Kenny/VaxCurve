@@ -12,10 +12,10 @@
 #   - tedwestling/survSuperLearner
 #   - zeehio/facetscales
 cfg <- list(
-  which_sim = "estimation", # estimation testing
+  which_sim = "edge", # estimation edge testing
   level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
   run_or_update = "run",
-  num_sim = 300,
+  num_sim = 1000,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp"),
@@ -23,8 +23,7 @@ cfg <- list(
                      "data.table", "latex2exp", "tidyr"),
   parallel = "none",
   stop_at_error = FALSE,
-  appx = list(t_e=1, w1=0.01, w1b=0.1, a=0.01)
-  # appx = list(t_e=1, w1=0.001, w1b=0.01, a=0.001)
+  appx = list(t_e=1, w1=0.1, w1b=0.1, a=0.01)
 )
 
 # Set cluster config
@@ -84,7 +83,6 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       edge = c("none", "expit", "complex"),
       surv_true = c("Cox PH", "complex"),
       sampling = c("iid", "two-phase"),
-      deriv_type = c("linear", "gcomp", "spline"),
       estimator = list(
         "G-comp" = list(
           est = "G-comp", cf_folds = 1,
@@ -98,7 +96,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
             S_n_type = c("Cox PH", "Random Forest"),
             g_n_type = c("parametric", "binning"),
             edge_corr = c("none", "point", "spread", "max"),
-            deriv_type = c("line", "spline", "linear", "gcomp")
+            deriv_type = c("line", "spline", "m-spline", "linear", "gcomp")
           )
         )
       ),
@@ -120,30 +118,27 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   # Estimation: compare all methods
   # Not currently using (ci_type="sample split", m=5) or (ci_type="regular")
   level_set_estimation_1 <- list(
-    n = 2000,
+    n = c(1000,5000),
     alpha_3 = 0.8,
-    # lambda2 = c(0.0001, 0.0003, 0.0005), # This set for "complex"
-    lambda2 = c(0.0001, 0.001), # This set for "Cox PH"
-    distr_A = "Beta(1.5+w1,1.5+w2)",
-    # distr_A = c("Unif(0,1)", "Beta(1.5+w1,1.5+w2)"),
-    edge = "none",
-    # edge = c("none", "expit"),
-    surv_true = "Cox PH",
-    # surv_true = c("Cox PH", "complex"),
+    lambda2 = 0.0001,
+    distr_A = "N(0.5,0.01)",
+    # distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
+    edge = "expit",
+    surv_true = c("Cox PH", "complex"),
     sampling = "two-phase",
     estimator = list(
-      # "Grenander (RF; g_n)" = list(
+      "Grenander (S_n:true, g_n:true)" = list(
+        est = "Grenander",
+        params = list(S_n_type="true", g_n_type="true",
+                      ci_type="regular", cf_folds=1, edge_corr="max",
+                      deriv_type="m-spline")
+      )
+      # "Grenander (S_n:RF, g_n:binning)" = list(
       #   est = "Grenander",
       #   params = list(S_n_type="Random Forest", g_n_type="binning",
       #                 ci_type="regular", cf_folds=1, edge_corr="none",
-      #                 deriv_type="spline")
-      # ),
-      "Grenander (true; g_0)" = list(
-        est = "Grenander",
-        params = list(S_n_type="true", g_n_type="true",
-                      ci_type="regular", cf_folds=1, edge_corr="none",
-                      deriv_type="spline")
-      )
+      #                 deriv_type="m-spline")
+      # )
     )
   )
   
@@ -165,10 +160,6 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     )
   )
   
-  # !!!!! Estimation/testing but with different nuisance estimators
-  # S_n_type = c("Cox PH", "...")
-  # g_n_type = c("parametric", "binning")
-  
   level_set <- eval(as.name(cfg$level_set_which))
   
 }
@@ -185,7 +176,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
 # sbatch --depend=afterok:12 --export=sim_run='last',cluster='bionic',type='R',project='z.VaxCurve' -e ./io/slurm-%A_%a.out -o ./io/slurm-%A_%a.out --constraint=gizmok run_r.sh
 
 if (cfg$run_or_update=="run") {
-
+  
   run_on_cluster(
     
     first = {
@@ -225,13 +216,13 @@ if (cfg$run_or_update=="run") {
       # lambda2 and v2 are the Weibull parameters for the censoring distribution
       # For the approximations, w1b is used for S_n and w1 is used elsewhere
       sim %<>% add_constants(
-        lambda = 10^-4,
+        lambda = 0.0001,
         v = 1.5,
         # lambda2 = 0.5 * 10^-4, # original (some censoring; biased)
         # lambda2 = 0.5 * 10^-7, # new (no censoring; unbiased)
         v2 = 1.5,
         points = seq(0,1,0.02),
-        alpha_1 = 0.3,
+        alpha_1 = 0.5,
         alpha_2 = 0.7,
         t_e = 200,
         appx = cfg$appx
@@ -291,12 +282,11 @@ if (FALSE) {
   sim <- readRDS("../SimEngine.out/sim_est_20210819.rds")
   
   # Summarize results
-  # !!!!! Count the number of NAs in coverage
   summ_bias <- list()
   summ_mse <- list()
   summ_cov <- list()
-  for (i in c(1:51)) { # for (i in c(1:11)) {
-    m <- format(round(i/50-0.02,2), nsmall=1) # m <- format(round(i/10-0.1,1), nsmall=1)
+  for (i in c(1:51)) {
+    m <- format(round(i/50-0.02,2), nsmall=1)
     summ_bias[[i]] <- list(
       name = paste0("bias_",m),
       estimate = paste0("est_",m),
@@ -319,14 +309,14 @@ if (FALSE) {
   
   summ %<>% rename("Estimator"=estimator)
   
-  # summ %<>% filter(distr_A=="Unif(0,1)") # !!!!!
-  # summ %<>% filter(distr_A=="Beta(1.5+w1,1.5+w2)") # !!!!!
+  # summ %<>% filter(distr_A=="N(0.5,0.01)")
+  # summ %<>% filter(distr_A=="N(0.5,0.04)")
+  # summ %<>% filter(distr_A=="N(0.4+0.2w1+0.1w2,0.01)")
   
   p_data <- pivot_longer(
     data = summ,
     cols = -c(level_id,n,alpha_3,lambda2,distr_A,edge,
               surv_true,sampling,Estimator),
-    # cols = -c(level_id,n,alpha_3,distr_A,edge,surv_true,sampling,Estimator),
     names_to = c("stat","point"),
     names_sep = "_"
   )
@@ -341,45 +331,77 @@ if (FALSE) {
     # `Grenander (regular CIs)` = cb_colors[4],
   )
   
-  # Bias plot
+  df_distr_A <- data.frame(
+    x = rep(seq(0,1,0.01),3),
+    ymax = c(dnorm(seq(0,1,0.01), mean=0.5, sd=0.1),
+             dnorm(seq(0,1,0.01), mean=0.5, sd=0.2),
+             rep(1,101)),
+    distr_A = rep(c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"), each=101),
+    value = 0
+  )
+  df_distr_A1 <- mutate(df_distr_A, ymin=-0.2, ymax=(ymax/15-0.2))
+  df_distr_A2 <- mutate(df_distr_A, ymin=0.7, ymax=(ymax/20+0.7))
+  df_vlines <- data.frame(
+    x = c(qnorm(0.1,0.5,0.1),qnorm(0.1,0.5,0.2),0.1,
+          qnorm(0.9,0.5,0.1),qnorm(0.9,0.5,0.2),0.9),
+    distr_A = rep(c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"),2)
+  )
+  
+  distr_A_ <- "N(0.5,0.01)"
+  df_distr_A1 %<>% filter(distr_A==distr_A_)
+  df_distr_A2 %<>% filter(distr_A==distr_A_)
+  df_vlines %<>% filter(distr_A==distr_A_)
+  
+  # Bias plots
   # Export: 8" x 5"
-  # p_data %<>% filter(sampling=="two-phase") # !!!!!
   ggplot(
     filter(p_data, stat=="bias"),
-    aes(x=point, y=value, color=factor(lambda2), group=factor(lambda2))
+    aes(x=point, y=value)
+    # aes(x=point, y=value, color=Estimator, group=Estimator)
   ) +
-    # geom_point() +
+    geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
+                data=df_distr_A1, fill="grey", color=NA, alpha=0.4) +
+    geom_vline(aes(xintercept=x), data=df_vlines, color="orange",
+               linetype="dashed") +
     geom_line() +
-    facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(surv_true)) +
-    scale_y_continuous(labels=percent, limits=c(-0.5,0.5)) +
+    facet_grid(rows=dplyr::vars(surv_true), cols=dplyr::vars(distr_A)) +
+    scale_y_continuous(labels=percent, limits=c(-0.04,0.04)) +
     # scale_y_continuous(labels=percent) +
+    xlim(c(0,1)) +
+    # xlim(c(0.2,0.8)) +
     # scale_color_manual(values=m_colors) +
-    labs(title="Bias (%)", x="A", y=NULL, color="Estimator")
+    labs(title="Bias (%)", x="A", y=NULL, color="n")
   
   # Coverage plot
   # Export: 8" x 5"
   ggplot(
     filter(p_data, stat=="cov"),
-    aes(x=point, y=value, color=lambda2, group=lambda2)
+    aes(x=point, y=value)
+    # aes(x=point, y=value, color=Estimator, group=Estimator)
   ) +
+    geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
+                data=df_distr_A2, fill="grey", color=NA, alpha=0.4) +
+    geom_vline(aes(xintercept=x), data=df_vlines, color="orange",
+               linetype="dashed") +
     geom_hline(aes(yintercept=0.95), linetype="longdash", color="grey") +
-    # geom_point() +
     geom_line() +
-    facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(surv_true)) +
+    facet_grid(rows=dplyr::vars(surv_true), cols=dplyr::vars(distr_A)) +
     scale_y_continuous(labels=percent, limits=c(0.7,1)) +
     # scale_y_continuous(labels=percent) +
+    xlim(c(0,1)) +
     # scale_color_manual(values=m_colors) +
-    labs(title="Coverage (%)", x="A", y=NULL, color="Estimator")
+    labs(title="Coverage (%)", x="A", y=NULL, color="n")
   
   # MSE plot
   # Export: 8" x 5"
   ggplot(
     filter(p_data, stat=="mse"),
-    aes(x=point, y=value, color=lambda2, group=lambda2)
+    aes(x=point, y=value)
+    # aes(x=point, y=value, color=Estimator, group=Estimator)
   ) +
-    # geom_point() +
+    geom_hline(aes(yintercept=0.95), linetype="longdash", color="grey") +
     geom_line() +
-    facet_grid(rows=dplyr::vars(distr_A), cols=dplyr::vars(surv_true)) +
+    facet_grid(rows=dplyr::vars(surv_true), cols=dplyr::vars(distr_A)) +
     # scale_color_manual(values=m_colors) +
     ylim(0,0.003) +
     labs(title="MSE", x="A", y=NULL, color="Estimator")

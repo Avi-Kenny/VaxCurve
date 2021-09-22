@@ -91,7 +91,7 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
   
   if (params$var=="boot") {
     
-    # !!!!! Update all of this
+    # !!!!! Update all of this if needed
     
     # Define the statistic to bootstrap
     bootstat <- function(dat_orig,indices) {
@@ -136,7 +136,7 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
   
   if (params$var=="mixed boot") {
     
-    # !!!!! Update all of this
+    # !!!!! Update all of this if needed
     
     # Pre-calculate non-bootstrapped pieces
     {

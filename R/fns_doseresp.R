@@ -215,10 +215,10 @@ construct_S_n <- function(dat_orig, vals, type, csf=FALSE) {
     
     fnc <- function(t, w1, w2, a) {
       if (L$surv_true=="Cox PH") {
-        lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a
+        lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1
         return(exp(-1*lambda*(t^v)*exp(lin)))
       } else if (L$surv_true=="complex") {
-        lin <- as.numeric(abs(w1-0.5)<0.2) + alpha_3*w2*a
+        lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + alpha_3*w2*a - 1
         return(exp(-1*lambda*(t^v)*exp(lin)))
       }
     }
@@ -405,7 +405,7 @@ construct_deriv_theta_n <- function(theta_n, type) {
     # Construct derivative function
     fnc <- function(x) {
       
-      width <- 0.6
+      width <- 0.3
       x1 <- x - width/2
       x2 <- x + width/2
       
@@ -420,6 +420,57 @@ construct_deriv_theta_n <- function(theta_n, type) {
       
       y1 <- predict(theta_n_smoothed, x=x1)$y
       y2 <- predict(theta_n_smoothed, x=x2)$y
+      
+      return(max((y2-y1)/width,0))
+      
+    }
+    
+  } else if (type=="m-spline") {
+    
+    # Estimate entire function on grid
+    grid <- seq(0,1,0.01)
+    theta_ns <- theta_n(grid)
+    
+    # Identify jump points of step function
+    # jump_points <- c(0)
+    jump_points <- c()
+    for (i in 2:length(grid)) {
+      if (theta_ns[i]!=theta_ns[i-1]) {
+        jump_points <- c(jump_points, mean(c(grid[i],grid[i-1])))
+      }
+    }
+    # jump_points <- c(jump_points,grid[length(grid)])
+    
+    # Identify midpoints of jump points
+    midpoints <- jump_points[1:(length(jump_points)-1)]+(diff(jump_points)/2)
+    
+    # Fit monotone cubic smoothing spline
+    theta_n_smoothed <- splinefun(
+      x = midpoints,
+      y = theta_n(midpoints),
+      method = "monoH.FC"
+    )
+    
+    # Construct derivative function
+    fnc <- function(x) {
+      
+      width <- 0.3
+      x1 <- x - width/2
+      x2 <- x + width/2
+      
+      if (x1<0) {
+        x2 <- x2 - x1
+        x1 <- 0
+      }
+      if (x2>1) {
+        x1 <- x1 - x2 + 1
+        x2 <- 1
+      }
+      
+      y1 <- theta_n_smoothed(x1)
+      y2 <- theta_n_smoothed(x2)
+      # y1 <- predict(theta_n_smoothed, x=x1)$y
+      # y2 <- predict(theta_n_smoothed, x=x2)$y
       
       return(max((y2-y1)/width,0))
       
@@ -499,7 +550,11 @@ construct_gamma_n <- function(dat_orig, vals, type, omega_n, f_aIw_n, f_a_n,
       (weights*omega_n(w1,w2,a,y_star,delta_star)) / f_aIw_n(a,w1,w2)
     )^2
   )
+  
+  # Remove outliers to prevent errors (revisit this)
+  cutoff <- as.numeric(quantile(dat$po, 0.75) + 10000*iqr(dat$po))
   dat %<>% filter(is.finite(po))
+  dat %<>% filter(po<cutoff)
   
   # Run regression
   if (type=="cubic") {
@@ -519,9 +574,9 @@ construct_gamma_n <- function(dat_orig, vals, type, omega_n, f_aIw_n, f_a_n,
       x = dat$a,
       y = dat$po,
       kernel = "normal",
-      bandwidth = 0.1, # !!!!! Later select via CV
-      range.x = vals$a,
-      x.points = seq(0,1,0.01)
+      bandwidth = 0.2,
+      range.x = c(0,1),
+      x.points = vals$a
     )
     
     fnc <- function(x) {
@@ -563,22 +618,25 @@ construct_f_aIw_n <- function(dat_orig, vals, type, k=0, delta1=FALSE) {
     # Note: this is not accurate if edge!="none"
     
     if (L$distr_A=="Unif(0,1)") {
-      par_1 <- 1
-      par_2 <- 0
-      par_3 <- 1
-      par_4 <- 0
+      fnc <- function(a, w1, w2) { 1 }
     } else if (L$distr_A=="Beta(1.5+w1,1.5+w2)") {
-      par_1 <- 1.5
-      par_2 <- 1
-      par_3 <- 1.5
-      par_4 <- 1
+      fnc <- function(a, w1, w2) {
+        dbeta(a, shape1=1.5+w1, shape2=1.5+w2)
+      }
+    } else if (L$distr_A=="N(0.5,0.01)") {
+      fnc <- function(a, w1, w2) {
+        dnorm(a, mean=0.5, sd=0.1)
+      }
+    } else if (L$distr_A=="N(0.5,0.04)") {
+      fnc <- function(a, w1, w2) {
+        dnorm(a, mean=0.5, sd=0.2)
+      }
+    } else if (L$distr_A=="N(0.4+0.2w1+0.1w2,0.01)") {
+      fnc <- function(a, w1, w2) {
+        dnorm(a, mean=0.4+0.2*w1+0.1*w2, sd=0.1)
+      }
     }
     
-    fnc <- function(a, w1, w2){
-      shape1 <- par_1 + par_2*w1
-      shape2 <- par_3 + par_4*w2
-      return(dbeta(a, shape1=shape1, shape2=shape2))
-    }
     
   } else if (type=="parametric") {
     
@@ -734,14 +792,7 @@ construct_f_a_n <- function(dat_orig, vals, f_aIw_n) {
 construct_g_n <- function(vals, f_aIw_n, f_a_n) {
   
   fnc <- function(a,w1,w2) {
-    
-    # Avoid divide by zero errors
-    if (a<0.01) a <- 0.01
-    if (a>0.99) a <- 0.99
-    
-    # Return density ratio
     f_aIw_n(a,w1,w2) / f_a_n(a)
-    
   }
   
   round_args <- c(-log10(C$appx$a), -log10(C$appx$w1), 0)
@@ -782,29 +833,23 @@ construct_omega_n <- function(vals, S_n, Sc_n) {
         )
       )
       
-      # integral_righthand <- sum(
-      #   (
-      #     S_n(i,w1,w2,a) - S_n(i-1,w1,w2,a)
-      #     # S_n((i*k)/m,w1,w2,a) - S_n(((i-1)*k)/m,w1,w2,a)
-      #   ) *
-      #     (
-      #       (S_n(i,w1,w2,a))^2 * Sc_n(i,w1,w2,a)
-      #       # (S_n((i*k)/m,w1,w2,a))^2 * Sc_n((i*k)/m,w1,w2,a)
-      #     )^-1
-      # )
+      integral_righthand <- sum(
+        ( H_n(i,w1,w2,a) - H_n(i-1,w1,w2,a) ) *
+          ( (S_n(i,w1,w2,a)) * Sc_n(i,w1,w2,a) )^-1
+      )
       
       # integral_diffgrid <- 0.5 * sum(
-      #   ( S_n((i*k)/m,w1,w2,a) - S_n(((i-1)*k)/m,w1,w2,a) ) * (
-      #     (S_n((i*k)/m,w1,w2,a))^-2 * (Sc_n((i*k)/m,w1,w2,a))^-1 +
-      #       (S_n(((i-1)*k)/m,w1,w2,a))^-2 * (Sc_n(((i-1)*k)/m,w1,w2,a))^-1
+      #   ( H_n((i*k)/m,w1,w2,a) - H_n(((i-1)*k)/m,w1,w2,a) ) * (
+      #     (S_n((i*k)/m,w1,w2,a))^-1 * (Sc_n((i*k)/m,w1,w2,a))^-1 +
+      #       (S_n(((i-1)*k)/m,w1,w2,a))^-1 * (Sc_n(((i-1)*k)/m,w1,w2,a))^-1
       #   )
       # )
       
     }
     
     return(S_n(C$t_e,w1,w2,a) * (
-      (delta_star * as.integer(y_star<=C$t_e)) /
-        (S_n(k,w1,w2,a) * Sc_n(k,w1,w2,a)) +
+        (delta_star * as.integer(y_star<=C$t_e)) /
+          (S_n(k,w1,w2,a) * Sc_n(k,w1,w2,a)) -
         integral
     ))
     
@@ -873,10 +918,12 @@ lambda <- function(dat_orig, k, G) {
 #' @param omega_n A nuisance influence function returned by construct_omega_n()
 #' @param S_n A conditional survival function returned by construct_S_n()
 #' @param g_n A density ratio estimator function returned by construct_g_n()
+#' @param type One of c("one-step", "plug-in")
 #' @return Gamma_n estimator
 #' @notes This is a generalization of the one-step estimator from Westling &
 #'     Carone 2020
-construct_Gamma_n <- function(dat_orig, vals, omega_n, S_n, g_n) {
+construct_Gamma_n <- function(dat_orig, vals, omega_n, S_n, g_n,
+                              type="one-step") {
   
   dat_orig$weights <- wts(dat_orig)
   n_orig <- nrow(dat_orig)
@@ -894,30 +941,41 @@ construct_Gamma_n <- function(dat_orig, vals, omega_n, S_n, g_n) {
   delta_star_j_long <- dat$delta_star[j_long]
   weights_i_long <- dat$weights[i_long]
   weights_j_long <- dat$weights[j_long]
-  subpiece_1a <- dat$weights * ( 1 + (
-    omega_n(dat$w1,dat$w2,dat$a,dat$y_star,dat$delta_star) /
-      g_n(dat$a,dat$w1,dat$w2)
-  ) )
-  subpiece_2a <- (weights_i_long*weights_j_long) *
-    S_n(C$t_e,w1_j_long,w2_j_long,a_i_long)
   
-  fnc <- function(x) {
+  if (type=="one-step") {
     
-    subpiece_1b <- as.integer(dat$a<=x)
-    piece_1 <- (1/n_orig) * sum(subpiece_1a*subpiece_1b)
-
-    subpiece_2b <- as.integer(a_i_long<=x)
-    piece_2 <- (1/(n_orig^2)) * sum(subpiece_2a*subpiece_2b)
-
-    return(piece_1-piece_2)
+    subpiece_1a <- dat$weights * ( 1 + (
+      omega_n(dat$w1,dat$w2,dat$a,dat$y_star,dat$delta_star) /
+        g_n(dat$a,dat$w1,dat$w2)
+    ) )
+    subpiece_2a <- (weights_i_long*weights_j_long) *
+      S_n(C$t_e,w1_j_long,w2_j_long,a_i_long)
     
-    # return(
-    #   (1/n_orig^2) * sum(
-    #     (weights_i_long*weights_j_long) *
-    #       as.integer(a_i_long<=x) *
-    #       (1 - S_n(C$t_e,w1_j_long,w2_j_long,a_i_long))
-    #   )
-    # )
+    fnc <- function(x) {
+      
+      subpiece_1b <- as.integer(dat$a<=x)
+      piece_1 <- (1/n_orig) * sum(subpiece_1a*subpiece_1b)
+      
+      subpiece_2b <- as.integer(a_i_long<=x)
+      piece_2 <- (1/(n_orig^2)) * sum(subpiece_2a*subpiece_2b)
+      
+      return(piece_1-piece_2)
+      
+    }
+    
+  }
+  
+  if (type=="plug-in") {
+    
+    fnc <- function(x) {
+      return(
+        (1/n_orig^2) * sum(
+          (weights_i_long*weights_j_long) *
+            as.integer(a_i_long<=x) *
+            (1 - S_n(C$t_e,w1_j_long,w2_j_long,a_i_long))
+        )
+      )
+    }
     
   }
   
@@ -1251,6 +1309,18 @@ construct_pi_n <- function(dat_orig, vals, type) {
   
   # Construct indicator I{A=0}
   dat$ind_A0 <- as.integer(dat$a==0)
+  
+  if (type=="true") {
+    
+    if (L$edge=="expit") {
+      fnc <- function(w1,w2) { expit(w1+w2-3.3) }
+    } else if (L$edge=="complex") {
+      fnc <- function(w1,w2) { 0.84*w2*pmax(0,1-4*abs(w1-0.5)) }
+    } else if (L$edge=="none") {
+      fnc <- function(w1,w2) { 0 }
+    }
+    
+  }
   
   if (type=="logistic") {
     

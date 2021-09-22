@@ -1,13 +1,107 @@
 
+# Histogram for edge values
+if (F) {
+  
+  r_cox <- filter(sim$results, surv_true=="Cox PH")
+  r_com <- filter(sim$results, surv_true=="complex")
+  cox <- r_cox$est_0.0
+  com <- r_com$est_0.0
+  tr_cox <- r_cox[1,"theta_0.0"]
+  tr_com <- r_com[1,"theta_0.0"]
+  
+  (mean(cox)-tr_cox)/mean(cox)
+  (mean(com)-tr_com)/mean(com)
+  
+  df <- data.frame(
+    x = c(cox,com),
+    grp = c(rep("Cox PH", length(cox)),
+            rep("complex", length(com)))
+  )
+  
+  ggplot(df, aes(x=x, group=grp, fill=factor(grp))) +
+    geom_histogram(color="white") +
+    facet_wrap(~grp, ncol=2) +
+    geom_vline(
+      aes(xintercept=tr),
+      data = data.frame(tr=c(tr_cox,tr_com), grp=c("Cox PH","complex"))
+    )
+  
+}
+
+# Monotone spline for derivative
+if (F) {
+  
+  x <- sort(runif(5))
+  y <- sort(runif(5))
+  
+  theta_n_smoothed <- splinefun(x=x, y=y, method="monoH.FC")
+  
+  ggplot(
+    data.frame(x=seq(0,1,0.01), y=theta_n_smoothed(seq(0,1,0.01))),
+    aes(x=x,y=y)) +
+    geom_line() +
+    labs(title=mmm) +
+    geom_point(data=data.frame(x=x, y=y))
+  
+}
+
+# Use softer cutoffs instead of step functions
+if (F) {
+  
+  ff <- function(w1) { as.integer(abs(w1-0.5)<0.11) }
+  ggplot(data.frame(x=seq(0,1,0.01)), aes(x=x)) + stat_function(fun=ff)
+  
+  ff2 <- function(w1) { pmax(0,1-4*abs(w1-0.5)) }
+  ggplot(data.frame(x=seq(0,1,0.01)), aes(x=x)) + stat_function(fun=ff2)
+  
+}
+
 #
 if (F) {
   
-  ff <- function(w1) { as.numeric(abs(w1-0.5)<0.2) }
-  ggplot(data.frame(x=seq(0,1,0.01)), aes(x=x)) + stat_function(fun=ff)
+  # Generate data
+  dat_orig <- generate_data(
+    n = 2000,
+    alpha_3 = 0.7,
+    distr_A = "Beta(1.5+w1,1.5+w2)", # "Unif(0,1)" "Beta(1.5+w1,1.5+w2)"
+    edge = "none",
+    surv_true = "complex",
+    sampling = "two-phase"
+  )
   
-  ff2 <- function(w1) { pmax(0,2-8*abs(w1-0.5)) }
-  ggplot(data.frame(x=seq(0,1,0.01)), aes(x=x)) + stat_function(fun=ff2)
+  # Prep
+  n_orig <- nrow(dat_orig)
+  dat_orig$weights <- wts(dat_orig)
+  dat <- dat_orig %>% filter(!is.na(a))
+  weights <- dat$weights
   
+  # Construct dataframes of values to pre-compute functions on
+  vlist <- create_val_list(dat_orig, C$appx)
+  
+  # Construct component functions
+  S_n <- construct_S_n(dat_orig, vlist$S_n, type="true")
+  Sc_n <- construct_S_n(dat_orig, vlist$S_n, type="true",
+                        csf=TRUE)
+  f_aIw_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
+                               type="true", k=15)
+  f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
+  g_n <- construct_g_n(vlist$AW_grid, f_aIw_n, f_a_n)
+  omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
+  
+  offset_25 <- (dat$weights *
+     as.integer(dat$a<=0.25) *
+     omega_n(dat$w1,dat$w2,dat$a,dat$y_star,dat$delta_star)
+  ) / g_n(dat$a,dat$w1,dat$w2)
+  offset_75 <- (dat$weights *
+                  as.integer(dat$a<=0.75) *
+                  omega_n(dat$w1,dat$w2,dat$a,dat$y_star,dat$delta_star)
+  ) / g_n(dat$a,dat$w1,dat$w2)
+  print(mean(offset_25))
+  print(mean(offset_75))
+  # print(head(sort(offset)))
+  # print(tail(sort(offset)))
+  # print(mean(sort(offset)[2:length(offset)]))
+    
 }
 
 # Variance of one-step edge estimator
@@ -833,7 +927,7 @@ if (F) {
   p1 <- hz1
   p2 <- hz2 * (1-hz1)
   p3 <- hz3 * (1-hz2)*(1-hz1)
-  p4 <- (1-hz3)*(1-hz2)*(1-hz1) # !!!!! Modification of Diaz and VDL
+  p4 <- (1-hz3)*(1-hz2)*(1-hz1) # Modification of Diaz and VDL
   ggplot(data.frame(
     x = c(1:4),
     y = c(p1,p2,p3,p4)

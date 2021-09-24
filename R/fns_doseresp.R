@@ -129,11 +129,12 @@ create_htab <- function(fnc, vals, round_args=NA, check_dupes=FALSE) {
 #' Probability of sampling
 #' 
 #' @param sampling One of c("iid", "two-phase")
-#' @param y Vector `y` of dataset returned by generate_data()
-#' @param w1 Vector `w1` of dataset returned by generate_data()
-#' @param w2 Vector `w2` of dataset returned by generate_data()
+#' @param delta_star Component of dataset returned by generate_data()
+#' @param y_star Component of dataset returned by generate_data()
+#' @param w1 Component of dataset returned by generate_data()
+#' @param w2 Component of dataset returned by generate_data()
 #' @return A vector of probabilities of sampling
-Pi <- function(sampling, delta_star, w1, w2) {
+Pi <- function(sampling, delta_star, y_star, w1, w2) {
   
   if (sampling=="iid") {
     
@@ -141,8 +142,9 @@ Pi <- function(sampling, delta_star, w1, w2) {
     
   } else if (sampling=="two-phase") {
     
-    pi_w <- function(w1,w2) { expit(w1+w2) }
-    return(delta_star + (1-delta_star)*pi_w(w1,w2))
+    pi_w <- function(w1,w2) { expit(w1+w2-3.85) }
+    ev <- as.integer(delta_star==1 & y_star<=200)
+    return(ev + (1-ev)*pi_w(w1,w2))
     
   }
   
@@ -164,7 +166,7 @@ wts <- function(dat_orig, scale="stabilized") {
   sampling <- attr(dat_orig,"sampling")
   
   weights <- dat_orig$delta /
-    Pi(sampling, dat_orig$delta_star, dat_orig$w1, dat_orig$w2)
+    Pi(sampling, dat_orig$delta_star, dat_orig$y_star, dat_orig$w1, dat_orig$w2)
   
   if (scale=="stabilized") {
     if (sampling=="iid") {
@@ -206,20 +208,22 @@ construct_S_n <- function(dat_orig, vals, type, csf=FALSE) {
     surv_true <- L$surv_true
     alpha_3 <- L$alpha_3
     if (csf) {
-      lambda <- L$lambda2
-      v <- C$v2
+      fnc <- function(t, w1, w2, a) {
+        if (L$surv_true=="Cox PH") {
+          lin <- C$alpha_1*w1 + C$alpha_2*w2 - 1
+        } else if (L$surv_true=="complex") {
+          lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) - 0.35
+        }
+        return(exp(-1*L$lambda2*(t^C$v2)*exp(lin)))
+      }
     } else {
-      lambda <- C$lambda
-      v <- C$v
-    }
-    
-    fnc <- function(t, w1, w2, a) {
-      if (L$surv_true=="Cox PH") {
-        lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1
-        return(exp(-1*lambda*(t^v)*exp(lin)))
-      } else if (L$surv_true=="complex") {
-        lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + alpha_3*w2*a - 1
-        return(exp(-1*lambda*(t^v)*exp(lin)))
+      fnc <- function(t, w1, w2, a) {
+        if (L$surv_true=="Cox PH") {
+          lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
+        } else if (L$surv_true=="complex") {
+          lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2*alpha_3*w2*a - 0.35
+        }
+        return(exp(-1*C$lambda*(t^C$v)*exp(lin)))
       }
     }
     
@@ -454,7 +458,7 @@ construct_deriv_theta_n <- function(theta_n, type) {
     # Construct derivative function
     fnc <- function(x) {
       
-      width <- 0.3
+      width <- 0.2
       x1 <- x - width/2
       x2 <- x + width/2
       
@@ -639,6 +643,8 @@ construct_f_aIw_n <- function(dat_orig, vals, type, k=0, delta1=FALSE) {
     
     
   } else if (type=="parametric") {
+    
+    # !!!!! Update this to include Normals
     
     # Set up weighted likelihood
     wlik <- function(par) {
@@ -833,10 +839,10 @@ construct_omega_n <- function(vals, S_n, Sc_n) {
         )
       )
       
-      integral_righthand <- sum(
-        ( H_n(i,w1,w2,a) - H_n(i-1,w1,w2,a) ) *
-          ( (S_n(i,w1,w2,a)) * Sc_n(i,w1,w2,a) )^-1
-      )
+      # integral_righthand <- sum(
+      #   ( H_n(i,w1,w2,a) - H_n(i-1,w1,w2,a) ) *
+      #     ( (S_n(i,w1,w2,a)) * Sc_n(i,w1,w2,a) )^-1
+      # )
       
       # integral_diffgrid <- 0.5 * sum(
       #   ( H_n((i*k)/m,w1,w2,a) - H_n(((i-1)*k)/m,w1,w2,a) ) * (
@@ -1314,15 +1320,15 @@ construct_pi_n <- function(dat_orig, vals, type) {
     
     if (L$edge=="expit") {
       fnc <- function(w1,w2) { expit(w1+w2-3.3) }
+    } else if (L$edge=="expit2") {
+      fnc <- function(w1,w2) { expit(w1+w2-1) }
     } else if (L$edge=="complex") {
       fnc <- function(w1,w2) { 0.84*w2*pmax(0,1-4*abs(w1-0.5)) }
     } else if (L$edge=="none") {
       fnc <- function(w1,w2) { 0 }
     }
     
-  }
-  
-  if (type=="logistic") {
+  } else if (type=="logistic") {
     
     suppressWarnings({
       model <- glm(
@@ -1338,9 +1344,7 @@ construct_pi_n <- function(dat_orig, vals, type) {
       expit( coeffs[[1]] + coeffs[[2]]*w1 + coeffs[[3]]*w2 )
     }
     
-  }
-  
-  if (type=="SL") {
+  } else if (type=="SL") {
     
     sl <- SuperLearner(
       Y = dat$ind_A0,
@@ -1379,15 +1383,14 @@ construct_pi_n <- function(dat_orig, vals, type) {
 #' @return Value of one-step estiamtor
 theta_os_n <- function(dat_orig, pi_n, S_n, omega_n) {
   
-  # Construct weights
+  # Prep
   n_orig <- nrow(dat_orig)
   dat_orig$weights <- wts(dat_orig)
   dat <- dat_orig %>% filter(!is.na(a))
-  weights <- dat$weights
   
   # Return estimate
   return(
-    1 - (1/n_orig) * sum(weights * (
+    1 - (1/n_orig) * sum(dat$weights * (
       S_n(C$t_e,dat$w1,dat$w2,a=0) - (
         (as.integer(dat$a==0)/pi_n(dat$w1,dat$w2)) *
           omega_n(dat$w1,dat$w2,a=0,dat$y_star,dat$delta_star)
@@ -1410,20 +1413,19 @@ theta_os_n <- function(dat_orig, pi_n, S_n, omega_n) {
 #' @return Asymptotic variance estimate
 sigma2_os_n <- function(dat_orig, pi_n, S_n, omega_n, theta_os_n_est) {
   
-  # Construct weights
+  # Prep
   n_orig <- nrow(dat_orig)
   dat_orig$weights <- wts(dat_orig)
   dat <- dat_orig %>% filter(!is.na(a))
-  weights <- dat$weights
   
   # Return estimate
   return(
-    (1/n_orig) * sum((weights * (
+    (1/n_orig) * sum((dat$weights * (
       S_n(C$t_e,dat$w1,dat$w2,a=0) - (
         (as.integer(dat$a==0)/pi_n(dat$w1,dat$w2)) *
           omega_n(dat$w1,dat$w2,a=0,dat$y_star,dat$delta_star)
       ) -
-        theta_os_n_est
+        (1-theta_os_n_est) # !!!!!
     ))^2)
   )
   

@@ -11,9 +11,60 @@
   params <- list(S_n_type="true", g_n_type="true", ci_type="regular",
                  cf_folds=1, edge_corr="none", deriv_type="spline")
   C <- sim$constants
-  L <- list(n=1000, alpha_3=0.8, lambda2=0.0001, distr_A="N(0.5,0.01)",
-            edge="none", surv_true="complex", sampling="two-phase")
+  L <- list(n=15000, alpha_3=2.5, lambda2=1e-5, distr_A="N(0.5,0.04)",
+            edge="none", surv_true="Cox PH", sampling="two-phase")
   L$estimator <- list(est="Grenander", params=params)
+  
+  # 3. Generate dataset
+  dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
+                            L$surv_true, L$sampling)
+  
+}
+
+
+
+##########################################.
+##### Dataset descriptive statistics #####
+##########################################.
+
+{
+  
+  dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
+                            L$surv_true, L$sampling)
+  
+  print("# of infections by t_e (target: ~50)")
+  print(nrow(filter(dat_orig, delta_star==1 & y_star<=200)))
+  
+  print("# in phase-2 sample (target: ~1,000")
+  print(sum(dat_orig$delta))
+  
+  print("True infection rate at A=0 (target: ~0.001)")
+  print(attr(dat_orig,"theta_true")[1])
+  
+  print("True infection rate at A=1 (target: ~0.02)")
+  print(attr(dat_orig,"theta_true")[51])
+  
+  print("Actual infection rate at A=0 (target: ~0.001)")
+  print("TO DO")
+  
+  print("Actual infection rate at A=1 (target: ~0.02)")
+  print("TO DO")
+  
+  n2 <- c()
+  n_inf <- c()
+  for(i in 1:20) {
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
+                              L$surv_true, L$sampling)
+    n_inf <- c(n_inf,nrow(filter(dat_orig, delta_star==1 & y_star<=200)))
+    n2 <- c(n2, )
+  }
+  print("# infections")
+  print(mean(n_inf))
+  print(mean(n_inf) + c(-1.96,1.96)*sd(n_inf))
+  print("# in phase-2 sample")
+  print(mean(n2))
+  print(mean(n2) + c(-1.96,1.96)*sd(n2))
+  
   
 }
 
@@ -92,9 +143,9 @@
       
       lin <- function(w1,w2,a) {
         if (surv_true=="Cox PH") {
-          C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1
+          C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
         } else if (surv_true=="complex") {
-          C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + alpha_3*w2*a - 1
+          C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2*alpha_3*w2*a - 0.35
         }
       }
       
@@ -198,10 +249,13 @@
   omega_0 <- Vectorize(function(w1,w2,a,y_star,delta_star) {
     
     if (L$surv_true=="Cox PH") {
-      lin <- C$alpha_1*w1 + C$alpha_2*w2 + L$alpha_3*a - 1
+      lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
     } else if (L$surv_true=="complex") {
-      lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + L$alpha_3*w2*a - 1
+      lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2*alpha_3*w2*a - 0.35
     }
+    
+    # !!!!! Note: this needs to be modified since the linear predictors are now
+    #       different for the survival and censoring distributions
     
     piece_1 <- exp(-1*C$lambda*(C$t_e^C$v)*exp(lin))
     
@@ -278,10 +332,13 @@
   omega_0 <- Vectorize(function(w1,w2,a,y_star,delta_star) {
     
     if (surv_true=="Cox PH") {
-      lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1
+      lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
     } else if (surv_true=="complex") {
-      lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + alpha_3*w2*a - 1
+      lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2*alpha_3*w2*a - 0.35
     }
+    
+    # !!!!! Note: this needs to be modified since the linear predictors are now
+    #       different for the survival and censoring distributions
     
     piece_1 <- exp(-1*C$lambda*(C$t_e^C$v)*exp(lin))
     

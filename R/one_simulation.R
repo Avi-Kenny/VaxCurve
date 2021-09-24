@@ -39,7 +39,7 @@ if (cfg$which_sim=="estimation") {
     res_list[["ex_gamma_n"]] <- ests$ex_gamma_n
     res_list[["ex_deriv_theta_n"]] <- ests$ex_deriv_theta_n
     res_list[["ex_tau_n"]] <- ests$ex_tau_n
-    # res_list[[".complex"]] <- dat_orig
+    res_list[[".complex"]] <- ests$timestamps # dat_orig
     
     return(res_list)
     
@@ -68,8 +68,6 @@ if (cfg$which_sim=="edge") {
     # Prep
     n_orig <- nrow(dat_orig)
     dat_orig$weights <- wts(dat_orig)
-    dat <- dat_orig %>% filter(!is.na(a))
-    weights <- dat$weights
     
     # Construct dataframes of values to pre-compute functions on
     vlist <- create_val_list(dat_orig, C$appx)
@@ -79,8 +77,7 @@ if (cfg$which_sim=="edge") {
     Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=L$estimator$params$S_n_type,
                           csf=TRUE)
     omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
-    # pi_n <- construct_pi_n(dat_orig, vlist$W_grid, type="logistic")
-    pi_n <- construct_pi_n(dat_orig, vlist$W_grid, type="true")
+    pi_n <- construct_pi_n(dat_orig, vlist$W_grid, type="logistic")
     theta_os_n_est <- theta_os_n(dat_orig, pi_n, S_n, omega_n)
     sigma2_os_n_est <- sigma2_os_n(dat_orig, pi_n, S_n, omega_n,
                                    theta_os_n_est)

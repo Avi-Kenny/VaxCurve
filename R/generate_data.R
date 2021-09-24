@@ -44,6 +44,8 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sampling) {
   # Adjust A for point mass at the edge
   if (edge=="expit") {
     edge_probs <- expit(w1+w2-3.3)
+  } else if (edge=="expit2") {
+    edge_probs <- expit(w1+w2-1)
   } else if (edge=="complex") {
     edge_probs <- 0.84*w2*pmax(0,1-4*abs(w1-0.5))
   } else if (edge=="none") {
@@ -60,9 +62,9 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sampling) {
       ((1/C$lambda)*t)^(1/C$v)
     }
     if (surv_true=="Cox PH") {
-      lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1
+      lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
     } else if (surv_true=="complex") {
-      lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + alpha_3*w2*a - 1
+      lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2*alpha_3*w2*a - 0.35
     }
     t <- H_0_inv(-1*log(U)*exp(-1*lin))
     
@@ -72,9 +74,9 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sampling) {
       ((1/L$lambda2)*t)^(1/C$v2)
     }
     if (surv_true=="Cox PH") {
-      lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1
+      lin <- C$alpha_1*w1 + C$alpha_2*w2 - 1
     } else if (surv_true=="complex") {
-      lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + alpha_3*w2*a - 1
+      lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) - 0.35
     }
     c <- H_0_inv2(-1*log(U)*exp(-1*lin))
     # c <- pmin(c,C$t_e)
@@ -87,14 +89,14 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sampling) {
   
   # IID sampling
   if (sampling=="iid") {
-    dat <- data.frame(w1=w1, w2=w2, a=a, delta=1, y_star=y_star,
+    dat_orig <- data.frame(w1=w1, w2=w2, a=a, delta=1, y_star=y_star,
                       delta_star=delta_star)
   }
   
   # Two-phase sampling
   if (sampling=="two-phase") {
-    delta <- rbinom(n, size=1, prob=Pi("two-phase",delta_star,w1,w2))
-    dat <- data.frame(w1=w1, w2=w2, a=ifelse(delta==1,a,NA), delta=delta,
+    delta <- rbinom(n, size=1, prob=Pi("two-phase",delta_star,y_star,w1,w2))
+    dat_orig <- data.frame(w1=w1, w2=w2, a=ifelse(delta==1,a,NA), delta=delta,
                       y_star=y_star, delta_star=delta_star)
   }
   
@@ -113,9 +115,9 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sampling) {
       
       lin <- function(w1,w2,a) {
         if (surv_true=="Cox PH") {
-          C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1
+          C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
         } else if (surv_true=="complex") {
-          C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + alpha_3*w2*a - 1
+          C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2*alpha_3*w2*a - 0.35
         }
       }
       
@@ -129,9 +131,9 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sampling) {
   }
   
   # Add attributes to dataframe
-  attr(dat, "theta_true") <- theta_true_f(C$points)
-  attr(dat, "sampling") <- sampling
+  attr(dat_orig, "theta_true") <- theta_true_f(C$points)
+  attr(dat_orig, "sampling") <- sampling
   
-  return(dat)
+  return(dat_orig)
   
 }

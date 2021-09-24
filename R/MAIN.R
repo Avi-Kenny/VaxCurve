@@ -12,22 +12,24 @@
 #   - tedwestling/survSuperLearner
 #   - zeehio/facetscales
 cfg <- list(
-  which_sim = "edge", # estimation edge testing
+  which_sim = "estimation", # estimation edge testing
   level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
   run_or_update = "run",
-  num_sim = 1000,
+  num_sim = 500,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp"),
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
                      "data.table", "latex2exp", "tidyr"),
   parallel = "none",
-  stop_at_error = FALSE,
+  stop_at_error = F,
   appx = list(t_e=1, w1=0.1, w1b=0.1, a=0.01)
 )
 
 # Set cluster config
 cluster_config <- list(
+  # js = "ge",
+  # dir = "/home/users/avikenny/Desktop/z.VaxCurve"
   js = "slurm",
   dir = "/home/akenny/z.VaxCurve"
 )
@@ -78,8 +80,11 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   # Level bank
   if (F) {
     level_bank <- list(
-      alpha_3 = c(0, 0.4, 0.8),
-      distr_A = c("Unif(0,1)", "Beta(1.5+w1,1.5+w2)"),
+      n = 5000,
+      alpha_3 = c(0,1.25,2.5),
+      lambda2 = 1e-5,
+      distr_A = c("Unif(0,1)", "Beta(1.5+w1,1.5+w2)",
+                  "N(0.5,0.01)", "N(0.5,0.04)"),
       edge = c("none", "expit", "complex"),
       surv_true = c("Cox PH", "complex"),
       sampling = c("iid", "two-phase"),
@@ -116,37 +121,33 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   }
   
   # Estimation: compare all methods
-  # Not currently using (ci_type="sample split", m=5) or (ci_type="regular")
   level_set_estimation_1 <- list(
-    n = c(1000,5000),
-    alpha_3 = 0.8,
-    lambda2 = 0.0001,
-    distr_A = "N(0.5,0.01)",
+    n = 15000,
+    alpha_3 = 2.5,
+    lambda2 = 1e-5, # 1e-4
+    distr_A = "N(0.5,0.04)",
     # distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
-    edge = "expit",
-    surv_true = c("Cox PH", "complex"),
+    edge = "none",
+    surv_true = "Cox PH",
+    # surv_true = c("Cox PH", "complex"),
     sampling = "two-phase",
     estimator = list(
-      "Grenander (S_n:true, g_n:true)" = list(
+      "Grenander (Est S_n/g_n)" = list(
         est = "Grenander",
         params = list(S_n_type="true", g_n_type="true",
-                      ci_type="regular", cf_folds=1, edge_corr="max",
+                      ci_type="regular", cf_folds=1, edge_corr="none",
                       deriv_type="m-spline")
+        # params = list(S_n_type="Random Forest", g_n_type="binning",
+        #               ci_type="regular", cf_folds=1, edge_corr="none",
+        #               deriv_type="m-spline")
       )
-      # "Grenander (S_n:RF, g_n:binning)" = list(
-      #   est = "Grenander",
-      #   params = list(S_n_type="Random Forest", g_n_type="binning",
-      #                 ci_type="regular", cf_folds=1, edge_corr="none",
-      #                 deriv_type="m-spline")
-      # )
     )
   )
   
   # Testing: compare all methods
-  # Not currently using (var="boot")
   level_set_testing_1 <- list(
     n = c(1000,2000),
-    alpha_3 = c(0,0.3,0.6),
+    alpha_3 = c(0,1.25,2.5),
     distr_A = c("Unif(0,1)","Beta(1.5+w1,1.5+w2)"),
     edge = "none",
     surv_true = "Cox PH",
@@ -172,8 +173,13 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
 
 # Use these commands to run on Slurm:
 # sbatch --export=sim_run='first',cluster='bionic',type='R',project='z.VaxCurve' -e ./io/slurm-%A_%a.out -o ./io/slurm-%A_%a.out --constraint=gizmok run_r.sh
-# sbatch --depend=afterok:11 --array=1-1200 --export=sim_run='main',cluster='bionic',type='R',project='z.VaxCurve' -e ./io/slurm-%A_%a.out -o ./io/slurm-%A_%a.out --constraint=gizmok run_r.sh
+# sbatch --depend=afterok:11 --array=1-600 --export=sim_run='main',cluster='bionic',type='R',project='z.VaxCurve' -e ./io/slurm-%A_%a.out -o ./io/slurm-%A_%a.out --constraint=gizmok run_r.sh
 # sbatch --depend=afterok:12 --export=sim_run='last',cluster='bionic',type='R',project='z.VaxCurve' -e ./io/slurm-%A_%a.out -o ./io/slurm-%A_%a.out --constraint=gizmok run_r.sh
+
+# Commands for job sumbission on SGE:
+# qsub -v sim_run='first',cluster='bayes',type='R',project='z.VaxCurve' -cwd -e ./io/ -o ./io/ run_r.sh
+# qsub -hold_jid 1992344 -t 1-600 -v sim_run='main',cluster='bayes',type='R',project='z.VaxCurve' -cwd -e ./io/ -o ./io/ run_r.sh
+# qsub -hold_jid 1992345 -v sim_run='last',cluster='bayes',type='R',project='z.VaxCurve' -cwd -e ./io/ -o ./io/ run_r.sh
 
 if (cfg$run_or_update=="run") {
   
@@ -216,10 +222,8 @@ if (cfg$run_or_update=="run") {
       # lambda2 and v2 are the Weibull parameters for the censoring distribution
       # For the approximations, w1b is used for S_n and w1 is used elsewhere
       sim %<>% add_constants(
-        lambda = 0.0001,
+        lambda = 1e-6, # 1e-4
         v = 1.5,
-        # lambda2 = 0.5 * 10^-4, # original (some censoring; biased)
-        # lambda2 = 0.5 * 10^-7, # new (no censoring; unbiased)
         v2 = 1.5,
         points = seq(0,1,0.02),
         alpha_1 = 0.5,
@@ -279,7 +283,7 @@ if (cfg$run_or_update=="update") {
 if (FALSE) {
   
   # Read in simulation object
-  sim <- readRDS("../SimEngine.out/sim_est_20210819.rds")
+  sim <- readRDS("../SimEngine.out/sim_est_20210922.rds")
   
   # Summarize results
   summ_bias <- list()
@@ -325,10 +329,8 @@ if (FALSE) {
   cb_colors <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442",
                  "#0072B2", "#D55E00", "#CC79A7", "#999999")
   m_colors <- c(
-    # `G-comp` = cb_colors[1],
-    `Grenander (logit CIs)` = cb_colors[2]
-    # `Grenander (split CIs, m=5)` = cb_colors[3]
-    # `Grenander (regular CIs)` = cb_colors[4],
+    `Grenander (Est S_n/g_n)` = cb_colors[2],
+    `Grenander (True S_n/g_n)` = cb_colors[5]
   )
   
   df_distr_A <- data.frame(
@@ -347,10 +349,10 @@ if (FALSE) {
     distr_A = rep(c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"),2)
   )
   
-  distr_A_ <- "N(0.5,0.01)"
-  df_distr_A1 %<>% filter(distr_A==distr_A_)
-  df_distr_A2 %<>% filter(distr_A==distr_A_)
-  df_vlines %<>% filter(distr_A==distr_A_)
+  # distr_A_ <- "N(0.5,0.04)"
+  # df_distr_A1 %<>% filter(distr_A==distr_A_)
+  # df_distr_A2 %<>% filter(distr_A==distr_A_)
+  # df_vlines %<>% filter(distr_A==distr_A_)
   
   # Bias plots
   # Export: 8" x 5"
@@ -365,11 +367,11 @@ if (FALSE) {
                linetype="dashed") +
     geom_line() +
     facet_grid(rows=dplyr::vars(surv_true), cols=dplyr::vars(distr_A)) +
-    scale_y_continuous(labels=percent, limits=c(-0.04,0.04)) +
+    scale_y_continuous(labels=percent, limits=c(-0.2,0.2)) +
     # scale_y_continuous(labels=percent) +
     xlim(c(0,1)) +
     # xlim(c(0.2,0.8)) +
-    # scale_color_manual(values=m_colors) +
+    scale_color_manual(values=m_colors) +
     labs(title="Bias (%)", x="A", y=NULL, color="n")
   
   # Coverage plot
@@ -389,15 +391,15 @@ if (FALSE) {
     scale_y_continuous(labels=percent, limits=c(0.7,1)) +
     # scale_y_continuous(labels=percent) +
     xlim(c(0,1)) +
-    # scale_color_manual(values=m_colors) +
+    scale_color_manual(values=m_colors) +
     labs(title="Coverage (%)", x="A", y=NULL, color="n")
   
   # MSE plot
   # Export: 8" x 5"
   ggplot(
     filter(p_data, stat=="mse"),
-    aes(x=point, y=value)
-    # aes(x=point, y=value, color=Estimator, group=Estimator)
+    # aes(x=point, y=value)
+    aes(x=point, y=value, color=Estimator, group=Estimator)
   ) +
     geom_hline(aes(yintercept=0.95), linetype="longdash", color="grey") +
     geom_line() +
@@ -456,6 +458,118 @@ if (FALSE) {
     labs(title="Testing", color="Sample size")
     # labs(title = paste0("alpha_3: ",alpha_3_,"; Sampling: ",sampling_),
     #      color = "Test")
+  
+}
+
+
+
+##################################################.
+##### MISC: Process edge estimation mini-sim #####
+##################################################.
+
+if (FALSE) {
+  
+  # Read in simulation object
+  sim <- readRDS("../SimEngine.out/sim_edge_20210921.rds")
+  
+  # Summarize results
+  summ <- sim %>% summarize(
+    bias_pct = list(
+      name = "bias_pct",
+      estimate = "theta_est",
+      truth = "theta_true"
+    ),
+    coverage = list(
+      name = "coverage",
+      truth = "theta_true",
+      lower = "ci_lo",
+      upper = "ci_hi"
+      # na.rm = TRUE
+    )
+  )
+  summ
+  
+}
+
+
+
+#############################.
+##### VIZ: Sample paths #####
+#############################.
+
+if (FALSE) {
+  
+  # Read in simulation object
+  # sim <- readRDS("../SimEngine.out/sim_est_20210921.rds") # edge_corr="none"
+  sim <- readRDS("../SimEngine.out/sim_est_20210922.rds") # edge_corr="max"
+  
+  # Filter data
+  distr_A_ <- "N(0.5,0.04)"
+  surv_true_ <- "complex"
+  d <- sim$results %>% filter(
+    n==5000 & distr_A==distr_A_ & surv_true==surv_true_
+  )
+  d %<>% filter(estimator=="Grenander (Est S_n/g_n)")
+  if (length(unique(d$level_id))!=1) { stop("adjust filtering") }
+  
+  # Set up vector containers
+  theta_true <- c()
+  theta_est <- c()
+  ci_lo <- c()
+  ci_hi <- c()
+  which <- c()
+  
+  # Extract simulation data into vectors
+  n_paths <- 6
+  row_offset <- 10
+  for (i in c(1:51)) {
+    m <- format(round(i/50-0.02,2), nsmall=1)
+    theta_true <- c(theta_true, d[1,paste0("theta_",m)])
+  }
+  for (i in 1:n_paths) {
+    for (j in c(1:51)) {
+      m <- format(round(j/50-0.02,2), nsmall=1)
+      theta_est <- c(theta_est, d[i+row_offset,paste0("est_",m)])
+      ci_lo <- c(ci_lo, d[i+row_offset,paste0("ci_lo_",m)])
+      ci_hi <- c(ci_hi, d[i+row_offset,paste0("ci_hi_",m)])
+      which <- c(which, i)
+    }
+  }
+  
+  plot_data <- data.frame(
+    x = rep(sim$constants$points, n_paths),
+    y = theta_est,
+    ci_lo = ci_lo,
+    ci_hi = ci_hi,
+    which = which
+  )
+  ggplot(
+    plot_data,
+    aes(x=x, y=y, fill=factor(which), color=factor(which))
+  ) +
+    geom_vline(
+      xintercept = c(qnorm(0.1,0.5,0.2),qnorm(0.9,0.5,0.2)),
+      color = "orange",
+      linetype = "dashed"
+    ) +
+    geom_line(
+      data = data.frame(x=sim$constants$points, y=theta_true),
+      color = "#222222"
+    ) +
+    geom_line() +
+    geom_ribbon(
+      aes(ymin=ci_lo, ymax=ci_hi),
+      alpha = 0.2,
+      linetype = "dotted"
+    ) +
+    facet_wrap(~which, ncol=3) +
+    # xlim(c(0.2,0.8)) +
+    ylim(c(0,0.01)) +
+    theme(
+      legend.position = "none",
+      strip.background = element_blank(),
+      strip.text.x = element_blank()
+    )
   
 }
 

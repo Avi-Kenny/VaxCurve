@@ -12,9 +12,13 @@
 #'     on the edge.s
 #' @param surv_true True form of the survival function; one c("Cox PH",
 #'     "complex")
-#' @param sampling Two-phase sampling mechanism; one of c("iid","two-phase")
+#' @param sc_params Weibull parameters for the survival and censoring
+#'     distributions; a list of the form list(lmbd=1,v=1,lmbd2=1,v2=1)
+#' @param sampling Two-phase sampling mechanism; one of c("iid",
+#'     "two-phase (6%)", "two-phase (72%)")
 #' @return A dataframe representing the study population
-generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sampling) {
+generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
+                          sampling) {
   
   # Sample baseline covariates
   w1 <- sample(seq(0,1,0.1), size=n, replace=T) # w1 <- runif(n)
@@ -59,19 +63,19 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sampling) {
     # Generate survival times (Weibull)
     U <- runif(n)
     H_0_inv <- function(t) {
-      ((1/C$lambda)*t)^(1/C$v)
+      ((1/sc_params$lmbd)*t)^(1/sc_params$v)
     }
     if (surv_true=="Cox PH") {
       lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
     } else if (surv_true=="complex") {
-      lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2*alpha_3*w2*a - 0.35
+      lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 1.2*alpha_3*w2*a - 1
     }
     t <- H_0_inv(-1*log(U)*exp(-1*lin))
     
     # Generate censoring times (Weibull)
     U <- runif(n)
     H_0_inv2 <- function(t) {
-      ((1/L$lambda2)*t)^(1/C$v2)
+      ((1/sc_params$lmbd2)*t)^(1/sc_params$v2)
     }
     if (surv_true=="Cox PH") {
       lin <- C$alpha_1*w1 + C$alpha_2*w2 - 1
@@ -87,21 +91,14 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sampling) {
     
   }
   
-  # IID sampling
+  # Conduct sampling
   if (sampling=="iid") {
     dat_orig <- data.frame(w1=w1, w2=w2, a=a, delta=1, y_star=y_star,
                       delta_star=delta_star)
-  }
-  
-  # Two-phase sampling
-  if (sampling=="two-phase") {
-    delta <- rbinom(n, size=1, prob=Pi("two-phase",delta_star,y_star,w1,w2))
+  } else {
+    delta <- rbinom(n, size=1, prob=Pi(sampling,delta_star,y_star,w1,w2))
     dat_orig <- data.frame(w1=w1, w2=w2, a=ifelse(delta==1,a,NA), delta=delta,
-                      y_star=y_star, delta_star=delta_star)
-  }
-  
-  if (!(sampling %in% c("iid", "two-phase"))) {
-    stop("`sampling` incorrectly specified")
+                           y_star=y_star, delta_star=delta_star)
   }
   
   # Set up function to calculate true regression values over C$points
@@ -117,12 +114,12 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sampling) {
         if (surv_true=="Cox PH") {
           C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
         } else if (surv_true=="complex") {
-          C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2*alpha_3*w2*a - 0.35
+          C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 1.2*alpha_3*w2*a - 1
         }
       }
       
       S_0 <- function(t, w1, w2, a) {
-        exp( -1 * C$lambda * (t^C$v) * exp(lin(w1,w2,a)) )
+        exp( -1 * sc_params$lmbd * (t^sc_params$v) * exp(lin(w1,w2,a)) )
       }
       
       return(1 - mean(S_0(C$t_e, w1, w2, a)))

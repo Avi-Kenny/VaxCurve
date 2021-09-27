@@ -13,9 +13,9 @@
 #   - zeehio/facetscales
 cfg <- list(
   which_sim = "estimation", # estimation edge testing
-  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
+  level_set_which = "level_set_estimation_2", # level_set_estimation_1 level_set_testing_1
   run_or_update = "run",
-  num_sim = 500,
+  num_sim = 1000,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp"),
@@ -82,12 +82,12 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     level_bank <- list(
       n = 5000,
       alpha_3 = c(0,1.25,2.5),
-      lambda2 = 1e-5,
+      sc_params = list("sc_params"=list(lmbd=9e-7, v=1.5, lmbd2=1e-5, v2=1.5)),
       distr_A = c("Unif(0,1)", "Beta(1.5+w1,1.5+w2)",
                   "N(0.5,0.01)", "N(0.5,0.04)"),
       edge = c("none", "expit", "complex"),
       surv_true = c("Cox PH", "complex"),
-      sampling = c("iid", "two-phase"),
+      sampling = c("iid", "two-phase (6%)", "two-phase (72%)"),
       estimator = list(
         "G-comp" = list(
           est = "G-comp", cf_folds = 1,
@@ -120,38 +120,66 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     )
   }
   
-  # Estimation: compare all methods
+  # Estimation: ideal
   level_set_estimation_1 <- list(
-    n = 15000,
-    alpha_3 = 2.5,
-    lambda2 = 1e-5, # 1e-4
-    distr_A = "N(0.5,0.04)",
-    # distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
+    n = 7000,
+    alpha_3 = 3,
+    sc_params = list("sc_params"=list(lmbd=3e-5, v=1.5, lmbd2=5e-5, v2=1.5)),
+    distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
     edge = "none",
-    surv_true = "Cox PH",
-    # surv_true = c("Cox PH", "complex"),
-    sampling = "two-phase",
+    surv_true = c("Cox PH", "complex"),
+    sampling = "two-phase (72%)",
     estimator = list(
-      "Grenander (Est S_n/g_n)" = list(
+      "Grenander (True S_n/g_n)" = list(
         est = "Grenander",
         params = list(S_n_type="true", g_n_type="true",
                       ci_type="regular", cf_folds=1, edge_corr="none",
                       deriv_type="m-spline")
-        # params = list(S_n_type="Random Forest", g_n_type="binning",
-        #               ci_type="regular", cf_folds=1, edge_corr="none",
-        #               deriv_type="m-spline")
+      ),
+      "Grenander (Est S_n/g_n)" = list(
+        est = "Grenander",
+        params = list(S_n_type="Random Forest", g_n_type="binning",
+                      ci_type="regular", cf_folds=1, edge_corr="none",
+                      deriv_type="m-spline")
+      )
+    )
+  )
+  
+  # Estimation: parameters similar to Moderna trial
+  level_set_estimation_2 <- list(
+    n = 15000,
+    alpha_3 = 3,
+    sc_params = list("sc_params"=list(lmbd=4e-7, v=1.6, lmbd2=3e-5, v2=1.5)),
+    distr_A = "N(0.5,0.04)",
+    edge = "none",
+    surv_true = c("Cox PH", "complex"),
+    sampling = "two-phase (6%)",
+    estimator = list(
+      "Grenander (True S_n/g_n)" = list(
+        est = "Grenander",
+        params = list(S_n_type="true", g_n_type="true",
+                      ci_type="regular", cf_folds=1, edge_corr="none",
+                      deriv_type="m-spline")
+      ),
+      "Grenander (Est S_n/g_n)" = list(
+        est = "Grenander",
+        params = list(S_n_type="Random Forest", g_n_type="binning",
+                      ci_type="regular", cf_folds=1, edge_corr="none",
+                      deriv_type="m-spline")
       )
     )
   )
   
   # Testing: compare all methods
+  # !!!!! Update these level sets
   level_set_testing_1 <- list(
     n = c(1000,2000),
     alpha_3 = c(0,1.25,2.5),
+    sc_params = list("sc_params"=list(lmbd=9e-7, v=1.5, lmbd2=1e-5, v2=1.5)),
     distr_A = c("Unif(0,1)","Beta(1.5+w1,1.5+w2)"),
     edge = "none",
     surv_true = "Cox PH",
-    sampling = "two-phase",
+    sampling = "two-phase (72%)",
     test = list(
       "Slope (one-step Gamma_n)" = list(
         type = "test_2",
@@ -174,12 +202,12 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
 # Use these commands to run on Slurm:
 # sbatch --export=sim_run='first',cluster='bionic',type='R',project='z.VaxCurve' -e ./io/slurm-%A_%a.out -o ./io/slurm-%A_%a.out --constraint=gizmok run_r.sh
 # sbatch --depend=afterok:11 --array=1-600 --export=sim_run='main',cluster='bionic',type='R',project='z.VaxCurve' -e ./io/slurm-%A_%a.out -o ./io/slurm-%A_%a.out --constraint=gizmok run_r.sh
-# sbatch --depend=afterok:12 --export=sim_run='last',cluster='bionic',type='R',project='z.VaxCurve' -e ./io/slurm-%A_%a.out -o ./io/slurm-%A_%a.out --constraint=gizmok run_r.sh
+# sbatch --depend=afterok:12 --export=sim_run='last',cluster='bionic',type='R',project='z.VaxCurve' -e ./io/slurm-%A_%a.out -o ./z.VaxCurve/sim_output.out --constraint=gizmok run_r.sh
 
 # Commands for job sumbission on SGE:
 # qsub -v sim_run='first',cluster='bayes',type='R',project='z.VaxCurve' -cwd -e ./io/ -o ./io/ run_r.sh
 # qsub -hold_jid 1992344 -t 1-600 -v sim_run='main',cluster='bayes',type='R',project='z.VaxCurve' -cwd -e ./io/ -o ./io/ run_r.sh
-# qsub -hold_jid 1992345 -v sim_run='last',cluster='bayes',type='R',project='z.VaxCurve' -cwd -e ./io/ -o ./io/ run_r.sh
+# qsub -hold_jid 1992345 -v sim_run='last',cluster='bayes',type='R',project='z.VaxCurve' -cwd -e ./io/ -o ./z.VaxCurve/ run_r.sh
 
 if (cfg$run_or_update=="run") {
   
@@ -218,13 +246,8 @@ if (cfg$run_or_update=="run") {
       }
       
       # Add constants
-      # lambda and v are the Weibull parameters for the survival distribution
-      # lambda2 and v2 are the Weibull parameters for the censoring distribution
       # For the approximations, w1b is used for S_n and w1 is used elsewhere
       sim %<>% add_constants(
-        lambda = 1e-6, # 1e-4
-        v = 1.5,
-        v2 = 1.5,
         points = seq(0,1,0.02),
         alpha_1 = 0.5,
         alpha_2 = 0.7,
@@ -319,7 +342,7 @@ if (FALSE) {
   
   p_data <- pivot_longer(
     data = summ,
-    cols = -c(level_id,n,alpha_3,lambda2,distr_A,edge,
+    cols = -c(level_id,n,alpha_3,sc_params,distr_A,edge,
               surv_true,sampling,Estimator),
     names_to = c("stat","point"),
     names_sep = "_"
@@ -358,8 +381,8 @@ if (FALSE) {
   # Export: 8" x 5"
   ggplot(
     filter(p_data, stat=="bias"),
-    aes(x=point, y=value)
-    # aes(x=point, y=value, color=Estimator, group=Estimator)
+    # aes(x=point, y=value)
+    aes(x=point, y=value, color=Estimator, group=Estimator)
   ) +
     geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
                 data=df_distr_A1, fill="grey", color=NA, alpha=0.4) +
@@ -369,8 +392,6 @@ if (FALSE) {
     facet_grid(rows=dplyr::vars(surv_true), cols=dplyr::vars(distr_A)) +
     scale_y_continuous(labels=percent, limits=c(-0.2,0.2)) +
     # scale_y_continuous(labels=percent) +
-    xlim(c(0,1)) +
-    # xlim(c(0.2,0.8)) +
     scale_color_manual(values=m_colors) +
     labs(title="Bias (%)", x="A", y=NULL, color="n")
   
@@ -378,8 +399,8 @@ if (FALSE) {
   # Export: 8" x 5"
   ggplot(
     filter(p_data, stat=="cov"),
-    aes(x=point, y=value)
-    # aes(x=point, y=value, color=Estimator, group=Estimator)
+    # aes(x=point, y=value)
+    aes(x=point, y=value, color=Estimator, group=Estimator)
   ) +
     geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
                 data=df_distr_A2, fill="grey", color=NA, alpha=0.4) +
@@ -390,7 +411,6 @@ if (FALSE) {
     facet_grid(rows=dplyr::vars(surv_true), cols=dplyr::vars(distr_A)) +
     scale_y_continuous(labels=percent, limits=c(0.7,1)) +
     # scale_y_continuous(labels=percent) +
-    xlim(c(0,1)) +
     scale_color_manual(values=m_colors) +
     labs(title="Coverage (%)", x="A", y=NULL, color="n")
   
@@ -404,8 +424,8 @@ if (FALSE) {
     geom_hline(aes(yintercept=0.95), linetype="longdash", color="grey") +
     geom_line() +
     facet_grid(rows=dplyr::vars(surv_true), cols=dplyr::vars(distr_A)) +
-    # scale_color_manual(values=m_colors) +
     ylim(0,0.003) +
+    scale_color_manual(values=m_colors) +
     labs(title="MSE", x="A", y=NULL, color="Estimator")
   
 }

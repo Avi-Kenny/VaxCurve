@@ -34,24 +34,20 @@ est_curve <- function(dat_orig, estimator, params, points) {
       dat_orig %<>% mutate(a = ifelse(a==0, noise, a))
     }
     
-    simlog <- (function() {
-      time_st <- Sys.time()
-      timestamps <- data.frame(msg="Start", time="0")
-      return(function (msg=NA) {
-        if (is.na(msg)) {
-          return(timestamps)
-        } else {
-          time_elapsed <- format(Sys.time()-time_st)
-          timestamps[nrow(timestamps)+1,] <<- list(msg, time_elapsed)
-        }
-      })
-    })()
-    
-    # Prep
-    n_orig <- nrow(dat_orig)
-    dat_orig$weights <- wts(dat_orig)
-    dat <- dat_orig %>% filter(!is.na(a))
-    weights <- dat$weights
+    # simlog <- (function() {
+    #   time_st <- Sys.time()
+    #   timestamps <- data.frame(msg="Start", time="0")
+    #   return(function (msg=NA) {
+    #     if (is.na(msg)) {
+    #       return(timestamps)
+    #     } else {
+    #       time_elapsed <- format(Sys.time()-time_st)
+    #       timestamps[nrow(timestamps)+1,] <<- list(msg, time_elapsed)
+    #     }
+    #   })
+    # })()
+    # simlog("1")
+    # simlog()
     
     # Construct dataframes of values to pre-compute functions on
     vlist <- create_val_list(dat_orig, C$appx)
@@ -60,39 +56,26 @@ est_curve <- function(dat_orig, estimator, params, points) {
     if (params$cf_folds==1) {
       
       # Construct component functions
-      simlog("1")
       Phi_n <- construct_Phi_n(dat_orig)
-      simlog("2")
       Phi_n_inv <- construct_Phi_n(dat_orig, type="inverse")
-      simlog("3")
       S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
-      simlog("4")
       Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type,
                             csf=TRUE)
-      simlog("5")
       f_aIw_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
                                    type=params$g_n_type, k=15)
-      simlog("6")
       f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
-      simlog("7")
       g_n <- construct_g_n(vlist$AW_grid, f_aIw_n, f_a_n)
-      simlog("8")
       omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
-      simlog("9")
-      
+
       # Construct Gamma_n
       Gamma_n <- construct_Gamma_n(dat_orig, vlist$A_grid, omega_n, S_n, g_n)
-      simlog("10")
-      
+
       # Construct one-step edge estimator
       if (params$edge_corr!="none") {
         pi_n <- construct_pi_n(dat_orig, vlist$W_grid, type="logistic")
-        simlog("10.1")
         theta_os_n_est <- theta_os_n(dat_orig, pi_n, S_n, omega_n)
-        simlog("10.2")
         sigma2_os_n_est <- sigma2_os_n(dat_orig, pi_n, S_n, omega_n,
                                        theta_os_n_est)
-        simlog("10.3")
       }
       
     }
@@ -113,10 +96,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
       
     }
 
-    simlog("11")
-    Psi_n <- Vectorize(function(x) {
-      return(Gamma_n(Phi_n_inv(x)))
-    })
+    Psi_n <- Vectorize(function(x) { Gamma_n(Phi_n_inv(x)) })
     gcm <- gcmlcm(x=seq(0,1,0.0001), y=Psi_n(seq(0,1,0.0001)), type="gcm")
     dGCM <- Vectorize(function(x) {
       if (x==0) {
@@ -129,11 +109,8 @@ est_curve <- function(dat_orig, estimator, params, points) {
     })
     
     # Construct Grenander-based theta_n
-    theta_n_Gr <- function(x) {
-      x_trans <- Phi_n(x)
-      return(dGCM(x_trans))
-    }
-
+    theta_n_Gr <- function(x) { dGCM(Phi_n(x)) }
+    
     # Recompute functions on full dataset
     if (params$cf_folds>1) {
       S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
@@ -146,17 +123,13 @@ est_curve <- function(dat_orig, estimator, params, points) {
     }
     
     # Compute new functions
-    simlog("12")
     f_aIw_delta1_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
                                         type=params$g_n_type, k=15, delta1=TRUE)
-    simlog("13")
     f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid,
                                     f_aIw_delta1_n)
-    simlog("14")
     gamma_n <- construct_gamma_n(dat_orig, vlist$A_grid, type="kernel",
                                  omega_n, f_aIw_n, f_a_n, f_a_delta1_n)
-    simlog("15")
-    
+
     # Edge correction
     if (params$edge_corr %in% c("none", "spread")) {
       
@@ -187,12 +160,9 @@ est_curve <- function(dat_orig, estimator, params, points) {
     }
     
     # Construct variance scale factor
-    simlog("16")
     deriv_theta_n <- construct_deriv_theta_n(theta_n, type=params$deriv_type)
-    simlog("17")
     tau_n <- construct_tau_n(deriv_theta_n, gamma_n, f_a_n)
-    simlog("18")
-    
+
     # Generate estimates for each point
     # The pmax() prevents errors when estimates are negative
     # ests <- pmax(theta_n(points),0)
@@ -213,6 +183,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
       # The 0.975 quantile of the Chernoff distribution occurs at roughly 1.00
       # The Normal approximation would use qnorm(0.975, sd=0.52) instead
       qnt <- 1.00
+      n_orig <- nrow(dat_orig)
       # qnt <- qnorm(0.975, sd=0.52)
       if (params$ci_type=="regular") {
         ci_lo <- ests - (qnt*tau_ns)/(n_orig^(1/3))
@@ -251,7 +222,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
     res[["ex_gamma_n"]] <- gamma_n(0.5)
     res[["ex_deriv_theta_n"]] <- deriv_theta_n(0.5)
     res[["ex_tau_n"]] <- tau_n(0.5)
-    res[["timestamps"]] <- simlog()
+    # res[["timestamps"]] <- simlog()
     
     return(res)
     

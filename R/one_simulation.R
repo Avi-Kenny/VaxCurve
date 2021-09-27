@@ -13,7 +13,7 @@ if (cfg$which_sim=="estimation") {
     
     # Generate dataset
     dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
-                              L$surv_true, L$sampling)
+                              L$surv_true, L$sc_params, L$sampling)
     
     # Obtain estimates
     ests <- est_curve(
@@ -39,7 +39,7 @@ if (cfg$which_sim=="estimation") {
     res_list[["ex_gamma_n"]] <- ests$ex_gamma_n
     res_list[["ex_deriv_theta_n"]] <- ests$ex_deriv_theta_n
     res_list[["ex_tau_n"]] <- ests$ex_tau_n
-    res_list[[".complex"]] <- ests$timestamps # dat_orig
+    # res_list[[".complex"]] <- ests$timestamps # dat_orig
     
     return(res_list)
     
@@ -63,7 +63,7 @@ if (cfg$which_sim=="edge") {
     
     # Generate dataset
     dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
-                              L$surv_true, L$sampling)
+                              L$surv_true, L$sc_params, L$sampling)
     
     # Prep
     n_orig <- nrow(dat_orig)
@@ -110,7 +110,7 @@ if (cfg$which_sim=="testing") {
     
     # Generate dataset
     dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
-                              L$surv_true, L$sampling)
+                              L$surv_true, L$sc_params, L$sampling)
     
     # Perform hypothesis test
     test_results <- use_method(L$test$type, list(

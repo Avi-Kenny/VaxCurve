@@ -9,15 +9,24 @@
   
   # 2. Set global constants
   params <- list(S_n_type="true", g_n_type="true", ci_type="regular",
-                 cf_folds=1, edge_corr="none", deriv_type="spline")
+                 cf_folds=1, edge_corr="none", deriv_type="m-spline")
   C <- sim$constants
-  L <- list(n=15000, alpha_3=2.5, lambda2=1e-5, distr_A="N(0.5,0.04)",
-            edge="none", surv_true="Cox PH", sampling="two-phase")
-  L$estimator <- list(est="Grenander", params=params)
+  L <- list(n=15000, alpha_3=3,
+            sc_params=list(lmbd=4e-7,v=1.6,lmbd2=3e-5,v2=1.5),
+            distr_A="N(0.5,0.04)", edge="none", surv_true="Cox PH",
+            sampling="two-phase (6%)",
+            estimator=list("G"=list(est="Grenander",params=params))
+  )
+  # L <- list(n=7000, alpha_3=3,
+  #           sc_params=list(lmbd=3e-5,v=1.5,lmbd2=5e-5,v2=1.5),
+  #           distr_A="N(0.5,0.04)", edge="none", surv_true="Cox PH",
+  #           sampling="two-phase (6%)",
+  #           estimator=list("G"=list(est="Grenander",params=params))
+  # )
   
   # 3. Generate dataset
   dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
-                            L$surv_true, L$sampling)
+                            L$surv_true, L$sc_params, L$sampling)
   
 }
 
@@ -29,42 +38,41 @@
 
 {
   
-  dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
-                            L$surv_true, L$sampling)
-  
-  print("# of infections by t_e (target: ~50)")
-  print(nrow(filter(dat_orig, delta_star==1 & y_star<=200)))
-  
-  print("# in phase-2 sample (target: ~1,000")
-  print(sum(dat_orig$delta))
-  
-  print("True infection rate at A=0 (target: ~0.001)")
-  print(attr(dat_orig,"theta_true")[1])
-  
-  print("True infection rate at A=1 (target: ~0.02)")
-  print(attr(dat_orig,"theta_true")[51])
-  
-  print("Actual infection rate at A=0 (target: ~0.001)")
-  print("TO DO")
-  
-  print("Actual infection rate at A=1 (target: ~0.02)")
-  print("TO DO")
-  
-  n2 <- c()
-  n_inf <- c()
-  for(i in 1:20) {
-    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
-                              L$surv_true, L$sampling)
-    n_inf <- c(n_inf,nrow(filter(dat_orig, delta_star==1 & y_star<=200)))
-    n2 <- c(n2, )
+  res <- function(title, s, rnd) {
+    print(title)
+    print(paste0(round(mean(s),rnd), " (", round(min(s),rnd),
+                 " -- ", round(max(s),rnd), ")"))
   }
-  print("# infections")
-  print(mean(n_inf))
-  print(mean(n_inf) + c(-1.96,1.96)*sd(n_inf))
-  print("# in phase-2 sample")
-  print(mean(n2))
-  print(mean(n2) + c(-1.96,1.96)*sd(n2))
   
+  # Set up counters
+  pct_rc <- c(); num_inf <- c(); pct_inf <- c(); num_tp <- c();
+  pct_inf_a0 <- c(); pct_inf_a1 <- c()
+  
+  n_reps <- 10
+  for (i in 1:n_reps) {
+    # Generate dataset
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
+                              L$surv_true, L$sc_params, L$sampling)
+    
+    # Calculate summary stats
+    pct_rc <- c(pct_rc, mean(as.integer(dat_orig$delta_star==0)*
+                                     as.integer(dat_orig$y_star<=200)))
+    num_inf <- c(num_inf, sum(as.integer(dat_orig$delta_star==1)*
+                                as.integer(dat_orig$y_star<=200)))
+    pct_inf <- c(pct_inf, mean(as.integer(dat_orig$delta_star==1)*
+                                 as.integer(dat_orig$y_star<=200)))
+    num_tp <- c(num_tp, sum(dat_orig$delta))
+    pct_inf_a0 <- c(pct_inf_a0, attr(dat_orig,"theta_true")[1])
+    pct_inf_a1 <- c(pct_inf_a1, attr(dat_orig,"theta_true")[51])
+    
+  }
+  
+  res("% right-censored by t_e", pct_rc, 3)
+  res("# of infections by t_e", num_inf, 0)
+  res("% of infections by t_e", pct_inf, 4)
+  res("# in phase-2 sample", num_tp, 0)
+  res("True inf rate (A=0)", pct_inf_a0, 4)
+  res("True inf rate (A=1)", pct_inf_a1, 4)
   
 }
 
@@ -77,11 +85,11 @@
 {
   
   # Generate datasets
-  distr_A <- "Unif(0,1)"
-  d1 <- generate_data(n=1000, alpha_3=0.7, distr_A=distr_A, edge="none",
-                      surv_true="Cox PH", sampling="iid")
-  d2 <- generate_data(n=1000, alpha_3=0.7, distr_A=distr_A, edge="none",
-                      surv_true="Cox PH", sampling="two-phase")
+  d1 <- generate_data(n=1000, alpha_3=0.7, distr_A="Unif(0,1)", edge="none",
+                      surv_true="Cox PH", sc_params=L$sc_params, sampling="iid")
+  d2 <- generate_data(n=1000, alpha_3=0.7, distr_A="Unif(0,1)", edge="none",
+                      surv_true="Cox PH", sc_params=L$sc_params,
+                      sampling=L$sampling)
   
   for (dat_orig in list(d1,d2)) {
     
@@ -133,24 +141,25 @@
   {
     library(numDeriv)
     
-    surv_true <- "Cox PH"
     m <- 10^5
     w1 <- runif(m)
     w2 <- rbinom(m, size=1, prob=0.5)
     alpha_3 <- 0.75
+    lmbd <- L$sc_params$lmbd
+    v <- L$sc_params$v
     
     theta_true_f <- Vectorize(function(a) {
       
       lin <- function(w1,w2,a) {
-        if (surv_true=="Cox PH") {
+        if (L$surv_true=="Cox PH") {
           C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
-        } else if (surv_true=="complex") {
-          C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2*alpha_3*w2*a - 0.35
+        } else if (L$surv_true=="complex") {
+          C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 1.2*alpha_3*w2*a - 1
         }
       }
       
       S_0 <- function(t, w1, w2, a) {
-        exp( -1 * C$lambda * (t^C$v) * exp(lin(w1,w2,a)) )
+        exp( -1 * lmbd * (t^v) * exp(lin(w1,w2,a)) )
       }
       
       return(1 - mean(S_0(C$t_e, w1, w2, a)))
@@ -161,26 +170,25 @@
   }
   
   # Esimate deriv_theta_n n_samples times
-  C$appx=list(t_e=10,w1=0.01,w1b=0.1,a=0.01)
-  n_samples <- 20
+  Cappxt_e_old <- C$appx$t_e
+  C$appx$t_e <- 10
   deriv_ests <- c()
   grid <- seq(0,1,0.1)
+  n_samples <- 1 # !!!!!
+  system.time({
   for (i in 1:n_samples) {
     
-    distr_A <- "Beta(1.5+w1,1.5+w2)" # "Unif(0,1)"
-    dat_orig <- generate_data(n=1000, alpha_3=0.75, distr_A=distr_A,
-                              edge="none", surv_true="Cox PH",
-                              sampling="two-phase")
+    # Construct dat_orig and vlist
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
+                              L$surv_true, L$sc_params, L$sampling)
     vlist <- create_val_list(dat_orig, C$appx)
     
+    # Construct ocmponent functions
     Phi_n <- construct_Phi_n(dat_orig)
     Phi_n_inv <- construct_Phi_n(dat_orig, type="inverse")
-    S_n <- construct_S_n(dat_orig, vlist$S_n, type="Random Forest")
-    Sc_n <- construct_S_n(dat_orig, vlist$S_n, type="Random Forest",
+    S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
+    Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type,
                           csf=TRUE)
-    # S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
-    # Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type,
-    #                       csf=TRUE)
     f_aIw_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
                                  type=params$g_n_type, k=15)
     f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
@@ -188,24 +196,32 @@
     omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
     Gamma_n <- construct_Gamma_n(dat_orig, vlist$A_grid, omega_n, S_n, g_n)
     
-    Psi_n <- Vectorize(function(x) { return(Gamma_n(Phi_n_inv(x))) })
-    gcm <- gcmlcm(x=seq(0,1,0.01), y=Psi_n(seq(0,1,0.01)), type="gcm")
+    # Construct additional component functions
+    Psi_n <- Vectorize(function(x) { Gamma_n(Phi_n_inv(x)) })
+    gcm <- gcmlcm(x=seq(0,1,0.0001), y=Psi_n(seq(0,1,0.0001)), type="gcm")
     dGCM <- Vectorize(function(x) {
       if (x==0) {
         index <- 1
       } else {
-        index <- which(x<=gcm$x.knots)[1]-1
+        index <- which(round(x,6)<=gcm$x.knots)[1]-1
       }
       return(gcm$slope.knots[index])
     })
-    theta_n <- function(x) {
-      x_trans <- Phi_n(x)
-      return(dGCM(x_trans))
-    }
-    deriv_theta_n <- construct_deriv_theta_n(theta_n, type="gcomp")
+    theta_n_Gr <- function(x) { dGCM(Phi_n(x)) }
+    f_aIw_delta1_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
+                                        type=params$g_n_type, k=15, delta1=TRUE)
+    f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid,
+                                    f_aIw_delta1_n)
+    gamma_n <- construct_gamma_n(dat_orig, vlist$A_grid, type="kernel",
+                                 omega_n, f_aIw_n, f_a_n, f_a_delta1_n)
+    theta_n <- theta_n_Gr
+    deriv_theta_n <- construct_deriv_theta_n(theta_n, type=params$deriv_type)
+    
+    # Compute estimates
     deriv_ests <- c(deriv_ests, deriv_theta_n(grid))
     
   }
+  })
   
   # Plot true curves against estimated curve
   len <- length(grid)
@@ -217,8 +233,11 @@
   ggplot(df, aes(x=x, y=y, color=which)) +
     geom_point() +
     ylim(c(0,1)) +
-    labs(title="Estimation of derivative of theta (RF)",
+    labs(title="Estimation of derivative of theta",
          color="Which")
+  
+  # Reset C$appx$t_e
+  C$appx$t_e <- Cappxt_e_old
   
 }
 
@@ -239,7 +258,8 @@
     distr_A = "Beta(1.5+w1,1.5+w2)", # "Unif(0,1)" "Beta(1.5+w1,1.5+w2)"
     edge = "none",
     surv_true = L$surv_true,
-    sampling = "two-phase" # two-phase iid
+    sc_params = L$sc_params,
+    sampling = L$sampling
   )
   vlist <- create_val_list(dat_orig, C$appx)
   
@@ -251,26 +271,31 @@
     if (L$surv_true=="Cox PH") {
       lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
     } else if (L$surv_true=="complex") {
-      lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2*alpha_3*w2*a - 0.35
+      lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 1.2*alpha_3*w2*a - 1
     }
     
     # !!!!! Note: this needs to be modified since the linear predictors are now
     #       different for the survival and censoring distributions
     
-    piece_1 <- exp(-1*C$lambda*(C$t_e^C$v)*exp(lin))
+    lmbd <- L$sc_params$lmbd
+    v <- L$sc_params$v
+    lmbd2 <- L$sc_params$lmbd2
+    v2 <- L$sc_params$v2
+    
+    piece_1 <- exp(-1*lmbd*(C$t_e^v)*exp(lin))
     
     piece_2 <- (delta_star*as.integer(y_star<=C$t_e)) /
-      exp(-exp(lin)*(C$lambda*y_star^C$v+L$lambda2*y_star^C$v2))
+      exp(-exp(lin)*(lmbd*y_star^v+lmbd2*y_star^v2))
     
     integral <- integrate(
       function(t) {
-        t^(C$v-1) * exp(lin+exp(lin)*(C$lambda*t^C$v+L$lambda2*t^C$v2))
+        t^(v-1) * exp(lin+exp(lin)*(lmbd*t^v+lmbd2*t^v2))
       },
       lower = 0,
       upper = min(C$t_e,y_star)
     )$value
     
-    piece_3 <- C$lambda*C$v*integral
+    piece_3 <- lmbd*v*integral
     
     return(piece_1*(piece_2-piece_3))
     
@@ -325,7 +350,8 @@
     distr_A = distr_A,
     edge = "none",
     surv_true = surv_true,
-    sampling = "two-phase"
+    sc_params = L$sc_params,
+    sampling = L$sampling
   )
   
   # True omega_0
@@ -334,26 +360,31 @@
     if (surv_true=="Cox PH") {
       lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
     } else if (surv_true=="complex") {
-      lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2*alpha_3*w2*a - 0.35
+      lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 1.2*alpha_3*w2*a - 1
     }
     
     # !!!!! Note: this needs to be modified since the linear predictors are now
     #       different for the survival and censoring distributions
     
-    piece_1 <- exp(-1*C$lambda*(C$t_e^C$v)*exp(lin))
+    lmbd <- L$sc_params$lmbd
+    v <- L$sc_params$v
+    lmbd2 <- L$sc_params$lmbd2
+    v2 <- L$sc_params$v2
+    
+    piece_1 <- exp(-1*lmbd*(C$t_e^v)*exp(lin))
     
     piece_2 <- (delta_star*as.integer(y_star<=C$t_e)) /
-      exp(-exp(lin)*(C$lambda*y_star^C$v+L$lambda2*y_star^C$v2))
+      exp(-exp(lin)*(lmbd*y_star^v+lmbd2*y_star^v2))
     
     integral <- integrate(
       function(t) {
-        t^(C$v-1) * exp(lin+exp(lin)*(C$lambda*t^C$v+L$lambda2*t^C$v2))
+        t^(v-1) * exp(lin+exp(lin)*(lmbd*t^v+lmbd2*t^v2))
       },
       lower = 0,
       upper = min(C$t_e,y_star)
     )$value
     
-    piece_3 <- C$lambda*C$v*integral
+    piece_3 <- lmbd*v*integral
     
     return(piece_1*(piece_2-piece_3))
     
@@ -370,7 +401,8 @@
       distr_A = distr_A,
       edge = "none",
       surv_true = surv_true,
-      sampling = "two-phase"
+      sc_params = L$sc_params,
+      sampling = L$sampling
     )
     
     f_aIw_0 <- function(a,w1,w2) {
@@ -439,7 +471,8 @@
     distr_A = "Unif(0,1)",
     edge = "none",
     surv_true = "Cox PH",
-    sampling = "iid" # iid two-phase
+    sc_params = L$sc_params,
+    sampling = "iid"
   )
   
   # Define the statistic to bootstrap
@@ -479,7 +512,8 @@
       distr_A = "Unif(0,1)",
       edge = "none",
       surv_true = "Cox PH",
-      sampling = "iid" # iid two-phase
+      sc_params = L$sc_params,
+      sampling = "iid"
     )
     
     Gammas <- c(Gammas, bootstat(dat, c(1:nrow(dat))))
@@ -573,7 +607,8 @@
   
   # Generate data
   dat_orig <- generate_data(n=400, alpha_3=0, distr_A="Unif(0,1)", edge="none",
-                            surv_true="Cox PH",sampling="iid")
+                            surv_true="Cox PH", sc_params = L$sc_params,
+                            sampling="iid")
   
   # Define the test statistic
   test_stat <- function(dat_orig, indices) {
@@ -631,7 +666,8 @@
   for (i in 1:50) {
     
     dat_orig <- generate_data(n=400, alpha_3=0, distr_A="Unif(0,1)",
-                              edge="none", surv_true="Cox PH", sampling="iid")
+                              edge="none", surv_true="Cox PH",
+                              sc_params=L$sc_params, sampling="iid")
     
     beta_n <- test_stat(dat_orig, c(1:nrow(dat_orig)))
     betas <- c(betas, beta_n)
@@ -807,7 +843,7 @@
     distr_A = "Beta(1.5+w1,1.5+w2)", # "Unif(0,1)" "Beta(1.5+w1,1.5+w2)"
     edge = "none",
     surv_true = "Cox PH",
-    sampling = "two-phase"
+    sampling = L$sampling
   )
   
   # Obtain estimates
@@ -864,7 +900,7 @@
   distr_A <- "Unif(0,1)"
   # distr_A <- "Beta(1.5+w1,1.5+w2)"
   edge <- "none"
-  sampling <- "two-phase"
+  sampling <- L$sampling
   
   # Generate data
   dat_orig <- generate_data(
@@ -969,7 +1005,7 @@
     distr_A = "Beta(1.5+w1,1.5+w2)",
     edge = edge,
     surv_true = "Cox PH",
-    sampling = "two-phase"
+    sampling = L$sampling
   )
   
   # True propensity score function

@@ -66,7 +66,8 @@ if (F) {
     distr_A = "Beta(1.5+w1,1.5+w2)", # "Unif(0,1)" "Beta(1.5+w1,1.5+w2)"
     edge = "none",
     surv_true = "complex",
-    sampling = "two-phase"
+    sc_params = L$sc_params,
+    sampling = "two-phase (72%)"
   )
   
   # Prep
@@ -123,7 +124,8 @@ if (F) {
       distr_A = "Beta(1.5+w1,1.5+w2)",
       edge = edge,
       surv_true = "Cox PH",
-      sampling = "two-phase"
+      sc_params = L$sc_params,
+      sampling = "two-phase (72%)"
     )
     
     n_orig <- nrow(dat_orig)
@@ -162,7 +164,8 @@ if (F) {
       distr_A = "Beta(1.5+w1,1.5+w2)",
       edge = edge,
       surv_true = "Cox PH",
-      sampling = "two-phase"
+      sc_params = L$sc_params,
+      sampling = "two-phase (72%)"
     )
     
     n_orig <- nrow(dat_orig)

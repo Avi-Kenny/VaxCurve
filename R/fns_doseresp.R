@@ -128,7 +128,7 @@ create_htab <- function(fnc, vals, round_args=NA, check_dupes=FALSE) {
 
 #' Probability of sampling
 #' 
-#' @param sampling One of c("iid", "two-phase")
+#' @param sampling One of c("iid", "two-phase (6%)", "two-phase (72%)")
 #' @param delta_star Component of dataset returned by generate_data()
 #' @param y_star Component of dataset returned by generate_data()
 #' @param w1 Component of dataset returned by generate_data()
@@ -136,16 +136,20 @@ create_htab <- function(fnc, vals, round_args=NA, check_dupes=FALSE) {
 #' @return A vector of probabilities of sampling
 Pi <- function(sampling, delta_star, y_star, w1, w2) {
   
+  if (!(sampling %in% c("iid", "two-phase (6%)", "two-phase (72%)"))) {
+    stop("sampling incorrectly specified")
+  }
+  
   if (sampling=="iid") {
-    
     return(rep(1, length(w1)))
-    
-  } else if (sampling=="two-phase") {
-    
-    pi_w <- function(w1,w2) { expit(w1+w2-3.85) }
+  } else {
+    if (sampling=="two-phase (6%)") {
+      pi_w <- function(w1,w2) { expit(w1+w2-3.85) }
+    } else if (sampling=="two-phase (72%)") {
+      pi_w <- function(w1,w2) { expit(w1+w2-0.1) }
+    }
     ev <- as.integer(delta_star==1 & y_star<=200)
     return(ev + (1-ev)*pi_w(w1,w2))
-    
   }
   
 }
@@ -171,7 +175,7 @@ wts <- function(dat_orig, scale="stabilized") {
   if (scale=="stabilized") {
     if (sampling=="iid") {
       s <- 1
-    } else if (sampling=="two-phase") {
+    } else {
       s <- sum(weights) / nrow(dat_orig)
     }
     weights <- weights / s
@@ -207,6 +211,10 @@ construct_S_n <- function(dat_orig, vals, type, csf=FALSE) {
     
     surv_true <- L$surv_true
     alpha_3 <- L$alpha_3
+    lmbd <- L$sc_params$lmbd
+    v <- L$sc_params$v
+    lmbd2 <- L$sc_params$lmbd2
+    v2 <- L$sc_params$v2
     if (csf) {
       fnc <- function(t, w1, w2, a) {
         if (L$surv_true=="Cox PH") {
@@ -214,16 +222,16 @@ construct_S_n <- function(dat_orig, vals, type, csf=FALSE) {
         } else if (L$surv_true=="complex") {
           lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) - 0.35
         }
-        return(exp(-1*L$lambda2*(t^C$v2)*exp(lin)))
+        return(exp(-1*lmbd2*(t^v2)*exp(lin)))
       }
     } else {
       fnc <- function(t, w1, w2, a) {
         if (L$surv_true=="Cox PH") {
           lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
         } else if (L$surv_true=="complex") {
-          lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2*alpha_3*w2*a - 0.35
+          lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 1.2*alpha_3*w2*a - 1
         }
-        return(exp(-1*C$lambda*(t^C$v)*exp(lin)))
+        return(exp(-1*lmbd*(t^v)*exp(lin)))
       }
     }
     
@@ -458,7 +466,7 @@ construct_deriv_theta_n <- function(theta_n, type) {
     # Construct derivative function
     fnc <- function(x) {
       
-      width <- 0.2
+      width <- 0.1
       x1 <- x - width/2
       x2 <- x + width/2
       
@@ -1430,5 +1438,3 @@ sigma2_os_n <- function(dat_orig, pi_n, S_n, omega_n, theta_os_n_est) {
   )
   
 }
-
-

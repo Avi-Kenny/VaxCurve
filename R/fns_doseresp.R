@@ -136,15 +136,21 @@ create_htab <- function(fnc, vals, round_args=NA, check_dupes=FALSE) {
 #' @return A vector of probabilities of sampling
 Pi <- function(sampling, delta_star, y_star, w1, w2) {
   
-  if (!(sampling %in% c("iid", "two-phase (6%)", "two-phase (72%)"))) {
-    stop("sampling incorrectly specified")
-  }
+  # if (!(sampling %in% c("iid", "two-phase (6%)", "two-phase (72%)"))) {
+  #   stop("sampling incorrectly specified")
+  # }
+  
+  if (sampling=="two-phase (10% compl random)") {   # !!!!!
+    return(rep(0.1, length(w1)))                    # !!!!!
+  }                                                 # !!!!!
   
   if (sampling=="iid") {
     return(rep(1, length(w1)))
   } else {
     if (sampling=="two-phase (6%)") {
       pi_w <- function(w1,w2) { expit(w1+w2-3.85) }
+    } else if (sampling=="two-phase (6% random)") { # !!!!!
+      pi_w <- function(w1,w2) { 0.06 }              # !!!!!
     } else if (sampling=="two-phase (72%)") {
       pi_w <- function(w1,w2) { expit(w1+w2-0.1) }
     }
@@ -160,7 +166,6 @@ Pi <- function(sampling, delta_star, y_star, w1, w2) {
 #' 
 #' @param dat_orig Dataset returned by generate_data()
 #' @param scale One of c("none", "stabilized", "mean 1")
-#' @param s Weight stabilization factor
 #' @return A sum-to-one vector of weights
 #' @notes
 #'   - Pi is accessed globally
@@ -180,7 +185,8 @@ wts <- function(dat_orig, scale="stabilized") {
     }
     weights <- weights / s
   } else if (scale=="mean 1") {
-    weights <- ( weights / sum(weights) ) * nrow(filter(dat_orig,!is.na(a)))
+    s <- sum(weights) / nrow(filter(dat_orig,!is.na(a)))
+    weights <- weights / s
   }
   
   return(weights)
@@ -822,50 +828,89 @@ construct_g_n <- function(vals, f_aIw_n, f_a_n) {
 #' @param S_n Conditional survival function estimator returned by construct_S_n
 #' @param Sc_n Conditional censoring survival function estimator returned by
 #'     construct_S_n
+#' @param type Defaults to "estimated". Override with "true" for debugging. Note
+#'     that type="true" only works for surv_true="Cox PH" and assumes that S_0
+#'     and Sc_0 (i.e. the true functions) are passed in.
 #' @return Estimator function of nuisance omega_0
-construct_omega_n <- function(vals, S_n, Sc_n) {
+construct_omega_n <- function(vals, S_n, Sc_n, type="estimated") {
   
-  # First, construct cumulative hazard estimator
-  H_n <- function(t, w1, w2, a) {
-    -1 * log(S_n(t, w1, w2, a))
-  }
-  
-  fnc <- function(w1,w2,a,y_star,delta_star) {
+  if (type=="estimated") {
     
-    k <- round(min(y_star,C$t_e))
-    if (k==0) {
-      integral <- 0
-    } else {
-      i <- c(1:k)
-      # i <- c(1:m)
-      # k <- min(y_star,C$t_e)
+    # First, construct cumulative hazard estimator
+    H_n <- function(t, w1, w2, a) {
+      -1 * log(S_n(t, w1, w2, a))
+    }
+    
+    fnc <- function(w1,w2,a,y_star,delta_star) {
       
-      integral <- 0.5 * sum(
-        ( H_n(i,w1,w2,a) - H_n(i-1,w1,w2,a) ) * (
-          ( S_n(i,w1,w2,a) * Sc_n(i,w1,w2,a) )^-1 +
-            ( S_n(i-1,w1,w2,a) * Sc_n(i-1,w1,w2,a))^-1
+      k <- round(min(y_star,C$t_e))
+      if (k==0) {
+        integral <- 0
+      } else {
+        i <- c(1:k)
+        # i <- c(1:m)
+        # k <- min(y_star,C$t_e)
+        
+        integral <- 0.5 * sum(
+          ( H_n(i,w1,w2,a) - H_n(i-1,w1,w2,a) ) * (
+            ( S_n(i,w1,w2,a) * Sc_n(i,w1,w2,a) )^-1 +
+              ( S_n(i-1,w1,w2,a) * Sc_n(i-1,w1,w2,a))^-1
+          )
         )
-      )
+        
+        # integral_righthand <- sum(
+        #   ( H_n(i,w1,w2,a) - H_n(i-1,w1,w2,a) ) *
+        #     ( (S_n(i,w1,w2,a)) * Sc_n(i,w1,w2,a) )^-1
+        # )
+        
+        # integral_diffgrid <- 0.5 * sum(
+        #   ( H_n((i*k)/m,w1,w2,a) - H_n(((i-1)*k)/m,w1,w2,a) ) * (
+        #     (S_n((i*k)/m,w1,w2,a))^-1 * (Sc_n((i*k)/m,w1,w2,a))^-1 +
+        #       (S_n(((i-1)*k)/m,w1,w2,a))^-1 * (Sc_n(((i-1)*k)/m,w1,w2,a))^-1
+        #   )
+        # )
+        
+      }
       
-      # integral_righthand <- sum(
-      #   ( H_n(i,w1,w2,a) - H_n(i-1,w1,w2,a) ) *
-      #     ( (S_n(i,w1,w2,a)) * Sc_n(i,w1,w2,a) )^-1
-      # )
-      
-      # integral_diffgrid <- 0.5 * sum(
-      #   ( H_n((i*k)/m,w1,w2,a) - H_n(((i-1)*k)/m,w1,w2,a) ) * (
-      #     (S_n((i*k)/m,w1,w2,a))^-1 * (Sc_n((i*k)/m,w1,w2,a))^-1 +
-      #       (S_n(((i-1)*k)/m,w1,w2,a))^-1 * (Sc_n(((i-1)*k)/m,w1,w2,a))^-1
-      #   )
-      # )
+      return(S_n(C$t_e,w1,w2,a) * (
+        (delta_star * as.integer(y_star<=C$t_e)) /
+          (S_n(k,w1,w2,a) * Sc_n(k,w1,w2,a)) -
+          integral
+      ))
       
     }
     
-    return(S_n(C$t_e,w1,w2,a) * (
-        (delta_star * as.integer(y_star<=C$t_e)) /
-          (S_n(k,w1,w2,a) * Sc_n(k,w1,w2,a)) -
-        integral
-    ))
+  } else if (type=="true") {
+    
+    fnc <- function(w1,w2,a,y_star,delta_star) {
+      
+      # Shorten parameter variable names
+      lmbd <- L$sc_params$lmbd
+      v <- L$sc_params$v
+      lmbd2 <- L$sc_params$lmbd2
+      v2 <- L$sc_params$v2
+      alpha_3 <- L$alpha_3
+      
+      # Construct linear predictors
+      lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
+      lin2 <- C$alpha_1*w1 + C$alpha_2*w2 - 1
+      
+      # Compute omega_0
+      piece_1 <- exp(-1*lmbd*(C$t_e^v)*exp(lin))
+      piece_2 <- (delta_star*as.integer(y_star<=C$t_e)) /
+        exp(-1*(lmbd*y_star^v*exp(lin)+lmbd2*y_star^v2*exp(lin2)))
+      integral <- integrate(
+        function(t) {
+          t^(v-1) * exp(lin+lmbd*t^v*exp(lin)+lmbd2*t^v2*exp(lin2))
+        },
+        lower = 0,
+        upper = min(C$t_e,y_star)
+      )$value
+      piece_3 <- lmbd*v*integral
+      
+      return(piece_1*(piece_2-piece_3))
+      
+    }
     
   }
   
@@ -1005,36 +1050,97 @@ construct_Gamma_n <- function(dat_orig, vals, omega_n, S_n, g_n,
 #' Construct Phi_n and Phi_n^{-1}
 #' 
 #' @param dat_orig Dataset returned by generate_data()
-#' @param type One of c("ecdf", "inverse").
+#' @param which One of c("ecdf", "inverse").
+#' @param type Defaults to "estimated". Override with "true" for debugging.
 #' @return CDF or inverse CDF estimator function
 #' @notes
 #'   - Adaptation of stats::ecdf() source code
 #'   - This accesses wts() globally
-construct_Phi_n <- function (dat_orig, type="ecdf") {
+construct_Phi_n <- function (dat_orig, which="ecdf", type="estimated") {
   
-  n_orig <- nrow(dat_orig)
-  dat_orig$weights <- wts(dat_orig)
-  dat <- dat_orig %>% filter(!is.na(a))
-  dat %<>% arrange(a)
-  vals_x <- unique(dat$a)
-  vals_y <- c()
-  
-  for (j in 1:length(vals_x)) {
-    indices <- which(dat$a==vals_x[j])
-    weights_j <- dat$weights[indices]
-    new_y_val <- (1/n_orig) * sum(weights_j)
-    vals_y <- c(vals_y, new_y_val)
+  if (type=="step") {
+    
+    n_orig <- nrow(dat_orig)
+    dat_orig$weights <- wts(dat_orig)
+    dat <- dat_orig %>% filter(!is.na(a))
+    dat %<>% arrange(a)
+    vals_x <- unique(dat$a)
+    vals_y <- c()
+    
+    for (j in 1:length(vals_x)) {
+      indices <- which(dat$a==vals_x[j])
+      weights_j <- dat$weights[indices]
+      new_y_val <- (1/n_orig) * sum(weights_j)
+      vals_y <- c(vals_y, new_y_val)
+    }
+    vals_y <- cumsum(vals_y)
+    
+    if (which=="ecdf") {
+      rval <- approxfun(vals_x, vals_y, method="constant", yleft=0,
+                        yright=1, f=0, ties="ordered")
+    } else if (which=="inverse") {
+      # rval <- approxfun(vals_y, vals_x, method="constant", yleft=min(vals_x),
+      #                   yright=max(vals_x), f=1, ties="ordered")
+      rval_pre <- approxfun(vals_y, vals_x, method="constant", yleft=min(vals_x),
+                            yright=max(vals_x), f=1, ties="ordered")
+      rval <- Vectorize(function(x) {
+        if (round(x,5)==0) { 0 } else { rval_pre(x) }
+      })
+    }
+    return(rval)
+    
+  } else if (type=="linear") {
+    
+    n_orig <- nrow(dat_orig)
+    dat_orig$weights <- wts(dat_orig)
+    dat <- dat_orig %>% filter(!is.na(a))
+    dat %<>% arrange(a)
+    vals_x <- unique(dat$a)
+    vals_y <- c()
+    
+    for (j in 1:length(vals_x)) {
+      indices <- which(dat$a==vals_x[j])
+      weights_j <- dat$weights[indices]
+      new_y_val <- (1/n_orig) * sum(weights_j)
+      vals_y <- c(vals_y, new_y_val)
+    }
+    vals_y <- cumsum(vals_y)
+    
+    if (which=="ecdf") {
+      rval <- approxfun(vals_x, vals_y, method="linear", yleft=0,
+                        yright=1, f=0, ties="ordered")
+    } else if (which=="inverse") {
+      # rval <- approxfun(vals_y, vals_x, method="constant", yleft=min(vals_x),
+      #                   yright=max(vals_x), f=1, ties="ordered")
+      rval_pre <- approxfun(vals_y, vals_x, method="linear", yleft=min(vals_x),
+                        yright=max(vals_x), f=1, ties="ordered")
+      rval <- Vectorize(function(x) {
+        if (round(x,5)==0) { 0 } else { rval_pre(x) }
+      })
+    }
+    return(rval)
+    
+  } else if (type=="true") {
+    
+    # These are approximate since the true Normals are truncated
+    
+    if (L$distr_A=="Unif(0,1)") {
+      return(function(x) {x})
+    } else if (L$distr_A=="N(0.5,0.01)") {
+      if (which=="ecdf") {
+        return(function(x) { ptruncnorm(x, a=0, b=1, mean=0.5, sd=0.1) })
+      } else {
+        return(function(x) { qtruncnorm(x, a=0, b=1, mean=0.5, sd=0.1) })
+      }
+    } else if (L$distr_A=="N(0.5,0.04)") {
+      if (which=="ecdf") {
+        return(function(x) { ptruncnorm(x, a=0, b=1, mean=0.5, sd=0.2) })
+      } else {
+        return(function(x) { qtruncnorm(x, a=0, b=1, mean=0.5, sd=0.2) })
+      }
+    }
+    
   }
-  vals_y <- cumsum(vals_y)
-  
-  if (type=="ecdf") {
-    rval <- approxfun(vals_x, vals_y, method="constant", yleft=0,
-                      yright=1, f=0, ties="ordered")
-  } else if (type=="inverse") {
-    rval <- approxfun(vals_y, vals_x, method="constant", yleft=min(vals_x),
-                      yright=max(vals_x), f=1, ties="ordered")
-  }
-  return(rval)
   
 }
 
@@ -1274,8 +1380,9 @@ construct_Gamma_cf <- function(dat_orig, params, vlist) {
     dat_test <- dat_orig[which(folds==k),]
     
     # Construct component functions
-    Phi_n <- construct_Phi_n(dat_train)
-    Phi_n_inv <- construct_Phi_n(dat_train, type="inverse")
+    Phi_n <- construct_Phi_n(dat_train, type=params$ecdf_type)
+    Phi_n_inv <- construct_Phi_n(dat_train, which="inverse",
+                                 type=params$ecdf_type)
     S_n <- construct_S_n(dat_train, vlist$S_n, type=params$S_n_type)
     Sc_n <- construct_S_n(dat_train, vlist$S_n, type=params$S_n_type, csf=TRUE)
     gcomp_n <- construct_gcomp_n(dat_train, vlist$A_grid, S_n)

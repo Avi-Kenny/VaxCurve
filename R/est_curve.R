@@ -56,8 +56,9 @@ est_curve <- function(dat_orig, estimator, params, points) {
     if (params$cf_folds==1) {
       
       # Construct component functions
-      Phi_n <- construct_Phi_n(dat_orig)
-      Phi_n_inv <- construct_Phi_n(dat_orig, type="inverse")
+      Phi_n <- construct_Phi_n(dat_orig, type=params$ecdf_type) # !!!!!
+      Phi_n_inv <- construct_Phi_n(dat_orig, which="inverse",
+                                   type=params$ecdf_type) # !!!!!
       S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
       Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type,
                             csf=TRUE)
@@ -66,7 +67,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
       f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
       g_n <- construct_g_n(vlist$AW_grid, f_aIw_n, f_a_n)
       omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
-
+      
       # Construct Gamma_n
       Gamma_n <- construct_Gamma_n(dat_orig, vlist$A_grid, omega_n, S_n, g_n)
 
@@ -86,8 +87,9 @@ est_curve <- function(dat_orig, estimator, params, points) {
       Gamma_n <- construct_Gamma_cf(dat_orig, params, vlist)
       
       # Recompute functions on full dataset
-      Phi_n <- construct_Phi_n(dat_orig)
-      Phi_n_inv <- construct_Phi_n(dat_orig, type="inverse")
+      Phi_n <- construct_Phi_n(dat_orig, type=params$ecdf_type)
+      Phi_n_inv <- construct_Phi_n(dat_orig, which="inverse",
+                                   type=params$ecdf_type)
       
       # Construct cross-fitted one-step edge estimator
       if (params$edge_corr!="none") {
@@ -95,16 +97,13 @@ est_curve <- function(dat_orig, estimator, params, points) {
       }
       
     }
-
+    
     Psi_n <- Vectorize(function(x) { Gamma_n(Phi_n_inv(x)) })
     gcm <- gcmlcm(x=seq(0,1,0.0001), y=Psi_n(seq(0,1,0.0001)), type="gcm")
     dGCM <- Vectorize(function(x) {
-      if (x==0) {
-        index <- 1
-      } else {
-        # The round deals with a floating point issue
-        index <- which(round(x,6)<=gcm$x.knots)[1]-1
-      }
+      # The round deals with a floating point issue
+      index <- which(round(x,5)<=gcm$x.knots)[1]-1
+      if (index==0) { index <- 1 }
       return(gcm$slope.knots[index])
     })
     
@@ -177,14 +176,14 @@ est_curve <- function(dat_orig, estimator, params, points) {
     } else {
 
       # Generate variance scale factor for each point
-      tau_ns <- tau_n(points) # !!!!! this is the problematic line
+      tau_ns <- tau_n(points)
       
       # Construct CIs
       # The 0.975 quantile of the Chernoff distribution occurs at roughly 1.00
       # The Normal approximation would use qnorm(0.975, sd=0.52) instead
       qnt <- 1.00
-      n_orig <- nrow(dat_orig)
       # qnt <- qnorm(0.975, sd=0.52)
+      n_orig <- nrow(dat_orig)
       if (params$ci_type=="regular") {
         ci_lo <- ests - (qnt*tau_ns)/(n_orig^(1/3))
         ci_hi <- ests + (qnt*tau_ns)/(n_orig^(1/3))

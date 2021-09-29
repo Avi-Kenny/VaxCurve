@@ -21,7 +21,7 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
                           sampling) {
   
   # Sample baseline covariates
-  w1 <- sample(seq(0,1,0.1), size=n, replace=T) # w1 <- runif(n)
+  w1 <- sample(seq(0,1,0.1), size=n, replace=T)
   w2 <- rbinom(n, size=1, prob=0.5)
   
   # Sample A (before point mass)

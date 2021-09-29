@@ -1,4 +1,45 @@
 
+# Smoothed ecdf
+if (F) {
+  
+  n_orig <- 200
+  dat <- data.frame(weights=rep(1,n_orig), a=runif(n_orig))
+  dat %<>% arrange(a)
+  vals_x <- unique(dat$a)
+  vals_y <- c()
+  
+  for (j in 1:length(vals_x)) {
+    indices <- which(dat$a==vals_x[j])
+    weights_j <- dat$weights[indices]
+    new_y_val <- (1/n_orig) * sum(weights_j)
+    vals_y <- c(vals_y, new_y_val)
+  }
+  vals_y <- cumsum(vals_y)
+  
+  rval <- approxfun(vals_x, vals_y, method="linear", yleft=0,
+                    yright=1, f=0, ties="ordered")
+  
+  rval_pre <- approxfun(vals_y, vals_x, method="linear", yleft=min(vals_x),
+                        yright=max(vals_x), f=1, ties="ordered")
+  rval_inv <- Vectorize(function(x) {
+    if (round(x,5)==0) { 0 } else { rval_pre(x) }
+  })
+  
+  grid <- seq(0,1,0.01)
+  jitter <- 0
+  # jitter <- rnorm(2*length(grid), sd=0.003)
+  df <- data.frame(
+    x = rep(grid,2),
+    y = c(rval(grid), rval_inv(grid)) + jitter,
+    which = rep(c("ecdf", "smoothed"), each=length(grid))
+  )
+  ggplot(df, aes(x=x, y=y, color=which)) + geom_line()
+  
+  rval(rval_inv(seq(0,1,0.1)))
+  rval_inv(rval(seq(0,1,0.1)))
+  
+}
+
 # Histogram for edge values
 if (F) {
   
@@ -1010,14 +1051,14 @@ if (F) {
   }
   
   # New functions
-  construct_Phi_n2 <- function(dat) {
+  construct_Phi_n2 <- function(dat, type=params$ecdf_type) {
     dat <- cbind(dat, wts=wts(dat, scale="sum 1"))
     n <- nrow(dat)
     dat %<>% filter(!is.na(a))
     s <- sum(dat$wts) / n
     Vectorize(function(x) { (1/(n*s))*sum(dat$wts*as.integer(dat$a<=x)) })
   }
-  construct_Phi_n3 <- function (dat, type="ecdf") {
+  construct_Phi_n3 <- function (dat, which="ecdf", type=params$ecdf_type) {
     # Adaptation of ecdf() source code
     dat <- cbind(dat, wts=wts(dat, scale="sum 1"))
     dat %<>% arrange(a)
@@ -1042,9 +1083,9 @@ if (F) {
     }
     return(rval)
   }
-  Phi_n2 <- construct_Phi_n2(dat)
-  Phi_n3 <- construct_Phi_n3(dat)
-  Phi_n_inv3 <- construct_Phi_n3(dat, type="inverse")
+  Phi_n2 <- construct_Phi_n2(dat, type=params$ecdf_type)
+  Phi_n3 <- construct_Phi_n3(dat, type=params$ecdf_type)
+  Phi_n_inv3 <- construct_Phi_n3(dat, which="inverse", type=params$ecdf_type)
   
   
   # # Run benchmarks

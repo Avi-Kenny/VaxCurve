@@ -13,12 +13,12 @@
 #   - zeehio/facetscales
 cfg <- list(
   which_sim = "estimation", # estimation edge testing
-  level_set_which = "level_set_estimation_2", # level_set_estimation_1 level_set_testing_1
+  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
   run_or_update = "run",
-  num_sim = 1000,
+  num_sim = 500,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
-           "randomForestSRC", "CFsurvival", "Rsolnp"),
+           "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm"),
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
                      "data.table", "latex2exp", "tidyr"),
   parallel = "none",
@@ -101,7 +101,8 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
             S_n_type = c("Cox PH", "Random Forest"),
             g_n_type = c("parametric", "binning"),
             edge_corr = c("none", "point", "spread", "max"),
-            deriv_type = c("line", "spline", "m-spline", "linear", "gcomp")
+            deriv_type = c("line", "spline", "m-spline", "linear", "gcomp"),
+            ecdf_type = c("step", "linear", "true")
           )
         )
       ),
@@ -120,9 +121,34 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     )
   }
   
+  # Estimation: scratch
+  level_set_estimation_0 <- list(
+    n = 3000, # 1500
+    alpha_3 = 3,
+    sc_params = list("sc_params"=list(lmbd=3e-5, v=1.5, lmbd2=5e-5, v2=1.5)),
+    distr_A = "N(0.5,0.01)",
+    edge = "none",
+    surv_true = c("Cox PH", "complex"),
+    sampling = "two-phase (72%)", # "iid"
+    estimator = list(
+      "Grenander (ecdf: linear)" = list(
+        est = "Grenander",
+        params = list(S_n_type="true", g_n_type="true",
+                      ci_type="regular", cf_folds=1, edge_corr="none",
+                      ecdf_type="linear", deriv_type="m-spline")
+      ),
+      "Grenander (ecdf: step)" = list(
+        est = "Grenander",
+        params = list(S_n_type="true", g_n_type="true",
+                      ci_type="regular", cf_folds=1, edge_corr="none",
+                      ecdf_type="step", deriv_type="m-spline")
+      )
+    )
+  )
+  
   # Estimation: ideal
   level_set_estimation_1 <- list(
-    n = 7000,
+    n = 5000,
     alpha_3 = 3,
     sc_params = list("sc_params"=list(lmbd=3e-5, v=1.5, lmbd2=5e-5, v2=1.5)),
     distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
@@ -130,17 +156,17 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     surv_true = c("Cox PH", "complex"),
     sampling = "two-phase (72%)",
     estimator = list(
-      "Grenander (True S_n/g_n)" = list(
+      "Grenander (ecdf: linear)" = list(
         est = "Grenander",
         params = list(S_n_type="true", g_n_type="true",
                       ci_type="regular", cf_folds=1, edge_corr="none",
-                      deriv_type="m-spline")
+                      ecdf_type="linear", deriv_type="m-spline")
       ),
-      "Grenander (Est S_n/g_n)" = list(
+      "Grenander (ecdf: step)" = list(
         est = "Grenander",
-        params = list(S_n_type="Random Forest", g_n_type="binning",
+        params = list(S_n_type="true", g_n_type="true",
                       ci_type="regular", cf_folds=1, edge_corr="none",
-                      deriv_type="m-spline")
+                      ecdf_type="step", deriv_type="m-spline")
       )
     )
   )
@@ -159,13 +185,13 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
         est = "Grenander",
         params = list(S_n_type="true", g_n_type="true",
                       ci_type="regular", cf_folds=1, edge_corr="none",
-                      deriv_type="m-spline")
+                      ecdf_type="linear", deriv_type="m-spline")
       ),
       "Grenander (Est S_n/g_n)" = list(
         est = "Grenander",
         params = list(S_n_type="Random Forest", g_n_type="binning",
                       ci_type="regular", cf_folds=1, edge_corr="none",
-                      deriv_type="m-spline")
+                      ecdf_type="linear", deriv_type="m-spline")
       )
     )
   )
@@ -349,12 +375,11 @@ if (FALSE) {
   )
   p_data %<>% mutate(point = as.numeric(point))
   
-  cb_colors <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442",
-                 "#0072B2", "#D55E00", "#CC79A7", "#999999")
-  m_colors <- c(
-    `Grenander (Est S_n/g_n)` = cb_colors[2],
-    `Grenander (True S_n/g_n)` = cb_colors[5]
-  )
+  # cb_colors <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442",
+  #                "#0072B2", "#D55E00", "#CC79A7", "#999999")
+  # m_colors <- c(cb_colors[2], cb_colors[5], cb_colors[6]
+  #   # `Grenander (Est S_n/g_n)` = cb_colors[2],
+  # )
   
   df_distr_A <- data.frame(
     x = rep(seq(0,1,0.01),3),
@@ -372,7 +397,7 @@ if (FALSE) {
     distr_A = rep(c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"),2)
   )
   
-  # distr_A_ <- "N(0.5,0.04)"
+  # distr_A_ <- "Unif(0,1)" # "N(0.5,0.04)"
   # df_distr_A1 %<>% filter(distr_A==distr_A_)
   # df_distr_A2 %<>% filter(distr_A==distr_A_)
   # df_vlines %<>% filter(distr_A==distr_A_)
@@ -392,8 +417,9 @@ if (FALSE) {
     facet_grid(rows=dplyr::vars(surv_true), cols=dplyr::vars(distr_A)) +
     scale_y_continuous(labels=percent, limits=c(-0.2,0.2)) +
     # scale_y_continuous(labels=percent) +
-    scale_color_manual(values=m_colors) +
-    labs(title="Bias (%)", x="A", y=NULL, color="n")
+    # scale_color_manual(values=m_colors) +
+    theme(legend.position="bottom") +
+    labs(title="Bias (%)", x="A", y=NULL, color="Estimator")
   
   # Coverage plot
   # Export: 8" x 5"
@@ -411,8 +437,9 @@ if (FALSE) {
     facet_grid(rows=dplyr::vars(surv_true), cols=dplyr::vars(distr_A)) +
     scale_y_continuous(labels=percent, limits=c(0.7,1)) +
     # scale_y_continuous(labels=percent) +
-    scale_color_manual(values=m_colors) +
-    labs(title="Coverage (%)", x="A", y=NULL, color="n")
+    # scale_color_manual(values=m_colors) +
+    theme(legend.position="bottom") +
+    labs(title="Coverage (%)", x="A", y=NULL, color="Estimator")
   
   # MSE plot
   # Export: 8" x 5"
@@ -425,7 +452,8 @@ if (FALSE) {
     geom_line() +
     facet_grid(rows=dplyr::vars(surv_true), cols=dplyr::vars(distr_A)) +
     ylim(0,0.003) +
-    scale_color_manual(values=m_colors) +
+    # scale_color_manual(values=m_colors) +
+    theme(legend.position="bottom") +
     labs(title="MSE", x="A", y=NULL, color="Estimator")
   
 }

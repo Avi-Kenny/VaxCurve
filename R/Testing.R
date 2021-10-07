@@ -9,14 +9,21 @@
   
   # 2. Set global constants
   params <- list(S_n_type="true", g_n_type="true", ci_type="regular",
-                 cf_folds=1, edge_corr="none", deriv_type="m-spline")
+                 cf_folds=1, edge_corr="none", deriv_type="m-spline",
+                 gamma_type="kernel")
   C <- sim$constants
-  L <- list(n=5000, alpha_3=3,
-            sc_params=list(lmbd=3e-5, v=1.5, lmbd2=5e-5, v2=1.5),
-            distr_A="Unif(0,1)", edge="none", surv_true="Cox PH",
-            ecdf_type="true", sampling="two-phase (72%)",
+  L <- list(n=15000, alpha_3=3,
+            sc_params=list(lmbd=4e-7, v=1.6, lmbd2=3e-5, v2=1.5),
+            distr_A="N(0.5,0.04)", edge="none", surv_true="Cox PH",
+            ecdf_type="true", sampling="two-phase (6%)",
             estimator=list("G"=list(est="Grenander",params=params))
   )
+  # L <- list(n=5000, alpha_3=3,
+  #           sc_params=list(lmbd=3e-5, v=1.5, lmbd2=5e-5, v2=1.5),
+  #           distr_A="Unif(0,1)", edge="none", surv_true="Cox PH",
+  #           ecdf_type="true", sampling="two-phase (72%)",
+  #           estimator=list("G"=list(est="Grenander",params=params))
+  # )
   
   # 3. Generate dataset
   dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
@@ -85,12 +92,14 @@
   #                     sampling="two-phase (6%)") # "iid" "two-phase (6%)"
   
   # Curve 1: Phi_n
-  Phi_n <- construct_Phi_n(dat_orig, type=params$ecdf_type)
-  Phi_0 <- construct_Phi_n(dat_orig, type="true")
+  Phi_n <- construct_Phi_n(d$a, d$weights, type=params$ecdf_type)
+  Phi_0 <- construct_Phi_n(d$a, d$weights, type="true")
   
   # Curve 2: Phi_n_inv
-  Phi_n_inv <- construct_Phi_n(dat_orig, which="inverse", type=params$ecdf_type)
-  Phi_0_inv <- construct_Phi_n(dat_orig, which="inverse", type="true")
+  Phi_n_inv <- construct_Phi_n(d$a, d$weights, which="inverse",
+                               type=params$ecdf_type)
+  Phi_0_inv <- construct_Phi_n(d$a, d$weights, which="inverse",
+                               type="true")
   
   # Plot true curves against estimated curve
   grid <- seq(0,1,0.01)
@@ -195,8 +204,8 @@
     vlist <- create_val_list(dat_orig, C$appx)
     
     # Construct component functions
-    Phi_n <- construct_Phi_n(dat_orig, type=params$ecdf_type)
-    Phi_n_inv <- construct_Phi_n(dat_orig, which="inverse",
+    Phi_n <- construct_Phi_n(d$a, d$weights, type=params$ecdf_type)
+    Phi_n_inv <- construct_Phi_n(d$a, d$weights, which="inverse",
                                  type=params$ecdf_type)
     S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
     Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type,
@@ -224,7 +233,7 @@
                                         type=params$g_n_type, k=15, delta1=TRUE)
     f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid,
                                     f_aIw_delta1_n)
-    gamma_n <- construct_gamma_n(dat_orig, vlist$A_grid, type="kernel",
+    gamma_n <- construct_gamma_n(dat_orig, vlist$A_grid, type=params$gamma_type,
                                  omega_n, f_aIw_n, f_a_n, f_a_delta1_n)
     theta_n <- theta_n_Gr
     deriv_theta_n <- construct_deriv_theta_n(theta_n, type=params$deriv_type)
@@ -349,7 +358,6 @@
   gamma_0 <- construct_gamma_0()
   
   # Construct gamma_n
-  vlist <- create_val_list(dat_orig, C$appx)
   f_aIw_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
                                type=params$g_n_type, k=15)
   f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
@@ -359,19 +367,20 @@
                                   f_aIw_delta1_n)
   gamma_n <- construct_gamma_n(dat_orig, vlist$A_grid, type="kernel",
                                omega_n, f_aIw_n, f_a_n, f_a_delta1_n)
+  gamma_n2 <- construct_gamma_n(dat_orig, vlist$A_grid, type="kernel2",
+                               omega_n, f_aIw_n, f_a_n, f_a_delta1_n)
   
   # Plot true curves against estimated curve
   grid <- seq(0,1,0.05)
   df <- data.frame(
-    x = rep(grid, 2),
-    y = c(gamma_n(grid), gamma_0(grid)),
-    which = rep(c("Estimate","Truth"), each=length(grid))
+    x = rep(grid, 3),
+    y = c(gamma_n(grid), gamma_n2(grid), gamma_0(grid)),
+    which = rep(c("Est (kernel)", "Est (kernel2)", "Truth"), each=length(grid))
   )
   ggplot(df, aes(x=x, y=y, color=which)) +
     geom_line() +
-    # ylim(c(0,10)) +
-    labs(title=paste("Estimation of gamma_0; distr_A:",distr_A),
-         color="Which")
+    # ylim(c(0,0.3)) +
+    labs(title="Estimation of gamma_0", color="Which")
   
 }
 
@@ -404,7 +413,7 @@
     dat_orig$weights <- wts(dat_orig)
     dat <- dat_orig %>% filter(!is.na(a))
     weights <- dat$weights
-    G_n <- construct_Phi_n(dat_orig, type=params$ecdf_type)
+    G_n <- construct_Phi_n(d$a, d$weights, type=params$ecdf_type)
     f_aIw_n <- construct_f_aIw_n(dat, type=params$g_n_type, k=15)
     f_a_n <- construct_f_a_n(dat_orig, f_aIw_n)
     g_n <- construct_g_n(f_aIw_n, f_a_n)
@@ -447,7 +456,7 @@
     dat_orig$weights <- wts(dat_orig)
     dat <- dat_orig %>% filter(!is.na(a))
     weights <- dat$weights
-    G_n <- construct_Phi_n(dat_orig, type=params$ecdf_type)
+    G_n <- construct_Phi_n(d$a, d$weights, type=params$ecdf_type)
     f_aIw_n <- construct_f_aIw_n(dat, type=params$g_n_type, k=15)
     f_a_n <- construct_f_a_n(dat_orig, f_aIw_n)
     g_n <- construct_g_n(f_aIw_n, f_a_n)
@@ -551,7 +560,7 @@
     vals_omega <- subset(dat, select=-c(delta,weights))
     
     # Construct component functions
-    G_n <- construct_Phi_n(dat_orig, type=params$ecdf_type)
+    G_n <- construct_Phi_n(d$a, d$weights, type=params$ecdf_type)
     f_aIw_n <- construct_f_aIw_n(dat, vals_AW_grid, type=params$g_n_type, k=15)
     f_a_n <- construct_f_a_n(dat_orig, vals_A_grid, f_aIw_n)
     g_n <- construct_g_n(vals_AW_grid, f_aIw_n, f_a_n)

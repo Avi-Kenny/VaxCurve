@@ -27,7 +27,7 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
     vlist <- create_val_list(dat_orig, C$appx)
     
     # Construct component functions
-    Phi_n <- construct_Phi_n(dat_orig, type=params$ecdf_type)
+    Phi_n <- construct_Phi_n(d$a, d$weights, type=params$ecdf_type)
     lambda_2 <- lambda(dat_orig,2,Phi_n)
     lambda_3 <- lambda(dat_orig,3,Phi_n)
     
@@ -101,7 +101,7 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
       dat_0 <- dat %>% filter(!is.na(a))
       n_0 <- nrow(dat_0)
       weights_0 <- wts(dat_0)
-      G_0 <- construct_Phi_n(dat_orig, type=params$ecdf_type)
+      G_0 <- construct_Phi_n(d$a, d$weights, type=params$ecdf_type)
       f_aIw_n <- construct_f_aIw_n(dat_0, type=params$g_n_type, k=15)
       f_a_n <- construct_f_a_n(dat_orig, f_aIw_n=f_aIw_n)
       g_0 <- construct_g_n(f_aIw_n, f_a_n)
@@ -146,7 +146,8 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
       n_0 <- nrow(dat_0)
       weights_0 <- wts(dat_0)
       
-      G_0 <- construct_Phi_n(dat_0_orig, type=params$ecdf_type)
+      G_0 <- construct_Phi_n(dat_0_orig$a, dat_0_orig$weights,
+                             type=params$ecdf_type)
       S_0 <- construct_S_n(dat_0, type=params$S_n_type)
       Sc_0 <- construct_S_n(dat_0, type=params$S_n_type, csf=TRUE)
       omega_0 <- construct_omega_n(S_0, Sc_0)
@@ -179,7 +180,8 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
       dat_b <- dat_b_orig %>% filter(!is.na(a))
       n_b <- nrow(dat_b)
       weights_b <- wts(dat_b)
-      Phi_n <- construct_Phi_n(dat_b_orig, type=params$ecdf_type)
+      Phi_n <- construct_Phi_n(dat_b_orig$a, dat_b_orig$weights,
+                               type=params$ecdf_type)
       
       piece_1 <- (1/n_orig) * sum(
         weights_b *

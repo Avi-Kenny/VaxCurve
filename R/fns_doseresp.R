@@ -165,11 +165,10 @@ Pi <- function(sampling, delta_star, y_star, w1, w2) {
 #' Return IP weights
 #' 
 #' @param dat_orig Dataset returned by generate_data()
-#' @param scale One of c("none", "stabilized", "mean 1")
+#' @param scale One of c("none", "stabilized")
 #' @return A sum-to-one vector of weights
 #' @notes
 #'   - Pi is accessed globally
-#'   - "Mean 1" weights are mean 1 EXCLUDING the zero weights
 wts <- function(dat_orig, scale="stabilized") {
   
   sampling <- attr(dat_orig,"sampling")
@@ -184,9 +183,6 @@ wts <- function(dat_orig, scale="stabilized") {
       s <- sum(weights) / nrow(dat_orig)
     }
     weights <- weights / s
-  } else if (scale=="mean 1") {
-    s <- sum(weights) / nrow(filter(dat_orig,!is.na(a)))
-    weights <- weights / s
   }
   
   return(weights)
@@ -197,58 +193,36 @@ wts <- function(dat_orig, scale="stabilized") {
 
 #' Construct conditional survival estimator S_n
 #' 
-#' @param dat_orig Dataset returned by generate_data()
+#' @param y_star Vector of min{T,C} survival variable y_star (short)
+#' @param delta_star Vector of event indicator delta_star (short)
+#' @param w Dataframe of covariates W (short)
+#' @param a Vector of exposure variable A (short)
+#' @param weights Vector of stabilized IP weights (short)
 #' @param vals Dataframe of values to run function on
 #' @param type One of c("true", "Cox PH", "KM", "Random Forest")
 #' @param csf Logical; if TRUE, estimate the conditional survival
 #'     function of the censoring distribution instead
 #' @return Conditional density estimator function
-construct_S_n <- function(dat_orig, vals, type, csf=FALSE) {
+construct_S_n <- function(y_star, delta_star, w, a, weights, vals, type,
+                          csf=FALSE) {
   
-  # Construct weights
-  n_orig <- nrow(dat_orig)
-  dat_orig$weights_m1 <- wts(dat_orig, scale="mean 1")
-  dat_orig$weights <- wts(dat_orig)
-  dat <- dat_orig %>% filter(!is.na(a))
+  if (csf) { delta_star <- 1 - delta_star }
   
-  if (csf) { dat$delta_star <- 1 - dat$delta_star }
-  
-  if (type=="true") {
-    
-    surv_true <- L$surv_true
-    alpha_3 <- L$alpha_3
-    lmbd <- L$sc_params$lmbd
-    v <- L$sc_params$v
-    lmbd2 <- L$sc_params$lmbd2
-    v2 <- L$sc_params$v2
-    if (csf) {
-      fnc <- function(t, w1, w2, a) {
-        if (L$surv_true=="Cox PH") {
-          lin <- C$alpha_1*w1 + C$alpha_2*w2 - 1
-        } else if (L$surv_true=="complex") {
-          lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) - 0.35
-        }
-        return(exp(-1*lmbd2*(t^v2)*exp(lin)))
-      }
-    } else {
-      fnc <- function(t, w1, w2, a) {
-        if (L$surv_true=="Cox PH") {
-          lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
-        } else if (L$surv_true=="complex") {
-          lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 1.2*alpha_3*w2*a - 1
-        }
-        return(exp(-1*lmbd*(t^v)*exp(lin)))
-      }
+  if (type %in% c("Cox PH", "Random Forest")) {
+    fml <- "Surv(y_star,delta_star)~a"
+    for (i in 1:length(w)) {
+      fml <- paste0(fml, "+w",i)
     }
+    fml <- formula(fml)
+    dat <- cbind(y_star, delta_star, a, w, weights)
+  }
+  
+  if (type=="Cox PH") {
     
-  } else if (type=="Cox PH") {
+    weights_m1 <- weights * (length(weights)/sum(weights))
     
     # Fit Cox model
-    model <- coxph(
-      Surv(y_star,delta_star)~w1+w2+a,
-      data = dat,
-      weights = weights_m1
-    )
+    model <- coxph(fml, data=dat, weights=weights_m1)
     coeffs <- model$coefficients
     
     # Get cumulative hazard estimate
@@ -261,68 +235,98 @@ construct_S_n <- function(dat_orig, vals, type, csf=FALSE) {
       H_0[t+1] <- bh$hazard[index]
     }
     
-    fnc <- function(t, w1, w2, a) {
-      return(exp(-1*H_0[t+1]*exp(coeffs[[1]]*w1+coeffs[[2]]*w2+coeffs[[3]]*a)))
+    fnc <- function(t, a, w) {
+      if (length(w)!=(length(coeffs)-1)) { stop("Error in construct_S_n (A)") }
+      lin <- coeffs[["a"]]*a
+      for (i in 1:length(w)) {
+        lin <- lin + coeffs[[paste0("w",i)]]*w[i]
+      }
+      return(exp(-1*H_0[t+1]*exp(lin)))
     }
     
   } else if (type=="Random Forest") {
     
-    model <- rfsrc(
-      Surv(y_star,delta_star)~w1+w2+a,
-      data = dat,
-      ntree = 500,
-      mtry = 2,
-      nodesize = 100,
-      splitrule = "logrank",
-      nsplit = 0,
-      case.wt = dat$weights
-      # samptype = "swr"
-    )
+    model <- rfsrc(fml, data=dat, ntree=500, mtry=2, nodesize=100,
+                   splitrule="logrank", nsplit=0, case.wt=weights,
+                   samptype="swor")
     
     newX <- subset(filter(vals, t==0), select=-c(t))
     pred <- predict(model, newdata=newX)
     
-    fnc <- function(t, w1, w2, a) {
-      r1 <- which(abs(w1-newX$w1)<1e-10)
-      r2 <- which(abs(w2-newX$w2)<1e-10)
-      r3 <- which(abs(a-newX$a)<1e-10)
-      row <- intersect(r1,intersect(r2,r3))
+    fnc <- function(t, a, w) {
+      r <- list()
+      for (i in 1:length(w)) {
+        r[[i]] <- which(abs(w[i]-newX[[paste0("w",i)]])<1e-8)
+      }
+      row <- Reduce(intersect, r)
       col <- which.min(abs(t-pred$time.interest))
+      if (length(row)!=1) { stop("Error in construct_S_n (B)") }
+      if (length(col)!=1) { stop("Error in construct_S_n (C)") }
       return(pred$survival[row,col])
     }
     
   } else if (type=="Random Forest Ted") {
     
-    method <- "survSL.rfsrc"
+    # !!!!! Adapt to new structure
     
-    newX <- subset(filter(vals, t==0), select=-c(t))
-    new.times <- unique(vals$t)
-
-    srv <- survSuperLearner(
-      time = dat$y_star,
-      event = dat$delta_star,
-      X = subset(dat, select=c(w1,w2,a)),
-      newX = newX,
-      new.times = new.times,
-      event.SL.library = c(method),
-      cens.SL.library = c(method),
-      obsWeights = dat$weights,
-      control = list(
-        initWeightAlg = method,
-        max.SL.iter = 10
-      )
-    )
-
-    fnc <- function(t, w1, w2, a) {
-      r1 <- which(abs(w1-newX$w1)<1e-10)
-      r2 <- which(abs(w2-newX$w2)<1e-10)
-      r3 <- which(abs(a-newX$a)<1e-10)
-      row <- intersect(r1,intersect(r2,r3))
-      col <- which(t==new.times)
-      return(srv$event.SL.predict[row,col])
+    # method <- "survSL.rfsrc"
+    # 
+    # newX <- subset(filter(vals, t==0), select=-c(t))
+    # new.times <- unique(vals$t)
+    # 
+    # srv <- survSuperLearner(
+    #   time = dat$y_star,
+    #   event = dat$delta_star,
+    #   X = subset(dat, select=c(w1,w2,a)),
+    #   newX = newX,
+    #   new.times = new.times,
+    #   event.SL.library = c(method),
+    #   cens.SL.library = c(method),
+    #   obsWeights = dat$weights,
+    #   control = list(
+    #     initWeightAlg = method,
+    #     max.SL.iter = 10
+    #   )
+    # )
+    # 
+    # fnc <- function(t, w1, w2, a) {
+    #   r1 <- which(abs(w1-newX$w1)<1e-8)
+    #   r2 <- which(abs(w2-newX$w2)<1e-8)
+    #   r3 <- which(abs(a-newX$a)<1e-8)
+    #   row <- intersect(r1,intersect(r2,r3))
+    #   col <- which(t==new.times)
+    #   return(srv$event.SL.predict[row,col])
+    # }
+    
+  } else if (type=="true") {
+    
+    surv_true <- L$surv_true
+    alpha_3 <- L$alpha_3
+    lmbd <- L$sc_params$lmbd
+    v <- L$sc_params$v
+    lmbd2 <- L$sc_params$lmbd2
+    v2 <- L$sc_params$v2
+    if (csf) {
+      fnc <- function(t, a, w) {
+        if (L$surv_true=="Cox PH") {
+          lin <- C$alpha_1*w[1] + C$alpha_2*w[2] - 1
+        } else if (L$surv_true=="complex") {
+          lin <- C$alpha_1*pmax(0,2-8*abs(w[1]-0.5)) - 0.35
+        }
+        return(exp(-1*lmbd2*(t^v2)*exp(lin)))
+      }
+    } else {
+      fnc <- function(t, a, w) {
+        if (L$surv_true=="Cox PH") {
+          lin <- C$alpha_1*w[1] + C$alpha_2*w[2] + alpha_3*a - 1.7
+        } else if (L$surv_true=="complex") {
+          lin <- C$alpha_1*pmax(0,2-8*abs(w[1]-0.5)) + 1.2*alpha_3*w[2]*a - 1
+        }
+        return(exp(-1*lmbd*(t^v)*exp(lin)))
+      }
     }
     
-  }
+  }  
   
   round_args <- c(-log10(C$appx$t_e), -log10(C$appx$w1b), 0, -log10(C$appx$a))
   return (create_htab(fnc, vals, round_args=round_args))
@@ -562,17 +566,20 @@ construct_gamma_n <- function(dat_orig, vals, type, omega_n, f_aIw_n, f_a_n,
   dat <- dat_orig %>% filter(!is.na(a))
   weights <- dat$weights
   
-  # Construct pseudo-outcomes
+  # Construct pseudo-outcomes and I_star variable
   dat %<>% mutate(
+    I_star = delta_star*as.integer(y_star<=C$t_e),
     po = (
       (weights*omega_n(w1,w2,a,y_star,delta_star)) / f_aIw_n(a,w1,w2)
     )^2
   )
   
   # Remove outliers to prevent errors (revisit this)
-  cutoff <- as.numeric(quantile(dat$po, 0.75) + 10000*iqr(dat$po))
   dat %<>% filter(is.finite(po))
-  dat %<>% filter(po<cutoff)
+  # if (type %in% c("cubic", "kernel")) {
+  #   cutoff <- as.numeric(quantile(dat$po, 0.75) + 10000*iqr(dat$po))
+  #   dat %<>% filter(po<cutoff)
+  # }
   
   # Run regression
   if (type=="cubic") {
@@ -580,12 +587,10 @@ construct_gamma_n <- function(dat_orig, vals, type, omega_n, f_aIw_n, f_a_n,
     model <- lm(po~a+I(a^2)+I(a^3), data=dat)
     coeff <- as.numeric(model$coefficients)
     
-    fnc <- function(x) {
-      delta_prob*(f_a_delta1_n(x)/f_a_n(x)) * (
-        coeff[1] + coeff[2]*x + coeff[3]*(x^2) + coeff[4]*(x^3)
-      )
+    reg <- function(x) {
+      coeff[1] + coeff[2]*x + coeff[3]*(x^2) + coeff[4]*(x^3)
     }
-    
+
   } else if (type=="kernel") {
     
     ks <- ksmooth(
@@ -593,15 +598,60 @@ construct_gamma_n <- function(dat_orig, vals, type, omega_n, f_aIw_n, f_a_n,
       y = dat$po,
       kernel = "normal",
       bandwidth = 0.2,
-      range.x = c(0,1),
       x.points = vals$a
     )
     
-    fnc <- function(x) {
+    reg <- function(x) {
       index <- which.min(abs(x-ks$x))
       return(ks$y[index])
     }
     
+  } else if (type=="kernel2") {
+    
+    dat_0 <- filter(dat, I_star==0)
+    dat_1 <- filter(dat, I_star==1)
+    
+    ks_0 <- ksmooth(
+      x = dat_0$a,
+      y = dat_0$po,
+      kernel = "normal",
+      bandwidth = 0.2,
+      x.points = vals$a
+    )
+    
+    ks_1 <- ksmooth(
+      x = dat_1$a,
+      y = dat_1$po,
+      kernel = "normal",
+      bandwidth = 0.2,
+      x.points = vals$a
+    )
+    
+    reg_0 <- function(x) {
+      index <- which.min(abs(x-ks_0$x))
+      return(ks_0$y[index])
+    }
+    
+    reg_1 <- function(x) {
+      index <- which.min(abs(x-ks_1$x))
+      return(ks_1$y[index])
+    }
+    
+    # Run logistic regression
+    model <- glm(I_star~a, data=dat, family="binomial")
+    coeff <- as.numeric(model$coefficients)
+    
+    prob_1 <- function(x) { expit(coeff[1]+coeff[2]*x) }
+    prob_0 <- function(x) { 1 - prob_1(x) }
+    
+    reg <- function(x) {
+      reg_0(x)*prob_0(x) + reg_1(x)*prob_1(x)
+    }
+    
+  }
+  
+  fnc <- function(x) {
+    delta_prob*(f_a_delta1_n(x)/f_a_n(x)) * reg(x)
   }
   
   return (create_htab(fnc, vals, round_args=-log10(C$appx$a)))
@@ -624,7 +674,7 @@ construct_gamma_n <- function(dat_orig, vals, type, omega_n, f_aIw_n, f_a_n,
 #'   - Assumes support of A is [0,1]
 construct_f_aIw_n <- function(dat_orig, vals, type, k=0, delta1=FALSE) {
   
-  n_orig <- nrow(dat_orig)
+  # n_orig <- nrow(dat_orig)
   dat_orig$weights <- wts(dat_orig)
   dat <- dat_orig %>% filter(!is.na(a))
   if (delta1) {
@@ -1049,80 +1099,52 @@ construct_Gamma_n <- function(dat_orig, vals, omega_n, S_n, g_n,
 
 #' Construct Phi_n and Phi_n^{-1}
 #' 
-#' @param dat_orig Dataset returned by generate_data()
-#' @param which One of c("ecdf", "inverse").
+#' @param a Vector of exposure variable A (short)
+#' @param weights Vector of stabilized IP weights (short)
+#' @param which One of c("ecdf", "inverse")
 #' @param type Defaults to "estimated". Override with "true" for debugging.
 #' @return CDF or inverse CDF estimator function
 #' @notes
 #'   - Adaptation of stats::ecdf() source code
 #'   - This accesses wts() globally
-construct_Phi_n <- function (dat_orig, which="ecdf", type="estimated") {
+construct_Phi_n <- function (a, weights, which="ecdf", type="estimated") {
   
-  if (type=="step") {
+  if (type!="true") {
     
-    n_orig <- nrow(dat_orig)
-    dat_orig$weights <- wts(dat_orig)
-    dat <- dat_orig %>% filter(!is.na(a))
-    dat %<>% arrange(a)
-    vals_x <- unique(dat$a)
+    n_orig <- sum(weights)
+    a <- sort(a)
+    vals_x <- unique(a)
     vals_y <- c()
     
     for (j in 1:length(vals_x)) {
-      indices <- which(dat$a==vals_x[j])
-      weights_j <- dat$weights[indices]
+      indices <- which(a==vals_x[j])
+      weights_j <- weights[indices]
       new_y_val <- (1/n_orig) * sum(weights_j)
       vals_y <- c(vals_y, new_y_val)
     }
     vals_y <- cumsum(vals_y)
     
-    if (which=="ecdf") {
-      rval <- approxfun(vals_x, vals_y, method="constant", yleft=0,
-                        yright=1, f=0, ties="ordered")
-    } else if (which=="inverse") {
-      # rval <- approxfun(vals_y, vals_x, method="constant", yleft=min(vals_x),
-      #                   yright=max(vals_x), f=1, ties="ordered")
-      rval_pre <- approxfun(vals_y, vals_x, method="constant", yleft=min(vals_x),
-                            yright=max(vals_x), f=1, ties="ordered")
-      rval <- Vectorize(function(x) {
-        if (round(x,5)==0) { 0 } else { rval_pre(x) }
-      })
+    if (type=="step") {
+      method <- "constant"
+    } else if (type=="linear (top)") {
+      method <- "linear"
+    } else if (type=="linear (mid)") {
+      vals_x <- c(vals_x[1], vals_x[1:(length(vals_x)-1)]+diff(vals_x)/2,
+                  vals_x[length(vals_x)])
+      vals_y <- c(0, vals_y[1:(length(vals_y)-1)], 1)
+      method <- "linear"
     }
-    return(rval)
-    
-  } else if (type=="linear") {
-    
-    n_orig <- nrow(dat_orig)
-    dat_orig$weights <- wts(dat_orig)
-    dat <- dat_orig %>% filter(!is.na(a))
-    dat %<>% arrange(a)
-    vals_x <- unique(dat$a)
-    vals_y <- c()
-    
-    for (j in 1:length(vals_x)) {
-      indices <- which(dat$a==vals_x[j])
-      weights_j <- dat$weights[indices]
-      new_y_val <- (1/n_orig) * sum(weights_j)
-      vals_y <- c(vals_y, new_y_val)
-    }
-    vals_y <- cumsum(vals_y)
     
     if (which=="ecdf") {
-      rval <- approxfun(vals_x, vals_y, method="linear", yleft=0,
+      rval <- approxfun(vals_x, vals_y, method=method, yleft=0,
                         yright=1, f=0, ties="ordered")
     } else if (which=="inverse") {
-      # rval <- approxfun(vals_y, vals_x, method="constant", yleft=min(vals_x),
-      #                   yright=max(vals_x), f=1, ties="ordered")
-      rval_pre <- approxfun(vals_y, vals_x, method="linear", yleft=min(vals_x),
+      rval <- approxfun(vals_y, vals_x, method=method, yleft=min(vals_x),
                         yright=max(vals_x), f=1, ties="ordered")
-      rval <- Vectorize(function(x) {
-        if (round(x,5)==0) { 0 } else { rval_pre(x) }
-      })
     }
     return(rval)
     
   } else if (type=="true") {
-    
-    # These are approximate since the true Normals are truncated
     
     if (L$distr_A=="Unif(0,1)") {
       return(function(x) {x})
@@ -1380,9 +1402,10 @@ construct_Gamma_cf <- function(dat_orig, params, vlist) {
     dat_test <- dat_orig[which(folds==k),]
     
     # Construct component functions
-    Phi_n <- construct_Phi_n(dat_train, type=params$ecdf_type)
-    Phi_n_inv <- construct_Phi_n(dat_train, which="inverse",
-                                 type=params$ecdf_type)
+    Phi_n <- construct_Phi_n(dat_train$a, dat_train$weights,
+                             type=params$ecdf_type)
+    Phi_n_inv <- construct_Phi_n(dat_train$a, dat_train$weights,
+                                 which="inverse", type=params$ecdf_type)
     S_n <- construct_S_n(dat_train, vlist$S_n, type=params$S_n_type)
     Sc_n <- construct_S_n(dat_train, vlist$S_n, type=params$S_n_type, csf=TRUE)
     gcomp_n <- construct_gcomp_n(dat_train, vlist$A_grid, S_n)
@@ -1474,8 +1497,8 @@ construct_pi_n <- function(dat_orig, vals, type) {
     assign("sl", sl, envir=.GlobalEnv)
     
     fnc <- function(w1, w2) {
-      r1 <- which(abs(w1-vals$w1)<1e-10)
-      r2 <- which(abs(w2-vals$w2)<1e-10)
+      r1 <- which(abs(w1-vals$w1)<1e-8)
+      r2 <- which(abs(w2-vals$w2)<1e-8)
       index <- intersect(r1,r2)
       return(sl$SL.predict[index])
     }

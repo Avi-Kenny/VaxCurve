@@ -1,13 +1,232 @@
+# New htab system
+if (F) {
+  
+  #' Given a function, return a "superfunction" that is:
+  #'     (1) memoised,
+  #'     (2) vectorized for both scalar and vector base function inputs,
+  #'     (3) allows for automatic argument rounding (for approximations), and
+  #'     (4) allows for pre-computation on a given set of values
+  #' 
+  #' @param fnc The base function
+  #' @param aux Any auxillary data that the function needs to access in its
+  #'     environment (e.g. a model object)
+  #' @param vec Vectorization. If the function inputs are all scalars, use
+  #'     vec=TRUE. If the function inputs are a combination of scalars and
+  #'     vectors, use a vector of 1s and 2s corresponding to whether the inputs
+  #'     are scalars or vectors, respectively. For example, for a function
+  #'     f(A,B,C) that takes scalars A and B and a vector C, use vec=c(1,1,2).
+  #'     If the function hsould not be vectorized, use vec=FALSE.
+  #' @param vals Values to precompute the function on. This should be a list
+  #'     with keys corresponding to the function arguments and values supplied
+  #'     in the same way they would be supplied to the function
+  #' @return A function with the above modifications. This can be called in the
+  #'     same way as the original function; for example, f(33, 0.2, c(1,2)). Or
+  #'     it can be called vectorized; for example,
+  #'     f(c(33,44), c(0.2,0.3), data.frame(x=c(1,6), y=c(2,5))). The number of
+  #'     rows of each data frame should be the same as the number of rows of
+  #'     each vector. The data frame column names are ignored.
+  #' @notes
+  #'   - The order of inputs matters and argument names are ignored.
+  #'   - This function only works on numeric data and will coerce all data to be
+  #'     numeric.
+  construct_superfunc <- function(fnc, aux, vec=TRUE, vals=NA, rnd=NA) {
+    
+    if (!is.numeric(vec) || any(!(vec %in% c(1,2)))) {
+      stop("vec must be a vector of 1s and 2s")
+    }
+    
+    # Set up components
+    htab <- new.env()
+    new_fnc <- function() {
+      
+      mc <- as.list(match.call())[-1]
+      mc1 <- eval(mc[[1]])
+      if (identical(vec[1],T)) {
+        vec <- rep(1, length(mc))
+      }
+      if (max(vec)!=1) {
+        index <- min(which(vec==2))
+        mc2 <- eval(mc[[index]])
+      }
+      if (max(vec)==1 && length(mc1)==1) {
+        vec_mode <- F
+      } else if (max(vec)==1 && length(mc1)>1) {
+        vec_mode <- T
+      } else if (max(vec)!=1 && class(mc2)!="data.frame") {
+        vec_mode <- F
+      } else if (max(vec)!=1 && class(mc2)=="data.frame") {
+        vec_mode <- T
+      } else {
+        stop("Function inputs incorrect")
+      }
+      
+      # First, we create a key and check to see if a key/value pair is already
+      #     stored. If it is, we retrieve the value. If it is not, we run the
+      #     function and store the value. This is done separately based on
+      #     whether the current function call is in "vectorized mode".
+      # Note: memoising will not work if the function itself returns NULL
+      if (vec_mode) {
+        # Vectorized operation
+        arglist <- list()
+        for (j in 1:length(vec)) {
+          if (vec[j]==1) {
+            arglist[[j]] <- eval(mc[[j]])
+          } else {
+            arglist[[j]] <- as.list(as.data.frame(t(eval(mc[[j]])),
+                                                  row.names=NA))
+          }
+        }
+        
+        # !!!!! Implement this option later
+        # if (mem=FALSE) {
+        #   res <- do.call(mapply, c(fnc,arglist))
+        # }
+        
+        res <- do.call(mapply, c(function(...) {
+          
+          key <- paste(list(...), collapse=";")
+          val <- htab[[key]]
+          if (is.null(val)) {
+            val <- do.call(fnc, list(...))
+            htab[[key]] <- val
+          }
+          return(val)
+          
+        }, arglist))
+        
+      } else {
+        # Non-vectorized operation
+        keylist <- list()
+        for (j in 1:length(vec)) {
+          keylist[[j]] <- as.numeric(eval(mc[[j]]))
+        }
+        key <- paste(keylist, collapse=";")
+        val <- htab[[key]]
+        if (is.null(val)) {
+          val <- do.call(fnc, keylist)
+          htab[[key]] <- val
+        }
+        res <- val
+      }
+      
+      # Return value
+      return(res)
+      
+    }
+    formals(new_fnc) <- formals(fnc)
+    environment(new_fnc) <- parent.env(environment())
+    
+    # Run function on vals list
+    # if (!is.na(vals)) {
+    #   do.call(new_fnc, c(0,vals))
+    # }
+
+    return(new_fnc)
+    
+  }
+  
+  aux <- list(val=3)
+  fnc <- function(a,w) {
+    Sys.sleep(1)
+    aux$val + (a * sum(w))
+  }
+  vals <- list(a=c(3,7), w=data.frame(c(4,8),c(5,9)))
+  sup_fnc <- construct_superfunc(fnc, aux=NA, vec=c(1,2),
+                                 vals=vals)
+  # sup_fnc <- construct_superfunc(fnc, aux=NA, vec=c(1,2))
+  sup_fnc(3, c(4,5))
+  sup_fnc(7, c(8,9))
+  sup_fnc(c(3,7), data.frame(c(4,8),c(5,9)))
+  # system.time(sup_fnc(3, c(4,5)))
+  # system.time(sup_fnc(7, c(8,9)))
+  # system.time(sup_fnc(c(3,7), data.frame(c(4,8),c(5,9))))
+  
+  testfnc <- function(x,y) {
+    c <- 99
+    d <- 999
+    r <- x+y+(d/c)
+    return(r)
+  }
+  
+  test_vect <- Vectorize(testfnc)
+  test_mine <- construct_superfunc(testfnc, aux=NA, vec=TRUE)
+  test_vect(c(1:3),c(6:8))
+  test_mine(c(1:3),c(6:8))
+  
+  microbenchmark(test_vect(c(1:3),c(1:3)), times=1000L) # 48 us
+  microbenchmark(test_mine(c(1:3),c(1:3)), times=1000L) # 73 us
+  microbenchmark(test_vect(c(1:999),c(1:999)), times=1000L) # 2 ms
+  microbenchmark(test_mine(c(1:999),c(1:999)), times=1000L) # 15 ms
+  
+  mem_fnc <- memoise(fnc)
+  microbenchmark(mem_fnc(3,c(4,5)))
+  microbenchmark(new_fnc(3,c(4,5)))
+  
+  # !!!!! TEMP !!!!!
+  # fnc(3,c(4,5))
+  # fnc(7,c(8,9))
+  new_fnc(c(3,7), data.frame(c(4,8),c(5,9)))
+  new_fnc(7,c(8,9))
+  
+  
+  
+  
+  
+  
+  
+  
+  aux <- list(val=3)
+  fnc <- function(a,w) {
+    aux$val + (a * sum(w))
+  }
+  vals <- list(
+    list(a=1, w=c(10,11)),
+    list(a=2, w=c(20,22)),
+    list(a=3, w=c(30,33))
+  )
+  fnc_sup <- superfunc(fnc=fnc, aux=aux, vals=vals, rnd=NA)
+  
+  # !!!!!
+  fnc_sup <- function(a,w) {
+    
+    if (F) {
+      return(fnc(a,w))
+    } else {
+      v <- cbind(a,w)
+      res <- apply(X=v, MARGIN=1, FUN=fnc)
+      return(res)
+    }
+    
+  }
+  
+  a <- c(1,2,3)
+  w <- data.frame(w1=c(10,20,30),w2=c(11,22,33))
+  # w <- list(w1=c(10,20,30),w2=c(11,22,33))
+  
+  # Test function instance
+  fnc(1, c(10,11))
+  fnc(2, c(20,22))
+  fnc(3, c(30,33))
+  fnc_sup(1, c(10,11))
+  fnc_sup(2, c(20,22))
+  fnc_sup(3, c(30,33))
+  
+  fnc_sup(a=a, w=w)
+  fnc_sup(a=a, w=w)
+  
+}
 
 # Smoothed ecdf
 if (F) {
   
-  n_orig <- 200
-  dat <- data.frame(weights=rep(1,n_orig), a=runif(n_orig))
+  # Create dataset
+  n_orig <- 100
+  dat <- data.frame(weights=rep(1,n_orig), a=runif(n_orig, min=0, max=1))
+  
+  # Calculate estimators
   dat %<>% arrange(a)
   vals_x <- unique(dat$a)
   vals_y <- c()
-  
   for (j in 1:length(vals_x)) {
     indices <- which(dat$a==vals_x[j])
     weights_j <- dat$weights[indices]
@@ -16,14 +235,15 @@ if (F) {
   }
   vals_y <- cumsum(vals_y)
   
-  rval <- approxfun(vals_x, vals_y, method="linear", yleft=0,
-                    yright=1, f=0, ties="ordered")
+  vals_x_ <- c(vals_x[1], vals_x[1:(length(vals_x)-1)]+diff(vals_x)/2,
+               vals_x[length(vals_x)])
+  vals_y_ <- c(0, vals_y[1:(length(vals_y)-1)], 1)
   
-  rval_pre <- approxfun(vals_y, vals_x, method="linear", yleft=min(vals_x),
-                        yright=max(vals_x), f=1, ties="ordered")
-  rval_inv <- Vectorize(function(x) {
-    if (round(x,5)==0) { 0 } else { rval_pre(x) }
-  })
+  rval <- approxfun(vals_x_, vals_y_, method="linear", yleft=0,
+                    yright=1, ties="ordered")
+  
+  rval_inv <- approxfun(vals_y_, vals_x_, method="linear", yleft=min(vals_x),
+                        yright=max(vals_x), ties="ordered")
   
   grid <- seq(0,1,0.01)
   jitter <- 0
@@ -33,7 +253,8 @@ if (F) {
     y = c(rval(grid), rval_inv(grid)) + jitter,
     which = rep(c("ecdf", "smoothed"), each=length(grid))
   )
-  ggplot(df, aes(x=x, y=y, color=which)) + geom_line()
+  ggplot(df, aes(x=x, y=y, color=which)) + geom_line() +
+    geom_abline(slope=1, color="grey")
   
   rval(rval_inv(seq(0,1,0.1)))
   rval_inv(rval(seq(0,1,0.1)))

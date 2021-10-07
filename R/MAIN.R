@@ -13,9 +13,9 @@
 #   - zeehio/facetscales
 cfg <- list(
   which_sim = "estimation", # estimation edge testing
-  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
+  level_set_which = "level_set_estimation_2", # level_set_estimation_1 level_set_testing_1
   run_or_update = "run",
-  num_sim = 500,
+  num_sim = 1000,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm"),
@@ -123,30 +123,32 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Estimation: scratch
   level_set_estimation_0 <- list(
-    n = 3000, # 1500
+    n = 15000,
     alpha_3 = 3,
-    sc_params = list("sc_params"=list(lmbd=3e-5, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_A = "N(0.5,0.01)",
+    sc_params = list("sc_params"=list(lmbd=4e-7, v=1.6, lmbd2=3e-5, v2=1.5)),
+    distr_A = "N(0.5,0.04)",
     edge = "none",
-    surv_true = c("Cox PH", "complex"),
-    sampling = "two-phase (72%)", # "iid"
+    surv_true = "Cox PH",
+    sampling = "two-phase (6%)",
     estimator = list(
-      "Grenander (ecdf: linear)" = list(
+      "Grenander (gamma_type='kernel')" = list(
         est = "Grenander",
         params = list(S_n_type="true", g_n_type="true",
                       ci_type="regular", cf_folds=1, edge_corr="none",
-                      ecdf_type="linear", deriv_type="m-spline")
+                      ecdf_type="linear (mid)", deriv_type="m-spline",
+                      gamma_type="kernel")
       ),
-      "Grenander (ecdf: step)" = list(
+      "Grenander (gamma_type='kernel2')" = list(
         est = "Grenander",
         params = list(S_n_type="true", g_n_type="true",
                       ci_type="regular", cf_folds=1, edge_corr="none",
-                      ecdf_type="step", deriv_type="m-spline")
+                      ecdf_type="linear (mid)", deriv_type="m-spline",
+                      gamma_type="kernel2")
       )
     )
   )
   
-  # Estimation: ideal
+  # Estimation: ideal params / no edge correction
   level_set_estimation_1 <- list(
     n = 5000,
     alpha_3 = 3,
@@ -156,44 +158,101 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     surv_true = c("Cox PH", "complex"),
     sampling = "two-phase (72%)",
     estimator = list(
-      "Grenander (ecdf: linear)" = list(
+      "Grenander (kernel)" = list(
         est = "Grenander",
-        params = list(S_n_type="true", g_n_type="true",
+        params = list(S_n_type="Random Forest", g_n_type="binning",
                       ci_type="regular", cf_folds=1, edge_corr="none",
-                      ecdf_type="linear", deriv_type="m-spline")
+                      ecdf_type="linear (mid)", deriv_type="m-spline",
+                      gamma_type="kernel")
       ),
-      "Grenander (ecdf: step)" = list(
+      "Grenander (kernel2)" = list(
         est = "Grenander",
-        params = list(S_n_type="true", g_n_type="true",
+        params = list(S_n_type="Random Forest", g_n_type="binning",
                       ci_type="regular", cf_folds=1, edge_corr="none",
-                      ecdf_type="step", deriv_type="m-spline")
+                      ecdf_type="linear (mid)", deriv_type="m-spline",
+                      gamma_type="kernel2")
       )
+      # "Grenander (estimated nuisances)" = list(
+      #   est = "Grenander",
+      #   params = list(S_n_type="Random Forest", g_n_type="binning",
+      #                 ci_type="regular", cf_folds=1, edge_corr="none",
+      #                 ecdf_type="linear (mid)", deriv_type="m-spline",
+      #                 gamma_type="kernel")
+      # ),
+      # "Grenander (true nuisances)" = list(
+      #   est = "Grenander",
+      #   params = list(S_n_type="true", g_n_type="true",
+      #                 ci_type="regular", cf_folds=1, edge_corr="none",
+      #                 ecdf_type="true", deriv_type="m-spline",
+      #                 gamma_type="kernel")
+      # )
     )
   )
   
-  # Estimation: parameters similar to Moderna trial
+  # Estimation: trial params / no edge correction
   level_set_estimation_2 <- list(
     n = 15000,
     alpha_3 = 3,
     sc_params = list("sc_params"=list(lmbd=4e-7, v=1.6, lmbd2=3e-5, v2=1.5)),
-    distr_A = "N(0.5,0.04)",
+    distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
     edge = "none",
     surv_true = c("Cox PH", "complex"),
     sampling = "two-phase (6%)",
     estimator = list(
-      "Grenander (True S_n/g_n)" = list(
-        est = "Grenander",
-        params = list(S_n_type="true", g_n_type="true",
-                      ci_type="regular", cf_folds=1, edge_corr="none",
-                      ecdf_type="linear", deriv_type="m-spline")
-      ),
-      "Grenander (Est S_n/g_n)" = list(
+      "Grenander (kernel)" = list(
         est = "Grenander",
         params = list(S_n_type="Random Forest", g_n_type="binning",
                       ci_type="regular", cf_folds=1, edge_corr="none",
-                      ecdf_type="linear", deriv_type="m-spline")
+                      ecdf_type="linear (mid)", deriv_type="m-spline",
+                      gamma_type="kernel")
+      ),
+      "Grenander (kernel2)" = list(
+        est = "Grenander",
+        params = list(S_n_type="Random Forest", g_n_type="binning",
+                      ci_type="regular", cf_folds=1, edge_corr="none",
+                      ecdf_type="linear (mid)", deriv_type="m-spline",
+                      gamma_type="kernel2")
+      )
+      # "Grenander (estimated nuisances)" = list(
+      #   est = "Grenander",
+      #   params = list(S_n_type="Random Forest", g_n_type="binning",
+      #                 ci_type="regular", cf_folds=1, edge_corr="none",
+      #                 ecdf_type="linear (mid)", deriv_type="m-spline",
+      #                 gamma_type="kernel")
+      # ),
+      # "Grenander (true nuisances)" = list(
+      #   est = "Grenander",
+      #   params = list(S_n_type="true", g_n_type="true",
+      #                 ci_type="regular", cf_folds=1, edge_corr="none",
+      #                 ecdf_type="true", deriv_type="m-spline",
+      #                 gamma_type="kernel")
+      # )
+    )
+  )
+  
+  # Estimation: ideal params / no edge correction
+  level_set_estimation_3 <- list(
+    n = 5000,
+    alpha_3 = 3,
+    sc_params = list("sc_params"=list(lmbd=3e-5, v=1.5, lmbd2=5e-5, v2=1.5)),
+    distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
+    edge = "expit",
+    surv_true = c("Cox PH", "complex"),
+    sampling = "two-phase (72%)",
+    estimator = list(
+      "Grenander (estimated nuisances)" = list(
+        est = "Grenander",
+        params = list(S_n_type="Random Forest", g_n_type="binning",
+                      ci_type="regular", cf_folds=1, edge_corr="max",
+                      ecdf_type="linear (mid)", deriv_type="m-spline",
+                      gamma_type="kernel")
       )
     )
+  )
+  
+  # Estimation: trial params / edge correction
+  level_set_estimation_4 <- list(
+    "TO DO"
   )
   
   # Testing: compare all methods
@@ -378,7 +437,7 @@ if (FALSE) {
   # cb_colors <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442",
   #                "#0072B2", "#D55E00", "#CC79A7", "#999999")
   # m_colors <- c(cb_colors[2], cb_colors[5], cb_colors[6]
-  #   # `Grenander (Est S_n/g_n)` = cb_colors[2],
+    # `Grenander (Est S_n/g_n)` = cb_colors[2],
   # )
   
   df_distr_A <- data.frame(
@@ -397,7 +456,7 @@ if (FALSE) {
     distr_A = rep(c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"),2)
   )
   
-  # distr_A_ <- "Unif(0,1)" # "N(0.5,0.04)"
+  # distr_A_ <- "N(0.5,0.04)" # "Unif(0,1)"
   # df_distr_A1 %<>% filter(distr_A==distr_A_)
   # df_distr_A2 %<>% filter(distr_A==distr_A_)
   # df_vlines %<>% filter(distr_A==distr_A_)
@@ -406,8 +465,8 @@ if (FALSE) {
   # Export: 8" x 5"
   ggplot(
     filter(p_data, stat=="bias"),
-    # aes(x=point, y=value)
-    aes(x=point, y=value, color=Estimator, group=Estimator)
+    aes(x=point, y=value)
+    # aes(x=point, y=value, color=Estimator, group=Estimator)
   ) +
     geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
                 data=df_distr_A1, fill="grey", color=NA, alpha=0.4) +
@@ -425,8 +484,8 @@ if (FALSE) {
   # Export: 8" x 5"
   ggplot(
     filter(p_data, stat=="cov"),
-    # aes(x=point, y=value)
-    aes(x=point, y=value, color=Estimator, group=Estimator)
+    aes(x=point, y=value)
+    # aes(x=point, y=value, color=Estimator, group=Estimator)
   ) +
     geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
                 data=df_distr_A2, fill="grey", color=NA, alpha=0.4) +

@@ -56,8 +56,8 @@ est_curve <- function(dat_orig, estimator, params, points) {
     if (params$cf_folds==1) {
       
       # Construct component functions
-      Phi_n <- construct_Phi_n(dat_orig, type=params$ecdf_type) # !!!!!
-      Phi_n_inv <- construct_Phi_n(dat_orig, which="inverse",
+      Phi_n <- construct_Phi_n(d$a, d$weights, type=params$ecdf_type) # !!!!!
+      Phi_n_inv <- construct_Phi_n(d$a, d$weights, which="inverse",
                                    type=params$ecdf_type) # !!!!!
       S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
       Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type,
@@ -87,8 +87,8 @@ est_curve <- function(dat_orig, estimator, params, points) {
       Gamma_n <- construct_Gamma_cf(dat_orig, params, vlist)
       
       # Recompute functions on full dataset
-      Phi_n <- construct_Phi_n(dat_orig, type=params$ecdf_type)
-      Phi_n_inv <- construct_Phi_n(dat_orig, which="inverse",
+      Phi_n <- construct_Phi_n(d$a, d$weights, type=params$ecdf_type)
+      Phi_n_inv <- construct_Phi_n(d$a, d$weights, which="inverse",
                                    type=params$ecdf_type)
       
       # Construct cross-fitted one-step edge estimator
@@ -126,7 +126,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
                                         type=params$g_n_type, k=15, delta1=TRUE)
     f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid,
                                     f_aIw_delta1_n)
-    gamma_n <- construct_gamma_n(dat_orig, vlist$A_grid, type="kernel",
+    gamma_n <- construct_gamma_n(dat_orig, vlist$A_grid, type=params$gamma_type,
                                  omega_n, f_aIw_n, f_a_n, f_a_delta1_n)
 
     # Edge correction

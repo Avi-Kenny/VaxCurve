@@ -1,4 +1,182 @@
 
+# Beta density estimator (weighted)
+if (F) {
+  
+  library(kdensity)
+  library(ks)
+  
+  n <- 500
+  shape <- c(0.6,0.6) # c(0.3,0.3)
+  sample <- rbeta(n, shape1=shape[1], shape2=shape[2]) %>% sort()
+  grid <- seq(0,1,0.01)
+  
+  wts <- c(
+    # rep(1,length(sample))
+    rep(0.5,length(sample)/2),
+    rep(1.5,length(sample)/2)
+  )
+  wts <- wts / sum(wts)
+  kd_gauss2_ests <- density(
+    x = sample,
+    kernel = "gaussian",
+    from = 0,
+    to = 1,
+    weights = wts
+  )
+  kd_gauss2 <- function(x) {
+    index <- which.min(abs(kd_gauss2_ests$x - x))
+    area <- mean(kd_gauss2_ests$y)
+    return(kd_gauss2_ests$y[index]/area)
+  }
+  kd_gauss <- kdensity(
+    x = sample,
+    start = "gumbel",
+    kernel = "gaussian",
+    support = c(0,1)
+  )
+  # kd_beta <- kdensity( # Weights unavailable
+  #   x = sample,
+  #   start = "gumbel",
+  #   kernel = "beta",
+  #   support = c(0,1)
+  # )
+  kd_beta2_ests <- kde.boundary(
+    x = sample,
+    boundary.kernel = "beta",
+    w = wts,
+    xmin = 0,
+    xmax = 1
+  )
+  kd_beta2 <- function(x) {
+    len <- length(kd_beta2_ests$eval.points)
+    k_x <- kd_beta2_ests$eval.points[2:(len-1)]
+    k_dens <- kd_beta2_ests$estimate[2:(len-1)]
+    index <- which.min(abs(k_x - x))
+    return(k_dens[index])
+  }
+  
+  # Graph of true Beta distribution against estimates
+  dens_true <- sapply(grid, function(x) {
+    dbeta(x, shape1=shape[1], shape2=shape[2])
+  })
+  dens_est_gauss <- sapply(grid, kd_gauss)
+  dens_est_gauss2 <- sapply(grid, kd_gauss2)
+  dens_est_beta <- sapply(grid, kd_beta)
+  dens_est_beta2 <- sapply(grid, kd_beta2)
+  dat_plot <- data.frame(
+    x = rep(grid, 5),
+    density = c(dens_true, dens_est_gauss, dens_est_gauss2,
+                dens_est_beta, dens_est_beta2),
+    which = rep(c("True", "Est: Gaussian", "Est: Gaussian 2",
+                  "Est: Beta", "Est: Beta 2"), each=length(grid))
+  )
+  ggplot(dat_plot, aes(x=x, y=density, color=factor(which))) +
+    geom_line() +
+    labs(color="Which")
+  
+  # # Histogram of sample
+  # ggplot(data.frame(x=sample), aes(x=x)) + geom_histogram()
+  
+  # # Check to see if densities are properly normalized (should appx equal 1)
+  # mean(dens_est_beta[1:100])
+  # # mean(dens_est_beta2[1:100])
+  # mean(dens_est_3[1:100])
+  # mean(dens_est_gauss[1:100])
+  
+  
+}
+
+# Old htab function
+if (F) {
+  
+  #' Construct a vectorized/memoized hash table
+  #'
+  #' @param fnc Function to evaluate
+  #' @param vals List of values to pre-compute function on; passed to
+  #' @param round_args If provided, a vector of length equal to the number of
+  #'     columns in vals; all computations will be rounded accordingly.
+  #' @param check_dupes NOT YET IMPLEMENTED; Logical; if TRUE, the values in
+  #'     vals will not be double-computed if there are duplicates (including
+  #'     duplicates after rounding)
+  #' @return A vectorized/memoized hash table
+  create_htab <- function(fnc, vals, round_args=NA, check_dupes=FALSE) {
+    
+    rnd <- !(is.na(round_args[1]))
+    
+    if (rnd && length(vals)!=length(round_args)) {
+      stop("length(vals) must equal length(round_args)")
+    }
+    
+    # Create and populate hash table (for function values)
+    htab <- new.env()
+    for (i in 1:nrow(vals)) {
+      # !!!!! Check keys in here for dupes; if (check_dupes) {...}
+      row <- as.numeric(vals[i,])
+      if (rnd) row <- round(row, round_args)
+      key <- rlang::hash(row)
+      htab[[key]] <- do.call(fnc, as.list(row))
+    }
+    rm(row)
+    rm(key)
+    
+    # Create hash table (for vectorized evaluations; populated on the fly)
+    htab_v <- new.env()
+    
+    # Create function
+    return(function(...) {
+      
+      # if (max(sapply(list(...), length))==1) {
+      #   if (!rnd) {
+      #     args <- as.numeric(list(...))
+      #   } else {
+      #     args <- round(as.numeric(list(...)), round_args)
+      #   }
+      #   key <- rlang::hash(args)
+      #   val <- htab[[key]]
+      #   if (is.null(val)) {
+      #     stop(paste0("Value corresponding to arguments (",
+      #                 paste0(args, collapse=","),
+      #                 ") has not been set"))
+      #   }
+      #   return(val)
+      # } else {
+      
+      # Memoize vectorized evaluations
+      if (!rnd) {
+        lst <- list(...)
+      } else {
+        lst <- lapply(
+          X = c(1:length(list(...))),
+          FUN = function(i) { round(list(...)[[i]], round_args[i]) }
+        )
+      }
+      hsh <- rlang::hash(lst)
+      vec <- htab_v[[hsh]]
+      if (!is.null(vec)) {
+        return(vec)
+      } else {
+        vec <- do.call("mapply", c(
+          FUN = function(...) {
+            key <- rlang::hash(as.numeric(list(...)))
+            val <- htab[[key]]
+            if (is.null(val)) {
+              stop(paste0("Value corresponding to arguments (",
+                          paste0(as.numeric(list(...)), collapse=","),
+                          ") has not been set"))
+            }
+            return(val)
+          },
+          lst
+        ))
+        htab_v[[hsh]] <- vec
+        return(vec)
+      }
+      # }
+    })
+  }
+  
+}
+
 # Precision-weighted edge correction
 if (F) {
   

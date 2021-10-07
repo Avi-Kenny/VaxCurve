@@ -3,8 +3,8 @@
 #' @param n Sample size
 #' @param alpha_3 Dose-response "relationship strength" parameter
 #' @param distr_A Distribution of A, possibly dependent on covariates; one of
-#'     c("Unif(0,1)", "Beta(1.5+w1,1.5+w2)", "N(0.5,0.01)", "N(0.5,0.04)",
-#'     "N(0.4+0.2w1+0.1w2,0.01)"). The Normals are truncated to lie in [0,1].
+#'     c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)", "N(0.4+0.2w1+0.1w2,0.01)").
+#'     The Normals are truncated to lie in [0,1].
 #' @param edge Propensity mechanism for point mass at edge. The distribution of
 #'     A will be (1-pi(w))*distr_A. One of the following: "none" (no point mass
 #'     at the edge), "expit" (expit propensity model), "complex" (non-logit
@@ -27,8 +27,6 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
   # Sample A (before point mass)
   if (distr_A=="Unif(0,1)") {
     a <- runif(n)
-  } else if (distr_A=="Beta(1.5+w1,1.5+w2)") {
-    a <- rbeta(n, shape1=1.5+w1, shape2=1.5+w2)
   } else if (distr_A=="N(0.5,0.01)") {
     a <- rnorm(n, mean=0.5, sd=0.1)
     a <- ifelse(a>1,1,ifelse(a<0,0,a))

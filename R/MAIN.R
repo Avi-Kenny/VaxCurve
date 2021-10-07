@@ -83,8 +83,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       n = 5000,
       alpha_3 = c(0,1.25,2.5),
       sc_params = list("sc_params"=list(lmbd=9e-7, v=1.5, lmbd2=1e-5, v2=1.5)),
-      distr_A = c("Unif(0,1)", "Beta(1.5+w1,1.5+w2)",
-                  "N(0.5,0.01)", "N(0.5,0.04)"),
+      distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
       edge = c("none", "expit", "complex"),
       surv_true = c("Cox PH", "complex"),
       sampling = c("iid", "two-phase (6%)", "two-phase (72%)"),
@@ -261,7 +260,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     n = c(1000,2000),
     alpha_3 = c(0,1.25,2.5),
     sc_params = list("sc_params"=list(lmbd=9e-7, v=1.5, lmbd2=1e-5, v2=1.5)),
-    distr_A = c("Unif(0,1)","Beta(1.5+w1,1.5+w2)"),
+    distr_A = c("Unif(0,1)"),
     edge = "none",
     surv_true = "Cox PH",
     sampling = "two-phase (72%)",
@@ -313,15 +312,15 @@ if (cfg$run_or_update=="run") {
       # Add functions to simulation object
       sim %<>% add_creator(generate_data)
       methods <- c(
-        "logit", "expit", "deriv_logit", "deriv_expit", "create_htab", "Pi",
-        "wts", "construct_S_n", "construct_gcomp_n", "construct_deriv_theta_n",
-        "construct_tau_n", "construct_gamma_n", "construct_f_aIw_n",
-        "construct_f_a_n", "construct_g_n", "construct_omega_n",
-        "construct_eta_n", "construct_Gamma_n", "construct_Phi_n",
-        "construct_rho_n", "construct_xi_n", "construct_infl_fn_1",
-        "construct_infl_fn_Gamma", "construct_infl_fn_2", "beta_n_var_hat",
-        "create_val_list", "construct_Gamma_cf_k", "construct_Gamma_cf",
-        "construct_pi_n", "theta_os_n", "sigma2_os_n",
+        "logit", "expit", "deriv_logit", "deriv_expit", "construct_superfunc",
+        "Pi", "wts", "construct_S_n", "construct_gcomp_n",
+        "construct_deriv_theta_n", "construct_tau_n", "construct_gamma_n",
+        "construct_f_aIw_n", "construct_f_a_n", "construct_g_n",
+        "construct_omega_n", "construct_eta_n", "construct_Gamma_n",
+        "construct_Phi_n", "construct_rho_n", "construct_xi_n",
+        "construct_infl_fn_1", "construct_infl_fn_Gamma", "construct_infl_fn_2",
+        "beta_n_var_hat", "create_val_list", "construct_Gamma_cf_k",
+        "construct_Gamma_cf", "construct_pi_n", "theta_os_n", "sigma2_os_n",
         
         "est_curve", "generate_data",
         "lambda", "one_simulation", "test_2"
@@ -550,7 +549,7 @@ if (FALSE) {
   )
   
   # Export: 7" x 4.5"
-  # distr_A_ <- "Unif(0,1)" # "Beta(1.5+w1,1.5+w2)"
+  # distr_A_ <- "Unif(0,1)"
   ggplot(
     summ,
     aes(x=alpha_3, y=Power, color=factor(n))

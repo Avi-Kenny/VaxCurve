@@ -768,7 +768,7 @@
   dat_orig <- generate_data(
     n = 2000,
     alpha_3 = 0.7,
-    distr_A = "Beta(1.5+w1,1.5+w2)", # "Unif(0,1)" "Beta(1.5+w1,1.5+w2)"
+    distr_A = "N(0.5,0.04)", # "Unif(0,1)"
     edge = "none",
     surv_true = "Cox PH",
     sampling = L$sampling
@@ -906,7 +906,7 @@
   dat_orig <- generate_data(
     n = n,
     alpha_3 = 0.7,
-    distr_A = "Beta(1.5+w1,1.5+w2)",
+    distr_A = "N(0.5,0.04)",
     edge = edge,
     surv_true = "Cox PH",
     sampling = L$sampling

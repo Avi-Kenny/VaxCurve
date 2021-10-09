@@ -30,8 +30,8 @@ est_curve <- function(dat_orig, estimator, params, points) {
   if (estimator=="Grenander") {
     
     if (params$edge_corr=="spread") {
-      dat_orig$noise <- runif(nrow(dat_orig))*0.05
-      dat_orig %<>% mutate(a = ifelse(a==0, noise, a))
+      dat_orig$noise <- runif(length(dat_orig$a))*0.05
+      dat_orig$a <- ifelse(dat_orig$a==0, noise, dat_orig$a)
     }
     
     # simlog <- (function() {
@@ -49,34 +49,32 @@ est_curve <- function(dat_orig, estimator, params, points) {
     # simlog("1")
     # simlog()
     
-    # Construct dataframes of values to pre-compute functions on
-    vlist <- create_val_list(dat_orig, C$appx)
+    # Setup
+    dat <- ss(dat_orig, which(dat_orig$delta==1))
+    vlist <- create_val_list(dat, C$appx)
     
     # Construct regular Gamma_0 estimator
     if (params$cf_folds==1) {
       
       # Construct component functions
-      Phi_n <- construct_Phi_n(d$a, d$weights, type=params$ecdf_type) # !!!!!
-      Phi_n_inv <- construct_Phi_n(d$a, d$weights, which="inverse",
-                                   type=params$ecdf_type) # !!!!!
-      S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
-      Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type,
-                            csf=TRUE)
-      f_aIw_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
+      Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
+      Phi_n_inv <- construct_Phi_n(dat, which="inverse", type=params$ecdf_type)
+      S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
+      Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
+      f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid,
                                    type=params$g_n_type, k=15)
       f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
       g_n <- construct_g_n(vlist$AW_grid, f_aIw_n, f_a_n)
       omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
       
       # Construct Gamma_n
-      Gamma_n <- construct_Gamma_n(dat_orig, vlist$A_grid, omega_n, S_n, g_n)
+      Gamma_n <- construct_Gamma_n(dat, vlist$A_grid, omega_n, S_n, g_n)
 
       # Construct one-step edge estimator
       if (params$edge_corr!="none") {
-        pi_n <- construct_pi_n(dat_orig, vlist$W_grid, type="logistic")
-        theta_os_n_est <- theta_os_n(dat_orig, pi_n, S_n, omega_n)
-        sigma2_os_n_est <- sigma2_os_n(dat_orig, pi_n, S_n, omega_n,
-                                       theta_os_n_est)
+        pi_n <- construct_pi_n(dat, vlist$W_grid, type="logistic")
+        theta_os_n_est <- theta_os_n(dat, pi_n, S_n, omega_n)
+        sigma2_os_n_est <- sigma2_os_n(dat, pi_n, S_n, omega_n, theta_os_n_est)
       }
       
     }
@@ -87,9 +85,8 @@ est_curve <- function(dat_orig, estimator, params, points) {
       Gamma_n <- construct_Gamma_cf(dat_orig, params, vlist)
       
       # Recompute functions on full dataset
-      Phi_n <- construct_Phi_n(d$a, d$weights, type=params$ecdf_type)
-      Phi_n_inv <- construct_Phi_n(d$a, d$weights, which="inverse",
-                                   type=params$ecdf_type)
+      Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
+      Phi_n_inv <- construct_Phi_n(dat, which="inverse", type=params$ecdf_type)
       
       # Construct cross-fitted one-step edge estimator
       if (params$edge_corr!="none") {
@@ -112,22 +109,22 @@ est_curve <- function(dat_orig, estimator, params, points) {
     
     # Recompute functions on full dataset
     if (params$cf_folds>1) {
-      S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
-      Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type,
-                            csf=TRUE)
-      f_aIw_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
+      S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
+      Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
+      f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid,
                                    type=params$g_n_type, k=15)
       f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
       omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
     }
     
     # Compute new functions
-    f_aIw_delta1_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
+    f_aIw_delta1_n <- construct_f_aIw_n(dat, vlist$AW_grid,
                                         type=params$g_n_type, k=15, delta1=TRUE)
     f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid,
                                     f_aIw_delta1_n)
-    gamma_n <- construct_gamma_n(dat_orig, vlist$A_grid, type=params$gamma_type,
-                                 omega_n, f_aIw_n, f_a_n, f_a_delta1_n)
+    gamma_n <- construct_gamma_n(dat_orig, dat, vlist$A_grid,
+                                 type=params$gamma_type, omega_n, f_aIw_n,
+                                 f_a_n, f_a_delta1_n)
 
     # Edge correction
     if (params$edge_corr %in% c("none", "spread")) {
@@ -174,7 +171,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
       ci_hi <- rep(0, length(ests))
       
     } else {
-
+      
       # Generate variance scale factor for each point
       tau_ns <- tau_n(points)
       
@@ -183,7 +180,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
       # The Normal approximation would use qnorm(0.975, sd=0.52) instead
       qnt <- 1.00
       # qnt <- qnorm(0.975, sd=0.52)
-      n_orig <- nrow(dat_orig)
+      n_orig <- length(dat_orig$delta)
       if (params$ci_type=="regular") {
         ci_lo <- ests - (qnt*tau_ns)/(n_orig^(1/3))
         ci_hi <- ests + (qnt*tau_ns)/(n_orig^(1/3))
@@ -217,7 +214,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
     }
     
     # Add extra return data
-    res[["ex_S_n"]] <- S_n(C$t_e, w1=0.5, w2=1, a=0.5)
+    res[["ex_S_n"]] <- S_n(C$t_e, w=c(0.5,1), a=0.5)
     res[["ex_gamma_n"]] <- gamma_n(0.5)
     res[["ex_deriv_theta_n"]] <- deriv_theta_n(0.5)
     res[["ex_tau_n"]] <- tau_n(0.5)

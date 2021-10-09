@@ -1,4 +1,132 @@
 
+# Unit tests for superfunc
+if (F) {
+  
+  f <- function(a,b,c) {
+    if (T) { Sys.sleep(1) }
+    (a-b)+sum(c)/5
+  }
+  fs <- construct_superfunc(f, vec=c(0,1,2))
+  # f(9,2,c(10,40))
+  # f(9,3,c(20,50))
+  # f(9,4,c(30,60))
+  system.time({x<-fs(9,2,c(10,40)); print(x);})
+  system.time({x<-fs(9,3,c(20,50)); print(x);})
+  system.time({x<-fs(9,4,c(30,60)); print(x);})
+  system.time({x<-fs(9,c(2,3,4),data.frame(c(10,20,30),c(40,50,60))); print(x)})
+  
+}
+
+# Deconstruct vectorize
+if (F) {
+  
+  # # !!!!!
+  # (function(){
+  #   (function(){
+  #     parent.frame()
+  #   })()
+  #   # parent.frame()
+  # })()
+  
+  Vectorize2 <- function (FUN, vectorize.args = arg.names, SIMPLIFY = TRUE, 
+            USE.NAMES = TRUE) 
+  {
+    arg.names <- as.list(formals(FUN))
+    arg.names[["..."]] <- NULL
+    arg.names <- names(arg.names)
+    vectorize.args <- as.character(vectorize.args)
+    if (!length(vectorize.args)) 
+      return(FUN)
+    if (!all(vectorize.args %in% arg.names)) 
+      stop("must specify names of formal arguments for 'vectorize'")
+    collisions <- arg.names %in% c("FUN", "SIMPLIFY", "USE.NAMES", 
+                                   "vectorize.args")
+    if (any(collisions)) 
+      stop(sQuote("FUN"), " may not have argument(s) named ", 
+           paste(sQuote(arg.names[collisions]), collapse = ", "))
+    rm(arg.names, collisions)
+    (function() {
+      FUNV <- function() {
+        print("parent.frame()")
+        print(parent.frame())
+        args <- lapply(as.list(match.call())[-1L], eval, 
+                       parent.frame())
+        print("args")
+        print(args)
+        names <- if (is.null(names(args))) 
+          character(length(args))
+        else names(args)
+        print("names")
+        print(names)
+        dovec <- names %in% vectorize.args
+        print("dovec")
+        print(dovec)
+        print("args[dovec]")
+        print(args[dovec])
+        print("args[!dovec]")
+        print(args[!dovec])
+        do.call("mapply", c(FUN = FUN, args[dovec], MoreArgs = list(args[!dovec]), 
+                            SIMPLIFY = SIMPLIFY, USE.NAMES = USE.NAMES))
+      }
+      formals(FUNV) <- formals(FUN)
+      environment(FUNV) <- parent.env(environment())
+      FUNV
+    })()
+  }
+  
+  x <- Vectorize2(function(a,b,c,d) {a+b+c+d}, vectorize.args=c("a","b"))
+  x(1,2,3,4)
+  
+}
+
+# Deconstruct memoise
+if (F) {
+  
+  mem2 <- function (f) {
+    memo_f <- function(...) {
+      encl <- parent.env(environment())
+      v <- encl$`_val`
+    }
+    memo_f_env <- new.env(parent=environment(f))
+    memo_f_env$`_val` <- 3
+    environment(memo_f) <- memo_f_env
+    memo_f
+  }
+  
+  f1 <- function() { print("there") }
+  f2 <- mem2(f1)
+  f2()
+  
+}
+
+# construct_superfunc: fixing environments issue
+if (F) {
+  
+  x <- 1
+  f0 <- function() { return(x) }
+  f1 <- memoise(f)
+  f2 <- construct_superfunc(f)
+  f3 <- Vectorize(f)
+  
+  f2 <- function() {
+    x <- 99
+    f()
+    # f1()
+  }
+  f2()
+  
+  f2(x=4) # This should give same answer as f2b
+  f2b <- function(x) {
+    f1b <- function() { return(x) }
+    f1b(a=3)
+  }
+  f2b(x=4)
+  
+  # !!!!! Try both passing function anonymously and named
+  # !!!!! Test use of aux
+  
+}
+
 # Smoothed ecdf
 if (F) {
   
@@ -117,10 +245,7 @@ if (F) {
   
   # Prep
   n_orig <- nrow(dat_orig)
-  dat_orig$weights <- wts(dat_orig)
-  dat <- dat_orig %>% filter(!is.na(a))
-  weights <- dat$weights
-  
+
   # Construct dataframes of values to pre-compute functions on
   vlist <- create_val_list(dat_orig, C$appx)
   
@@ -180,10 +305,9 @@ if (F) {
     Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type,
                           csf=TRUE)
     omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
-    pi_n <- construct_pi_n(dat_orig, vlist$W_grid, type="logistic")
-    theta_os_n_est <- theta_os_n(dat_orig, pi_n, S_n, omega_n)
-    sigma2_os_n_est <- sigma2_os_n(dat_orig, pi_n, S_n, omega_n,
-                                   theta_os_n_est)
+    pi_n <- construct_pi_n(dat, vlist$W_grid, type="logistic")
+    theta_os_n_est <- theta_os_n(dat, pi_n, S_n, omega_n)
+    sigma2_os_n_est <- sigma2_os_n(dat, pi_n, S_n, omega_n, theta_os_n_est)
     
     ests <- c(ests, theta_os_n_est)
     sigma2s <- c(sigma2s, sigma2_os_n_est/n_orig)
@@ -220,10 +344,9 @@ if (F) {
     Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type,
                           csf=TRUE)
     omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
-    pi_n <- construct_pi_n(dat_orig, vlist$W_grid, type="logistic")
-    theta_os_n_est <- theta_os_n(dat_orig, pi_n, S_n, omega_n)
-    sigma2_os_n_est <- sigma2_os_n(dat_orig, pi_n, S_n, omega_n,
-                                   theta_os_n_est)
+    pi_n <- construct_pi_n(dat, vlist$W_grid, type="logistic")
+    theta_os_n_est <- theta_os_n(dat, pi_n, S_n, omega_n)
+    sigma2_os_n_est <- sigma2_os_n(dat, pi_n, S_n, omega_n, theta_os_n_est)
     
     ests <- c(ests, theta_os_n_est)
     sigma2s <- c(sigma2s, sigma2_os_n_est/n_orig)

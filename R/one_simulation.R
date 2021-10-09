@@ -61,26 +61,27 @@ if (cfg$which_sim=="edge") {
 
   one_simulation <- function() {
     
+    # !!!!! Update function calls (htab-->superfunc)
+    
     # Generate dataset
     dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
                               L$surv_true, L$sc_params, L$sampling)
     
     # Prep
-    n_orig <- nrow(dat_orig)
-    dat_orig$weights <- wts(dat_orig)
+    n_orig <- length(dat_orig$delta)
+    dat <- ss(dat_orig, which(dat_orig$delta==1))
     
     # Construct dataframes of values to pre-compute functions on
-    vlist <- create_val_list(dat_orig, C$appx)
+    vlist <- create_val_list(dat, C$appx)
     
     # Construct component functions
-    S_n <- construct_S_n(dat_orig, vlist$S_n, type=L$estimator$params$S_n_type)
-    Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=L$estimator$params$S_n_type,
+    S_n <- construct_S_n(dat, vlist$S_n, type=L$estimator$params$S_n_type)
+    Sc_n <- construct_S_n(dat, vlist$S_n, type=L$estimator$params$S_n_type,
                           csf=TRUE)
     omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
-    pi_n <- construct_pi_n(dat_orig, vlist$W_grid, type="logistic")
-    theta_os_n_est <- theta_os_n(dat_orig, pi_n, S_n, omega_n)
-    sigma2_os_n_est <- sigma2_os_n(dat_orig, pi_n, S_n, omega_n,
-                                   theta_os_n_est)
+    pi_n <- construct_pi_n(dat, vlist$W_grid, type="logistic")
+    theta_os_n_est <- theta_os_n(dat, pi_n, S_n, omega_n)
+    sigma2_os_n_est <- sigma2_os_n(dat, pi_n, S_n, omega_n, theta_os_n_est)
     
     # Return results
     return(list(

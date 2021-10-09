@@ -9,25 +9,26 @@
   
   # 2. Set global constants
   params <- list(S_n_type="true", g_n_type="true", ci_type="regular",
-                 cf_folds=1, edge_corr="none", deriv_type="m-spline",
-                 gamma_type="kernel")
+                 cf_folds=1, edge_corr="none", ecdf_type="linear (mid)",
+                 deriv_type="m-spline", gamma_type="kernel")
   C <- sim$constants
-  L <- list(n=15000, alpha_3=3,
-            sc_params=list(lmbd=4e-7, v=1.6, lmbd2=3e-5, v2=1.5),
-            distr_A="N(0.5,0.04)", edge="none", surv_true="Cox PH",
-            ecdf_type="true", sampling="two-phase (6%)",
-            estimator=list("G"=list(est="Grenander",params=params))
-  )
-  # L <- list(n=5000, alpha_3=3,
-  #           sc_params=list(lmbd=3e-5, v=1.5, lmbd2=5e-5, v2=1.5),
-  #           distr_A="Unif(0,1)", edge="none", surv_true="Cox PH",
-  #           ecdf_type="true", sampling="two-phase (72%)",
+  # L <- list(n=15000, alpha_3=3,
+  #           sc_params=list(lmbd=4e-7, v=1.6, lmbd2=3e-5, v2=1.5),
+  #           distr_A="N(0.5,0.04)", edge="none", surv_true="Cox PH",
+  #           ecdf_type="true", sampling="two-phase (6%)",
   #           estimator=list("G"=list(est="Grenander",params=params))
   # )
+  L <- list(n=1000, alpha_3=3,
+            sc_params=list(lmbd=3e-5, v=1.5, lmbd2=5e-5, v2=1.5),
+            distr_A="N(0.5,0.04)", edge="none", surv_true="Cox PH", # Unif(0,1)
+            ecdf_type="true", sampling="two-phase (72%)",
+            estimator=list("G"=list(est="Grenander",params=params))
+  )
   
   # 3. Generate dataset
   dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
                             L$surv_true, L$sc_params, L$sampling)
+  dat <- ss(dat_orig, which(dat_orig$delta==1))
   
 }
 
@@ -92,13 +93,13 @@
   #                     sampling="two-phase (6%)") # "iid" "two-phase (6%)"
   
   # Curve 1: Phi_n
-  Phi_n <- construct_Phi_n(d$a, d$weights, type=params$ecdf_type)
-  Phi_0 <- construct_Phi_n(d$a, d$weights, type="true")
+  Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
+  Phi_0 <- construct_Phi_n(dat, type="true")
   
   # Curve 2: Phi_n_inv
-  Phi_n_inv <- construct_Phi_n(d$a, d$weights, which="inverse",
+  Phi_n_inv <- construct_Phi_n(dat, which="inverse",
                                type=params$ecdf_type)
-  Phi_0_inv <- construct_Phi_n(d$a, d$weights, which="inverse",
+  Phi_0_inv <- construct_Phi_n(dat, which="inverse",
                                type="true")
   
   # Plot true curves against estimated curve
@@ -201,21 +202,18 @@
     # Construct dat_orig and vlist
     dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
                               L$surv_true, L$sc_params, L$sampling)
-    vlist <- create_val_list(dat_orig, C$appx)
+    vlist <- create_val_list(dat, C$appx)
     
     # Construct component functions
-    Phi_n <- construct_Phi_n(d$a, d$weights, type=params$ecdf_type)
-    Phi_n_inv <- construct_Phi_n(d$a, d$weights, which="inverse",
-                                 type=params$ecdf_type)
-    S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
-    Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type,
-                          csf=TRUE)
-    f_aIw_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
-                                 type=params$g_n_type, k=15)
+    Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
+    Phi_n_inv <- construct_Phi_n(dat, which="inverse", type=params$ecdf_type)
+    S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
+    Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
+    f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=params$g_n_type, k=15)
     f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
     g_n <- construct_g_n(vlist$AW_grid, f_aIw_n, f_a_n)
     omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
-    Gamma_n <- construct_Gamma_n(dat_orig, vlist$A_grid, omega_n, S_n, g_n)
+    Gamma_n <- construct_Gamma_n(dat, vlist$A_grid, omega_n, S_n, g_n)
     
     # Construct additional component functions
     Psi_n <- Vectorize(function(x) { Gamma_n(Phi_n_inv(x)) })
@@ -229,12 +227,13 @@
       return(gcm$slope.knots[index])
     })
     theta_n_Gr <- function(x) { dGCM(Phi_n(x)) }
-    f_aIw_delta1_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
+    f_aIw_delta1_n <- construct_f_aIw_n(dat, vlist$AW_grid,
                                         type=params$g_n_type, k=15, delta1=TRUE)
     f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid,
                                     f_aIw_delta1_n)
-    gamma_n <- construct_gamma_n(dat_orig, vlist$A_grid, type=params$gamma_type,
-                                 omega_n, f_aIw_n, f_a_n, f_a_delta1_n)
+    gamma_n <- construct_gamma_n(dat_orig, dat, vlist$A_grid,
+                                 type=params$gamma_type, omega_n, f_aIw_n,
+                                 f_a_n, f_a_delta1_n)
     theta_n <- theta_n_Gr
     deriv_theta_n <- construct_deriv_theta_n(theta_n, type=params$deriv_type)
     
@@ -272,11 +271,11 @@
   # Note: this check only works for surv_true=="Cox PH"
   
   # Create vlist
-  vlist <- create_val_list(dat_orig, C$appx)
+  vlist <- create_val_list(dat, C$appx)
   
   # True omega_0
-  S_0 <- construct_S_n(dat_orig, vlist$S_n, type="true")
-  Sc_0 <- construct_S_n(dat_orig, vlist$S_n, type="true", csf=TRUE)
+  S_0 <- construct_S_n(dat, vlist$S_n, type="true")
+  Sc_0 <- construct_S_n(dat, vlist$S_n, type="true", csf=TRUE)
   omega_0 <- Vectorize(function(w1,w2,a,y_star,delta_star) {
     
     # Shorten parameter variable names
@@ -309,8 +308,8 @@
   # Construct omega_n
   # S_n <- S_0
   # Sc_n <- Sc_0
-  S_n <- construct_S_n(dat_orig, vlist$S_n, type="Random Forest")
-  Sc_n <- construct_S_n(dat_orig, vlist$S_n, type="Random Forest", csf=TRUE)
+  S_n <- construct_S_n(dat, vlist$S_n, type="Random Forest")
+  Sc_n <- construct_S_n(dat, vlist$S_n, type="Random Forest", csf=TRUE)
   omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
   
   omegas_est <- c()
@@ -344,30 +343,33 @@
     dat_mc <- generate_data(n=50000, L$alpha_3, L$distr_A, L$edge, L$surv_true,
                             L$sc_params, sampling="iid")
     
-    f_aIw_0 <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
-                                 type="true", k=15)
+    f_aIw_0 <- construct_f_aIw_n(dat, vlist$AW_grid, type="true", k=15)
     return(Vectorize(function(x) {
-      dat_mc %<>% filter(abs(a-x)<=epsilon)
-      d <- dat_mc
+      i <- which(abs(dat_mc$a-x)<=epsilon)
+      d <- list(
+        w = dat_mc$w[i,],
+        a = dat_mc$a[i],
+        delta = dat_mc$delta[i],
+        y_star = dat_mc$y_star[i],
+        delta_star = dat_mc$delta_star[i]
+      )
       return(mean(
-        (omega_0(d$w1,d$w2,d$a,d$y_star,d$delta_star) /
-           f_aIw_0(d$a,d$w1,d$w2))^2
+        (omega_0(d$w,d$a,d$y_star,d$delta_star) /
+           f_aIw_0(d$a,d$w))^2
       ))
     }))
   }
   gamma_0 <- construct_gamma_0()
   
   # Construct gamma_n
-  f_aIw_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
-                               type=params$g_n_type, k=15)
+  f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=params$g_n_type, k=15)
   f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
-  f_aIw_delta1_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
+  f_aIw_delta1_n <- construct_f_aIw_n(dat, vlist$AW_grid,
                                       type=params$g_n_type, delta1=TRUE, k=15)
-  f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid,
-                                  f_aIw_delta1_n)
-  gamma_n <- construct_gamma_n(dat_orig, vlist$A_grid, type="kernel",
+  f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_delta1_n)
+  gamma_n <- construct_gamma_n(dat_orig, dat, vlist$A_grid, type="kernel",
                                omega_n, f_aIw_n, f_a_n, f_a_delta1_n)
-  gamma_n2 <- construct_gamma_n(dat_orig, vlist$A_grid, type="kernel2",
+  gamma_n2 <- construct_gamma_n(dat_orig, dat, vlist$A_grid, type="kernel2",
                                omega_n, f_aIw_n, f_a_n, f_a_delta1_n)
   
   # Plot true curves against estimated curve
@@ -409,18 +411,17 @@
     dat_orig <- dat_orig[indices,]
     
     # Construct component functions
-    n_orig <- nrow(dat_orig)
-    dat_orig$weights <- wts(dat_orig)
-    dat <- dat_orig %>% filter(!is.na(a))
+    n_orig <- length(dat_orig$delta)
+    dat <- ss(dat_orig, which(dat_orig$delta==1))
     weights <- dat$weights
-    G_n <- construct_Phi_n(d$a, d$weights, type=params$ecdf_type)
+    G_n <- construct_Phi_n(dat, type=params$ecdf_type)
     f_aIw_n <- construct_f_aIw_n(dat, type=params$g_n_type, k=15)
     f_a_n <- construct_f_a_n(dat_orig, f_aIw_n)
-    g_n <- construct_g_n(f_aIw_n, f_a_n)
+    g_n <- construct_g_n(vlist$AW_grid, f_aIw_n, f_a_n)
     S_n <- construct_S_n(dat, type=params$S_n_type)
     Sc_n <- construct_S_n(dat, type=params$S_n_type, csf=TRUE)
     omega_n <- construct_omega_n(S_n, Sc_n)
-    Gamma_n <- construct_Gamma_n(dat_orig, omega_n, S_n, g_n)
+    Gamma_n <- construct_Gamma_n(dat, omega_n, S_n, g_n)
     
     # Return the value of Gamma_n(0.5)
     return (Gamma_n(0.5))
@@ -444,7 +445,7 @@
       sampling = "iid"
     )
     
-    Gammas <- c(Gammas, bootstat(dat, c(1:nrow(dat))))
+    Gammas <- c(Gammas, bootstat(dat, c(1:length(dat$a))))
     
   }
   
@@ -452,20 +453,19 @@
   {
     
     # Construct component functions
-    n_orig <- nrow(dat_orig)
-    dat_orig$weights <- wts(dat_orig)
-    dat <- dat_orig %>% filter(!is.na(a))
+    n_orig <- length(dat_orig$delta)
+    dat <- ss(dat_orig, which(dat_orig$delta==1))
     weights <- dat$weights
-    G_n <- construct_Phi_n(d$a, d$weights, type=params$ecdf_type)
+    G_n <- construct_Phi_n(dat, type=params$ecdf_type)
     f_aIw_n <- construct_f_aIw_n(dat, type=params$g_n_type, k=15)
     f_a_n <- construct_f_a_n(dat_orig, f_aIw_n)
-    g_n <- construct_g_n(f_aIw_n, f_a_n)
+    g_n <- construct_g_n(vlist$AW_grid, f_aIw_n, f_a_n)
     S_n <- construct_S_n(dat, type=params$S_n_type)
     Sc_n <- construct_S_n(dat, type=params$S_n_type, csf=TRUE)
     omega_n <- construct_omega_n(S_n, Sc_n)
-    gcomp_n <- construct_gcomp_n(dat_orig, S_n)
-    eta_n <- construct_eta_n(dat_orig, S_n)
-    Gamma_n <- construct_Gamma_n(dat_orig, omega_n, S_n, g_n)
+    gcomp_n <- construct_gcomp_n(dat_orig, vals_A_grid, S_n)
+    eta_n <- construct_eta_n(dat, vals_AW_grid, S_n)
+    Gamma_n <- construct_Gamma_n(dat, omega_n, S_n, g_n)
     
     if (F) {
       
@@ -473,7 +473,7 @@
         geom_smooth(formula=y~x, method=lm)
       
       plot2 <- ggplot(dat_orig, aes(x=a, y=po)) + geom_point()
-      model <- lm(po~a, data=filter(dat_orig,!is.na(a)))
+      model <- lm(po~a, data=filter(dat_orig,!is.na(a))) # !!!!!
       coeff1 <- as.numeric(model$coefficients)
       plot2$layers <- c({
         stat_function(fun = function(x) {
@@ -482,7 +482,7 @@
       }, plot2$layers)
       
       plot3 <- ggplot(dat_orig, aes(x=a, y=po)) + geom_point()
-      model <- lm(po~a+I(a^2)+I(a^3), data=filter(dat_orig,!is.na(a)))
+      model <- lm(po~a+I(a^2)+I(a^3), data=filter(dat_orig,!is.na(a))) # !!!!!
       coeff <- as.numeric(model$coefficients)
       plot3$layers <- c({
         stat_function(fun = function(x) {
@@ -497,14 +497,14 @@
     }
     
     # Construct influence function
-    infl_fn_Gamma <- construct_infl_fn_Gamma(dat_orig, omega_n, g_n, gcomp_n,
+    infl_fn_Gamma <- construct_infl_fn_Gamma(omega_n, g_n, gcomp_n,
                                              eta_n, Gamma_n)
     
     # Estimate variance and SD
     var_hat <- mean((
-      infl_fn_Gamma(x=0.5,dat$w1,dat$w2,dat$y_star,dat$delta_star,dat$delta,dat$a)
+      infl_fn_Gamma(x=0.5,dat$w,dat$y_star,dat$delta_star,dat$delta,dat$a)
     )^2)
-    sd_hat <- sqrt(var_hat/nrow(dat))
+    sd_hat <- sqrt(var_hat/length(dat$a))
     
   }
   
@@ -544,34 +544,34 @@
     dat_orig <- dat_orig[indices,]
     
     # Prep
-    n_orig <- nrow(dat_orig)
-    dat_orig$weights <- wts(dat_orig)
-    dat <- dat_orig %>% filter(!is.na(a))
+    n_orig <- length(dat_orig$delta)
+    dat <- ss(dat_orig, which(dat_orig$delta==1))
     weights <- dat$weights
     
-    # Construct dataframes of values to pre-compute functions on
-    vals_A <- data.frame(a=dat$a)
-    vals_AW <- data.frame(a=dat$a, w1=dat$w1, w2=dat$w2)
-    vals_A_grid <- data.frame(a=seq(0,1,C$appx$a))
-    vals_AW_grid <- expand.grid(a=seq(0,1,C$appx$a), w1=seq(0,1,C$appx$w1),
-                                w2=c(0,1))
-    vals_S_n <- expand.grid(t=seq(0,C$t_e,C$appx$t_e), w1=seq(0,1,C$appx$w1b),
-                            w2=c(0,1), a=seq(0,1,C$appx$a))
-    vals_omega <- subset(dat, select=-c(delta,weights))
+    # !!!!! Replace this with a vall to create_val_list()
+    # # Construct dataframes of values to pre-compute functions on
+    # vals_A <- data.frame(a=dat$a)
+    # vals_AW <- data.frame(a=dat$a, w1=dat$w1, w2=dat$w2)
+    # vals_A_grid <- data.frame(a=seq(0,1,C$appx$a))
+    # vals_AW_grid <- expand.grid(a=seq(0,1,C$appx$a), w1=seq(0,1,C$appx$w1),
+    #                             w2=c(0,1))
+    # vals_S_n <- expand.grid(t=seq(0,C$t_e,C$appx$t_e), w1=seq(0,1,C$appx$w1b),
+    #                         w2=c(0,1), a=seq(0,1,C$appx$a))
+    # vals_omega <- subset(dat, select=-c(delta,weights))
     
     # Construct component functions
-    G_n <- construct_Phi_n(d$a, d$weights, type=params$ecdf_type)
+    G_n <- construct_Phi_n(dat, type=params$ecdf_type)
     f_aIw_n <- construct_f_aIw_n(dat, vals_AW_grid, type=params$g_n_type, k=15)
     f_a_n <- construct_f_a_n(dat_orig, vals_A_grid, f_aIw_n)
     g_n <- construct_g_n(vals_AW_grid, f_aIw_n, f_a_n)
     S_n <- construct_S_n(dat, vals_S_n, type=params$S_n_type)
     Sc_n <- construct_S_n(dat, vals_S_n, type=params$S_n_type, csf=TRUE)
     omega_n <- construct_omega_n(vals_omega, S_n, Sc_n)
-    Gamma_n <- construct_Gamma_n(dat_orig, vals_A_grid, omega_n, S_n, g_n)
+    Gamma_n <- construct_Gamma_n(dat, vals_A_grid, omega_n, S_n, g_n)
     gcomp_n <- construct_gcomp_n(dat_orig, vals_A_grid, S_n)
-    eta_n <- construct_eta_n(dat_orig, vals_AW_grid, S_n)
+    eta_n <- construct_eta_n(dat, vals_AW_grid, S_n)
     xi_n <- construct_xi_n(Phi_n=G_n, lambda_2, lambda_3)
-    rho_n <- construct_rho_n(dat_orig, Phi_n=G_n)
+    rho_n <- construct_rho_n(dat, Phi_n=G_n)
     lambda_2 <- lambda(dat_orig,2,G_n)
     lambda_3 <- lambda(dat_orig,3,G_n)
     
@@ -597,7 +597,7 @@
                               edge="none", surv_true="Cox PH",
                               sc_params=L$sc_params, sampling="iid")
     
-    beta_n <- test_stat(dat_orig, c(1:nrow(dat_orig)))
+    beta_n <- test_stat(dat_orig, c(1:length(dat_orig$delta)))
     betas <- c(betas, beta_n)
     
     print(paste("i:",i))
@@ -655,38 +655,40 @@
   
   # Generate data
   dat_orig <- generate_data(
-    n = 3000,
+    n = L$n,
     alpha_3 = L$alpha_3,
     distr_A = L$distr_A,
     edge = L$edge,
     surv_true = L$surv_true,
+    sc_params = L$sc_params,
     sampling = L$sampling
   )
-  vlist <- create_val_list(dat_orig, C$appx)
+  vlist <- create_val_list(dat, C$appx)
   
-  # S_n_CoxPH <- construct_S_n(dat_orig, vlist$S_n, type="Cox PH")
-  # S_n_RF <- construct_S_n(dat_orig, vlist$S_n, type="Random Forest")
-  S_0 <- construct_S_n(dat_orig, vlist$S_n, type="true")
+  # S_n_CoxPH <- construct_S_n(dat, vlist$S_n, type="Cox PH")
+  # S_n_RF <- construct_S_n(dat, vlist$S_n, type="Random Forest")
+  S_0 <- construct_S_n(dat, vlist$S_n, type="true")
   S_n_CoxPH <- S_0
   S_n_RF <- S_0
   
   # Plot true curve against estimated curve
   times <- c(1:200)
+  n <- length(times)
   df <- data.frame(
     time = rep(times, 12),
     survival = c(
-      S_n_CoxPH(t=times, w1=0.2, w2=1, a=0.2),
-      S_n_CoxPH(t=times, w1=0.5, w2=1, a=0.2),
-      S_n_CoxPH(t=times, w1=0.2, w2=1, a=0.8),
-      S_n_CoxPH(t=times, w1=0.5, w2=1, a=0.8),
-      S_n_RF(t=times, w1=0.2, w2=1, a=0.2),
-      S_n_RF(t=times, w1=0.5, w2=1, a=0.2),
-      S_n_RF(t=times, w1=0.2, w2=1, a=0.8),
-      S_n_RF(t=times, w1=0.5, w2=1, a=0.8),
-      S_0(t=times, w1=0.2, w2=1, a=0.2),
-      S_0(t=times, w1=0.5, w2=1, a=0.2),
-      S_0(t=times, w1=0.2, w2=1, a=0.8),
-      S_0(t=times, w1=0.5, w2=1, a=0.8)
+      S_n_CoxPH(t=times, cbind(w1=rep(0.2,n), w2=rep(1,n)), a=rep(0.2,n)),
+      S_n_CoxPH(t=times, cbind(w1=rep(0.5,n), w2=rep(1,n)), a=rep(0.2,n)),
+      S_n_CoxPH(t=times, cbind(w1=rep(0.2,n), w2=rep(1,n)), a=rep(0.8,n)),
+      S_n_CoxPH(t=times, cbind(w1=rep(0.5,n), w2=rep(1,n)), a=rep(0.8,n)),
+      S_n_RF(t=times, cbind(w1=rep(0.2,n), w2=rep(1,n)), a=rep(0.2,n)),
+      S_n_RF(t=times, cbind(w1=rep(0.5,n), w2=rep(1,n)), a=rep(0.2,n)),
+      S_n_RF(t=times, cbind(w1=rep(0.2,n), w2=rep(1,n)), a=rep(0.8,n)),
+      S_n_RF(t=times, cbind(w1=rep(0.5,n), w2=rep(1,n)), a=rep(0.8,n)),
+      S_0(t=times, cbind(w1=rep(0.2,n), w2=rep(1,n)), a=rep(0.2,n)),
+      S_0(t=times, cbind(w1=rep(0.5,n), w2=rep(1,n)), a=rep(0.2,n)),
+      S_0(t=times, cbind(w1=rep(0.2,n), w2=rep(1,n)), a=rep(0.8,n)),
+      S_0(t=times, cbind(w1=rep(0.5,n), w2=rep(1,n)), a=rep(0.8,n))
     ),
     which = rep(c("Cox PH","RF","True S_0"), each=4*length(times)),
     covs = rep(rep(c("w1=0.2,w2=1,a=0.2","w1=0.5,w2=1,a=0.2",
@@ -717,11 +719,11 @@
     surv_true = L$surv_true,
     sampling = L$sampling
   )
-  vlist <- create_val_list(dat_orig, C$appx)
+  vlist <- create_val_list(dat, C$appx)
   
-  # Sc_n_CoxPH <- construct_S_n(dat_orig, vlist$S_n, type="Cox PH", csf=TRUE)
-  # Sc_n_RF <- construct_S_n(dat_orig, vlist$S_n, type="Random Forest", csf=TRUE)
-  Sc_0 <- construct_S_n(dat_orig, vlist$S_n, type="true", csf=TRUE)
+  # Sc_n_CoxPH <- construct_S_n(dat, vlist$S_n, type="Cox PH", csf=TRUE)
+  # Sc_n_RF <- construct_S_n(dat, vlist$S_n, type="Random Forest", csf=TRUE)
+  Sc_0 <- construct_S_n(dat, vlist$S_n, type="true", csf=TRUE)
   Sc_n_CoxPH <- Sc_0
   Sc_n_RF <- Sc_0
   
@@ -730,18 +732,18 @@
   df <- data.frame(
     time = rep(times, 12),
     survival = c(
-      Sc_n_CoxPH(t=times, w1=0.2, w2=1, a=0.2),
-      Sc_n_CoxPH(t=times, w1=0.1, w2=1, a=0.2),
-      Sc_n_CoxPH(t=times, w1=0.2, w2=1, a=0.8),
-      Sc_n_CoxPH(t=times, w1=0.1, w2=1, a=0.8),
-      Sc_n_RF(t=times, w1=0.2, w2=1, a=0.2),
-      Sc_n_RF(t=times, w1=0.1, w2=1, a=0.2),
-      Sc_n_RF(t=times, w1=0.2, w2=1, a=0.8),
-      Sc_n_RF(t=times, w1=0.1, w2=1, a=0.8),
-      Sc_0(t=times, w1=0.2, w2=1, a=0.2),
-      Sc_0(t=times, w1=0.1, w2=1, a=0.2),
-      Sc_0(t=times, w1=0.2, w2=1, a=0.8),
-      Sc_0(t=times, w1=0.1, w2=1, a=0.8)
+      Sc_n_CoxPH(t=times, cbind(w1=rep(0.2,n), w2=rep(1,n)), a=rep(0.2,n)),
+      Sc_n_CoxPH(t=times, cbind(w1=rep(0.5,n), w2=rep(1,n)), a=rep(0.2,n)),
+      Sc_n_CoxPH(t=times, cbind(w1=rep(0.2,n), w2=rep(1,n)), a=rep(0.8,n)),
+      Sc_n_CoxPH(t=times, cbind(w1=rep(0.5,n), w2=rep(1,n)), a=rep(0.8,n)),
+      Sc_n_RF(t=times, cbind(w1=rep(0.2,n), w2=rep(1,n)), a=rep(0.2,n)),
+      Sc_n_RF(t=times, cbind(w1=rep(0.5,n), w2=rep(1,n)), a=rep(0.2,n)),
+      Sc_n_RF(t=times, cbind(w1=rep(0.2,n), w2=rep(1,n)), a=rep(0.8,n)),
+      Sc_n_RF(t=times, cbind(w1=rep(0.5,n), w2=rep(1,n)), a=rep(0.8,n)),
+      Sc_0(t=times, cbind(w1=rep(0.2,n), w2=rep(1,n)), a=rep(0.2,n)),
+      Sc_0(t=times, cbind(w1=rep(0.5,n), w2=rep(1,n)), a=rep(0.2,n)),
+      Sc_0(t=times, cbind(w1=rep(0.2,n), w2=rep(1,n)), a=rep(0.8,n)),
+      Sc_0(t=times, cbind(w1=rep(0.5,n), w2=rep(1,n)), a=rep(0.8,n))
     ),
     which = rep(c("Cox PH","RF","True Sc_0"), each=4*length(times)),
     covs = rep(rep(c("w1=0.2,w2=1,a=0.2","w1=0.5,w2=1,a=0.2",
@@ -824,13 +826,18 @@
 {
   
   # Construct vlist
-  vlist <- create_val_list(dat_orig, C$appx)
+  vlist <- create_val_list(dat, C$appx)
+  
+  # # !!!!!
+  # R.utils::withTimeout({
+  #   f_aIw_n_semi <- construct_f_aIw_n(dat, NA, type="binning", k=15)
+  # }, timeout=5)
   
   # True conditional density function
-  f_aIw_0 <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
-                               type="true", k=15)
-  f_aIw_n_semi <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
-                               type="binning", k=15)
+  f_aIw_0 <- construct_f_aIw_n(dat, NA, type="true", k=15)
+  f_aIw_n_semi <- construct_f_aIw_n(dat, NA, type="binning", k=15)
+  # f_aIw_0 <- construct_f_aIw_n(dat, vlist$AW_grid, type="true", k=15)
+  # f_aIw_n_semi <- construct_f_aIw_n(dat, vlist$AW_grid, type="binning", k=15)
   f_aIw_n_para <- f_aIw_0 # !!!!!
   
   # Generate plot data
@@ -841,18 +848,18 @@
   plot_data <- data.frame(
     a = rep(grid, 4*n_models),
     density = c(
-      sapply(grid, function(a) { f_aIw_0(a, w1=0.2, w2=0) }),
-      sapply(grid, function(a) { f_aIw_0(a, w1=0.8, w2=0) }),
-      sapply(grid, function(a) { f_aIw_0(a, w1=0.2, w2=1) }),
-      sapply(grid, function(a) { f_aIw_0(a, w1=0.8, w2=1) }),
-      sapply(grid, function(a) { f_aIw_n_para(a, w1=0.2, w2=0) }),
-      sapply(grid, function(a) { f_aIw_n_para(a, w1=0.8, w2=0) }),
-      sapply(grid, function(a) { f_aIw_n_para(a, w1=0.2, w2=1) }),
-      sapply(grid, function(a) { f_aIw_n_para(a, w1=0.8, w2=1) }),
-      sapply(grid, function(a) { f_aIw_n_semi(a, w1=0.2, w2=0) }),
-      sapply(grid, function(a) { f_aIw_n_semi(a, w1=0.8, w2=0) }),
-      sapply(grid, function(a) { f_aIw_n_semi(a, w1=0.2, w2=1) }),
-      sapply(grid, function(a) { f_aIw_n_semi(a, w1=0.8, w2=1) })
+      sapply(grid, function(a) { f_aIw_0(a, w=c(0.2,0)) }),
+      sapply(grid, function(a) { f_aIw_0(a, w=c(0.8,0)) }),
+      sapply(grid, function(a) { f_aIw_0(a, w=c(0.2,1)) }),
+      sapply(grid, function(a) { f_aIw_0(a, w=c(0.8,1)) }),
+      sapply(grid, function(a) { f_aIw_n_para(a, w=c(0.2,0)) }),
+      sapply(grid, function(a) { f_aIw_n_para(a, w=c(0.8,0)) }),
+      sapply(grid, function(a) { f_aIw_n_para(a, w=c(0.2,1)) }),
+      sapply(grid, function(a) { f_aIw_n_para(a, w=c(0.8,1)) }),
+      sapply(grid, function(a) { f_aIw_n_semi(a, w=c(0.2,0)) }),
+      sapply(grid, function(a) { f_aIw_n_semi(a, w=c(0.8,0)) }),
+      sapply(grid, function(a) { f_aIw_n_semi(a, w=c(0.2,1)) }),
+      sapply(grid, function(a) { f_aIw_n_semi(a, w=c(0.8,1)) })
     ),
     which = rep(f_aIw_models, each=len*4),
     covariates = rep(c(
@@ -870,8 +877,10 @@
     ylim(c(0,NA))
   
   # Check marginal density
-  f_a_0 <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_0)
-  f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n_semi)
+  # f_a_0 <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_0)
+  # f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n_semi)
+  f_a_0 <- construct_f_a_n(dat_orig, NA, f_aIw_0)
+  f_a_n <- construct_f_a_n(dat_orig, NA, f_aIw_n_semi)
   
   # Generate plot data
   grid <- seq(0,1,0.01)
@@ -913,18 +922,21 @@
   )
   
   # True propensity score function
-  pi_0 <- function(w1,w2) {
-    if (edge=="expit") {
-      return(expit(w1+w2-3.3))
-    } else if (edge=="complex") {
-      return(0.84*w2*pmax(0,1-4*abs(w1-0.5)))
-    }
-  }
+  pi_0 <- construct_superfunc(
+    function(w) {
+      if (edge=="expit") {
+        return(expit(w[1]+w[2]-3.3))
+      } else if (edge=="complex") {
+        return(0.84*w[2]*pmax(0,1-4*abs(w[1]-0.5)))
+      }
+    },
+    vec=c(2)
+  )
   
   # Construct estimators
-  vlist <- create_val_list(dat_orig, C$appx)
-  pi_n_logistic <- construct_pi_n(dat_orig, vlist$W_grid, type="logistic")
-  pi_n_SL <- construct_pi_n(dat_orig, vlist$W_grid, type="SL")
+  vlist <- create_val_list(dat, C$appx)
+  pi_n_logistic <- construct_pi_n(dat, vlist$W_grid, type="logistic")
+  pi_n_SL <- construct_pi_n(dat, vlist$W_grid, type="SL")
   
   # Curve 1: W2=0
   pi_n_log_0 <- function(w1) { pi_n_logistic(w1,w2=0) }

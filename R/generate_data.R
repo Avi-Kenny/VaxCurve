@@ -21,8 +21,10 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
                           sampling) {
   
   # Sample baseline covariates
-  w1 <- sample(seq(0,1,0.1), size=n, replace=T)
-  w2 <- rbinom(n, size=1, prob=0.5)
+  w <- data.frame(
+    w1 = sample(seq(0,1,0.1), size=n, replace=T),
+    w2 = rbinom(n, size=1, prob=0.5)
+  )
   
   # Sample A (before point mass)
   if (distr_A=="Unif(0,1)") {
@@ -34,7 +36,7 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
     a <- rnorm(n, mean=0.5, sd=0.2)
     a <- ifelse(a>1,1,ifelse(a<0,0,a))
   } else if (distr_A=="N(0.4+0.2w1+0.1w2,0.01)") {
-    a <- rnorm(n, mean=0.4+0.2*w1+0.1*w2, sd=0.1)
+    a <- rnorm(n, mean=0.4+0.2*w$w1+0.1*w$w2, sd=0.1)
     a <- ifelse(a>1,1,ifelse(a<0,0,a))
   } else {
     stop("distr_A incorrectly specified")
@@ -45,11 +47,11 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
   
   # Adjust A for point mass at the edge
   if (edge=="expit") {
-    edge_probs <- expit(w1+w2-3.3)
+    edge_probs <- expit(w$w1+w$w2-3.3)
   } else if (edge=="expit2") {
-    edge_probs <- expit(w1+w2-1)
+    edge_probs <- expit(w$w1+w$w2-1)
   } else if (edge=="complex") {
-    edge_probs <- 0.84*w2*pmax(0,1-4*abs(w1-0.5))
+    edge_probs <- 0.84*w$w2*pmax(0,1-4*abs(w$w1-0.5))
   } else if (edge=="none") {
     edge_probs <- 0
   }
@@ -64,9 +66,9 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
       ((1/sc_params$lmbd)*t)^(1/sc_params$v)
     }
     if (surv_true=="Cox PH") {
-      lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
+      lin <- C$alpha_1*w$w1 + C$alpha_2*w$w2 + alpha_3*a - 1.7
     } else if (surv_true=="complex") {
-      lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 1.2*alpha_3*w2*a - 1
+      lin <- C$alpha_1*pmax(0,2-8*abs(w$w1-0.5)) + 1.2*alpha_3*w$w2*a - 1
     }
     t <- H_0_inv(-1*log(U)*exp(-1*lin))
     
@@ -76,12 +78,11 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
       ((1/sc_params$lmbd2)*t)^(1/sc_params$v2)
     }
     if (surv_true=="Cox PH") {
-      lin <- C$alpha_1*w1 + C$alpha_2*w2 - 1
+      lin <- C$alpha_1*w$w1 + C$alpha_2*w$w2 - 1
     } else if (surv_true=="complex") {
-      lin <- C$alpha_1*pmax(0,2-8*abs(w1-0.5)) - 0.35
+      lin <- C$alpha_1*pmax(0,2-8*abs(w$w1-0.5)) - 0.35
     }
     c <- H_0_inv2(-1*log(U)*exp(-1*lin))
-    # c <- pmin(c,C$t_e)
     
     # Generate survival variables
     y_star <- pmin(t,c)
@@ -91,11 +92,11 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
   
   # Conduct sampling
   if (sampling=="iid") {
-    dat_orig <- data.frame(w1=w1, w2=w2, a=a, delta=1, y_star=y_star,
+    dat_orig <- list(w=w, a=a, delta=rep(1, length(a)), y_star=y_star,
                       delta_star=delta_star)
   } else {
-    delta <- rbinom(n, size=1, prob=Pi(sampling,delta_star,y_star,w1,w2))
-    dat_orig <- data.frame(w1=w1, w2=w2, a=ifelse(delta==1,a,NA), delta=delta,
+    delta <- rbinom(n, size=1, prob=Pi(sampling,delta_star,y_star,w))
+    dat_orig <- list(w=w, a=ifelse(delta==1,a,NA), delta=delta,
                            y_star=y_star, delta_star=delta_star)
   }
   
@@ -128,6 +129,9 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
   # Add attributes to dataframe
   attr(dat_orig, "theta_true") <- theta_true_f(C$points)
   attr(dat_orig, "sampling") <- sampling
+  
+  # Add (stabilized) inverse weights
+  dat_orig$weights <- wts(dat_orig)
   
   return(dat_orig)
   

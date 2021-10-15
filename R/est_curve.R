@@ -56,6 +56,11 @@ est_curve <- function(dat_orig, estimator, params, points) {
     # Construct regular Gamma_0 estimator
     if (params$cf_folds==1) {
       
+      # !!!!!
+      vlist$AW_grid <- NA
+      vlist$omega <- NA
+      vlist$W_grid <- NA
+      
       # Construct component functions
       Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
       Phi_n_inv <- construct_Phi_n(dat, which="inverse", type=params$ecdf_type)
@@ -64,12 +69,10 @@ est_curve <- function(dat_orig, estimator, params, points) {
       f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid,
                                    type=params$g_n_type, k=15)
       f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
-      g_n <- construct_g_n(vlist$AW_grid, f_aIw_n, f_a_n)
+      g_n <- construct_g_n(f_aIw_n, f_a_n)
       omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
-      
-      # Construct Gamma_n
       Gamma_n <- construct_Gamma_n(dat, vlist$A_grid, omega_n, S_n, g_n)
-
+      
       # Construct one-step edge estimator
       if (params$edge_corr!="none") {
         pi_n <- construct_pi_n(dat, vlist$W_grid, type="logistic")
@@ -95,7 +98,9 @@ est_curve <- function(dat_orig, estimator, params, points) {
       
     }
     
-    Psi_n <- Vectorize(function(x) { Gamma_n(Phi_n_inv(x)) })
+    Psi_n <- Vectorize(function(x) {
+      Gamma_n(round(Phi_n_inv(x), -log10(C$appx$a))) # Gamma_n(Phi_n_inv(x))
+    })
     gcm <- gcmlcm(x=seq(0,1,0.0001), y=Psi_n(seq(0,1,0.0001)), type="gcm")
     dGCM <- Vectorize(function(x) {
       # The round deals with a floating point issue
@@ -125,7 +130,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
     gamma_n <- construct_gamma_n(dat_orig, dat, vlist$A_grid,
                                  type=params$gamma_type, omega_n, f_aIw_n,
                                  f_a_n, f_a_delta1_n)
-
+    
     # Edge correction
     if (params$edge_corr %in% c("none", "spread")) {
       

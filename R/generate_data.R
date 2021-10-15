@@ -92,11 +92,11 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
   
   # Conduct sampling
   if (sampling=="iid") {
-    dat_orig <- list(w=w, a=a, delta=rep(1, length(a)), y_star=y_star,
-                      delta_star=delta_star)
+    dat_orig <- list(id=c(1:n), w=w, a=a, delta=rep(1,n),
+                     y_star=y_star, delta_star=delta_star)
   } else {
     delta <- rbinom(n, size=1, prob=Pi(sampling,delta_star,y_star,w))
-    dat_orig <- list(w=w, a=ifelse(delta==1,a,NA), delta=delta,
+    dat_orig <- list(id=c(1:n), w=w, a=ifelse(delta==1,a,NA), delta=delta,
                            y_star=y_star, delta_star=delta_star)
   }
   
@@ -104,7 +104,7 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
   # These are Monte Carlo approximations
   {
     m <- 10^5
-    w1 <- runif(m)
+    w1 <- sample(seq(0,1,0.1), size=m, replace=T) # runif(m)
     w2 <- rbinom(m, size=1, prob=0.5)
     
     theta_true_f <- Vectorize(function(a) {

@@ -10,10 +10,14 @@ if (F) {
   # f(9,2,c(10,40))
   # f(9,3,c(20,50))
   # f(9,4,c(30,60))
-  system.time({x<-fs(9,2,c(10,40)); print(x);})
-  system.time({x<-fs(9,3,c(20,50)); print(x);})
-  system.time({x<-fs(9,4,c(30,60)); print(x);})
-  system.time({x<-fs(9,c(2,3,4),data.frame(c(10,20,30),c(40,50,60))); print(x)})
+  # system.time({x<-fs(9,2,c(10,40)); print(x);})
+  # system.time({x<-fs(9,3,c(20,50)); print(x);})
+  # system.time({x<-fs(9,4,c(30,60)); print(x);})
+  # system.time({x<-fs(9,c(2,3,4),data.frame(c(10,20,30),c(40,50,60))); print(x)})
+  
+  # Test rounding
+  fs(9,2,c(10,40))
+  fs(9,c(2,3,4),data.frame(c(10,20,30),c(40,50,60)))
   
 }
 
@@ -256,7 +260,7 @@ if (F) {
   f_aIw_n <- construct_f_aIw_n(dat_orig, vlist$AW_grid,
                                type="true", k=15)
   f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
-  g_n <- construct_g_n(vlist$AW_grid, f_aIw_n, f_a_n)
+  g_n <- construct_g_n(f_aIw_n, f_a_n)
   omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
   
   offset_25 <- (dat$weights *

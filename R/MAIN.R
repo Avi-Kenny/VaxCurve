@@ -12,17 +12,17 @@
 #   - tedwestling/survSuperLearner
 #   - zeehio/facetscales
 cfg <- list(
+  main_task = "run", # run update analysis_moderna.R
   which_sim = "estimation", # estimation edge testing
   level_set_which = "level_set_estimation_2", # level_set_estimation_1 level_set_testing_1
-  run_or_update = "run",
-  num_sim = 1000,
+  num_sim = 400,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm"),
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
                      "data.table", "latex2exp", "tidyr"),
   parallel = "none",
-  stop_at_error = F,
+  stop_at_error = FALSE,
   appx = list(t_e=1, w1=0.1, w1b=0.1, a=0.01)
 )
 
@@ -49,7 +49,11 @@ if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
 } else {
   # Cluster
   setwd("z.VaxCurve/R")
-  load_pkgs_local <- FALSE
+  if (cfg$main_task %in% c("run", "update")) {
+    load_pkgs_local <- FALSE
+  } else {
+    load_pkgs_local <- TRUE
+  }
 }
 
 # Load packages (if running locally)
@@ -122,27 +126,27 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Estimation: scratch
   level_set_estimation_0 <- list(
-    n = 15000,
+    n = 5000,
     alpha_3 = 3,
-    sc_params = list("sc_params"=list(lmbd=4e-7, v=1.6, lmbd2=3e-5, v2=1.5)),
-    distr_A = "N(0.5,0.04)",
+    sc_params = list("sc_params"=list(lmbd=3e-5, v=1.5, lmbd2=5e-5, v2=1.5)),
+    distr_A = "N(0.5,0.01)",
     edge = "none",
     surv_true = "Cox PH",
-    sampling = "two-phase (6%)",
+    sampling = "two-phase (72%)",
     estimator = list(
-      "Grenander (gamma_type='kernel')" = list(
+      # "Grenander (true nuisances)" = list(
+      #   est = "Grenander",
+      #   params = list(S_n_type="true", g_n_type="true",
+      #                 ci_type="regular", cf_folds=1, edge_corr="none",
+      #                 ecdf_type="true", deriv_type="m-spline",
+      #                 gamma_type="kernel")
+      # )
+      "Grenander (est nuisances)" = list(
         est = "Grenander",
-        params = list(S_n_type="true", g_n_type="true",
+        params = list(S_n_type="Cox PH", g_n_type="binning",
                       ci_type="regular", cf_folds=1, edge_corr="none",
                       ecdf_type="linear (mid)", deriv_type="m-spline",
                       gamma_type="kernel")
-      ),
-      "Grenander (gamma_type='kernel2')" = list(
-        est = "Grenander",
-        params = list(S_n_type="true", g_n_type="true",
-                      ci_type="regular", cf_folds=1, edge_corr="none",
-                      ecdf_type="linear (mid)", deriv_type="m-spline",
-                      gamma_type="kernel2")
       )
     )
   )
@@ -195,37 +199,16 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     sc_params = list("sc_params"=list(lmbd=4e-7, v=1.6, lmbd2=3e-5, v2=1.5)),
     distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
     edge = "none",
-    surv_true = c("Cox PH", "complex"),
+    surv_true = "Cox PH",
     sampling = "two-phase (6%)",
     estimator = list(
       "Grenander (kernel)" = list(
         est = "Grenander",
-        params = list(S_n_type="Random Forest", g_n_type="binning",
+        params = list(S_n_type="Cox PH", g_n_type="binning",
                       ci_type="regular", cf_folds=1, edge_corr="none",
                       ecdf_type="linear (mid)", deriv_type="m-spline",
                       gamma_type="kernel")
-      ),
-      "Grenander (kernel2)" = list(
-        est = "Grenander",
-        params = list(S_n_type="Random Forest", g_n_type="binning",
-                      ci_type="regular", cf_folds=1, edge_corr="none",
-                      ecdf_type="linear (mid)", deriv_type="m-spline",
-                      gamma_type="kernel2")
       )
-      # "Grenander (estimated nuisances)" = list(
-      #   est = "Grenander",
-      #   params = list(S_n_type="Random Forest", g_n_type="binning",
-      #                 ci_type="regular", cf_folds=1, edge_corr="none",
-      #                 ecdf_type="linear (mid)", deriv_type="m-spline",
-      #                 gamma_type="kernel")
-      # ),
-      # "Grenander (true nuisances)" = list(
-      #   est = "Grenander",
-      #   params = list(S_n_type="true", g_n_type="true",
-      #                 ci_type="regular", cf_folds=1, edge_corr="none",
-      #                 ecdf_type="true", deriv_type="m-spline",
-      #                 gamma_type="kernel")
-      # )
     )
   )
   
@@ -279,21 +262,22 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
 
 
 
-##########################################.
-##### MAIN: Setup and run simulation #####
-##########################################.
+######################################################.
+##### MAIN: Setup and run simulation (or script) #####
+######################################################.
 
 # Use these commands to run on Slurm:
 # sbatch --export=sim_run='first',cluster='bionic',type='R',project='z.VaxCurve' -e ./io/slurm-%A_%a.out -o ./io/slurm-%A_%a.out --constraint=gizmok run_r.sh
 # sbatch --depend=afterok:11 --array=1-600 --export=sim_run='main',cluster='bionic',type='R',project='z.VaxCurve' -e ./io/slurm-%A_%a.out -o ./io/slurm-%A_%a.out --constraint=gizmok run_r.sh
 # sbatch --depend=afterok:12 --export=sim_run='last',cluster='bionic',type='R',project='z.VaxCurve' -e ./io/slurm-%A_%a.out -o ./z.VaxCurve/sim_output.out --constraint=gizmok run_r.sh
+# sbatch --export=cluster='bionic',type='R',project='z.VaxCurve' -e ./io/slurm-%A_%a.out -o ./z.VaxCurve/slurm-%A_%a.out --constraint=gizmok run_r.sh
 
 # Commands for job sumbission on SGE:
 # qsub -v sim_run='first',cluster='bayes',type='R',project='z.VaxCurve' -cwd -e ./io/ -o ./io/ run_r.sh
 # qsub -hold_jid 1992344 -t 1-600 -v sim_run='main',cluster='bayes',type='R',project='z.VaxCurve' -cwd -e ./io/ -o ./io/ run_r.sh
 # qsub -hold_jid 1992345 -v sim_run='last',cluster='bayes',type='R',project='z.VaxCurve' -cwd -e ./io/ -o ./z.VaxCurve/ run_r.sh
 
-if (cfg$run_or_update=="run") {
+if (cfg$main_task=="run") {
   
   run_on_cluster(
     
@@ -358,9 +342,7 @@ if (cfg$run_or_update=="run") {
     
   )
   
-}
-
-if (cfg$run_or_update=="update") {
+} else if (cfg$main_task=="update") {
   
   update_sim_on_cluster(
     
@@ -378,6 +360,10 @@ if (cfg$run_or_update=="update") {
     cluster_config = cluster_config
     
   )
+  
+} else {
+  
+  source(cfg$main_task, local=TRUE)
   
 }
 

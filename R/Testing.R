@@ -12,23 +12,19 @@
                  cf_folds=1, edge_corr="none", ecdf_type="linear (mid)",
                  deriv_type="m-spline", gamma_type="kernel")
   C <- sim$constants
-  # L <- list(n=15000, alpha_3=3,
-  #           sc_params=list(lmbd=4e-7, v=1.6, lmbd2=3e-5, v2=1.5),
-  #           distr_A="N(0.5,0.04)", edge="none", surv_true="Cox PH",
-  #           ecdf_type="true", sampling="two-phase (6%)",
-  #           estimator=list("G"=list(est="Grenander",params=params))
-  # )
-  L <- list(n=1000, alpha_3=3,
-            sc_params=list(lmbd=3e-5, v=1.5, lmbd2=5e-5, v2=1.5),
-            distr_A="N(0.5,0.04)", edge="none", surv_true="Cox PH", # Unif(0,1)
-            ecdf_type="true", sampling="two-phase (72%)",
-            estimator=list("G"=list(est="Grenander",params=params))
+  C$appx$t_e <- 10
+  L <- list(n=15000, alpha_3=3,
+            sc_params=list(lmbd=4e-7, v=1.6, lmbd2=3e-5, v2=1.5),
+            distr_A="N(0.5,0.04)", edge="none", surv_true="Cox PH", # Unif(0,1) N(0.5,0.04)
+            ecdf_type="true", sampling="two-phase (6%)",
+            estimator=list(est="Grenander",params=params)
   )
   
   # 3. Generate dataset
   dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
                             L$surv_true, L$sc_params, L$sampling)
   dat <- ss(dat_orig, which(dat_orig$delta==1))
+  vlist <- create_val_list(dat, C$appx)
   
 }
 
@@ -86,11 +82,44 @@
 
 {
   
-  # # Generate datasets
-  # L$distr_A <- "N(0.5,0.04)" # "Unif(0,1)" "N(0.5,0.01)" "N(0.5,0.04)"
-  # dat_orig <- generate_data(n=14000, alpha_3=L$alpha_3, distr_A=L$distr_A,
-  #                     edge=L$edge, surv_true=L$surv_true, sc_params=L$sc_params,
-  #                     sampling="two-phase (6%)") # "iid" "two-phase (6%)"
+  # !!!!!
+  p1a <- c(); p1b <- c(); p2a <- c(); p2b <- c();
+  n_reps <- 100
+  for (i in c(1:n_reps)) {
+    print(paste("rep:",i))
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
+                              L$surv_true, L$sc_params, L$sampling)
+    dat <- ss(dat_orig, which(dat_orig$delta==1))
+    Phi_n1 <- construct_Phi_n(dat, type="step")
+    Phi_n2 <- construct_Phi_n(dat, type="linear (mid)")
+    p1a <- c(p1a, Phi_n1(0.5))
+    p1b <- c(p1b, Phi_n1(0.8))
+    p2a <- c(p2a, Phi_n2(0.5))
+    p2b <- c(p2b, Phi_n2(0.8))
+  }
+  p1a <- p1a - 0.5
+  p1b <- p1b - 0.8
+  p2a <- p2a - 0.5
+  p2b <- p2b - 0.8
+  ggplot(
+    data.frame(
+      x = c(p1a,p1b,p2a,p2b),
+      grp = rep(c("step (0.5)","step (0.8)","linear (0.5)","linear (0.8)"),
+                each=n_reps)
+    ),
+    aes(x=x, group=grp, fill=factor(grp))) +
+    geom_histogram(color="white") +
+    geom_vline(xintercept=0, color="grey") +
+    facet_wrap(~grp, ncol=2)
+  
+  # !!!!!
+  dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
+                            L$surv_true, L$sc_params, "iid") # L$sampling
+  dat <- ss(dat_orig, which(dat_orig$delta==1))
+  vlist <- create_val_list(dat, C$appx)
+  Phi_n1 <- construct_Phi_n(dat, type="step")
+  Phi_n2 <- ecdf(dat$a)
+  round(Phi_n1(seq(0,1,0.1))-Phi_n2(seq(0,1,0.1)),10) # !!!!!
   
   # Curve 1: Phi_n
   Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
@@ -102,31 +131,31 @@
   Phi_0_inv <- construct_Phi_n(dat, which="inverse",
                                type="true")
   
-  # Plot true curves against estimated curve
-  grid <- seq(0,1,0.01)
-  curves <- c("Phi","Phi_inv")
-  estimators <- c("True","Estimate")
-  len <- length(grid)
-  n_curves <- length(curves)
-  n_estimators <- length(estimators)
-  df <- data.frame(
-    x = rep(grid, n_curves*n_estimators),
-    y = c(
-      Phi_0(grid),
-      Phi_n(grid),
-      Phi_0_inv(grid),
-      Phi_n_inv(grid)
-    ),
-    curve = rep(rep(curves, each=n_estimators*len)),
-    which = rep(rep(estimators, each=len), n_curves)
-  )
-  ggplot(df, aes(x=x, y=y, color=which)) +
-    geom_line() +
-    facet_wrap(~curve, ncol=2) +
-    # xlim(c(0.25,0.35)) + # !!!!!
-    # ylim(c(0.25,0.35)) + # !!!!!
-    labs(title="Estimation of empirical CDFs (and inverse ECDFs)",
-         color="Which")
+  # # Plot true curves against estimated curve
+  # grid <- seq(0,1,0.01)
+  # curves <- c("Phi","Phi_inv")
+  # estimators <- c("True","Estimate")
+  # len <- length(grid)
+  # n_curves <- length(curves)
+  # n_estimators <- length(estimators)
+  # df <- data.frame(
+  #   x = rep(grid, n_curves*n_estimators),
+  #   y = c(
+  #     Phi_0(grid),
+  #     Phi_n(grid),
+  #     Phi_0_inv(grid),
+  #     Phi_n_inv(grid)
+  #   ),
+  #   curve = rep(rep(curves, each=n_estimators*len)),
+  #   which = rep(rep(estimators, each=len), n_curves)
+  # )
+  # ggplot(df, aes(x=x, y=y, color=which)) +
+  #   geom_line() +
+  #   facet_wrap(~curve, ncol=2) +
+  #   # xlim(c(0.25,0.35)) + # !!!!!
+  #   # ylim(c(0.25,0.35)) + # !!!!!
+  #   labs(title="Estimation of empirical CDFs (and inverse ECDFs)",
+  #        color="Which")
   
   # !!!!!
   grid <- seq(0,1,0.01)
@@ -147,7 +176,7 @@
     # ylim(c(0.25,0.35)) + # !!!!!
     labs(title="Estimation of empirical CDFs (and inverse ECDFs)",
          color="Which") +
-    geom_abline(slope=1)
+    geom_abline(slope=1, color="grey")
   
 }
 
@@ -192,8 +221,6 @@
   }
   
   # Esimate deriv_theta_n n_samples times
-  Cappxt_e_old <- C$appx$t_e
-  C$appx$t_e <- 10
   deriv_ests <- c()
   grid <- seq(0,1,0.1)
   n_samples <- 3 # !!!!!
@@ -211,7 +238,7 @@
     Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
     f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=params$g_n_type, k=15)
     f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
-    g_n <- construct_g_n(vlist$AW_grid, f_aIw_n, f_a_n)
+    g_n <- construct_g_n(f_aIw_n, f_a_n)
     omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
     Gamma_n <- construct_Gamma_n(dat, vlist$A_grid, omega_n, S_n, g_n)
     
@@ -254,9 +281,6 @@
     ylim(c(0,0.1)) +
     labs(title="Estimation of derivative of theta",
          color="Which")
-  
-  # Reset C$appx$t_e
-  C$appx$t_e <- Cappxt_e_old
   
 }
 
@@ -417,7 +441,7 @@
     G_n <- construct_Phi_n(dat, type=params$ecdf_type)
     f_aIw_n <- construct_f_aIw_n(dat, type=params$g_n_type, k=15)
     f_a_n <- construct_f_a_n(dat_orig, f_aIw_n)
-    g_n <- construct_g_n(vlist$AW_grid, f_aIw_n, f_a_n)
+    g_n <- construct_g_n(f_aIw_n, f_a_n)
     S_n <- construct_S_n(dat, type=params$S_n_type)
     Sc_n <- construct_S_n(dat, type=params$S_n_type, csf=TRUE)
     omega_n <- construct_omega_n(S_n, Sc_n)
@@ -459,7 +483,7 @@
     G_n <- construct_Phi_n(dat, type=params$ecdf_type)
     f_aIw_n <- construct_f_aIw_n(dat, type=params$g_n_type, k=15)
     f_a_n <- construct_f_a_n(dat_orig, f_aIw_n)
-    g_n <- construct_g_n(vlist$AW_grid, f_aIw_n, f_a_n)
+    g_n <- construct_g_n(f_aIw_n, f_a_n)
     S_n <- construct_S_n(dat, type=params$S_n_type)
     Sc_n <- construct_S_n(dat, type=params$S_n_type, csf=TRUE)
     omega_n <- construct_omega_n(S_n, Sc_n)
@@ -563,7 +587,7 @@
     G_n <- construct_Phi_n(dat, type=params$ecdf_type)
     f_aIw_n <- construct_f_aIw_n(dat, vals_AW_grid, type=params$g_n_type, k=15)
     f_a_n <- construct_f_a_n(dat_orig, vals_A_grid, f_aIw_n)
-    g_n <- construct_g_n(vals_AW_grid, f_aIw_n, f_a_n)
+    g_n <- construct_g_n(f_aIw_n, f_a_n)
     S_n <- construct_S_n(dat, vals_S_n, type=params$S_n_type)
     Sc_n <- construct_S_n(dat, vals_S_n, type=params$S_n_type, csf=TRUE)
     omega_n <- construct_omega_n(vals_omega, S_n, Sc_n)
@@ -653,46 +677,38 @@
 
 {
   
-  # Generate data
-  dat_orig <- generate_data(
-    n = L$n,
-    alpha_3 = L$alpha_3,
-    distr_A = L$distr_A,
-    edge = L$edge,
-    surv_true = L$surv_true,
-    sc_params = L$sc_params,
-    sampling = L$sampling
-  )
-  vlist <- create_val_list(dat, C$appx)
+  # Set C$appx$t_e to 10 in "Setup" section
   
-  # S_n_CoxPH <- construct_S_n(dat, vlist$S_n, type="Cox PH")
-  # S_n_RF <- construct_S_n(dat, vlist$S_n, type="Random Forest")
   S_0 <- construct_S_n(dat, vlist$S_n, type="true")
-  S_n_CoxPH <- S_0
-  S_n_RF <- S_0
+  S_n_CoxPH <- construct_S_n(dat, vlist$S_n, type="Cox PH")
+  S_n_RF <- construct_S_n(dat, vlist$S_n, type="Random Forest")
   
   # Plot true curve against estimated curve
-  times <- c(1:200)
+  # times <- c(1:200)
+  times <- seq(0,200,10)
   n <- length(times)
+  w_a <- as.data.frame(cbind(w1=rep(0.2,n), w2=rep(1,n)))
+  w_b <- as.data.frame(cbind(w1=rep(0.5,n), w2=rep(1,n)))
   df <- data.frame(
     time = rep(times, 12),
     survival = c(
-      S_n_CoxPH(t=times, cbind(w1=rep(0.2,n), w2=rep(1,n)), a=rep(0.2,n)),
-      S_n_CoxPH(t=times, cbind(w1=rep(0.5,n), w2=rep(1,n)), a=rep(0.2,n)),
-      S_n_CoxPH(t=times, cbind(w1=rep(0.2,n), w2=rep(1,n)), a=rep(0.8,n)),
-      S_n_CoxPH(t=times, cbind(w1=rep(0.5,n), w2=rep(1,n)), a=rep(0.8,n)),
-      S_n_RF(t=times, cbind(w1=rep(0.2,n), w2=rep(1,n)), a=rep(0.2,n)),
-      S_n_RF(t=times, cbind(w1=rep(0.5,n), w2=rep(1,n)), a=rep(0.2,n)),
-      S_n_RF(t=times, cbind(w1=rep(0.2,n), w2=rep(1,n)), a=rep(0.8,n)),
-      S_n_RF(t=times, cbind(w1=rep(0.5,n), w2=rep(1,n)), a=rep(0.8,n)),
-      S_0(t=times, cbind(w1=rep(0.2,n), w2=rep(1,n)), a=rep(0.2,n)),
-      S_0(t=times, cbind(w1=rep(0.5,n), w2=rep(1,n)), a=rep(0.2,n)),
-      S_0(t=times, cbind(w1=rep(0.2,n), w2=rep(1,n)), a=rep(0.8,n)),
-      S_0(t=times, cbind(w1=rep(0.5,n), w2=rep(1,n)), a=rep(0.8,n))
+      S_n_CoxPH(t=times, w=w_a, a=rep(0.2,n)),
+      S_n_CoxPH(t=times, w=w_b, a=rep(0.2,n)),
+      S_n_CoxPH(t=times, w=w_a, a=rep(0.8,n)),
+      S_n_CoxPH(t=times, w=w_b, a=rep(0.8,n)),
+      S_n_RF(t=times, w=w_a, a=rep(0.2,n)),
+      S_n_RF(t=times, w=w_b, a=rep(0.2,n)),
+      S_n_RF(t=times, w=w_a, a=rep(0.8,n)),
+      S_n_RF(t=times, w=w_b, a=rep(0.8,n)),
+      S_0(t=times, w=w_a, a=rep(0.2,n)),
+      S_0(t=times, w=w_b, a=rep(0.2,n)),
+      S_0(t=times, w=w_a, a=rep(0.8,n)),
+      S_0(t=times, w=w_b, a=rep(0.8,n))
     ),
     which = rep(c("Cox PH","RF","True S_0"), each=4*length(times)),
     covs = rep(rep(c("w1=0.2,w2=1,a=0.2","w1=0.5,w2=1,a=0.2",
-                     "w1=0.2,w2=1,a=0.8","w1=0.5,w2=1,a=0.8"),3), each=length(times))
+                     "w1=0.2,w2=1,a=0.8","w1=0.5,w2=1,a=0.8"),3),
+               each=length(times))
   )
   ggplot(df, aes(x=time, y=survival, color=which)) +
     geom_line() +

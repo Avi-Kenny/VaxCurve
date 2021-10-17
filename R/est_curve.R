@@ -71,7 +71,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
       f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
       g_n <- construct_g_n(f_aIw_n, f_a_n)
       omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
-      Gamma_n <- construct_Gamma_n(dat, vlist$A_grid, omega_n, S_n, g_n)
+      Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n)
       
       # Construct one-step edge estimator
       if (params$edge_corr!="none") {
@@ -85,7 +85,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
     # Construct cross-fitted Gamma_0 estimator
     if (params$cf_folds>1) {
       
-      Gamma_n <- construct_Gamma_cf(dat_orig, params, vlist)
+      Gamma_os_n <- construct_Gamma_cf(dat_orig, params, vlist)
       
       # Recompute functions on full dataset
       Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
@@ -99,9 +99,9 @@ est_curve <- function(dat_orig, estimator, params, points) {
     }
     
     Psi_n <- Vectorize(function(x) {
-      Gamma_n(round(Phi_n_inv(x), -log10(C$appx$a))) # Gamma_n(Phi_n_inv(x))
+      Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a))) # Gamma_os_n(Phi_n_inv(x))
     })
-    gcm <- gcmlcm(x=seq(0,1,0.0001), y=Psi_n(seq(0,1,0.0001)), type="gcm")
+    gcm <- gcmlcm(x=seq(0,1,0.0001), y=Psi_n(seq(0,1,0.0001)), type="lcm")
     dGCM <- Vectorize(function(x) {
       # The round deals with a floating point issue
       index <- which(round(x,5)<=gcm$x.knots)[1]-1
@@ -110,7 +110,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
     })
     
     # Construct Grenander-based theta_n
-    theta_n_Gr <- function(x) { dGCM(Phi_n(x)) }
+    theta_n_Gr <- Vectorize(function(x) { min(dGCM(Phi_n(x)),1) })
     
     # Recompute functions on full dataset
     if (params$cf_folds>1) {
@@ -161,7 +161,8 @@ est_curve <- function(dat_orig, estimator, params, points) {
     }
     
     # Construct variance scale factor
-    deriv_theta_n <- construct_deriv_theta_n(theta_n, type=params$deriv_type)
+    deriv_theta_n <- construct_deriv_theta_n(theta_n, type=params$deriv_type,
+                                             dir="decr")
     tau_n <- construct_tau_n(deriv_theta_n, gamma_n, f_a_n)
 
     # Generate estimates for each point

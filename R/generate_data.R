@@ -68,7 +68,8 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
     if (surv_true=="Cox PH") {
       lin <- C$alpha_1*w$w1 + C$alpha_2*w$w2 + alpha_3*a - 1.7
     } else if (surv_true=="complex") {
-      lin <- C$alpha_1*pmax(0,2-8*abs(w$w1-0.5)) + 1.2*alpha_3*w$w2*a - 1
+      lin <- C$alpha_1*pmax(0,2-8*abs(w$w1-0.5)) + 2.5*alpha_3*w$w2*a +
+        0.7*alpha_3*(1-w$w2)*a - 1.3
     }
     t <- H_0_inv(-1*log(U)*exp(-1*lin))
     
@@ -113,7 +114,8 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
         if (surv_true=="Cox PH") {
           C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
         } else if (surv_true=="complex") {
-          C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 1.2*alpha_3*w2*a - 1
+          C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2.5*alpha_3*w2*a +
+            0.7*alpha_3*(1-w2)*a - 1.3
         }
       }
       

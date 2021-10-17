@@ -239,7 +239,7 @@ if (F) {
   # Generate data
   dat_orig <- generate_data(
     n = 2000,
-    alpha_3 = 0.7,
+    alpha_3 = -3,
     distr_A = "N(1.5+w1,1.5+w2)", # "Unif(0,1)"
     edge = "none",
     surv_true = "complex",
@@ -294,7 +294,7 @@ if (F) {
     # Generate data
     dat_orig <- generate_data(
       n = 1000,
-      alpha_3 = 0.7,
+      alpha_3 = -3,
       distr_A = "N(0.5,0.04)",
       edge = edge,
       surv_true = "Cox PH",
@@ -333,7 +333,7 @@ if (F) {
     # Generate data
     dat_orig <- generate_data(
       n = 1000,
-      alpha_3 = 0.7,
+      alpha_3 = -3,
       distr_A = "N(0.5,0.04)",
       edge = edge,
       surv_true = "Cox PH",
@@ -1006,7 +1006,7 @@ if (F) {
     alpha_0 <- -1.5
     alpha_1 <- 0.3
     alpha_2 <- 0.7
-    alpha_3 <- 0.7
+    alpha_3 <- -3
     w1 <- runif(n)
     w2 <- rbinom(n, size=1, prob=0.5)
     a <- rbeta(n, shape1=0.9, shape2=(1.1 + 0.4*w2))

@@ -13,9 +13,9 @@
                  deriv_type="m-spline", gamma_type="kernel")
   C <- sim$constants
   C$appx$t_e <- 10
-  L <- list(n=15000, alpha_3=3,
-            sc_params=list(lmbd=4e-7, v=1.6, lmbd2=3e-5, v2=1.5),
-            distr_A="N(0.5,0.04)", edge="none", surv_true="Cox PH", # Unif(0,1) N(0.5,0.04)
+  L <- list(n=14000, alpha_3=-4,
+            sc_params=list(lmbd=3e-5, v=1.5, lmbd2=3e-5, v2=1.5),
+            distr_A="N(0.5,0.01)", edge="none", surv_true="complex", # Unif(0,1) N(0.5,0.04)
             ecdf_type="true", sampling="two-phase (6%)",
             estimator=list(est="Grenander",params=params)
   )
@@ -44,7 +44,7 @@
   
   # Set up counters
   pct_rc <- c(); num_inf <- c(); pct_inf <- c(); num_tp <- c();
-  pct_inf_a0 <- c(); pct_inf_a1 <- c()
+  pct_inf_a0 <- c(); pct_inf_a3 <- c(); pct_inf_a5 <- c(); pct_inf_a7 <- c();
   
   n_reps <- 10
   for (i in 1:n_reps) {
@@ -61,7 +61,9 @@
                                  as.integer(dat_orig$y_star<=200)))
     num_tp <- c(num_tp, sum(dat_orig$delta))
     pct_inf_a0 <- c(pct_inf_a0, attr(dat_orig,"theta_true")[1])
-    pct_inf_a1 <- c(pct_inf_a1, attr(dat_orig,"theta_true")[51])
+    pct_inf_a3 <- c(pct_inf_a3, attr(dat_orig,"theta_true")[16])
+    pct_inf_a5 <- c(pct_inf_a5, attr(dat_orig,"theta_true")[26])
+    pct_inf_a7 <- c(pct_inf_a7, attr(dat_orig,"theta_true")[36])
     
   }
   
@@ -69,8 +71,10 @@
   res("# of infections by t_e", num_inf, 0)
   res("% of infections by t_e", pct_inf, 4)
   res("# in phase-2 sample", num_tp, 0)
-  res("True inf rate (A=0)", pct_inf_a0, 4)
-  res("True inf rate (A=1)", pct_inf_a1, 4)
+  res("True inf rate (A=0)", pct_inf_a0, 5)
+  res("True inf rate (A=0.3)", pct_inf_a3, 5)
+  res("True inf rate (A=0.5)", pct_inf_a5, 5)
+  res("True inf rate (A=0.7)", pct_inf_a7, 5)
   
 }
 
@@ -205,7 +209,8 @@
         if (L$surv_true=="Cox PH") {
           C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
         } else if (L$surv_true=="complex") {
-          C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 1.2*alpha_3*w2*a - 1
+          C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2.5*alpha_3*w2*a +
+            0.7*alpha_3*(1-w2)*a - 1.3
         }
       }
       
@@ -240,11 +245,11 @@
     f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
     g_n <- construct_g_n(f_aIw_n, f_a_n)
     omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
-    Gamma_n <- construct_Gamma_n(dat, vlist$A_grid, omega_n, S_n, g_n)
+    Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n)
     
     # Construct additional component functions
-    Psi_n <- Vectorize(function(x) { Gamma_n(Phi_n_inv(x)) })
-    gcm <- gcmlcm(x=seq(0,1,0.0001), y=Psi_n(seq(0,1,0.0001)), type="gcm")
+    Psi_n <- Vectorize(function(x) { Gamma_os_n(Phi_n_inv(x)) })
+    gcm <- gcmlcm(x=seq(0,1,0.0001), y=Psi_n(seq(0,1,0.0001)), type="lcm")
     dGCM <- Vectorize(function(x) {
       if (x==0) {
         index <- 1
@@ -262,7 +267,8 @@
                                  type=params$gamma_type, omega_n, f_aIw_n,
                                  f_a_n, f_a_delta1_n)
     theta_n <- theta_n_Gr
-    deriv_theta_n <- construct_deriv_theta_n(theta_n, type=params$deriv_type)
+    deriv_theta_n <- construct_deriv_theta_n(theta_n, type=params$deriv_type,
+                                             dir="decr")
     
     # Compute estimates
     deriv_ests <- c(deriv_ests, deriv_theta_n(grid))
@@ -412,9 +418,9 @@
 
 
 
-######################################################.
-##### Checking the influence function of Gamma_n #####
-######################################################.
+#########################################################.
+##### Checking the influence function of Gamma_os_n #####
+#########################################################.
 
 {
   
@@ -445,10 +451,10 @@
     S_n <- construct_S_n(dat, type=params$S_n_type)
     Sc_n <- construct_S_n(dat, type=params$S_n_type, csf=TRUE)
     omega_n <- construct_omega_n(S_n, Sc_n)
-    Gamma_n <- construct_Gamma_n(dat, omega_n, S_n, g_n)
+    Gamma_os_n <- construct_Gamma_os_n(dat, omega_n, S_n, g_n)
     
-    # Return the value of Gamma_n(0.5)
-    return (Gamma_n(0.5))
+    # Return the value of Gamma_os_n(0.5)
+    return (Gamma_os_n(0.5))
     
   }
   
@@ -489,7 +495,7 @@
     omega_n <- construct_omega_n(S_n, Sc_n)
     gcomp_n <- construct_gcomp_n(dat_orig, vals_A_grid, S_n)
     eta_n <- construct_eta_n(dat, vals_AW_grid, S_n)
-    Gamma_n <- construct_Gamma_n(dat, omega_n, S_n, g_n)
+    Gamma_os_n <- construct_Gamma_os_n(dat, omega_n, S_n, g_n)
     
     if (F) {
       
@@ -522,7 +528,7 @@
     
     # Construct influence function
     infl_fn_Gamma <- construct_infl_fn_Gamma(omega_n, g_n, gcomp_n,
-                                             eta_n, Gamma_n)
+                                             eta_n, Gamma_os_n)
     
     # Estimate variance and SD
     var_hat <- mean((
@@ -591,7 +597,7 @@
     S_n <- construct_S_n(dat, vals_S_n, type=params$S_n_type)
     Sc_n <- construct_S_n(dat, vals_S_n, type=params$S_n_type, csf=TRUE)
     omega_n <- construct_omega_n(vals_omega, S_n, Sc_n)
-    Gamma_n <- construct_Gamma_n(dat, vals_A_grid, omega_n, S_n, g_n)
+    Gamma_os_n <- construct_Gamma_os_n(dat, vals_A_grid, omega_n, S_n, g_n)
     gcomp_n <- construct_gcomp_n(dat_orig, vals_A_grid, S_n)
     eta_n <- construct_eta_n(dat, vals_AW_grid, S_n)
     xi_n <- construct_xi_n(Phi_n=G_n, lambda_2, lambda_3)
@@ -605,7 +611,7 @@
         lambda_2*(G_n(dat$a))^2 -
           lambda_3*G_n(dat$a)
       ) *
-        (Gamma_n(dat$a))
+        (Gamma_os_n(dat$a))
     )
     
     return (beta_n)
@@ -785,7 +791,7 @@
   set.seed(10)
   dat_orig <- generate_data(
     n = 2000,
-    alpha_3 = 0.7,
+    alpha_3 = -4,
     distr_A = "N(0.5,0.04)", # "Unif(0,1)"
     edge = "none",
     surv_true = "Cox PH",
@@ -930,7 +936,7 @@
   # Generate data
   dat_orig <- generate_data(
     n = n,
-    alpha_3 = 0.7,
+    alpha_3 = -4,
     distr_A = "N(0.5,0.04)",
     edge = edge,
     surv_true = "Cox PH",

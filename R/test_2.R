@@ -40,12 +40,12 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
     
     # Construct regular Gamma_0 estimator
     if (params$cf_folds==1) {
-      Gamma_n <- construct_Gamma_n(dat, vlist$A_grid, omega_n, S_n, g_n)
+      Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n)
     }
     
     # Construct cross-fitted Gamma_0 estimator
     if (params$cf_folds>1) {
-      Gamma_n <- construct_Gamma_cf(dat_orig, params, vlist)
+      Gamma_os_n <- construct_Gamma_cf(dat_orig, params, vlist)
     }
     
     # Compute the test statistic
@@ -54,7 +54,7 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
         lambda_2*(Phi_n(dat$a))^2 -
           lambda_3*Phi_n(dat$a)
       ) *
-        (Gamma_n(dat$a))
+        (Gamma_os_n(dat$a))
     )
     
     # Use known values of nuisances to estimate variance more accurately
@@ -69,10 +69,10 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
     eta_n <- construct_eta_n(dat, vlist$AW_grid, S_n)
     xi_n <- construct_xi_n(Phi_n, lambda_2, lambda_3)
     # rho_n <- construct_rho_n(dat, Phi_n)
-    infl_fn_1 <- construct_infl_fn_1(dat, Gamma_n, Phi_n, xi_n, rho_n,
+    infl_fn_1 <- construct_infl_fn_1(dat, Gamma_os_n, Phi_n, xi_n, rho_n,
                                      lambda_2, lambda_3)
     infl_fn_Gamma <- construct_infl_fn_Gamma(omega_n, g_n, gcomp_n,
-                                             eta_n, Gamma_n)
+                                             eta_n, Gamma_os_n)
     infl_fn_2 <- construct_infl_fn_2(dat, Phi_n, infl_fn_Gamma,
                                      lambda_2, lambda_3)
     
@@ -108,7 +108,7 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
       S_0 <- construct_S_n(dat, type=params$S_n_type)
       Sc_0 <- construct_S_n(dat, type=params$S_n_type, csf=TRUE)
       omega_0 <- construct_omega_n(S_0, Sc_0)
-      Gamma_0 <- construct_Gamma_n(dat, vlist$A_grid, omega_0, S_0, g_0)
+      Gamma_0 <- construct_Gamma_os_n(dat, vlist$A_grid, omega_0, S_0, g_0)
       
       beta_0 <- (1/n_orig) * sum(
         weights_0 *
@@ -153,7 +153,7 @@ test_2 <- function(dat_orig, alt_type="incr", params, return_sd=FALSE) {
       f_aIw_n <- construct_f_aIw_n(dat_0, type=params$g_n_type, k=15)
       f_a_n <- construct_f_a_n(dat_0_orig, f_aIw_n=f_aIw_n)
       g_0 <- construct_g_n(f_aIw_n, f_a_n)
-      Gamma_0 <- construct_Gamma_n(dat_0, vlist$A_grid, omega_0, S_0, g_0)
+      Gamma_0 <- construct_Gamma_os_n(dat_0, vlist$A_grid, omega_0, S_0, g_0)
       lambda_2 <- lambda(dat_0_orig, k=2, G_0)
       lambda_3 <- lambda(dat_0_orig, k=3, G_0)
       eta_0 <- construct_eta_n(dat_0, vlist$AW_grid, S_0)

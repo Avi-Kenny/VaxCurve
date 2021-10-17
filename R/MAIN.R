@@ -6,16 +6,13 @@
 ##################.
 
 # Set global config
-# GitHub packages:
-#   - tedwestling/ctsCausal
-#   - tedwestling/CFsurvival
-#   - tedwestling/survSuperLearner
-#   - zeehio/facetscales
+# GitHub packages: tedwestling/ctsCausal, tedwestling/CFsurvival, 
+#                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
-  main_task = "run", # run update analysis_moderna.R
+  main_task = "analysis_moderna.R", # run update analysis_moderna.R
   which_sim = "estimation", # estimation edge testing
   level_set_which = "level_set_estimation_2", # level_set_estimation_1 level_set_testing_1
-  num_sim = 400,
+  num_sim = 500,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm"),
@@ -28,10 +25,10 @@ cfg <- list(
 
 # Set cluster config
 cluster_config <- list(
-  # js = "ge",
-  # dir = "/home/users/avikenny/Desktop/z.VaxCurve"
-  js = "slurm",
-  dir = "/home/akenny/z.VaxCurve"
+  js = "ge",
+  dir = "/home/users/avikenny/Desktop/z.VaxCurve"
+  # js = "slurm",
+  # dir = "/home/akenny/z.VaxCurve"
 )
 
 
@@ -85,7 +82,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   if (F) {
     level_bank <- list(
       n = 5000,
-      alpha_3 = c(0,1.25,2.5),
+      alpha_3 = c(0,-2,-4),
       sc_params = list("sc_params"=list(lmbd=9e-7, v=1.5, lmbd2=1e-5, v2=1.5)),
       distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
       edge = c("none", "expit", "complex"),
@@ -110,7 +107,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
         )
       ),
       test = list(
-        "Slope (one-step Gamma_n)" = list(
+        "Slope (one-step Gamma_os_n)" = list(
           type = "test_2",
           params = list(
             var = "asymptotic",
@@ -127,7 +124,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   # Estimation: scratch
   level_set_estimation_0 <- list(
     n = 5000,
-    alpha_3 = 3,
+    alpha_3 = -4,
     sc_params = list("sc_params"=list(lmbd=3e-5, v=1.5, lmbd2=5e-5, v2=1.5)),
     distr_A = "N(0.5,0.01)",
     edge = "none",
@@ -154,7 +151,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   # Estimation: ideal params / no edge correction
   level_set_estimation_1 <- list(
     n = 5000,
-    alpha_3 = 3,
+    alpha_3 = -4,
     sc_params = list("sc_params"=list(lmbd=3e-5, v=1.5, lmbd2=5e-5, v2=1.5)),
     distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
     edge = "none",
@@ -194,15 +191,22 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Estimation: trial params / no edge correction
   level_set_estimation_2 <- list(
-    n = 15000,
-    alpha_3 = 3,
-    sc_params = list("sc_params"=list(lmbd=4e-7, v=1.6, lmbd2=3e-5, v2=1.5)),
-    distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
+    n = 14000,
+    alpha_3 = -4,
+    sc_params = list("sc_params"=list(lmbd=3e-5, v=1.5, lmbd2=3e-5, v2=1.5)),
+    distr_A = "N(0.5,0.01)",
     edge = "none",
     surv_true = "Cox PH",
     sampling = "two-phase (6%)",
     estimator = list(
-      "Grenander (kernel)" = list(
+      "Grenander (true nuisances)" = list(
+        est = "Grenander",
+        params = list(S_n_type="true", g_n_type="true",
+                      ci_type="regular", cf_folds=1, edge_corr="none",
+                      ecdf_type="true", deriv_type="m-spline",
+                      gamma_type="kernel")
+      ),
+      "Grenander (est nuisances)" = list(
         est = "Grenander",
         params = list(S_n_type="Cox PH", g_n_type="binning",
                       ci_type="regular", cf_folds=1, edge_corr="none",
@@ -215,7 +219,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   # Estimation: ideal params / no edge correction
   level_set_estimation_3 <- list(
     n = 5000,
-    alpha_3 = 3,
+    alpha_3 = -4,
     sc_params = list("sc_params"=list(lmbd=3e-5, v=1.5, lmbd2=5e-5, v2=1.5)),
     distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
     edge = "expit",
@@ -241,14 +245,14 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   # !!!!! Update these level sets
   level_set_testing_1 <- list(
     n = c(1000,2000),
-    alpha_3 = c(0,1.25,2.5),
+    alpha_3 = c(0,-2,-4),
     sc_params = list("sc_params"=list(lmbd=9e-7, v=1.5, lmbd2=1e-5, v2=1.5)),
     distr_A = c("Unif(0,1)"),
     edge = "none",
     surv_true = "Cox PH",
     sampling = "two-phase (72%)",
     test = list(
-      "Slope (one-step Gamma_n)" = list(
+      "Slope (one-step Gamma_os_n)" = list(
         type = "test_2",
         params = list(var="asymptotic", S_n_type="Cox PH", cf_folds=1,
                       g_n_type="parametric", est_known_nuis=FALSE)
@@ -300,7 +304,7 @@ if (cfg$main_task=="run") {
         "Pi", "wts", "construct_S_n", "construct_gcomp_n",
         "construct_deriv_theta_n", "construct_tau_n", "construct_gamma_n",
         "construct_f_aIw_n", "construct_f_a_n", "construct_g_n",
-        "construct_omega_n", "construct_eta_n", "construct_Gamma_n",
+        "construct_omega_n", "construct_eta_n", "construct_Gamma_os_n",
         "construct_Phi_n", "construct_rho_n", "construct_xi_n",
         "construct_infl_fn_1", "construct_infl_fn_Gamma", "construct_infl_fn_2",
         "beta_n_var_hat", "create_val_list", "construct_Gamma_cf_k",

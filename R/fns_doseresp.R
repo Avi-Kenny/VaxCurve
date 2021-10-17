@@ -482,7 +482,8 @@ construct_S_n <- function(dat, vals, type, csf=F, return_model=F) {
         if (L$surv_true=="Cox PH") {
           lin <- C$alpha_1*w[1] + C$alpha_2*w[2] + alpha_3*a - 1.7
         } else if (L$surv_true=="complex") {
-          lin <- C$alpha_1*pmax(0,2-8*abs(w[1]-0.5)) + 1.2*alpha_3*w[2]*a - 1
+          lin <- C$alpha_1*pmax(0,2-8*abs(w[1]-0.5)) + 2.5*alpha_3*w[2]*a +
+            0.7*alpha_3*(1-w[2])*a - 1.3
         }
         return(exp(-1*lmbd*(t^v)*exp(lin)))
       }
@@ -507,7 +508,7 @@ construct_S_n <- function(dat, vals, type, csf=F, return_model=F) {
 construct_gcomp_n <- function(dat_orig, vals=NA, S_n) {
   
   fnc <- function(a) {
-    1 - mean(S_n(C$t_e,dat_orig$w,a))
+    1 - mean(S_n(rep(C$t_e,nrow(dat_orig$w)),dat$w,a=rep(a,nrow(dat_orig$w))))
   }
   
   # round_args <- c(-log10(C$appx$a)))
@@ -753,10 +754,13 @@ construct_omega_n <- function(vals=NA, S_n, Sc_n, type="estimated") {
         # i <- c(1:m)
         # k <- min(y_star,C$t_e)
         
+        w_long <- as.data.frame(matrix(rep(w,length(i)), ncol=length(w), byrow=T))
+        a_long <- rep(a,length(i))
+        
         integral <- 0.5 * sum(
-          ( H_n(i,w,a) - H_n(i-1,w,a) ) * (
-            ( S_n(i,w,a) * Sc_n(i,w,a) )^-1 +
-              ( S_n(i-1,w,a) * Sc_n(i-1,w,a))^-1
+          ( H_n(i,w_long,a_long) - H_n(i-1,w_long,a_long) ) * (
+            ( S_n(i,w_long,a_long) * Sc_n(i,w_long,a_long) )^-1 +
+              ( S_n(i-1,w_long,a_long) * Sc_n(i-1,w_long,a_long))^-1
           )
         )
         
@@ -1029,13 +1033,6 @@ construct_f_aIw_n <- function(dat, vals=NA, type, k=0, delta1=FALSE) {
       
       # Set up weighted likelihood
       wlik <- function(prm) {
-        # if (x==0) {
-        #   print("dat$a")
-        #   print(dat$a)
-        #   print("dat$w")
-        #   print(dat$w)
-        #   x<<-1
-        # }
         -1 * sum(dat$weights * log(pmax(dens_s(a=dat$a, w=dat$w, prm),1e-8)))
       }
       
@@ -1162,9 +1159,12 @@ construct_eta_n <- function(dat, vals=NA, S_n) {
   n_orig <- sum(dat$weights)
   
   fnc <- function(x,w) {
-    (1/n_orig) * sum(
-      dat$weights * as.integer(dat$a<=x) *
-        (1-S_n(C$t_e,w,dat$a))
+    w_long <- as.data.frame(matrix(rep(w,length(dat$a)), ncol=length(w), byrow=T))
+    return(
+      (1/n_orig) * sum(
+        dat$weights * as.integer(dat$a<=x) *
+          (1-S_n(rep(C$t_e,length(dat$a)),w_long,dat$a))
+      )
     )
   }
   
@@ -1194,7 +1194,7 @@ lambda <- function(n_orig, dat, k, G) {
 
 
 
-#' Construct Gamma_n primitive one-step estimator
+#' Construct Gamma_os_n primitive one-step estimator
 #' 
 #' @param dat Subsample of dataset returned by ss() for which delta==1
 #' @param vals List of values to pre-compute function on; passed to
@@ -1203,10 +1203,11 @@ lambda <- function(n_orig, dat, k, G) {
 #' @param S_n A conditional survival function returned by construct_S_n()
 #' @param g_n A density ratio estimator function returned by construct_g_n()
 #' @param type One of c("one-step", "plug-in")
-#' @return Gamma_n estimator
+#' @return Gamma_os_n estimator
 #' @notes This is a generalization of the one-step estimator from Westling &
 #'     Carone 2020
-construct_Gamma_n <- function(dat, vals=NA, omega_n, S_n, g_n, type="one-step") {
+construct_Gamma_os_n <- function(dat, vals=NA, omega_n, S_n, g_n,
+                                 type="one-step") {
   
   n_orig <- sum(dat$weights)
   n <- length(dat$a)
@@ -1227,7 +1228,7 @@ construct_Gamma_n <- function(dat, vals=NA, omega_n, S_n, g_n, type="one-step") 
         g_n(dat$a,dat$w)
     ) )
     subpiece_2a <- (weights_i_long*weights_j_long) *
-      S_n(C$t_e,w_j_long,a_i_long)
+      S_n(rep(C$t_e, length(a_i_long)),w_j_long,a_i_long)
     
     fnc <- function(a) {
       
@@ -1245,7 +1246,8 @@ construct_Gamma_n <- function(dat, vals=NA, omega_n, S_n, g_n, type="one-step") 
   
   if (type=="plug-in") {
     
-    piece <- weights_i_long*weights_j_long * (1 - S_n(C$t_e,w_j_long,a_i_long))
+    piece <- weights_i_long*weights_j_long *
+      (1 - S_n(rep(C$t_e, length(a_i_long)),w_j_long,a_i_long))
     
     fnc <- function(a) {
       return((1/n_orig^2) * sum(piece * as.integer(a_i_long<=a)))
@@ -1299,7 +1301,7 @@ construct_xi_n <- function(Phi_n, lambda_2, lambda_3) {
 #' 
 #' @param x x
 #' @return x
-construct_infl_fn_1 <- function(dat, Gamma_n, Phi_n, xi_n, rho_n,
+construct_infl_fn_1 <- function(dat, Gamma_os_n, Phi_n, xi_n, rho_n,
                                 lambda_2, lambda_3) {
   
   n_orig <- sum(dat$weights)
@@ -1309,10 +1311,10 @@ construct_infl_fn_1 <- function(dat, Gamma_n, Phi_n, xi_n, rho_n,
   fnc <- function(a) {
     
     piece_1 <- (1/n_orig) * sum(
-      weights_j * (xi_n(a,a_j)) * Gamma_n(a_j)
+      weights_j * (xi_n(a,a_j)) * Gamma_os_n(a_j)
     )
     
-    piece_2 <- (lambda_2*(Phi_n(a)^2) - lambda_3*Phi_n(a)) * Gamma_n(a)
+    piece_2 <- (lambda_2*(Phi_n(a)^2) - lambda_3*Phi_n(a)) * Gamma_os_n(a)
     
     return(piece_1+piece_2)
     
@@ -1329,7 +1331,7 @@ construct_infl_fn_1 <- function(dat, Gamma_n, Phi_n, xi_n, rho_n,
 #' @param x x
 #' @return x
 construct_infl_fn_Gamma <- function(omega_n, g_n, gcomp_n, eta_n,
-                                    Gamma_n) {
+                                    Gamma_os_n) {
   
   fnc <- function(x,w,y_star,delta_star,a) {
     as.integer(a<=x)*(
@@ -1337,7 +1339,7 @@ construct_infl_fn_Gamma <- function(omega_n, g_n, gcomp_n, eta_n,
         gcomp_n(a)
     ) +
       eta_n(x,w) - 
-      2*Gamma_n(x)
+      2*Gamma_os_n(x)
   }
   
   return(construct_superfunc(fnc, vec=c(1,2,1,1,1)))
@@ -1525,7 +1527,7 @@ construct_Gamma_cf <- function(dat_orig, params, vlist) {
     
   }
   
-  # Construct cross-fitted Gamma_n
+  # Construct cross-fitted Gamma_os_n
   return(Vectorize(function(a) {
     mean(sapply(c(1:params$cf_folds), function(k) {
       Gamma_cf_k[[k]](a)
@@ -1629,7 +1631,7 @@ theta_os_n <- function(dat, pi_n, S_n, omega_n) {
   
   return(
     1 - (1/n_orig) * sum(dat$weights * (
-      S_n(C$t_e,dat$w,a=0) - (
+      S_n(rep(C$t_e,nrow(dat$w)),dat$w,a=rep(0,nrow(dat$w))) - (
         (as.integer(dat$a==0)/pi_n(dat$w)) *
           omega_n(dat$w,a=0,dat$y_star,dat$delta_star)
       )
@@ -1654,7 +1656,7 @@ sigma2_os_n <- function(dat, pi_n, S_n, omega_n, theta_os_n_est) {
   
   return(
     (1/n_orig) * sum((dat$weights * (
-      S_n(C$t_e,dat$w,a=0) - (
+      S_n(rep(C$t_e,nrow(dat$w)),dat$w,a=rep(0,nrow(dat$w))) - (
         (as.integer(dat$a==0)/pi_n(dat$w)) *
           omega_n(dat$w,a=0,dat$y_star,dat$delta_star)
       ) -

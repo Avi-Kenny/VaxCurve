@@ -3,17 +3,19 @@
 ##### Setup #####
 #################.
 
-run_import_data <- F
-folder <- "moderna (RF, spike-29)" # "moderna (Random Forest)"
-run_recomp_1 <- T
-run_recomp_2 <- T
-run_recomp_3 <- T
-run_recomp_4 <- T
-run_recomp_5 <- T
-run_dqa <- F
-run_graphs <- F
+folder <- "moderna (RF, ID50-29)"
 which_day <- 29 # 29 57
-which_marker <- "spike" # "spike" "ID50"
+which_marker <- "ID50" # "spike" "ID50"
+run_import_data <- F
+run_recomp_1 <- F
+run_recomp_2 <- F
+run_recomp_3 <- F
+run_recomp_4 <- F
+run_recomp_5 <- F
+run_dqa <- F
+run_graphs <- T
+
+
 
 ###########################.
 ##### Data processing #####
@@ -136,33 +138,38 @@ if (run_dqa) {
 ##### Data analysis #####
 #########################.
 
-# !!!!! Eventually, replace this with a call to est_curve()
-
-# Set up end time of interest
-C <- list(t_e=100, appx=cfg$appx)
-
-# Rescale A to lie in [0,1]
-a_scale <- ceiling(10*max(dat_orig$a, na.rm=T))/10
-dat_orig$a <- dat_orig$a / a_scale
-
-# Round A, W2
-# !!!!! Temporary; later use round(...,1)
-dat_orig$a <- round(dat_orig$a, 2)
-dat_orig$w$w2 <- round(dat_orig$w$w2, 0)
-
-# Create truncated data object
-dat <- ss(dat_orig, which(dat_orig$delta==1))
-
-# Create val_list
-vlist <- create_val_list(dat, C$appx)
-vlist$AW_grid <- NA
-vlist$omega <- NA
-vlist$W_grid <- NA
-
-# Set estimation tuning parameters
-params <- list(S_n_type="Random Forest", g_n_type="binning",
-               ecdf_type="linear (mid)", deriv_type="m-spline",
-               gamma_type="kernel", ci_type="trunc")
+{
+  # !!!!! Eventually, replace this with a call to est_curve()
+  
+  # Set up end time of interest
+  C <- list(t_e=100, appx=cfg$appx)
+  
+  # Rescale A to lie in [0,1]
+  a_shift <- -1 * floor(10*min(dat_orig$a, na.rm=T))/10
+  dat_orig$a <- dat_orig$a + a_shift
+  a_scale <- ceiling(10*max(dat_orig$a, na.rm=T))/10
+  dat_orig$a <- dat_orig$a / a_scale
+  
+  # Round A, W2
+  # !!!!! Temporary; later use round(...,1)
+  dat_orig$a <- round(dat_orig$a, 2)
+  dat_orig$w$w2 <- round(dat_orig$w$w2, 0)
+  
+  # Create truncated data object
+  dat <- ss(dat_orig, which(dat_orig$delta==1))
+  
+  # Create val_list
+  vlist <- create_val_list(dat, C$appx)
+  vlist$AW_grid <- NA
+  vlist$omega <- NA
+  vlist$W_grid <- NA
+  
+  # Set estimation tuning parameters
+  params <- list(S_n_type="Random Forest", g_n_type="binning",
+                 ecdf_type="linear (mid)", deriv_type="m-spline",
+                 gamma_type="kernel", ci_type="trunc")
+  
+}
 
 # Construct/save component functions (SECTION 1)
 fns <- c("Phi_n","Phi_n_inv","S_n","Sc_n","f_aIw_n","f_a_n","g_n","omega_n")
@@ -275,9 +282,9 @@ if (run_graphs) {
     
     # Marginal distribution of A
     df_marg <- data.frame(
-      x = grid*a_scale,
+      x = grid*a_scale-a_shift,
       ymin = 0,
-      ymax = f_a_n(grid)*0.2
+      ymax = f_a_n(grid)*0.12
     )
     
     # Truncate at 5/95 quantiles
@@ -286,11 +293,23 @@ if (run_graphs) {
     ci_lo <- ifelse(which,ci_lo,NA)
     ci_hi <- ifelse(which,ci_hi,NA)
     
+    # Labels
+    if (which_marker=="ID50") {
+      x_lab <- "Pseudovirus-nAb cID50 (=s)"
+    } else if (which_marker=="spike") {
+      x_lab <- "Anti Spike IgG (=s)"
+    }
+    if (which_day==29) {
+      y_lab <- "Controlled VE against COVID-19 by day 126"
+    } else if (which_day==57) {
+      y_lab <- "Controlled VE against COVID-19 by day 100"
+    }
+    
     # Plot
     # Export: PNG 600 x 500
-    ggplot(
+    print(ggplot(
       data.frame(
-        x = rep(grid*a_scale,2),
+        x = rep(grid*a_scale-a_shift,2),
         y = c(ests_gcomp,ests_gren),
         which = rep(c("G-comp", "Grenander"), each=length(grid)),
         ci_lo = c(ests_gcomp,ci_lo),
@@ -310,64 +329,64 @@ if (run_graphs) {
       scale_y_continuous(labels=label_percent(accuracy=1), limits=c(0,1.05),
                          breaks=seq(0,1,0.1)) +
       theme(legend.position="bottom") +
-      labs(
-        x = "Pseudovirus-nAb cID50 (=s)",
-        y = "Controlled VE against COVID-19 by day 100",
-        color = "Estimator"
-      ) +
-      geom_line()
+      labs(x=x_lab, y=y_lab, color="Estimator") +
+      geom_line())
       
   }
   
-  # Gamma_os_n graph
-  # Export: 6" x 5"
-  grid <- seq(0,1,0.01)
-  df_marg <- data.frame(
-    x = grid*a_scale,
-    ymin = 0,
-    ymax = f_a_n(grid)*0.001
-  )
-  ggplot(
-    data.frame(
-      x = grid*a_scale,
-      y = Gamma_os_n(grid)
-    ),
-    aes(x=x, y=y)
-  ) +
-    geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax), inherit.aes=F,
-                data=df_marg, fill="forestgreen", color=NA, alpha=0.3) +
-    theme(legend.position="bottom") +
-    labs(x="Day 57 pseudoneut-ID50", y="Gamma_os_n",
-         color="Estimator") +
-    geom_line()
-  
-  # theta graph
-  # Export: 6" x 5"
-  grid <- seq(0,1,0.01)
-  df_marg <- data.frame(
-    x = grid*a_scale,
-    ymin = 0,
-    ymax = f_a_n(grid)*0.01
-  )
-  ests_gcomp <- gcomp(grid)
-  ests_gren <- theta_n(grid)
-  ggplot(
-    data.frame(
-      x = rep(grid*a_scale,2),
-      y = c(ests_gcomp,ests_gren),
-      which = rep(c("G-comp", "Grenander"), each=length(grid))
-    ),
-    aes(x=x, y=y, color=which)
-  ) +
-    geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax), inherit.aes=F,
-                data=df_marg, fill="forestgreen", color=NA, alpha=0.3) +
-    scale_color_manual(values=c("purple", "darkblue")) +
-    scale_y_continuous(labels=label_percent(accuracy=1), limits=c(0,0.05),
-                       breaks=seq(0,0.05,0.01)) +
-    theme(legend.position="bottom") +
-    labs(x="Day 57 pseudoneut-ID50", y="theta_n",
-         color="Estimator") +
-    geom_line()
+  if (F) {
+    
+    # Gamma_os_n graph
+    # Export: 6" x 5"
+    grid <- seq(0,1,0.01)
+    df_marg <- data.frame(
+      x = grid*a_scale-a_shift,
+      ymin = 0,
+      ymax = f_a_n(grid)*0.001
+    )
+    ggplot(
+      data.frame(
+        x = grid*a_scale-a_shift,
+        y = Gamma_os_n(grid)
+      ),
+      aes(x=x, y=y)
+    ) +
+      geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax), inherit.aes=F,
+                  data=df_marg, fill="forestgreen", color=NA, alpha=0.3) +
+      theme(legend.position="bottom") +
+      labs(x="Day 57 pseudoneut-ID50", y="Gamma_os_n",
+           color="Estimator") +
+      geom_line()
+    
+    # theta graph
+    # Export: 6" x 5"
+    grid <- seq(0,1,0.01)
+    df_marg <- data.frame(
+      x = grid*a_scale-a_shift,
+      ymin = 0,
+      ymax = f_a_n(grid)*0.01
+    )
+    ests_gcomp <- gcomp(grid)
+    ests_gren <- theta_n(grid)
+    ggplot(
+      data.frame(
+        x = rep(grid*a_scale-a_shift,2),
+        y = c(ests_gcomp,ests_gren),
+        which = rep(c("G-comp", "Grenander"), each=length(grid))
+      ),
+      aes(x=x, y=y, color=which)
+    ) +
+      geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax), inherit.aes=F,
+                  data=df_marg, fill="forestgreen", color=NA, alpha=0.3) +
+      scale_color_manual(values=c("purple", "darkblue")) +
+      scale_y_continuous(labels=label_percent(accuracy=1), limits=c(0,0.05),
+                         breaks=seq(0,0.05,0.01)) +
+      theme(legend.position="bottom") +
+      labs(x="Day 57 pseudoneut-ID50", y="theta_n",
+           color="Estimator") +
+      geom_line()
+    
+  }
   
 }
 

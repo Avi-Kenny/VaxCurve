@@ -16,9 +16,9 @@
 #'     different estimator).
 #'   - `cf_folds` Number of cross-fitting folds; 1 for no cross-fitting
 #'   - `m` If params$ci_type=="sample split", the number of splits
-#'   - `edge_corr` One of c("none", "spread", "point", "weighted", "max").
+#'   - `edge_corr` One of c("none", "spread", "point", "weighted", "min").
 #'     "point" uses the root-n estimator to replace the Grenander-based
-#'     estimator only at the leftmost point. "weighted" and "max" both use the
+#'     estimator only at the leftmost point. "weighted" and "min" both use the
 #'     precision-weighted estimator to adjust both the leftmost point and the
 #'     rest of the curve. "spread" adds a small amount of noise to the edge
 #'     points
@@ -110,7 +110,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
     })
     
     # Construct Grenander-based theta_n
-    theta_n_Gr <- Vectorize(function(x) { min(dGCM(Phi_n(x)),1) })
+    theta_n_Gr <- Vectorize(function(x) { max(dGCM(Phi_n(x)),0) })
     
     # Recompute functions on full dataset
     if (params$cf_folds>1) {
@@ -146,10 +146,10 @@ est_curve <- function(dat_orig, estimator, params, points) {
         }
       }
       
-    } else if (params$edge_corr=="max") {
+    } else if (params$edge_corr=="min") {
       
       theta_n <- Vectorize(function(x) {
-        max(theta_os_n_est, theta_n_Gr(x))
+        min(theta_os_n_est, theta_n_Gr(x))
       })
       
       gren_ests <- theta_n_Gr(points)
@@ -203,7 +203,7 @@ est_curve <- function(dat_orig, estimator, params, points) {
       if (params$edge_corr=="point") {
         ci_lo[1] <- ests[1] - 1.96*sqrt(sigma2_os_n_est/n_orig)
         ci_hi[1] <- ests[1] + 1.96*sqrt(sigma2_os_n_est/n_orig)
-      } else if (params$edge_corr %in% c("weighted","max")) {
+      } else if (params$edge_corr %in% c("weighted","min")) {
         ci_lo2 <- ests - 1.96*sqrt(sigma2_os_n_est/n_orig)
         ci_hi2 <- ests + 1.96*sqrt(sigma2_os_n_est/n_orig)
         ci_lo <- (1-gren_points)*pmin(ci_lo,ci_lo2) + gren_points*ci_lo

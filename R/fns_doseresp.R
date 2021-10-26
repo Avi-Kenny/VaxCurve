@@ -427,38 +427,84 @@ construct_S_n <- function(dat, vals, type, csf=F, return_model=F) {
       return(pred$survival[row,col])
     }
     
-  } else if (type=="Super Learner") {
+  } else if (type=="GAM") {
     
-    # !!!!! Adapt to new structure
-    
-    # method <- "survSL.rfsrc"
+    # fml <- "Surv(y_star,delta_star)~a"
+    # for (i in 1:length(dat$w)) {
+    #   fml <- paste0(fml, "+w",i)
+    # }
+    # fml <- formula(fml)
+    # df <- cbind("y_star"=dat$y_star, "delta_star"=dat$delta_star, "a"=dat$a,
+    #             dat$w, "weights"=dat$weights)
     # 
-    # newX <- subset(filter(vals, t==0), select=-c(t))
-    # new.times <- unique(vals$t)
-    # 
-    # srv <- survSuperLearner(
-    #   time = dat$y_star,
-    #   event = dat$delta_star,
-    #   X = subset(dat, select=c(w1,w2,a)),
-    #   newX = newX,
-    #   new.times = new.times,
-    #   event.SL.library = c(method),
-    #   cens.SL.library = c(method),
-    #   obsWeights = dat$weights,
-    #   control = list(
-    #     initWeightAlg = method,
-    #     max.SL.iter = 10
-    #   )
+    # model <- gam(
+    #   formula = fml,
+    #   family = cox.ph(),
+    #   data = df,
+    #   weights = dat$weights
     # )
     # 
-    # fnc <- function(t, w1, w2, a) {
-    #   r1 <- which(abs(w1-newX$w1)<1e-8)
-    #   r2 <- which(abs(w2-newX$w2)<1e-8)
-    #   r3 <- which(abs(a-newX$a)<1e-8)
-    #   row <- intersect(r1,intersect(r2,r3))
-    #   col <- which(t==new.times)
-    #   return(srv$event.SL.predict[row,col])
+    # model <- gam(
+    #   time~s(age,by=sex)+sex+s(nodes)+perfor+rx+obstruct+adhere,
+    #          family=cox.ph(),data=col1,weights=status)
+    # 
+    # model <- rfsrc(fml, data=df, ntree=500, mtry=2, nodesize=100,
+    #                splitrule="logrank", nsplit=0, case.wt=df$weights,
+    #                samptype="swor")
+    # if (return_model) { return(model) }
+    # 
+    # 
+    # 
+    # newX <- cbind(vals$w, a=vals$a)[which(vals$t==0),]
+    # pred <- predict(model, newdata=newX)
+    # 
+    # fnc <- function(t, w, a) {
+    #   r <- list()
+    #   for (i in 1:length(w)) {
+    #     r[[i]] <- which(abs(w[i]-newX[[paste0("w",i)]])<1e-8)
+    #   }
+    #   r[[length(w)+1]] <- which(abs(a-newX[["a"]])<1e-8)
+    #   row <- Reduce(intersect, r)
+    #   col <- which.min(abs(t-pred$time.interest))
+    #   if (length(row)!=1) { stop("Error in construct_S_n (B)") }
+    #   if (length(col)!=1) { stop("Error in construct_S_n (C)") }
+    #   return(pred$survival[row,col])
     # }
+    
+  } else if (type=="Super Learner") {
+    
+    method <- "survSL.gam" # survSL.rfsrc survSL.gam
+
+    newX <- cbind(vals$w, a=vals$a)[which(vals$t==0),]
+    new.times <- unique(vals$t)
+    
+    srv <- survSuperLearner(
+      time = dat$y_star,
+      event = dat$delta_star,
+      X = cbind(dat$w, a=dat$a),
+      newX = newX,
+      new.times = new.times,
+      event.SL.library = c(method),
+      cens.SL.library = c(method),
+      obsWeights = dat$weights,
+      control = list(
+        initWeightAlg = method,
+        max.SL.iter = 10
+      )
+    )
+
+    fnc <- function(t, w, a) {
+      r <- list()
+      for (i in 1:length(w)) {
+        r[[i]] <- which(abs(w[i]-newX[[paste0("w",i)]])<1e-8)
+      }
+      r[[length(w)+1]] <- which(abs(a-newX[["a"]])<1e-8)
+      row <- Reduce(intersect, r)
+      col <- which.min(abs(t-new.times))
+      if (length(row)!=1) { stop("Error in construct_S_n (B)") }
+      if (length(col)!=1) { stop("Error in construct_S_n (C)") }
+      return(srv$event.SL.predict[row,col])
+    }
     
   } else if (type=="true") {
     

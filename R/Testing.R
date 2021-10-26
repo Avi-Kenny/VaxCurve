@@ -13,10 +13,10 @@
                  deriv_type="m-spline", gamma_type="kernel")
   C <- sim$constants
   C$appx$t_e <- 10
-  L <- list(n=14000, alpha_3=-4,
-            sc_params=list(lmbd=3e-5, v=1.5, lmbd2=3e-5, v2=1.5),
-            distr_A="N(0.5,0.01)", edge="none", surv_true="complex", # Unif(0,1) N(0.5,0.04)
-            ecdf_type="true", sampling="two-phase (6%)",
+  L <- list(n=5000, alpha_3=-4,
+            sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5),
+            distr_A="N(0.5,0.01)", edge="none", surv_true="Cox PH", # Unif(0,1) N(0.5,0.04)
+            ecdf_type="true", sampling="two-phase (72%)",
             estimator=list(est="Grenander",params=params)
   )
   
@@ -48,6 +48,18 @@
   
   n_reps <- 10
   for (i in 1:n_reps) {
+    
+    # # !!!!!
+    # dat_orig <- sim$creators$generate_data(
+    #   n = 5000,
+    #   alpha_3 = 3,
+    #   distr_A = "N(0.5,0.01)",
+    #   edge = "none",
+    #   surv_true = "Cox PH",
+    #   sc_params = sim$levels$sc_params$sc_params,
+    #   sampling = "two-phase (72%)"
+    # )
+    
     # Generate dataset
     dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
                               L$surv_true, L$sc_params, L$sampling)
@@ -687,7 +699,8 @@
   
   S_0 <- construct_S_n(dat, vlist$S_n, type="true")
   S_n_CoxPH <- construct_S_n(dat, vlist$S_n, type="Cox PH")
-  S_n_RF <- construct_S_n(dat, vlist$S_n, type="Random Forest")
+  S_n_SL <- construct_S_n(dat, vlist$S_n, type="Super Learner")
+  # S_n_RF <- construct_S_n(dat, vlist$S_n, type="Random Forest")
   
   # Plot true curve against estimated curve
   # times <- c(1:200)
@@ -702,16 +715,16 @@
       S_n_CoxPH(t=times, w=w_b, a=rep(0.2,n)),
       S_n_CoxPH(t=times, w=w_a, a=rep(0.8,n)),
       S_n_CoxPH(t=times, w=w_b, a=rep(0.8,n)),
-      S_n_RF(t=times, w=w_a, a=rep(0.2,n)),
-      S_n_RF(t=times, w=w_b, a=rep(0.2,n)),
-      S_n_RF(t=times, w=w_a, a=rep(0.8,n)),
-      S_n_RF(t=times, w=w_b, a=rep(0.8,n)),
+      S_n_SL(t=times, w=w_a, a=rep(0.2,n)),
+      S_n_SL(t=times, w=w_b, a=rep(0.2,n)),
+      S_n_SL(t=times, w=w_a, a=rep(0.8,n)),
+      S_n_SL(t=times, w=w_b, a=rep(0.8,n)),
       S_0(t=times, w=w_a, a=rep(0.2,n)),
       S_0(t=times, w=w_b, a=rep(0.2,n)),
       S_0(t=times, w=w_a, a=rep(0.8,n)),
       S_0(t=times, w=w_b, a=rep(0.8,n))
     ),
-    which = rep(c("Cox PH","RF","True S_0"), each=4*length(times)),
+    which = rep(c("Cox PH","SL","True S_0"), each=4*length(times)),
     covs = rep(rep(c("w1=0.2,w2=1,a=0.2","w1=0.5,w2=1,a=0.2",
                      "w1=0.2,w2=1,a=0.8","w1=0.5,w2=1,a=0.8"),3),
                each=length(times))
@@ -787,24 +800,11 @@
 
 {
   
-  # Generate data
-  set.seed(10)
-  dat_orig <- generate_data(
-    n = 2000,
-    alpha_3 = -4,
-    distr_A = "N(0.5,0.04)", # "Unif(0,1)"
-    edge = "none",
-    surv_true = "Cox PH",
-    sampling = L$sampling
-  )
-  
   # Obtain estimates
   ests <- est_curve(
     dat_orig = dat_orig,
     estimator = "Grenander",
-    params = list(S_n_type="true", g_n_type="true",
-                  deriv_type="spline", ci_type="regular", cf_folds=1,
-                  edge_corr="none"),
+    params = params,
     points = C$points
   )
   
@@ -822,7 +822,7 @@
   plot_data <- data.frame(
     x = rep(C$points, 2),
     theta = c(theta_ests, theta_true),
-    which = rep(c("Est (RF)","Truth"), each=len),
+    which = rep(c("Est","Truth"), each=len),
     ci_lo = c(ci_lo, theta_true),
     ci_hi = c(ci_hi, theta_true)
   )

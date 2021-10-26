@@ -9,10 +9,11 @@
 # GitHub packages: tedwestling/ctsCausal, tedwestling/CFsurvival, 
 #                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
-  main_task = "analysis_moderna.R", # run update analysis_moderna.R
+  main_task = "run", # run update analysis_moderna.R
   which_sim = "estimation", # estimation edge testing
-  level_set_which = "level_set_estimation_2", # level_set_estimation_1 level_set_testing_1
-  num_sim = 500,
+  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
+  # keep = c(1:3,7:9,16:18,22:24),
+  num_sim = 600,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm"),
@@ -25,10 +26,10 @@ cfg <- list(
 
 # Set cluster config
 cluster_config <- list(
-  js = "ge",
-  dir = "/home/users/avikenny/Desktop/z.VaxCurve"
-  # js = "slurm",
-  # dir = "/home/akenny/z.VaxCurve"
+  # js = "ge",
+  # dir = "/home/users/avikenny/Desktop/z.VaxCurve"
+  js = "slurm",
+  dir = "/home/akenny/z.VaxCurve"
 )
 
 
@@ -100,7 +101,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
             cf_folds = c(1,10),
             S_n_type = c("Cox PH", "Random Forest"),
             g_n_type = c("parametric", "binning"),
-            edge_corr = c("none", "point", "spread", "max"),
+            edge_corr = c("none", "point", "spread", "min"),
             deriv_type = c("line", "spline", "m-spline", "linear", "gcomp"),
             ecdf_type = c("step", "linear", "true")
           )
@@ -121,57 +122,34 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     )
   }
   
-  # Estimation: scratch
-  level_set_estimation_0 <- list(
-    n = 5000,
-    alpha_3 = -4,
-    sc_params = list("sc_params"=list(lmbd=3e-5, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_A = "N(0.5,0.01)",
-    edge = "none",
-    surv_true = "Cox PH",
-    sampling = "two-phase (72%)",
-    estimator = list(
-      # "Grenander (true nuisances)" = list(
-      #   est = "Grenander",
-      #   params = list(S_n_type="true", g_n_type="true",
-      #                 ci_type="regular", cf_folds=1, edge_corr="none",
-      #                 ecdf_type="true", deriv_type="m-spline",
-      #                 gamma_type="kernel")
-      # )
-      "Grenander (est nuisances)" = list(
-        est = "Grenander",
-        params = list(S_n_type="Cox PH", g_n_type="binning",
-                      ci_type="regular", cf_folds=1, edge_corr="none",
-                      ecdf_type="linear (mid)", deriv_type="m-spline",
-                      gamma_type="kernel")
-      )
-    )
-  )
-  
-  # Estimation: ideal params / no edge correction
+  # Estimation: ideal params
   level_set_estimation_1 <- list(
     n = 5000,
     alpha_3 = -4,
-    sc_params = list("sc_params"=list(lmbd=3e-5, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
+    sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
+    distr_A = "N(0.5,0.04)",
+    # distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
     edge = "none",
-    surv_true = c("Cox PH", "complex"),
-    sampling = "two-phase (72%)",
+    # edge = c("none", "expit"),
+    surv_true = "Cox PH",
+    # surv_true = c("Cox PH", "complex"),
+    sampling = "iid",
+    # sampling = "two-phase (72%)",
     estimator = list(
-      "Grenander (kernel)" = list(
-        est = "Grenander",
-        params = list(S_n_type="Random Forest", g_n_type="binning",
-                      ci_type="regular", cf_folds=1, edge_corr="none",
-                      ecdf_type="linear (mid)", deriv_type="m-spline",
-                      gamma_type="kernel")
-      ),
-      "Grenander (kernel2)" = list(
-        est = "Grenander",
-        params = list(S_n_type="Random Forest", g_n_type="binning",
-                      ci_type="regular", cf_folds=1, edge_corr="none",
-                      ecdf_type="linear (mid)", deriv_type="m-spline",
-                      gamma_type="kernel2")
-      )
+      # "Grenander (no edge corr)" = list(
+      #   est = "Grenander",
+      #   params = list(S_n_type="Random Forest", g_n_type="binning",
+      #                 ci_type="regular", cf_folds=1, edge_corr="none",
+      #                 ecdf_type="linear (mid)", deriv_type="m-spline",
+      #                 gamma_type="kernel")
+      # ),
+      # "Grenander (edge corr)" = list(
+      #   est = "Grenander",
+      #   params = list(S_n_type="Random Forest", g_n_type="binning",
+      #                 ci_type="regular", cf_folds=1, edge_corr="min",
+      #                 ecdf_type="linear (mid)", deriv_type="m-spline",
+      #                 gamma_type="kernel")
+      # )
       # "Grenander (estimated nuisances)" = list(
       #   est = "Grenander",
       #   params = list(S_n_type="Random Forest", g_n_type="binning",
@@ -179,17 +157,17 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       #                 ecdf_type="linear (mid)", deriv_type="m-spline",
       #                 gamma_type="kernel")
       # ),
-      # "Grenander (true nuisances)" = list(
-      #   est = "Grenander",
-      #   params = list(S_n_type="true", g_n_type="true",
-      #                 ci_type="regular", cf_folds=1, edge_corr="none",
-      #                 ecdf_type="true", deriv_type="m-spline",
-      #                 gamma_type="kernel")
-      # )
+      "Grenander (true nuisances)" = list(
+        est = "Grenander",
+        params = list(S_n_type="true", g_n_type="true",
+                      ci_type="regular", cf_folds=1, edge_corr="none",
+                      ecdf_type="true", deriv_type="m-spline",
+                      gamma_type="kernel")
+      )
     )
   )
   
-  # Estimation: trial params / no edge correction
+  # Estimation: trial params
   level_set_estimation_2 <- list(
     n = 14000,
     alpha_3 = -4,
@@ -214,31 +192,6 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
                       gamma_type="kernel")
       )
     )
-  )
-  
-  # Estimation: ideal params / no edge correction
-  level_set_estimation_3 <- list(
-    n = 5000,
-    alpha_3 = -4,
-    sc_params = list("sc_params"=list(lmbd=3e-5, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
-    edge = "expit",
-    surv_true = c("Cox PH", "complex"),
-    sampling = "two-phase (72%)",
-    estimator = list(
-      "Grenander (estimated nuisances)" = list(
-        est = "Grenander",
-        params = list(S_n_type="Random Forest", g_n_type="binning",
-                      ci_type="regular", cf_folds=1, edge_corr="max",
-                      ecdf_type="linear (mid)", deriv_type="m-spline",
-                      gamma_type="kernel")
-      )
-    )
-  )
-  
-  # Estimation: trial params / edge correction
-  level_set_estimation_4 <- list(
-    "TO DO"
   )
   
   # Testing: compare all methods
@@ -296,7 +249,8 @@ if (cfg$main_task=="run") {
         packages = cfg$pkgs
       )
       sim <- do.call(set_levels, c(list(sim), level_set))
-      
+      if (!is.null(cfg$keep)) { sim %<>% set_levels(.keep=cfg$keep) }
+
       # Add functions to simulation object
       sim %<>% add_creator(generate_data)
       methods <- c(
@@ -380,7 +334,7 @@ if (cfg$main_task=="run") {
 if (FALSE) {
   
   # Read in simulation object
-  sim <- readRDS("../SimEngine.out/sim_est_20210922.rds")
+  sim <- readRDS("../SimEngine.out/sim_est_20211004.rds")
   
   # Summarize results
   summ_bias <- list()

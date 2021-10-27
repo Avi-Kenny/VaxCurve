@@ -13,9 +13,9 @@
                  deriv_type="m-spline", gamma_type="kernel")
   C <- sim$constants
   C$appx$t_e <- 10
-  L <- list(n=5000, alpha_3=-4,
+  L <- list(n=5000, alpha_3=-2,
             sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5),
-            distr_A="N(0.5,0.01)", edge="none", surv_true="Cox PH", # Unif(0,1) N(0.5,0.04)
+            distr_A="N(0.5,0.04)", edge="none", surv_true="Cox PH", # Unif(0,1) N(0.5,0.04)
             ecdf_type="true", sampling="two-phase (72%)",
             estimator=list(est="Grenander",params=params)
   )
@@ -43,8 +43,8 @@
   }
   
   # Set up counters
-  pct_rc <- c(); num_inf <- c(); pct_inf <- c(); num_tp <- c();
-  pct_inf_a0 <- c(); pct_inf_a3 <- c(); pct_inf_a5 <- c(); pct_inf_a7 <- c();
+  pct_rc <- num_inf <- pct_inf <- num_tp <- c()
+  pct_inf_a0 <- pct_inf_a3 <- pct_inf_a5 <- pct_inf_a7 <- pct_inf_a1 <- c()
   
   n_reps <- 10
   for (i in 1:n_reps) {
@@ -76,6 +76,7 @@
     pct_inf_a3 <- c(pct_inf_a3, attr(dat_orig,"theta_true")[16])
     pct_inf_a5 <- c(pct_inf_a5, attr(dat_orig,"theta_true")[26])
     pct_inf_a7 <- c(pct_inf_a7, attr(dat_orig,"theta_true")[36])
+    pct_inf_a1 <- c(pct_inf_a1, attr(dat_orig,"theta_true")[51])
     
   }
   
@@ -87,6 +88,7 @@
   res("True inf rate (A=0.3)", pct_inf_a3, 5)
   res("True inf rate (A=0.5)", pct_inf_a5, 5)
   res("True inf rate (A=0.7)", pct_inf_a7, 5)
+  res("True inf rate (A=1.0)", pct_inf_a1, 5)
   
 }
 

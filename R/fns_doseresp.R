@@ -554,7 +554,11 @@ construct_S_n <- function(dat, vals, type, csf=F, return_model=F) {
 construct_gcomp_n <- function(dat_orig, vals=NA, S_n) {
   
   fnc <- function(a) {
-    1 - mean(S_n(rep(C$t_e,nrow(dat_orig$w)),dat$w,a=rep(a,nrow(dat_orig$w))))
+    1 - mean(S_n(
+      rep(C$t_e, nrow(dat_orig$w)),
+      dat_orig$w,
+      rep(a, nrow(dat_orig$w))
+    ))
   }
   
   # round_args <- c(-log10(C$appx$a)))

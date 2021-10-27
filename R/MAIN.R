@@ -13,7 +13,7 @@ cfg <- list(
   which_sim = "estimation", # estimation edge testing
   level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
   # keep = c(1:3,7:9,16:18,22:24),
-  num_sim = 600,
+  num_sim = 500,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm"),
@@ -91,7 +91,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       sampling = c("iid", "two-phase (6%)", "two-phase (72%)"),
       estimator = list(
         "G-comp" = list(
-          est = "G-comp", cf_folds = 1,
+          est = "gcomp", cf_folds = 1,
           params = list(S_n_type="Cox PH", boot_reps=100)
         ),
         "Grenander" = list(
@@ -125,7 +125,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   # Estimation: ideal params
   level_set_estimation_1 <- list(
     n = 5000,
-    alpha_3 = -4,
+    alpha_3 = -2,
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
     distr_A = "N(0.5,0.04)",
     # distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
@@ -133,8 +133,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     # edge = c("none", "expit"),
     surv_true = "Cox PH",
     # surv_true = c("Cox PH", "complex"),
-    sampling = "iid",
-    # sampling = "two-phase (72%)",
+    sampling = "two-phase (72%)",
     estimator = list(
       # "Grenander (no edge corr)" = list(
       #   est = "Grenander",
@@ -195,7 +194,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   )
   
   # Testing: compare all methods
-  # !!!!! Update these level sets
+  # !!!!! Update these level sets; possibly merge with above
   level_set_testing_1 <- list(
     n = c(1000,2000),
     alpha_3 = c(0,-2,-4),
@@ -305,7 +304,7 @@ if (cfg$main_task=="run") {
   update_sim_on_cluster(
     
     first = {
-      sim <- readRDS('/home/akenny/z.VaxCurve/sim.rds')
+      sim <- readRDS(paste0(cluster_config$dir,"/sim.rds"))
       sim <- do.call(set_levels, c(list(sim), level_set))
     },
     
@@ -543,9 +542,9 @@ if (FALSE) {
 
 
 
-#############################.
-##### VIZ: Sample paths #####
-#############################.
+###################################.
+##### VIZ: Sample paths (CIs) #####
+###################################.
 
 if (FALSE) {
   
@@ -620,6 +619,73 @@ if (FALSE) {
       strip.background = element_blank(),
       strip.text.x = element_blank()
     )
+  
+}
+
+
+
+###################################.
+##### VIZ: Sample paths (all) #####
+###################################.
+
+if (FALSE) {
+  
+  # Read in simulation object
+  sim <- readRDS("../SimEngine.out/sim_est_20211004.rds")
+  
+  # Filter data
+  # distr_A_ <- "N(0.5,0.04)"
+  # surv_true_ <- "complex"
+  # d <- sim$results %>% filter(
+  #   n==5000 & distr_A==distr_A_ & surv_true==surv_true_
+  # )
+  # d %<>% filter(estimator=="Grenander (Est S_n/g_n)")
+  d <- sim$results
+  if (length(unique(d$level_id))!=1) { stop("adjust filtering") }
+  
+  # Set up vector containers
+  theta_true <- c()
+  theta_est <- c()
+  which <- c()
+  
+  # Extract simulation data into vectors
+  n_paths <- 500 # nrow(sim$results)
+  row_offset <- 0
+  for (i in c(1:51)) {
+    m <- format(round(i/50-0.02,2), nsmall=1)
+    theta_true <- c(theta_true, d[1,paste0("theta_",m)])
+  }
+  for (i in 1:n_paths) {
+    for (j in c(1:51)) {
+      m <- format(round(j/50-0.02,2), nsmall=1)
+      theta_est <- c(theta_est, d[i+row_offset,paste0("est_",m)])
+      which <- c(which, i)
+    }
+  }
+  
+  plot_data <- data.frame(
+    x = rep(sim$constants$points, n_paths),
+    y = theta_est,
+    which = which
+  )
+  ggplot(
+    plot_data,
+    aes(x=x, y=y, group=which)
+  ) +
+    geom_line(alpha=0.05) +
+    geom_line(
+      data = data.frame(x=sim$constants$points, y=theta_true),
+      aes(x=x, y=y),
+      color = "white",
+      inherit.aes = FALSE
+    ) +
+    geom_vline(
+      xintercept = c(qnorm(0.1,0.5,0.2),qnorm(0.9,0.5,0.2)),
+      color = "orange",
+      linetype = "dashed"
+    ) +
+    ylim(c(0,1)) +
+    theme(legend.position="none")
   
 }
 

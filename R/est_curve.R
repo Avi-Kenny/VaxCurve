@@ -84,18 +84,22 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr") {
       
     }
     
-    Psi_n <- Vectorize(function(x) {
-      # Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
-      -1 * Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
-      # Gamma_os_n(round(Phi_n_inv(1-x), -log10(C$appx$a)))
-    })
+    # Construct Psi_n
+    if (dir=="incr") {
+      Psi_n <- Vectorize(function(x) {
+        Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
+      })
+    } else {
+      Psi_n <- Vectorize(function(x) {
+        -1 * Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
+      })
+    }
+    
+    # Compute GCM and extract its derivative
     gcm <- gcmlcm(
       x = seq(0,1,C$appx$a),
-      # x = seq(0,1,C$appx$a),
-      y = Psi_n(seq(0,1,C$appx$a)),
-      # y = rev(Psi_n(seq(0,1,C$appx$a))),
-      # y = rev(Psi_n(seq(0,1,0.0001))),
-      type = ifelse(dir=="decr", "lcm", "gcm")
+      y = Psi_n(seq(0,1,C$appx$a)), # rev(Psi_n(seq(0,1,C$appx$a)))
+      type = "gcm"
     )
     dGCM <- Vectorize(function(x) {
       # The round deals with a floating point issue
@@ -105,13 +109,11 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr") {
     })
     
     # Construct Grenander-based theta_n
-    # theta_n_Gr <- Vectorize(function(x) { min(max(dGCM(Phi_n(x)),0),1) })
-    theta_n_Gr <- Vectorize(function(x) { min(max(-1 * dGCM(Phi_n(x)),0),1) })
-    # theta_n_Gr <- Vectorize(function(x) { min(max(dGCM(Phi_n(1-x)),0),1) })
-    # theta_n_Gr <- Vectorize(function(x) {
-    #   dGCM(Phi_n(round(1-x,-log10(C$appx$a)))) # Phi_n(1-x)
-    # })
-    # theta_n_Gr <- Vectorize(function(x) { dGCM(Phi_n(x)) })
+    if (dir=="incr") {
+      theta_n_Gr <- Vectorize(function(x) { min(max(dGCM(Phi_n(x)),0),1) })
+    } else {
+      theta_n_Gr <- Vectorize(function(x) { min(max(-1 * dGCM(Phi_n(x)),0),1) })
+    }
     
     # Recompute functions on full dataset
     if (params$cf_folds>1) {
@@ -166,8 +168,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr") {
     }
     
     # Generate estimates for each point
-    # The pmax() prevents errors when estimates are outside [0,1]
-    # ests <- pmin(pmax(theta_n(points),0),0)
     ests <- theta_n(points)
     
     # Construct variance scale factor
@@ -224,13 +224,9 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr") {
                        ci_lo=ci_lo[p], ci_hi=ci_hi[p])
     }
     
-    # Add extra return data
-    # res[["timestamps"]] <- simlog()
-    # res[["theta_n"]] <- theta_n
+    # # Add extra return data
+    # res[["Phi_n"]] <- Phi_n
     # res[["Gamma_os_n"]] <- Gamma_os_n
-    # res[["gcm"]] <- gcm
-    # res[["dGCM"]] <- dGCM
-    # res[["Psi_n"]] <- Psi_n
     
     return(res)
     

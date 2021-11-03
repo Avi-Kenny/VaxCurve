@@ -21,7 +21,7 @@ if (cfg$which_sim=="estimation") {
       estimator = L$estimator$est,
       params = L$estimator$params,
       points = C$points,
-      dir = "incr" # "decr"
+      dir = "decr"
     )
     
     # Return results
@@ -35,16 +35,12 @@ if (cfg$which_sim=="estimation") {
       res_list[paste0("ci_hi_",m)] <- ests[[i]]$ci_hi
     }
     
-    # Return extra results
+    # # Return extra results
     # res_list[[".complex"]] <- list(
     #   res_list = res_list,
     #   dat_orig = dat_orig,
-    #   ests = ests,
-    #   theta_n = ests$theta_n,
-    #   Gamma_os_n = ests$Gamma_os_n,
-    #   gcm = ests$gcm,
-    #   dGCM = ests$dGCM,
-    #   Psi_n = ests$Psi_n
+    #   Phi_n = ests$Phi_n,
+    #   Gamma_os_n = ests$Gamma_os_n
     # )
     
     return(res_list)

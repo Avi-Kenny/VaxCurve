@@ -21,7 +21,7 @@ cfg <- list(
                      "data.table", "latex2exp", "tidyr"),
   parallel = "none",
   stop_at_error = FALSE,
-  appx = list(t_e=1, w1=0.1, w1b=0.1, a=0.001)
+  appx = list(t_e=1, w1=0.1, w1b=0.1, a=0.01)
 )
 
 # Set cluster config
@@ -124,7 +124,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Estimation: ideal params
   level_set_estimation_1 <- list(
-    n = 5000,
+    n = 1000,
     alpha_3 = -2,
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
     distr_A = "N(0.5,0.04)",

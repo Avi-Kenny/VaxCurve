@@ -1283,16 +1283,12 @@ construct_Gamma_os_n <- function(dat, vals=NA, omega_n, S_n, g_n,
     
     fnc <- function(a) {
       
-      subpiece_1b <- as.integer(round(dat$a,-log10(C$appx$a))<=
-                                  round(a,-log10(C$appx$a))) # !!!!!
-      # subpiece_1b <- as.integer(round(dat$a,-log10(C$appx$a))>=
-      #                             round(a,-log10(C$appx$a)))
+      subpiece_1b <- as.integer(round(dat$a,-log10(C$appx$a))<= # >=
+                                  round(a,-log10(C$appx$a)))
       piece_1 <- (1/n_orig) * sum(subpiece_1a*subpiece_1b)
       
-      subpiece_2b <- as.integer(round(a_i_long,-log10(C$appx$a))<=
-                                  round(a,-log10(C$appx$a))) # !!!!!
-      # subpiece_2b <- as.integer(round(a_i_long,-log10(C$appx$a))>=
-      #                             round(a,-log10(C$appx$a))) # !!!!!
+      subpiece_2b <- as.integer(round(a_i_long,-log10(C$appx$a))<= # >=
+                                  round(a,-log10(C$appx$a)))
       piece_2 <- (1/(n_orig^2)) * sum(subpiece_2a*subpiece_2b)
       
       return(piece_1-piece_2)

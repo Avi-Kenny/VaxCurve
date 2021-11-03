@@ -9,11 +9,11 @@
   
   # 2. Set global constants
   params <- list(S_n_type="true", g_n_type="true", ci_type="regular",
-                 cf_folds=1, edge_corr="none", ecdf_type="linear (mid)",
+                 cf_folds=1, edge_corr="none", ecdf_type="true",
                  deriv_type="m-spline", gamma_type="kernel")
   C <- sim$constants
   C$appx$t_e <- 10
-  L <- list(n=5000, alpha_3=-2,
+  L <- list(n=1000, alpha_3=-2, # !!!!! 5000
             sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5),
             distr_A="N(0.5,0.04)", edge="none", surv_true="Cox PH", # Unif(0,1) N(0.5,0.04)
             ecdf_type="true", sampling="two-phase (72%)",

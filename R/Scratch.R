@@ -1,4 +1,66 @@
 
+# Debugging
+if (F) {
+  
+  # Set up containers
+  df <- data.frame(
+    "rep" = integer(),
+    "point" = double(),
+    "theta_n" = double(),
+    "Gamma_n" = double(),
+    "Psi_n" = double()
+  )
+  
+  # Run for-loop
+  for (i in 1:20) {
+    
+    print(paste0("Rep ",i,": ",Sys.time()))
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
+                              L$surv_true, L$sc_params, L$sampling)
+    dat <- ss(dat_orig, which(dat_orig$delta==1))
+    vlist <- create_val_list(dat, C$appx)
+    vlist$AW_grid <- NA; vlist$omega <- NA; vlist$W_grid <- NA;
+    Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n)
+    Psi_n <- Vectorize(function(x) {
+      Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
+    })
+    gcm <- gcmlcm(
+      x = seq(0,1,C$appx$a),
+      y = rev(Psi_n(seq(0,1,C$appx$a))),
+      type = ifelse(dir=="decr", "lcm", "gcm")
+    )
+    dGCM <- Vectorize(function(x) {
+      index <- which(round(x,5)<=gcm$x.knots)[1]-1
+      if (index==0) { index <- 1 }
+      return(gcm$slope.knots[index])
+    })
+    theta_n_Gr <- Vectorize(function(x) { dGCM(Phi_n(1-x)) })
+    
+    for (j in 1:51) {
+      df[nrow(df)+1,] <- c(i,points[j],theta_n_Gr(points[j]),
+                           Gamma_os_n(points[j]), Psi_n(points[j]))
+    }
+    
+  }
+  
+  # Plot results
+  ggplot(df, aes(x=point, y=Gamma_n, group=rep)) + # Gamma_n Psi_n
+    geom_line(alpha=0.4) +
+    ylim(c(0,1)) # 0.4
+  
+  # !!!!!
+  ggplot(
+    data.frame(
+      x = c(gcm$x.knots, seq(0,1,0.01)),
+      y = c(gcm$y.knots, rev(Psi_n(seq(0,1,0.01)))),
+      grp = c(rep("gcm",length(gcm$x.knots)),rep("Psi_n",101))
+    ),
+    aes(x=x, y=y, color=factor(grp))) +
+    geom_line()
+  
+
+}
+
 # Unit tests for superfunc
 if (F) {
   

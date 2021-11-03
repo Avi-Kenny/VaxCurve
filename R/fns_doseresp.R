@@ -363,7 +363,7 @@ construct_Phi_n <- function (dat, which="ecdf", type="estimated") {
 #' @return Conditional density estimator function
 construct_S_n <- function(dat, vals, type, csf=F, return_model=F) {
   
-  if (csf) { dat$delta_star <- 1 - dat$delta_star }
+  if (csf) { dat$delta_star <- round(1-dat$delta_star) }
   
   if (type %in% c("Cox PH", "Random Forest")) {
     fml <- "Surv(y_star,delta_star)~a"
@@ -527,6 +527,7 @@ construct_S_n <- function(dat, vals, type, csf=F, return_model=F) {
       fnc <- function(t, w, a) {
         if (L$surv_true=="Cox PH") {
           lin <- C$alpha_1*w[1] + C$alpha_2*w[2] + alpha_3*a - 1.7
+          # lin <- C$alpha_1*w[1] + C$alpha_2*w[2] + alpha_3*(1-a) - 1.7
         } else if (L$surv_true=="complex") {
           lin <- C$alpha_1*pmax(0,2-8*abs(w[1]-0.5)) + 2.5*alpha_3*w[2]*a +
             0.7*alpha_3*(1-w[2])*a - 1.3
@@ -1282,10 +1283,16 @@ construct_Gamma_os_n <- function(dat, vals=NA, omega_n, S_n, g_n,
     
     fnc <- function(a) {
       
-      subpiece_1b <- as.integer(dat$a<=a)
+      subpiece_1b <- as.integer(round(dat$a,-log10(C$appx$a))<=
+                                  round(a,-log10(C$appx$a))) # !!!!!
+      # subpiece_1b <- as.integer(round(dat$a,-log10(C$appx$a))>=
+      #                             round(a,-log10(C$appx$a)))
       piece_1 <- (1/n_orig) * sum(subpiece_1a*subpiece_1b)
       
-      subpiece_2b <- as.integer(a_i_long<=a)
+      subpiece_2b <- as.integer(round(a_i_long,-log10(C$appx$a))<=
+                                  round(a,-log10(C$appx$a))) # !!!!!
+      # subpiece_2b <- as.integer(round(a_i_long,-log10(C$appx$a))>=
+      #                             round(a,-log10(C$appx$a))) # !!!!!
       piece_2 <- (1/(n_orig^2)) * sum(subpiece_2a*subpiece_2b)
       
       return(piece_1-piece_2)

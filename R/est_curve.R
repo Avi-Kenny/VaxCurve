@@ -35,21 +35,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr") {
       dat_orig$a <- ifelse(dat_orig$a==0, noise, dat_orig$a)
     }
     
-    # simlog <- (function() {
-    #   time_st <- Sys.time()
-    #   timestamps <- data.frame(msg="Start", time="0")
-    #   return(function (msg=NA) {
-    #     if (is.na(msg)) {
-    #       return(timestamps)
-    #     } else {
-    #       time_elapsed <- format(Sys.time()-time_st)
-    #       timestamps[nrow(timestamps)+1,] <<- list(msg, time_elapsed)
-    #     }
-    #   })
-    # })()
-    # simlog("1")
-    # simlog()
-    
     # Setup
     dat <- ss(dat_orig, which(dat_orig$delta==1))
     vlist <- create_val_list(dat, C$appx)
@@ -70,7 +55,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr") {
       f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid,
                                    type=params$g_n_type, k=15)
       f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
-      g_n <- construct_g_n(f_aIw_n, f_a_n) # g_n <- Vectorize(function(x) {1}) # !!!!!
+      g_n <- construct_g_n(f_aIw_n, f_a_n)
       omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
       Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n)
       
@@ -100,11 +85,16 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr") {
     }
     
     Psi_n <- Vectorize(function(x) {
-      Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a))) # Gamma_os_n(Phi_n_inv(x))
+      # Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
+      -1 * Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
+      # Gamma_os_n(round(Phi_n_inv(1-x), -log10(C$appx$a)))
     })
     gcm <- gcmlcm(
-      x = seq(0,1,0.0001),
-      y = Psi_n(seq(0,1,0.0001)),
+      x = seq(0,1,C$appx$a),
+      # x = seq(0,1,C$appx$a),
+      y = Psi_n(seq(0,1,C$appx$a)),
+      # y = rev(Psi_n(seq(0,1,C$appx$a))),
+      # y = rev(Psi_n(seq(0,1,0.0001))),
       type = ifelse(dir=="decr", "lcm", "gcm")
     )
     dGCM <- Vectorize(function(x) {
@@ -115,7 +105,13 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr") {
     })
     
     # Construct Grenander-based theta_n
-    theta_n_Gr <- Vectorize(function(x) { min(max(dGCM(Phi_n(x)),0),1) })
+    # theta_n_Gr <- Vectorize(function(x) { min(max(dGCM(Phi_n(x)),0),1) })
+    theta_n_Gr <- Vectorize(function(x) { min(max(-1 * dGCM(Phi_n(x)),0),1) })
+    # theta_n_Gr <- Vectorize(function(x) { min(max(dGCM(Phi_n(1-x)),0),1) })
+    # theta_n_Gr <- Vectorize(function(x) {
+    #   dGCM(Phi_n(round(1-x,-log10(C$appx$a)))) # Phi_n(1-x)
+    # })
+    # theta_n_Gr <- Vectorize(function(x) { dGCM(Phi_n(x)) })
     
     # Recompute functions on full dataset
     if (params$cf_folds>1) {
@@ -169,16 +165,16 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr") {
       
     }
     
-    # Construct variance scale factor
-    deriv_theta_n <- construct_deriv_theta_n(theta_n, type=params$deriv_type,
-                                             dir=dir)
-    tau_n <- construct_tau_n(deriv_theta_n, gamma_n, f_a_n)
-
     # Generate estimates for each point
     # The pmax() prevents errors when estimates are outside [0,1]
     # ests <- pmin(pmax(theta_n(points),0),0)
     ests <- theta_n(points)
     
+    # Construct variance scale factor
+    deriv_theta_n <- construct_deriv_theta_n(theta_n, type=params$deriv_type,
+                                             dir=dir)
+    tau_n <- construct_tau_n(deriv_theta_n, gamma_n, f_a_n)
+
     # Generate confidence limits
     if (params$ci_type=="none") {
       
@@ -229,11 +225,12 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr") {
     }
     
     # Add extra return data
-    res[["ex_S_n"]] <- S_n(C$t_e, w=c(0.5,1), a=0.5)
-    res[["ex_gamma_n"]] <- gamma_n(0.5)
-    res[["ex_deriv_theta_n"]] <- deriv_theta_n(0.5)
-    res[["ex_tau_n"]] <- tau_n(0.5)
     # res[["timestamps"]] <- simlog()
+    # res[["theta_n"]] <- theta_n
+    # res[["Gamma_os_n"]] <- Gamma_os_n
+    # res[["gcm"]] <- gcm
+    # res[["dGCM"]] <- dGCM
+    # res[["Psi_n"]] <- Psi_n
     
     return(res)
     
@@ -265,10 +262,10 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr") {
     }
     
     # Add extra return data
-    res[["ex_S_n"]] <- S_n(C$t_e, w=c(0.5,1), a=0.5)
-    res[["ex_gamma_n"]] <- 0
-    res[["ex_deriv_theta_n"]] <- 0
-    res[["ex_tau_n"]] <- 0
+    # res[["ex_S_n"]] <- S_n(C$t_e, w=c(0.5,1), a=0.5)
+    # res[["ex_gamma_n"]] <- 0
+    # res[["ex_deriv_theta_n"]] <- 0
+    # res[["ex_tau_n"]] <- 0
     
     return(res)
     

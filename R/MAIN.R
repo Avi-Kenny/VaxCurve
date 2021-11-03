@@ -21,7 +21,7 @@ cfg <- list(
                      "data.table", "latex2exp", "tidyr"),
   parallel = "none",
   stop_at_error = FALSE,
-  appx = list(t_e=1, w1=0.1, w1b=0.1, a=0.01)
+  appx = list(t_e=1, w1=0.1, w1b=0.1, a=0.001)
 )
 
 # Set cluster config
@@ -262,6 +262,7 @@ if (cfg$main_task=="run") {
         "construct_infl_fn_1", "construct_infl_fn_Gamma", "construct_infl_fn_2",
         "beta_n_var_hat", "create_val_list", "construct_Gamma_cf_k",
         "construct_Gamma_cf", "construct_pi_n", "theta_os_n", "sigma2_os_n",
+        "ss",
         
         "est_curve", "generate_data",
         "lambda", "one_simulation", "test_2"
@@ -672,7 +673,7 @@ if (FALSE) {
     plot_data,
     aes(x=x, y=y, group=which)
   ) +
-    geom_line(alpha=0.05) +
+    geom_line(alpha=0.05) + # 0.4
     geom_line(
       data = data.frame(x=sim$constants$points, y=theta_true),
       aes(x=x, y=y),
@@ -684,7 +685,8 @@ if (FALSE) {
       color = "orange",
       linetype = "dashed"
     ) +
-    ylim(c(0,1)) +
+    # scale_x_continuous(breaks=seq(0.5,0.8,0.01), limits=c(0.5,0.8)) +
+    ylim(c(0,1)) + # 0.4
     theme(legend.position="none")
   
 }

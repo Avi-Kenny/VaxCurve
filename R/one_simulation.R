@@ -20,7 +20,8 @@ if (cfg$which_sim=="estimation") {
       dat_orig = dat_orig,
       estimator = L$estimator$est,
       params = L$estimator$params,
-      points = C$points
+      points = C$points,
+      dir = "incr" # "decr"
     )
     
     # Return results
@@ -35,11 +36,16 @@ if (cfg$which_sim=="estimation") {
     }
     
     # Return extra results
-    res_list[["ex_S_n"]] <- ests$ex_S_n
-    res_list[["ex_gamma_n"]] <- ests$ex_gamma_n
-    res_list[["ex_deriv_theta_n"]] <- ests$ex_deriv_theta_n
-    res_list[["ex_tau_n"]] <- ests$ex_tau_n
-    # res_list[[".complex"]] <- ests$timestamps # dat_orig
+    # res_list[[".complex"]] <- list(
+    #   res_list = res_list,
+    #   dat_orig = dat_orig,
+    #   ests = ests,
+    #   theta_n = ests$theta_n,
+    #   Gamma_os_n = ests$Gamma_os_n,
+    #   gcm = ests$gcm,
+    #   dGCM = ests$dGCM,
+    #   Psi_n = ests$Psi_n
+    # )
     
     return(res_list)
     

@@ -1,4 +1,25 @@
 
+# simlog() function
+if (F) {
+  
+  simlog <- (function() {
+    time_st <- Sys.time()
+    timestamps <- data.frame(msg="Start", time="0")
+    return(function (msg=NA) {
+      if (is.na(msg)) {
+        return(timestamps)
+      } else {
+        time_elapsed <- format(Sys.time()-time_st)
+        timestamps[nrow(timestamps)+1,] <<- list(msg, time_elapsed)
+      }
+    })
+  })()
+  simlog("1")
+  simlog()
+  
+}
+
+
 # Beta density estimator (weighted)
 if (F) {
   

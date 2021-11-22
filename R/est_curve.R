@@ -31,7 +31,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr") {
   if (estimator=="Grenander") {
     
     if (params$edge_corr=="spread") {
-      dat_orig$noise <- runif(length(dat_orig$a))*0.05
+      noise <- runif(length(dat_orig$a))*0.05 # !!!!! dat_orig$noise
       dat_orig$a <- ifelse(dat_orig$a==0, noise, dat_orig$a)
     }
     
@@ -227,6 +227,69 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr") {
     # # Add extra return data
     # res[["Phi_n"]] <- Phi_n
     # res[["Gamma_os_n"]] <- Gamma_os_n
+    
+    return(res)
+    
+  }
+  
+  if (estimator=="Qbins") {
+    
+    # !!!!! Handle case in which marginal distribution has mass
+    # !!!!! Implement cross-fitted version
+    
+    # Construct bin cutoffs
+    dat <- ss(dat_orig, which(dat_orig$delta==1))
+    Phi_n_inv <- construct_Phi_n(dat, which="inverse", type=params$ecdf_type)
+    cutoffs <- Phi_n_inv(seq(0,1,length.out=params$n_bins+1))
+    
+    # Function to transform A values to categorical bins values
+    transform_a <- function(a) {
+      cut(a, breaks=cutoffs, right=F, include.lowest=T)
+    }
+    
+    # Create vlist
+    vlist <- create_val_list(dat, C$appx, factor_A=unique(transform_a(dat$a)))
+    vlist$AW_grid <- NA # !!!!!
+    vlist$omega <- NA # !!!!!
+    vlist$W_grid <- NA # !!!!!
+    
+    # Construct f_aIw_n BEFORE transforming A values
+    f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid,
+                                 type=params$g_n_type, k=15)
+    
+    # Transform A values
+    dat$a <- transform_a(dat$a)
+    
+    # !!!!! Check to see if these need to be modified to handle factor A (including different S_n types)
+    # Note: S_n and Sc_n will not work with type="true"
+    S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
+    Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
+    omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
+    pi_n <- construct_pi_n(dat, vlist$W_grid, type="generalized",
+                           f_aIw_n=f_aIw_n, cutoffs=cutoffs)
+    
+    # Generate estimates and standard deviations for each point
+    ests <- sapply(c(1:length(points)), function(i) {
+      a_binned <- transform_a(points[i])
+      return(theta_os_n(dat, pi_n, S_n, omega_n, val=a_binned))
+    })
+    sigma2s <- sapply(c(1:length(points)), function(i) {
+      a_binned <- transform_a(points[i])
+      return(sigma2_os_n(dat, pi_n, S_n, omega_n, ests[i], val=a_binned))
+    })
+    
+    # Construct CIs
+    n_orig <- length(dat_orig$delta)
+    ci_lo <- ests - 1.96*sqrt(sigma2s/n_orig)
+    ci_hi <- ests + 1.96*sqrt(sigma2s/n_orig)
+    # !!!!! Deal with CI truncation
+    
+    # Parse and return results
+    res <- list()
+    for (p in 1:length(points)) {
+      res[[p]] <- list(point=points[p], est=ests[p],
+                       ci_lo=ci_lo[p], ci_hi=ci_hi[p])
+    }
     
     return(res)
     

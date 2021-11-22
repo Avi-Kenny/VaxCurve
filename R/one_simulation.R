@@ -118,7 +118,6 @@ if (cfg$which_sim=="testing") {
     # Perform hypothesis test
     test_results <- use_method(L$test$type, list(
       dat_orig = dat_orig,
-      alt_type = "incr",
       params = L$test$params
     ))
     

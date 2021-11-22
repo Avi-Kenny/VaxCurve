@@ -1,4 +1,20 @@
 
+# Figure out why returned functions are so large
+if (F) {
+  
+  S_n <- readRDS("705 (SL, marker 8)/S_n.rds")
+  
+  objs <- ls(environment(get("fnc",envir=environment(gamma_n))))
+  for (obj in objs) {
+    print(obj)
+    print(object.size(get(
+      obj,
+      envir = environment(get("fnc",envir=environment(gamma_n)))
+    )))
+  }
+
+}
+
 # Debugging
 if (F) {
   

@@ -616,8 +616,8 @@
     eta_n <- construct_eta_n(dat, vals_AW_grid, S_n)
     xi_n <- construct_xi_n(Phi_n=G_n, lambda_2, lambda_3)
     rho_n <- construct_rho_n(dat, Phi_n=G_n)
-    lambda_2 <- lambda(dat_orig,2,G_n)
-    lambda_3 <- lambda(dat_orig,3,G_n)
+    lambda_2 <- lambda(dat,2,G_n)
+    lambda_3 <- lambda(dat,3,G_n)
     
     # Compute the test statistic
     beta_n <- (1/n_orig) * sum(
@@ -705,7 +705,6 @@
   # S_n_RF <- construct_S_n(dat, vlist$S_n, type="Random Forest")
   
   # Plot true curve against estimated curve
-  # times <- c(1:200)
   times <- seq(0,200,10)
   n <- length(times)
   w_a <- as.data.frame(cbind(w1=rep(0.2,n), w2=rep(1,n)))

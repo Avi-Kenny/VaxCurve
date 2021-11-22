@@ -3,17 +3,32 @@
 ##### Setup #####
 #################.
 
-folder <- "moderna (RF, ID50-29)"
-which_day <- 29 # 29 57
-which_marker <- "ID50" # "spike" "ID50"
-run_import_data <- F
-run_recomp_1 <- F
-run_recomp_2 <- F
-run_recomp_3 <- F
-run_recomp_4 <- F
-run_recomp_5 <- F
-run_dqa <- F
-run_graphs <- T
+# Set configuration
+cfg2 <- list(
+  which_day = 29, # 29 57
+  which_marker = "ID50", # "spike" "ID50"
+  run_import_data = F,
+  run_recomp_1 = T,
+  run_recomp_2 = T,
+  run_recomp_3 = T,
+  run_recomp_4 = T,
+  run_recomp_5 = T,
+  run_dqa = F,
+  run_graphs = T
+)
+cfg2$folder = paste0("moderna (SL, ",cfg2$which_marker,"-",cfg2$which_day,")")
+
+# Create directory if it doesn't exist
+if (!dir.exists(cfg2$folder)) { dir.create(cfg2$folder) }
+
+# Helper function: save or load functions
+save_or_load <- function(fns, folder, which) {
+  if (which=="load") {
+    for (fn in fns) { assign(fn, readRDS(paste0(folder,"/",fn,".rds"))) }
+  } else if (which=="save") {
+    for (fn in fns) { saveRDS(eval(as.name(fn)), paste0(folder,"/",fn,".rds")) }
+  }
+}
 
 
 
@@ -21,15 +36,18 @@ run_graphs <- T
 ##### Data processing #####
 ###########################.
 
-if (run_import_data) {
+if (cfg2$run_import_data) {
   
   # Read in raw data; DO NOT STORE THIS LOCALLY !!!!!
-  df_raw <- read.csv(paste0("Z:/covpn/p3001/download_data/Moderna COVE mRNA 12",
-                            "73P301_immune_20210915/moderna_real_data_processe",
-                            "d_with_riskscore.csv"))
+  df_raw <- read.csv(paste0("Z:/covpn/p3001/analysis/correlates/Part_A_Blinded",
+                            "_Phase_Data/adata/P3001ModernaCOVEimmunemarkerdat",
+                            "a_correlates_processed_v1.0_Oct28_2021.csv"))
+  # df_raw <- read.csv(paste0("Z:/covpn/p3001/download_data/Moderna COVE mRNA 12",
+  #                           "73P301_immune_20210915/moderna_real_data_processe",
+  #                           "d_with_riskscore_Weiping.csv"))
   
-  # df_raw_copy <- df_raw
-  # df_raw <- df_raw_copy
+  # Save control group data
+  dat_ctrl <- filter(df_raw, Trt==0)
   
   # Filter to include only treatment group
   df_raw %<>% filter(Trt==1)
@@ -37,37 +55,37 @@ if (run_import_data) {
   # Create data structure for analysis
   dat_orig <- list(
     "id" = df_raw[["Ptid"]],
-    "y_star" = df_raw[[paste0("EventTimePrimaryD",which_day)]],
-    "delta_star" = df_raw[[paste0("EventIndPrimaryD",which_day)]],
+    "y_star" = df_raw[[paste0("EventTimePrimaryD",cfg2$which_day)]],
+    "delta_star" = df_raw[[paste0("EventIndPrimaryD",cfg2$which_day)]],
     "w" = data.frame(
       "w1" = df_raw[["MinorityInd"]],
       "w2" = df_raw[["standardized_risk_score"]],
       "w3" = df_raw[["HighRiskInd"]]
     ),
-    "weights" = df_raw[[paste0("wt.D",which_day)]]
+    "weights" = df_raw[[paste0("wt.D",cfg2$which_day)]],
+    "delta" = as.integer(df_raw[[paste0("ph2.D",cfg2$which_day)]])
   )
   
-  if (which_marker=="ID50") {
-    dat_orig[["a"]] <- df_raw[[paste0("Day",which_day,"pseudoneutid50")]]
-  } else if (which_marker=="spike") {
-    dat_orig[["a"]] <- df_raw[[paste0("Day",which_day,"bindSpike")]]
+  if (cfg2$which_marker=="ID50") {
+    dat_orig[["a"]] <- df_raw[[paste0("Day",cfg2$which_day,"pseudoneutid50")]]
+  } else if (cfg2$which_marker=="spike") {
+    dat_orig[["a"]] <- df_raw[[paste0("Day",cfg2$which_day,"bindSpike")]]
   }
-  
-  # Create subcohort indicator
-  dat_orig[["delta"]] <- as.integer(df_raw[[paste0("ph2.D",which_day)]])
   
   # Stabilize weights (rescale to sum to sample size)
   dat_orig$weights <- ifelse(dat_orig$delta==1, dat_orig$weights, 0)
   s <- sum(dat_orig$weights) / length(dat_orig$delta)
   dat_orig$weights <- dat_orig$weights / s
   
-  saveRDS(dat_orig, file=paste0(folder,"/dat_orig_moderna-",which_marker,"-",
-                                which_day,".rds"))
+  saveRDS(dat_orig, file=paste0(cfg2$folder,"/dat_orig_moderna-",
+                                cfg2$which_marker,"-",cfg2$which_day,".rds"))
+  saveRDS(dat_ctrl, file=paste0(cfg2$folder,"/dat_ctrl_moderna.rds"))
   
 } else {
   
-  dat_orig <- readRDS(paste0(folder,"/dat_orig_moderna-",which_marker,"-",
-                             which_day,".rds"))
+  dat_orig <- readRDS(paste0(cfg2$folder,"/dat_orig_moderna-",
+                             cfg2$which_marker,"-",cfg2$which_day,".rds"))
+  dat_ctrl <- readRDS(paste0(cfg2$folder,"/dat_ctrl_moderna.rds"))
   
 }
 
@@ -77,7 +95,7 @@ if (run_import_data) {
 ##### Data quality checks #####
 ###############################.
 
-if (run_dqa) {
+if (cfg2$run_dqa) {
   
   # print(paste("# with missing covariate (MinorityInd):",
   #             sum(is.na(df_raw$MinorityInd))))
@@ -142,7 +160,8 @@ if (run_dqa) {
   # !!!!! Eventually, replace this with a call to est_curve()
   
   # Set up end time of interest
-  C <- list(t_e=100, appx=cfg$appx)
+  C <- list(appx=cfg$appx)
+  C$t_e <- ifelse(cfg2$which_day==29, 126, ifelse(cfg2$which_day==57, 100, NA))
   
   # Rescale A to lie in [0,1]
   a_shift <- -1 * floor(10*min(dat_orig$a, na.rm=T))/10
@@ -151,9 +170,8 @@ if (run_dqa) {
   dat_orig$a <- dat_orig$a / a_scale
   
   # Round A, W2
-  # !!!!! Temporary; later use round(...,1)
-  dat_orig$a <- round(dat_orig$a, 2)
-  dat_orig$w$w2 <- round(dat_orig$w$w2, 0)
+  dat_orig$a <- round(dat_orig$a, -log10(C$appx$a))
+  dat_orig$w$w2 <- round(dat_orig$w$w2, 0) # !!!!!
   
   # Create truncated data object
   dat <- ss(dat_orig, which(dat_orig$delta==1))
@@ -165,15 +183,24 @@ if (run_dqa) {
   vlist$W_grid <- NA
   
   # Set estimation tuning parameters
-  params <- list(S_n_type="Random Forest", g_n_type="binning",
+  params <- list(S_n_type="Super Learner", g_n_type="binning",
                  ecdf_type="linear (mid)", deriv_type="m-spline",
                  gamma_type="kernel", ci_type="trunc")
+  
+  # Calculate control group survival
+  var_time <- paste0("EventTimePrimaryD",cfg2$which_day)
+  var_delta <- paste0("EventIndPrimaryD",cfg2$which_day)
+  srv <- survfit(
+    formula(paste0("Surv(",var_time,",",var_delta,")~1")),
+    data = dat_ctrl
+  )
+  rate_ctrl <- 1 - srv$surv[which.min(abs(srv$time-C$t_e))]
   
 }
 
 # Construct/save component functions (SECTION 1)
 fns <- c("Phi_n","Phi_n_inv","S_n","Sc_n","f_aIw_n","f_a_n","g_n","omega_n")
-if (run_recomp_1) {
+if (cfg2$run_recomp_1) {
   Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
   Phi_n_inv <- construct_Phi_n(dat, which="inverse", type=params$ecdf_type)
   S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
@@ -182,27 +209,27 @@ if (run_recomp_1) {
   f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
   g_n <- construct_g_n(f_aIw_n, f_a_n)
   omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
-  for (fn in fns) { saveRDS(eval(as.name(fn)), paste0(folder,"/",fn,".rds")) }
+  save_or_load(fns, cfg2$folder, "save")
 } else {
-  for (fn in fns) { assign(fn, readRDS(paste0(folder,"/",fn,".rds"))) }
+  save_or_load(fns, cfg2$folder, "load")
 }
 
 # Construct/save component functions (SECTION 2)
 fns <- c("Gamma_os_n")
-if (run_recomp_2) {
+if (cfg2$run_recomp_2) {
   Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n) # type="plug-in"
-  for (fn in fns) { saveRDS(eval(as.name(fn)), paste0(folder,"/",fn,".rds")) }
+  save_or_load(fns, cfg2$folder, "save")
 } else {
-  for (fn in fns) { assign(fn, readRDS(paste0(folder,"/",fn,".rds"))) }
+  save_or_load(fns, cfg2$folder, "load")
 }
 
 # Construct/save component functions (SECTION 3)
 fns <- c("Psi_n","gcm","dGCM","theta_n_Gr","theta_n")
-if (run_recomp_3) {
+if (cfg2$run_recomp_3) {
   Psi_n <- Vectorize(function(x) {
     Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a))) # Gamma_os_n(Phi_n_inv(x))
   })
-  gcm <- gcmlcm(x=seq(0,1,0.0001), y=Psi_n(seq(0,1,0.0001)), type="lcm")
+  gcm <- gcmlcm(x=seq(0,1,C$appx$a), y=Psi_n(seq(0,1,C$appx$a)), type="lcm")
   dGCM <- Vectorize(function(x) {
     index <- which(round(x,5)<=gcm$x.knots)[1]-1
     if (index==0) { index <- 1 }
@@ -210,14 +237,14 @@ if (run_recomp_3) {
   })
   theta_n_Gr <- Vectorize(function(x) { min(dGCM(Phi_n(x)),1) })
   theta_n <- theta_n_Gr
-  for (fn in fns) { saveRDS(eval(as.name(fn)), paste0(folder,"/",fn,".rds")) }
+  save_or_load(fns, cfg2$folder, "save")
 } else {
-  for (fn in fns) { assign(fn, readRDS(paste0(folder,"/",fn,".rds"))) }
+  save_or_load(fns, cfg2$folder, "load")
 }
 
 # Construct/save component functions (SECTION 4)
 fns <- c("f_aIw_delta1_n","f_a_delta1_n","gamma_n","deriv_theta_n","tau_n")
-if (run_recomp_4) {
+if (cfg2$run_recomp_4) {
   f_aIw_delta1_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=params$g_n_type,
                                       k=15, delta1=TRUE) # !!!!! Also do k=0 for cross-validated selection of k
   f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid,
@@ -228,30 +255,29 @@ if (run_recomp_4) {
   deriv_theta_n <- construct_deriv_theta_n(theta_n, type=params$deriv_type,
                                            dir="decr")
   tau_n <- construct_tau_n(deriv_theta_n, gamma_n, f_a_n)
-  for (fn in fns) { saveRDS(eval(as.name(fn)), paste0(folder,"/",fn,".rds")) }
+  save_or_load(fns, cfg2$folder, "save")
 } else {
-  for (fn in fns) { assign(fn, readRDS(paste0(folder,"/",fn,".rds"))) }
+  save_or_load(fns, cfg2$folder, "load")
 }
 
 # Construct/save component functions (SECTION 5)
 fns <- c("gcomp")
-if (run_recomp_5) {
+if (cfg2$run_recomp_5) {
   S_n2 <- construct_S_n(dat, vlist$S_n, type="Cox PH")
   gcomp <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n=S_n2)
-  for (fn in fns) { saveRDS(eval(as.name(fn)), paste0(folder,"/",fn,".rds")) }
+  save_or_load(fns, cfg2$folder, "save")
 } else {
-  for (fn in fns) { assign(fn, readRDS(paste0(folder,"/",fn,".rds"))) }
+  save_or_load(fns, cfg2$folder, "load")
 }
 
-if (run_graphs) {
+if (cfg2$run_graphs) {
   
   # CVE graph
   {
     
     # Generate point estimates
-    theta_plc <- 0.061
     grid <- seq(0,1,0.01)
-    cve <- Vectorize(function(x) { 1 - x/theta_plc })
+    cve <- Vectorize(function(x) { 1 - x/rate_ctrl })
     ests_gcomp <- gcomp(grid)
     ests_gren <- theta_n(grid)
     
@@ -265,11 +291,11 @@ if (run_graphs) {
     } else if (params$ci_type=="logit") {
       ci_lo <- expit(
         logit(cve(ests_gren)) -
-          qnt * (tau_ns*deriv_logit(cve(ests_gren)))/(theta_plc*n_orig^(1/3))
+          qnt * (tau_ns*deriv_logit(cve(ests_gren)))/(rate_ctrl*n_orig^(1/3))
       )
       ci_hi <- expit(
         logit(cve(ests_gren)) +
-          qnt * (tau_ns*deriv_logit(cve(ests_gren)))/(theta_plc*n_orig^(1/3))
+          qnt * (tau_ns*deriv_logit(cve(ests_gren)))/(rate_ctrl*n_orig^(1/3))
       )
     } else if (params$ci_type=="trunc") {
       ci_lo <- cve(ests_gren - qnt * (tau_ns/(n_orig^(1/3)))) %>%
@@ -294,14 +320,14 @@ if (run_graphs) {
     ci_hi <- ifelse(which,ci_hi,NA)
     
     # Labels
-    if (which_marker=="ID50") {
+    if (cfg2$which_marker=="ID50") {
       x_lab <- "Pseudovirus-nAb cID50 (=s)"
-    } else if (which_marker=="spike") {
+    } else if (cfg2$which_marker=="spike") {
       x_lab <- "Anti Spike IgG (=s)"
     }
-    if (which_day==29) {
+    if (cfg2$which_day==29) {
       y_lab <- "Controlled VE against COVID-19 by day 126"
-    } else if (which_day==57) {
+    } else if (cfg2$which_day==57) {
       y_lab <- "Controlled VE against COVID-19 by day 100"
     }
     

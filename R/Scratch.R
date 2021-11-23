@@ -33,8 +33,8 @@ if (F) {
     
     print(paste0("Rep ",i,": ",Sys.time()))
     set.seed(i)
-    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
-                              L$surv_true, L$sc_params, L$sampling)
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+                              L$sc_params, L$sampling, L$dir)
     dat <- ss(dat_orig, which(dat_orig$delta==1))
     vlist <- create_val_list(dat, C$appx)
     vlist$AW_grid <- NA; vlist$omega <- NA; vlist$W_grid <- NA;
@@ -367,7 +367,8 @@ if (F) {
     edge = "none",
     surv_true = "complex",
     sc_params = L$sc_params,
-    sampling = "two-phase (72%)"
+    sampling = "two-phase (72%)",
+    dir = "decr"
   )
   
   # Prep
@@ -422,7 +423,8 @@ if (F) {
       edge = edge,
       surv_true = "Cox PH",
       sc_params = L$sc_params,
-      sampling = "two-phase (72%)"
+      sampling = "two-phase (72%)",
+      dir = "decr"
     )
     
     n_orig <- nrow(dat_orig)
@@ -461,7 +463,8 @@ if (F) {
       edge = edge,
       surv_true = "Cox PH",
       sc_params = L$sc_params,
-      sampling = "two-phase (72%)"
+      sampling = "two-phase (72%)",
+      dir = "decr"
     )
     
     n_orig <- nrow(dat_orig)

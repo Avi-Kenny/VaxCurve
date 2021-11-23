@@ -13,7 +13,7 @@
                  deriv_type="m-spline", gamma_type="kernel")
   C <- sim$constants
   C$appx$t_e <- 10
-  L <- list(n=1000, alpha_3=-2, # !!!!! 5000
+  L <- list(n=1000, alpha_3=-2, dir="decr", # !!!!! 5000
             sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5),
             distr_A="N(0.5,0.04)", edge="none", surv_true="Cox PH", # Unif(0,1) N(0.5,0.04)
             ecdf_type="true", sampling="two-phase (72%)",
@@ -21,8 +21,8 @@
   )
   
   # 3. Generate dataset
-  dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
-                            L$surv_true, L$sc_params, L$sampling)
+  dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+                            L$sc_params, L$sampling, L$dir)
   dat <- ss(dat_orig, which(dat_orig$delta==1))
   vlist <- create_val_list(dat, C$appx)
   
@@ -57,12 +57,13 @@
     #   edge = "none",
     #   surv_true = "Cox PH",
     #   sc_params = sim$levels$sc_params$sc_params,
-    #   sampling = "two-phase (72%)"
+    #   sampling = "two-phase (72%)",
+    #   dir = "decr"
     # )
     
     # Generate dataset
-    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
-                              L$surv_true, L$sc_params, L$sampling)
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+                              L$sc_params, L$sampling, L$dir)
     
     # Calculate summary stats
     pct_rc <- c(pct_rc, mean(as.integer(dat_orig$delta_star==0)*
@@ -105,8 +106,8 @@
   n_reps <- 100
   for (i in c(1:n_reps)) {
     print(paste("rep:",i))
-    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
-                              L$surv_true, L$sc_params, L$sampling)
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+                              L$sc_params, L$sampling, L$dir)
     dat <- ss(dat_orig, which(dat_orig$delta==1))
     Phi_n1 <- construct_Phi_n(dat, type="step")
     Phi_n2 <- construct_Phi_n(dat, type="linear (mid)")
@@ -131,8 +132,8 @@
     facet_wrap(~grp, ncol=2)
   
   # !!!!!
-  dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
-                            L$surv_true, L$sc_params, "iid") # L$sampling
+  dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+                            L$sc_params, "iid", L$dir) # L$sampling
   dat <- ss(dat_orig, which(dat_orig$delta==1))
   vlist <- create_val_list(dat, C$appx)
   Phi_n1 <- construct_Phi_n(dat, type="step")
@@ -221,10 +222,19 @@
       
       lin <- function(w1,w2,a) {
         if (L$surv_true=="Cox PH") {
-          C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
+          if (dir="decr") {
+            C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
+          } else {
+            C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*(1-a) - 1.7
+          }
         } else if (L$surv_true=="complex") {
-          C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2.5*alpha_3*w2*a +
-            0.7*alpha_3*(1-w2)*a - 1.3
+          if (dir="decr") {
+            C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2.5*alpha_3*w2*a +
+              0.7*alpha_3*(1-w2)*a - 1.3
+          } else {
+            C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2.5*alpha_3*w2*(1-a) +
+              0.7*alpha_3*(1-w2)*(1-a) - 1.3
+          }
         }
       }
       
@@ -246,8 +256,8 @@
   for (i in 1:n_samples) {
     
     # Construct dat_orig and vlist
-    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
-                              L$surv_true, L$sc_params, L$sampling)
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+                              L$sc_params, L$sampling, L$dir)
     vlist <- create_val_list(dat, C$appx)
     
     # Construct component functions
@@ -330,7 +340,11 @@
     alpha_3 <- L$alpha_3
     
     # Construct linear predictors
-    lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
+    if (dir="decr") {
+      lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
+    } else {
+      lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*(1-a) - 1.7
+    }
     lin2 <- C$alpha_1*w1 + C$alpha_2*w2 - 1
     
     # Compute omega_0
@@ -385,7 +399,7 @@
   construct_gamma_0 <- function() {
     epsilon <- 0.02
     dat_mc <- generate_data(n=50000, L$alpha_3, L$distr_A, L$edge, L$surv_true,
-                            L$sc_params, sampling="iid")
+                            L$sc_params, sampling="iid", L$dir)
     
     f_aIw_0 <- construct_f_aIw_n(dat, vlist$AW_grid, type="true", k=15)
     return(Vectorize(function(x) {
@@ -446,7 +460,8 @@
     edge = "none",
     surv_true = "Cox PH",
     sc_params = L$sc_params,
-    sampling = "iid"
+    sampling = "iid",
+    dir = L$dir
   )
   
   # Define the statistic to bootstrap
@@ -486,7 +501,8 @@
       edge = "none",
       surv_true = "Cox PH",
       sc_params = L$sc_params,
-      sampling = "iid"
+      sampling = "iid",
+      dir = L$dir
     )
     
     Gammas <- c(Gammas, bootstat(dat, c(1:length(dat$a))))
@@ -571,59 +587,50 @@
 
 
 
-#################################################.
-##### New test statistic variance estimator #####
-#################################################.
+#############################################.
+##### Test statistic variance estimator #####
+#############################################.
 
 {
   
   # Generate data
   dat_orig <- generate_data(n=400, alpha_3=0, distr_A="Unif(0,1)", edge="none",
-                            surv_true="Cox PH", sc_params = L$sc_params,
-                            sampling="iid")
+                            surv_true="Cox PH", sc_params=L$sc_params,
+                            sampling="two-phase (72%)", dir=L$dir)
   
   # Define the test statistic
   test_stat <- function(dat_orig, indices) {
     
-    dat_orig <- dat_orig[indices,]
+    # # Uncomment this if running bootstrap
+    # dat_orig <- ss(dat_orig, indices)
     
     # Prep
     n_orig <- length(dat_orig$delta)
     dat <- ss(dat_orig, which(dat_orig$delta==1))
     weights <- dat$weights
     
-    # !!!!! Replace this with a vall to create_val_list()
-    # # Construct dataframes of values to pre-compute functions on
-    # vals_A <- data.frame(a=dat$a)
-    # vals_AW <- data.frame(a=dat$a, w1=dat$w1, w2=dat$w2)
-    # vals_A_grid <- data.frame(a=seq(0,1,C$appx$a))
-    # vals_AW_grid <- expand.grid(a=seq(0,1,C$appx$a), w1=seq(0,1,C$appx$w1),
-    #                             w2=c(0,1))
-    # vals_S_n <- expand.grid(t=seq(0,C$t_e,C$appx$t_e), w1=seq(0,1,C$appx$w1b),
-    #                         w2=c(0,1), a=seq(0,1,C$appx$a))
-    # vals_omega <- subset(dat, select=-c(delta,weights))
+    # Construct dataframes of values to pre-compute functions on
+    vlist <- create_val_list(dat, C$appx)
     
     # Construct component functions
-    G_n <- construct_Phi_n(dat, type=params$ecdf_type)
-    f_aIw_n <- construct_f_aIw_n(dat, vals_AW_grid, type=params$g_n_type, k=15)
-    f_a_n <- construct_f_a_n(dat_orig, vals_A_grid, f_aIw_n)
+    Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
+    # lambda_2 <- lambda(dat,2,Phi_n)
+    # lambda_3 <- lambda(dat,3,Phi_n)
+    lambda_2 <- 1/3
+    lambda_3 <- 1/4
+    f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=params$g_n_type, k=15)
+    f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
     g_n <- construct_g_n(f_aIw_n, f_a_n)
-    S_n <- construct_S_n(dat, vals_S_n, type=params$S_n_type)
-    Sc_n <- construct_S_n(dat, vals_S_n, type=params$S_n_type, csf=TRUE)
-    omega_n <- construct_omega_n(vals_omega, S_n, Sc_n)
-    Gamma_os_n <- construct_Gamma_os_n(dat, vals_A_grid, omega_n, S_n, g_n)
-    gcomp_n <- construct_gcomp_n(dat_orig, vals_A_grid, S_n)
-    eta_n <- construct_eta_n(dat, vals_AW_grid, S_n)
-    xi_n <- construct_xi_n(Phi_n=G_n, lambda_2, lambda_3)
-    rho_n <- construct_rho_n(dat, Phi_n=G_n)
-    lambda_2 <- lambda(dat,2,G_n)
-    lambda_3 <- lambda(dat,3,G_n)
+    S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
+    Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
+    omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
+    Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n)
     
     # Compute the test statistic
     beta_n <- (1/n_orig) * sum(
       weights * (
-        lambda_2*(G_n(dat$a))^2 -
-          lambda_3*G_n(dat$a)
+        lambda_2*(Phi_n(dat$a))^2 -
+          lambda_3*Phi_n(dat$a)
       ) *
         (Gamma_os_n(dat$a))
     )
@@ -637,9 +644,9 @@
   betas <- c()
   for (i in 1:50) {
     
-    dat_orig <- generate_data(n=400, alpha_3=0, distr_A="Unif(0,1)",
-                              edge="none", surv_true="Cox PH",
-                              sc_params=L$sc_params, sampling="iid")
+    dat_orig <- generate_data(n=400, alpha_3=0, distr_A="Unif(0,1)", edge="none",
+                              surv_true="Cox PH", sc_params=L$sc_params,
+                              sampling="two-phase (72%)", dir=L$dir) # "iid" "two-phase (72%)"
     
     beta_n <- test_stat(dat_orig, c(1:length(dat_orig$delta)))
     betas <- c(betas, beta_n)
@@ -661,9 +668,8 @@
       g_n_type = params$g_n_type,
       est_known_nuis = FALSE,
       cf_folds = 1
-    ),
-    return_sd = TRUE
-  )
+    )
+  )$sd_n
   
   # Empirical SE
   # n=400: 0.0002369075
@@ -753,7 +759,8 @@
     distr_A = L$distr_A,
     edge = L$edge,
     surv_true = L$surv_true,
-    sampling = L$sampling
+    sampling = L$sampling,
+    dir = L$dir
   )
   vlist <- create_val_list(dat, C$appx)
   
@@ -941,7 +948,8 @@
     distr_A = "N(0.5,0.04)",
     edge = edge,
     surv_true = "Cox PH",
-    sampling = L$sampling
+    sampling = L$sampling,
+    dir = L$dir
   )
   
   # True propensity score function

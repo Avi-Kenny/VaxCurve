@@ -1,4 +1,94 @@
 
+# saving functions (analysis_705)
+if (F) {
+  
+  # Construct/save component functions (SECTION 1)
+  fns <- c("Phi_n","Phi_n_inv","S_n","Sc_n","f_aIw_n","f_a_n","g_n","omega_n")
+  if (cfg2$run_recomp_1) {
+    print(paste("Check 1:",Sys.time()))
+    Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
+    Phi_n_inv <- construct_Phi_n(dat, which="inverse", type=params$ecdf_type)
+    print(paste("Check 2:",Sys.time()))
+    S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
+    Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
+    print(paste("Check 3:",Sys.time()))
+    f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=params$g_n_type, k=15) # !!!!! Also do k=0 for cross-validated selection of k
+    f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
+    g_n <- construct_g_n(f_aIw_n, f_a_n)
+    print(paste("Check 4:",Sys.time()))
+    omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
+    print(paste("Check 5:",Sys.time()))
+    if (cfg2$save_fns) { save_or_load(fns, cfg2$folder, "save") }
+  } else {
+    save_or_load(fns, cfg2$folder, "load")
+  }
+  
+  # Construct/save component functions (SECTION 2)
+  fns <- c("Gamma_os_n")
+  if (cfg2$run_recomp_2) {
+    print(paste("Check 6:",Sys.time()))
+    Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n) # type="plug-in"
+    print(paste("Check 7:",Sys.time()))
+    if (cfg2$save_fns) { save_or_load(fns, cfg2$folder, "save") }
+  } else {
+    save_or_load(fns, cfg2$folder, "load")
+  }
+  
+  # Construct/save component functions (SECTION 3)
+  fns <- c("Psi_n","gcm","dGCM","theta_n_Gr","theta_n")
+  if (cfg2$run_recomp_3) {
+    print(paste("Check 8:",Sys.time()))
+    Psi_n <- Vectorize(function(x) {
+      Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a))) # Gamma_os_n(Phi_n_inv(x))
+    })
+    gcm <- gcmlcm(x=seq(0,1,C$appx$a), y=Psi_n(seq(0,1,C$appx$a)), type="lcm")
+    dGCM <- Vectorize(function(x) {
+      index <- which(round(x,5)<=gcm$x.knots)[1]-1
+      if (index==0) { index <- 1 }
+      return(gcm$slope.knots[index])
+    })
+    theta_n_Gr <- Vectorize(function(x) { min(dGCM(Phi_n(x)),1) })
+    theta_n <- theta_n_Gr
+    print(paste("Check 9:",Sys.time()))
+    if (cfg2$save_fns) { save_or_load(fns, cfg2$folder, "save") }
+  } else {
+    save_or_load(fns, cfg2$folder, "load")
+  }
+  
+  # Construct/save component functions (SECTION 4)
+  fns <- c("f_aIw_delta1_n","f_a_delta1_n","gamma_n","deriv_theta_n","tau_n")
+  if (cfg2$run_recomp_4) {
+    print(paste("Check 10:",Sys.time()))
+    f_aIw_delta1_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=params$g_n_type,
+                                        k=15, delta1=TRUE) # !!!!! Also do k=0 for cross-validated selection of k
+    f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid,
+                                    f_aIw_delta1_n)
+    gamma_n <- construct_gamma_n(dat_orig, dat, vlist$A_grid,
+                                 type=params$gamma_type, omega_n, f_aIw_n,
+                                 f_a_n, f_a_delta1_n)
+    deriv_theta_n <- construct_deriv_theta_n(theta_n, type=params$deriv_type,
+                                             dir="decr")
+    tau_n <- construct_tau_n(deriv_theta_n, gamma_n, f_a_n)
+    print(paste("Check 11:",Sys.time()))
+    if (cfg2$save_fns) { save_or_load(fns, cfg2$folder, "save") }
+  } else {
+    save_or_load(fns, cfg2$folder, "load")
+  }
+  
+  # Construct/save component functions (SECTION 5)
+  fns <- c("gcomp")
+  if (cfg2$run_recomp_5) {
+    print(paste("Check 12:",Sys.time()))
+    S_n2 <- construct_S_n(dat, vlist$S_n, type="Cox PH")
+    gcomp <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n=S_n2)
+    print(paste("Check 13:",Sys.time()))
+    if (cfg2$save_fns) { save_or_load(fns, cfg2$folder, "save") }
+  } else {
+    save_or_load(fns, cfg2$folder, "load")
+  }
+  
+}
+
 # simlog() function
 if (F) {
   
@@ -18,7 +108,6 @@ if (F) {
   simlog()
   
 }
-
 
 # Beta density estimator (weighted)
 if (F) {

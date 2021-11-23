@@ -12,8 +12,8 @@ if (cfg$which_sim=="estimation") {
   one_simulation <- function() {
     
     # Generate dataset
-    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
-                              L$surv_true, L$sc_params, L$sampling)
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+                              L$sc_params, L$sampling, L$dir)
     
     # Obtain estimates
     ests <- est_curve(
@@ -21,7 +21,7 @@ if (cfg$which_sim=="estimation") {
       estimator = L$estimator$est,
       params = L$estimator$params,
       points = C$points,
-      dir = "decr"
+      dir = L$dir
     )
     
     # Return results
@@ -66,8 +66,8 @@ if (cfg$which_sim=="edge") {
     # !!!!! Update function calls (htab-->superfunc)
     
     # Generate dataset
-    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
-                              L$surv_true, L$sc_params, L$sampling)
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+                              L$sc_params, L$sampling, L$dir)
     
     # Prep
     n_orig <- length(dat_orig$delta)
@@ -112,19 +112,29 @@ if (cfg$which_sim=="testing") {
   one_simulation <- function() {
     
     # Generate dataset
-    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
-                              L$surv_true, L$sc_params, L$sampling)
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+                              L$sc_params, L$sampling, L$dir)
+    
+    msg <- "Direction of monotonicity does not align with test type"
+    if (L$dir=="incr" && L$test$alt_type=="decr") { stop(msg) }
+    if (L$dir=="decr" && L$test$alt_type=="incr") { stop(msg) }
     
     # Perform hypothesis test
     test_results <- use_method(L$test$type, list(
       dat_orig = dat_orig,
-      params = L$test$params
+      alt_type = L$test$alt_type,
+      params = L$test$params,
+      test_stat_only = L$test$test_stat_only
     ))
     
     # Return results
     return (list(
       "reject" = test_results$reject,
-      "p_val" = test_results$p_val
+      "p_val" = test_results$p_val,
+      "beta_n" = test_results$beta_n,
+      "Gamma_n_5" = test_results$Gamma_n_5, # !!!!!
+      "Gamma_var_n" = test_results$Gamma_var_n, # !!!!!
+      "sd_n" = test_results$sd_n
     ))
     
   }

@@ -1,7 +1,8 @@
 #' Generate data
 #' 
 #' @param n Sample size
-#' @param alpha_3 Dose-response "relationship strength" parameter
+#' @param alpha_3 Dose-response "relationship strength" parameter; should be
+#'     zero or negative.
 #' @param distr_A Distribution of A, possibly dependent on covariates; one of
 #'     c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)", "N(0.4+0.2w1+0.1w2,0.01)").
 #'     The Normals are truncated to lie in [0,1].
@@ -16,9 +17,10 @@
 #'     distributions; a list of the form list(lmbd=1,v=1,lmbd2=1,v2=1)
 #' @param sampling Two-phase sampling mechanism; one of c("iid",
 #'     "two-phase (6%)", "two-phase (72%)")
+#' @param dir Direction of monotonicity; one of c("incr", "decr")
 #' @return A dataframe representing the study population
 generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
-                          sampling) {
+                          sampling, dir) {
   
   # Sample baseline covariates
   w <- data.frame(
@@ -66,11 +68,19 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
       ((1/sc_params$lmbd)*t)^(1/sc_params$v)
     }
     if (surv_true=="Cox PH") {
-      lin <- C$alpha_1*w$w1 + C$alpha_2*w$w2 + alpha_3*a - 1.7
-      # lin <- C$alpha_1*w$w1 + C$alpha_2*w$w2 + alpha_3*(1-a) - 1.7
+      if (dir="decr") {
+        lin <- C$alpha_1*w$w1 + C$alpha_2*w$w2 + alpha_3*a - 1.7
+      } else {
+        lin <- C$alpha_1*w$w1 + C$alpha_2*w$w2 + alpha_3*(1-a) - 1.7
+      }
     } else if (surv_true=="complex") {
-      lin <- C$alpha_1*pmax(0,2-8*abs(w$w1-0.5)) + 2.5*alpha_3*w$w2*a +
-        0.7*alpha_3*(1-w$w2)*a - 1.3
+      if (dir="decr") {
+        lin <- C$alpha_1*pmax(0,2-8*abs(w$w1-0.5)) + 2.5*alpha_3*w$w2*a +
+          0.7*alpha_3*(1-w$w2)*a - 1.3
+      } else {
+        lin <- C$alpha_1*pmax(0,2-8*abs(w$w1-0.5)) + 2.5*alpha_3*w$w2*(1-a) +
+          0.7*alpha_3*(1-w$w2)*(1-a) - 1.3
+      }
     }
     t <- H_0_inv(-1*log(U)*exp(-1*lin))
     
@@ -113,11 +123,19 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
       
       lin <- function(w1,w2,a) {
         if (surv_true=="Cox PH") {
-          C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
-          # C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*(1-a) - 1.7
+          if (dir="decr") {
+            C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
+          } else {
+            C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*(1-a) - 1.7
+          }
         } else if (surv_true=="complex") {
-          C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2.5*alpha_3*w2*a +
-            0.7*alpha_3*(1-w2)*a - 1.3
+          if (dir="decr") {
+            C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2.5*alpha_3*w2*a +
+              0.7*alpha_3*(1-w2)*a - 1.3
+          } else {
+            C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2.5*alpha_3*w2*(1-a) +
+              0.7*alpha_3*(1-w2)*(1-a) - 1.3
+          }
         }
       }
       

@@ -13,7 +13,7 @@ cfg <- list(
   which_sim = "testing", # estimation edge testing
   level_set_which = "level_set_testing_1", # level_set_estimation_1 level_set_testing_1
   # keep = c(1:3,7:9,16:18,22:24),
-  num_sim = 1000,
+  num_sim = 600,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm"),
@@ -21,7 +21,7 @@ cfg <- list(
                      "data.table", "latex2exp", "tidyr"),
   parallel = "none",
   stop_at_error = FALSE,
-  appx = list(t_e=1, w1=0.1, w1b=0.1, a=0.01) # !!!!! a=0.001
+  appx = list(t_e=1, w1=0.1, w1b=0.1, a=0.001) # !!!!! a=0.001
 )
 
 # Set cluster config
@@ -84,6 +84,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     level_bank <- list(
       n = 5000,
       alpha_3 = c(0,-2,-4),
+      rev = FALSE,
       sc_params = list("sc_params"=list(lmbd=9e-7, v=1.5, lmbd2=1e-5, v2=1.5)),
       distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
       edge = c("none", "expit", "complex"),
@@ -126,6 +127,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   level_set_temp <- list(
     n = 2000,
     alpha_3 = -2,
+    rev = FALSE,
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
     distr_A = "Unif(0,1)",
     edge = "none",
@@ -167,6 +169,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   level_set_estimation_1 <- list(
     n = 5000,
     alpha_3 = -2,
+    rev = FALSE,
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
     distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
     edge = "none",
@@ -209,6 +212,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   level_set_estimation_2 <- list(
     n = 14000,
     alpha_3 = -4,
+    rev = FALSE,
     sc_params = list("sc_params"=list(lmbd=3e-5, v=1.5, lmbd2=3e-5, v2=1.5)),
     distr_A = "N(0.5,0.01)",
     edge = "none",
@@ -234,28 +238,33 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Testing: compare all methods
   level_set_testing_1 <- list(
-    n = 2000,
+    n = 1000,
     # n = c(1000,2000),
     alpha_3 = 0,
     # alpha_3 = c(0,-0.25,-0.5),
+    rev = FALSE,
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
     distr_A = "Unif(0,1)",
     edge = "none",
     surv_true = "Cox PH",
     sampling = "two-phase (72%)",
     test = list(
-      "Slope (true nuisances)" = list(
-        type = "test_2",
-        params = list(var="asymptotic", ecdf_type="true",
-                      g_n_type="true", S_n_type="true", cf_folds=1,
-                      est_known_nuis=FALSE)
-      )
-      # "Slope (est nuisances)" = list(
+      # "Slope (two-tailed)" = list(
       #   type = "test_2",
-      #   params = list(var="asymptotic", ecdf_type="linear (mid)",
+      #   alt_type = "two-tailed",
+      #   test_stat_only = FALSE,
+      #   params = list(var="asymptotic", ecdf_type="step", # "step" "linear (mid)"
       #                 g_n_type="binning", S_n_type="Cox PH", cf_folds=1,
       #                 est_known_nuis=FALSE)
-      # )
+      # ),
+      "Slope (decr)" = list(
+        type = "test_2",
+        alt_type = "decr",
+        test_stat_only = FALSE,
+        params = list(var="asymptotic", ecdf_type="step", # "step" "linear (mid)"
+                      g_n_type="binning", S_n_type="Cox PH", cf_folds=1,
+                      est_known_nuis=FALSE)
+      )
     )
   )
   
@@ -555,6 +564,47 @@ if (FALSE) {
     labs(title="Testing", color="Sample size")
     # labs(title = paste0("alpha_3: ",alpha_3_,"; Sampling: ",sampling_),
     #      color = "Test")
+  
+  # Diagnostics
+  if (F) {
+    
+    # Filter (if necessary)
+    res <- filter(sim$results, level_id==1)
+    
+    # Extract vectors
+    mean(res$reject)
+    beta_n <- res$beta_n
+    p_vals <- res$p_val
+    sd_n <- res$sd_n
+    Gamma_n_5 <- res$Gamma_n_5
+    Gamma_var_n <- res$Gamma_var_n
+    
+    # Histograms
+    ggplot(data.frame(x=beta_n), aes(x=x)) +
+      geom_histogram(bins=50) +
+      labs(title="beta_n")
+    ggplot(data.frame(x=p_vals), aes(x=x)) +
+      geom_histogram(bins=50) +
+      labs(title="p_vals")
+    ggplot(data.frame(x=sd_n), aes(x=x)) +
+      geom_histogram(bins=50, alpha=0.7) +
+      geom_vline(xintercept=sd(beta_n), color="forestgreen", linetype="dashed") +
+      labs(title="sd(beta_n)")
+    ggplot(data.frame(x=sqrt(Gamma_var_n)), aes(x=x)) +
+      geom_histogram(bins=50, alpha=0.7) +
+      geom_vline(xintercept=sd(Gamma_n_5), color="forestgreen", linetype="dashed") +
+      labs(title="sd(Gamma_n(0.5))")
+    
+    # IF of Gamma_os_n depends on:   omega_n, g_n, gcomp_n, eta_n, Gamma_os_n
+    # Gamma_os_n depends on:         omega_n, S_n, g_n
+    
+    # Comparisons of SDs
+    print(paste0("Actual SD(beta_n): ", sd(beta_n))) # 0.000123 (n=1,000)
+    print(paste0("Estimated SD(beta_n): ", mean(sd_n))) # 0.000135 -- 0.000145 (n=1,000)
+    print(paste0("Actual SD(Gamma_n): ", sd(Gamma_n_5))) # 0.0158 (n=1,000)
+    print(paste0("Estimated SD(Gamma_n): ", mean(sqrt(Gamma_var_n)))) # 0.0160 -- x=0.0170 (n=1,000)
+    
+  }
   
 }
 

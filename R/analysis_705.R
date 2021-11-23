@@ -123,13 +123,12 @@ if (cfg2$run_dqa) {
 
 
 
-#########################.
-##### Data analysis #####
-#########################.
+##############################.
+##### Data analysis prep #####
+##############################.
 
 {
-  # !!!!! Eventually, replace this with a call to est_curve()
-
+  
   # Set up end time of interest `t_e`
   C <- list(appx=cfg$appx, t_e=550)
 
@@ -163,163 +162,100 @@ if (cfg2$run_dqa) {
     # dat_orig$a <- round(dat_orig$a, -log10(C$appx$a))
   }
 
-  # Create truncated data object
-  dat <- ss(dat_orig, which(dat_orig$delta==1))
-
-  # Create val_list
-  vlist <- create_val_list(dat, C$appx)
-  vlist$AW_grid <- NA
-  vlist$omega <- NA
-  vlist$W_grid <- NA
-
   # Set estimation tuning parameters
   params <- list(S_n_type=cfg2$S_n_type, g_n_type="binning",
                  ecdf_type="linear (mid)", deriv_type="m-spline",
                  gamma_type="kernel", ci_type="trunc")
-
-  # Calculate control group survival
-  srv <- survfit(
-    Surv(Ttilde.D210,Delta.D210)~1,
-    data = df_ctrl
-  )
-  rate_ctrl <- 1 - srv$surv[which.min(abs(srv$time-C$t_e))]
-
-  # # !!!!! Overall VE
-  # srv_ct <- survfit(
-  #   Surv(Ttilde.D210,Delta.D210)~1,
-  #   data = df_ctrl
-  # )
-  # rate_ct <- 1 - srv_ct$surv[which.min(abs(srv_ct$time-C$t_e))]
-  # srv_tx <- survfit(
-  #   Surv(Ttilde.D210,Delta.D210)~1,
-  #   data = df_trt
-  # )
-  # rate_tx <- 1 - srv_tx$surv[which.min(abs(srv_tx$time-C$t_e))]
-  # 1 - (rate_tx/rate_ct)
-  # 
-  # # !!!!! VE within subcohort
-  # df_trt_sub <- filter(df_trt, Ph2ptids.D210==1)
-  # srv_tx_sub <- survfit(coxph(
-  #   Surv(Ttilde.D210,Delta.D210)~1,
-  #   data = df_trt_sub,
-  #   weights = wt.D210
-  # ))
-  # rate_tx_sub <- 1 - srv_tx_sub$surv[which.min(abs(srv_ct$time-C$t_e))]
-  # 1 - (rate_tx_sub/rate_ct)
   
 }
 
-# Construct/save component functions (SECTION 1)
-fns <- c("Phi_n","Phi_n_inv","S_n","Sc_n","f_aIw_n","f_a_n","g_n","omega_n")
-if (cfg2$run_recomp_1) {
-  print(paste("Check 1:",Sys.time()))
-  Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
-  Phi_n_inv <- construct_Phi_n(dat, which="inverse", type=params$ecdf_type)
-  print(paste("Check 2:",Sys.time()))
-  S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
-  Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
-  print(paste("Check 3:",Sys.time()))
-  f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=params$g_n_type, k=15) # !!!!! Also do k=0 for cross-validated selection of k
-  f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
-  g_n <- construct_g_n(f_aIw_n, f_a_n)
-  print(paste("Check 4:",Sys.time()))
-  omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
-  print(paste("Check 5:",Sys.time()))
-  if (cfg2$save_fns) { save_or_load(fns, cfg2$folder, "save") }
-} else {
-  save_or_load(fns, cfg2$folder, "load")
+
+#########################.
+##### Data analysis #####
+#########################.
+
+# Create truncated data object
+dat <- ss(dat_orig, which(dat_orig$delta==1))
+
+# Create val_list
+vlist <- create_val_list(dat, C$appx)
+vlist$AW_grid <- NA
+vlist$omega <- NA
+vlist$W_grid <- NA
+
+# Obtain estimates
+p_grid <- seq(0,1,0.01)
+ests <- est_curve(
+  dat_orig = dat_orig,
+  estimator = "Grenander",
+  params = params,
+  points = p_grid,
+  dir = "decr",
+  return_gcomp = TRUE
+)
+
+# !!!!! continue
+asdf
+
+# Calculate control group survival
+srv_ct <- survfit(
+  Surv(Ttilde.D210,Delta.D210)~1,
+  data = df_ctrl
+)
+rate_ct <- 1 - srv_ct$surv[which.min(abs(srv_ct$time-C$t_e))]
+
+# Calculate VE
+calc_ve <- FALSE
+if (calc_ve) {
+  
+  # VE, overall
+  srv_tx <- survfit(
+    Surv(Ttilde.D210,Delta.D210)~1,
+    data = df_trt
+  )
+  rate_tx <- 1 - srv_tx$surv[which.min(abs(srv_tx$time-C$t_e))]
+  ve_overall <- 1 - (rate_tx/rate_ct)
+  print(ve_overall)
+  
+  # VE, within subcohort
+  df_trt_sub <- filter(df_trt, Ph2ptids.D210==1)
+  srv_tx_sub <- survfit(coxph(
+    Surv(Ttilde.D210,Delta.D210)~1,
+    data = df_trt_sub,
+    weights = wt.D210
+  ))
+  rate_tx_sub <- 1 - srv_tx_sub$surv[which.min(abs(srv_ct$time-C$t_e))]
+  ve_subcohort <- 1 - (rate_tx_sub/rate_ct)
+  print(ve_subcohort)
+  
 }
 
-# Construct/save component functions (SECTION 2)
-fns <- c("Gamma_os_n")
-if (cfg2$run_recomp_2) {
-  print(paste("Check 6:",Sys.time()))
-  Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n) # type="plug-in"
-  print(paste("Check 7:",Sys.time()))
-  if (cfg2$save_fns) { save_or_load(fns, cfg2$folder, "save") }
-} else {
-  save_or_load(fns, cfg2$folder, "load")
-}
 
-# Construct/save component functions (SECTION 3)
-fns <- c("Psi_n","gcm","dGCM","theta_n_Gr","theta_n")
-if (cfg2$run_recomp_3) {
-  print(paste("Check 8:",Sys.time()))
-  Psi_n <- Vectorize(function(x) {
-    Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a))) # Gamma_os_n(Phi_n_inv(x))
-  })
-  gcm <- gcmlcm(x=seq(0,1,C$appx$a), y=Psi_n(seq(0,1,C$appx$a)), type="lcm")
-  dGCM <- Vectorize(function(x) {
-    index <- which(round(x,5)<=gcm$x.knots)[1]-1
-    if (index==0) { index <- 1 }
-    return(gcm$slope.knots[index])
-  })
-  theta_n_Gr <- Vectorize(function(x) { min(dGCM(Phi_n(x)),1) })
-  theta_n <- theta_n_Gr
-  print(paste("Check 9:",Sys.time()))
-  if (cfg2$save_fns) { save_or_load(fns, cfg2$folder, "save") }
-} else {
-  save_or_load(fns, cfg2$folder, "load")
-}
 
-# Construct/save component functions (SECTION 4)
-fns <- c("f_aIw_delta1_n","f_a_delta1_n","gamma_n","deriv_theta_n","tau_n")
-if (cfg2$run_recomp_4) {
-  print(paste("Check 10:",Sys.time()))
-  f_aIw_delta1_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=params$g_n_type,
-                                      k=15, delta1=TRUE) # !!!!! Also do k=0 for cross-validated selection of k
-  f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid,
-                                  f_aIw_delta1_n)
-  gamma_n <- construct_gamma_n(dat_orig, dat, vlist$A_grid,
-                               type=params$gamma_type, omega_n, f_aIw_n,
-                               f_a_n, f_a_delta1_n)
-  deriv_theta_n <- construct_deriv_theta_n(theta_n, type=params$deriv_type,
-                                           dir="decr")
-  tau_n <- construct_tau_n(deriv_theta_n, gamma_n, f_a_n)
-  print(paste("Check 11:",Sys.time()))
-  if (cfg2$save_fns) { save_or_load(fns, cfg2$folder, "save") }
-} else {
-  save_or_load(fns, cfg2$folder, "load")
-}
-
-# Construct/save component functions (SECTION 5)
-fns <- c("gcomp")
-if (cfg2$run_recomp_5) {
-  print(paste("Check 12:",Sys.time()))
-  S_n2 <- construct_S_n(dat, vlist$S_n, type="Cox PH")
-  gcomp <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n=S_n2)
-  print(paste("Check 13:",Sys.time()))
-  if (cfg2$save_fns) { save_or_load(fns, cfg2$folder, "save") }
-} else {
-  save_or_load(fns, cfg2$folder, "load")
-}
-
-# # !!!!! New section
-# pi_n <- construct_pi_n(dat, vlist$W_grid, type="logistic")
-# theta_os_n_est <- theta_os_n(dat, pi_n, S_n, omega_n)
-# sigma2_os_n_est <- sigma2_os_n(dat, pi_n, S_n, omega_n, theta_os_n_est)
-# n_orig <- length(dat_orig$delta) # !!!!! redundant with below
-# ci_lo2 <- theta_os_n_est - 1.96*sqrt(sigma2_os_n_est/n_orig)
-# ci_hi2 <- theta_os_n_est + 1.96*sqrt(sigma2_os_n_est/n_orig)
-# cve <- Vectorize(function(x) { 1 - x/rate_ctrl }) # !!!!! redundant with below
-# print("!!!!! New estimate !!!!!")
-# print(paste0("Point estimate: ", round(cve(theta_os_n_est),3)))
-# print(paste0("CI lo: ", round(cve(ci_lo2),3)))
-# print(paste0("CI hi: ", round(cve(ci_hi2),3)))
+##################.
+##### Graphs #####
+##################.
 
 if (cfg2$run_graphs) {
 
   # CVE graph
   {
-
-    # Generate point estimates
-    grid <- seq(0,1,0.01)
-    cve <- Vectorize(function(x) { 1 - x/rate_ctrl })
-    ests_gcomp <- gcomp(grid)
-    ests_gren <- theta_n(grid)
-
+    
+    # Extract results
+    ests_gren <- rep(NA, length(p_grid))
+    ci_lo <- rep(NA, length(p_grid))
+    ci_hi <- rep(NA, length(p_grid))
+    for (i in c(1:length(p_grid))) {
+      ests_gren[i] <- ests[[i]]$est
+      ci_lo[i] <- ests[[i]]$ci_lo
+      ci_hi[i] <- ests[[i]]$ci_hi
+    }
+    ests_gcomp <- ests[["gcomp"]](p_grid)
+    
+    cve <- Vectorize(function(x) { 1 - x/rate_ct })
+    
     # Generate CIs
-    tau_ns <- tau_n(grid)
+    tau_ns <- tau_n(p_grid)
     qnt <- 1.00
     n_orig <- length(dat_orig$delta)
     if (params$ci_type=="regular") {
@@ -328,11 +264,11 @@ if (cfg2$run_graphs) {
     } else if (params$ci_type=="logit") {
       ci_lo <- expit(
         logit(cve(ests_gren)) -
-          qnt * (tau_ns*deriv_logit(cve(ests_gren)))/(rate_ctrl*n_orig^(1/3))
+          qnt * (tau_ns*deriv_logit(cve(ests_gren)))/(rate_ct*n_orig^(1/3))
       )
       ci_hi <- expit(
         logit(cve(ests_gren)) +
-          qnt * (tau_ns*deriv_logit(cve(ests_gren)))/(rate_ctrl*n_orig^(1/3))
+          qnt * (tau_ns*deriv_logit(cve(ests_gren)))/(rate_ct*n_orig^(1/3))
       )
     } else if (params$ci_type=="trunc") {
       ci_lo <- cve(ests_gren - qnt * (tau_ns/(n_orig^(1/3)))) %>%
@@ -347,17 +283,17 @@ if (cfg2$run_graphs) {
 
     # Marginal distribution of A
     df_marg <- data.frame(
-      x = grid*a_scale-a_shift,
+      x = p_grid*a_scale-a_shift,
       ymin = 0,
-      ymax = (1.6/max(f_a_n(grid))) * f_a_n(grid)
+      ymax = (1.6/max(f_a_n(p_grid))) * f_a_n(p_grid)
     )
     
     # Truncate at 5/95 or 10/90 quantiles
-    # which <- grid>=Phi_n_inv(0.05) & grid<=Phi_n_inv(0.95)
+    # which <- p_grid>=Phi_n_inv(0.05) & p_grid<=Phi_n_inv(0.95)
     if (cfg2$marker_num==3) {
-      which <- grid<=Phi_n_inv(0.9)
+      which <- p_grid<=Phi_n_inv(0.9)
     } else {
-      which <- grid>=Phi_n_inv(0.1) & grid<=Phi_n_inv(0.9)
+      which <- p_grid>=Phi_n_inv(0.1) & p_grid<=Phi_n_inv(0.9)
     }
     ests_gren <- ifelse(which,ests_gren,NA)
     ci_lo <- ifelse(which,ci_lo,NA)
@@ -385,9 +321,9 @@ if (cfg2$run_graphs) {
     # Plots
     plot_1 <- ggplot(
       data.frame(
-        x = rep(grid*a_scale-a_shift,2),
+        x = rep(p_grid*a_scale-a_shift,2),
         y = c(ests_gcomp,ests_gren),
-        which = rep(c("G-comp", "Grenander"), each=length(grid)),
+        which = rep(c("G-comp", "Grenander"), each=length(p_grid)),
         ci_lo = c(ests_gcomp,ci_lo),
         ci_hi = c(ests_gcomp,ci_hi)
       ),
@@ -415,7 +351,7 @@ if (cfg2$run_graphs) {
     
     plot_2 <- ggplot(
       data.frame(
-        x = grid*a_scale-a_shift,
+        x = p_grid*a_scale-a_shift,
         y = ests_gren,
         ci_lo = ci_lo,
         ci_hi = ci_hi
@@ -480,16 +416,15 @@ if (cfg2$run_graphs) {
   if (F) {
 
     # Export: 6" x 5"
-    grid <- seq(0,1,0.01)
     df_marg <- data.frame(
-      x = grid*a_scale-a_shift,
+      x = p_grid*a_scale-a_shift,
       ymin = 0,
-      ymax = f_a_n(grid)*0.001
+      ymax = f_a_n(p_grid)*0.001
     )
     ggplot(
       data.frame(
-        x = grid*a_scale-a_shift,
-        y = Gamma_os_n(grid)
+        x = p_grid*a_scale-a_shift,
+        y = Gamma_os_n(p_grid)
       ),
       aes(x=x, y=y)
     ) +
@@ -506,19 +441,18 @@ if (cfg2$run_graphs) {
   # Export: 6" x 5"
   if (F) {
 
-    grid <- seq(0,1,0.01)
     df_marg <- data.frame(
-      x = grid*a_scale-a_shift,
+      x = p_grid*a_scale-a_shift,
       ymin = 0,
-      ymax = f_a_n(grid)*0.01
+      ymax = f_a_n(p_grid)*0.01
     )
-    ests_gcomp <- gcomp(grid)
-    ests_gren <- theta_n(grid)
+    ests_gcomp <- gcomp(p_grid)
+    ests_gren <- theta_n(p_grid)
     ggplot(
       data.frame(
-        x = rep(grid*a_scale-a_shift,2),
+        x = rep(p_grid*a_scale-a_shift,2),
         y = c(ests_gcomp,ests_gren),
-        which = rep(c("G-comp", "Grenander"), each=length(grid))
+        which = rep(c("G-comp", "Grenander"), each=length(p_grid))
       ),
       aes(x=x, y=y, color=which)
     ) +

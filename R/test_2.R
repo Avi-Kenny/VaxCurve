@@ -10,10 +10,11 @@
 #'     c("parametric", "binning")
 #'   - `var` Variance estimation; one of c("boot","mixed boot")
 #'   - `boot_reps` Number of bootstrap replicates to run
-#' @param return_sd Boolean; if TRUE, return the standard deviation estimate
-#'     instead of the test result
+#' @param test_stat_only Boolean; if TRUE, only calculate the test statistic and
+#'     do not estimate its variance
 #' @return Binary; is null rejected (1) or not (0)
-test_2 <- function(dat_orig, alt_type="two-tailed", params, return_sd=FALSE) {
+test_2 <- function(dat_orig, alt_type="two-tailed", params,
+                   test_stat_only=FALSE) {
   
   if (params$var=="asymptotic") {
     
@@ -29,8 +30,6 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params, return_sd=FALSE) {
     Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
     lambda_2 <- lambda(dat,2,Phi_n)
     lambda_3 <- lambda(dat,3,Phi_n)
-    
-    # Construct component functions
     f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=params$g_n_type, k=15)
     f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
     g_n <- construct_g_n(f_aIw_n, f_a_n)
@@ -57,40 +56,61 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params, return_sd=FALSE) {
         (Gamma_os_n(dat$a))
     )
     
-    # Use known values of nuisances to estimate variance more accurately
-    if (params$est_known_nuis==FALSE) {
-      lambda_2 <- 1/3
-      lambda_3 <- 1/4
-      rho_n <- function(x) { 0 }
-    }
-    
-    # Construct additional component functions
-    gcomp_n <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n)
-    eta_n <- construct_eta_n(dat, vlist$AW_grid, S_n)
-    xi_n <- construct_xi_n(Phi_n, lambda_2, lambda_3)
-    # rho_n <- construct_rho_n(dat, Phi_n)
-    infl_fn_1 <- construct_infl_fn_1(dat, Gamma_os_n, Phi_n, xi_n, rho_n,
-                                     lambda_2, lambda_3)
-    infl_fn_Gamma <- construct_infl_fn_Gamma(omega_n, g_n, gcomp_n,
-                                             eta_n, Gamma_os_n)
-    infl_fn_2 <- construct_infl_fn_2(dat, Phi_n, infl_fn_Gamma,
-                                     lambda_2, lambda_3)
-    
-    # Estimate variance
-    var_n <- beta_n_var_hat(dat, infl_fn_1, infl_fn_2) / n_orig
-    sd_n <- sqrt(var_n)
-    
-    if (return_sd) { return(sd_n) }
-    
-    # Calculate P-value (for a one-sided test)
-    alt_type <- "decr" # !!!!!
-    if (alt_type=="incr") {
-      p_val <- pnorm(beta_n, mean=0, sd=sd_n, lower.tail=FALSE)
-    } else if (alt_type=="decr") {
-      p_val <- pnorm(beta_n, mean=0, sd=sd_n)
-    } else if (alt_type=="two-tailed") {
-      test_stat_chisq <- beta_n^2/var_n
-      p_val <- pchisq(test_stat_chisq, df=1, lower.tail=FALSE)
+    if (test_stat_only) {
+      
+      p_val <- NA
+      sd_n <- NA
+      
+    } else {
+      
+      # Use known values of nuisances to estimate variance more accurately
+      # Note that we intentionally DO NOT use the exact values to construct beta_n
+      if (params$est_known_nuis==FALSE) {
+        lambda_2 <- 1/3
+        lambda_3 <- 1/4
+        rho_n <- function(x) { 0 }
+      } else {
+        rho_n <- construct_rho_n(dat, Phi_n)
+      }
+      
+      # Construct additional component functions
+      gcomp_n <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n)
+      eta_n <- construct_eta_n(dat, vlist$AW_grid, S_n)
+      xi_n <- construct_xi_n(Phi_n, lambda_2, lambda_3)
+      infl_fn_1 <- construct_infl_fn_1(dat, Gamma_os_n, Phi_n, xi_n, rho_n,
+                                       lambda_2, lambda_3)
+      infl_fn_Gamma <- construct_infl_fn_Gamma(omega_n, g_n, gcomp_n,
+                                               eta_n, Gamma_os_n)
+      infl_fn_2 <- construct_infl_fn_2(dat, Phi_n, infl_fn_Gamma,
+                                       lambda_2, lambda_3)
+      
+      # !!!!! Debugging
+      if (T) {
+        
+        Gamma_n_5 <- Gamma_os_n(0.5)
+        
+        # Estimate variance and SD
+        Gamma_var_n <- mean((
+          infl_fn_Gamma(rep(0.5,length(dat$a)),
+                        dat$w,dat$y_star,dat$delta_star,dat$a)
+        )^2) / length(dat$a)
+        
+      }
+      
+      # Estimate variance
+      var_n <- beta_n_var_hat(dat, infl_fn_1, infl_fn_2) / n_orig
+      sd_n <- sqrt(var_n)
+      
+      # Calculate P-value
+      if (alt_type=="incr") {
+        p_val <- pnorm(beta_n, mean=0, sd=sd_n, lower.tail=FALSE)
+      } else if (alt_type=="decr") {
+        p_val <- pnorm(beta_n, mean=0, sd=sd_n)
+      } else if (alt_type=="two-tailed") {
+        test_stat_chisq <- beta_n^2/var_n
+        p_val <- pchisq(test_stat_chisq, df=1, lower.tail=FALSE)
+      }
+      
     }
     
   }
@@ -251,7 +271,11 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params, return_sd=FALSE) {
   
   return(list(
     reject = as.integer(p_val<0.05),
-    p_val = p_val
+    p_val = p_val,
+    beta_n = beta_n,
+    sd_n = sd_n,
+    Gamma_n_5 = Gamma_n_5, # !!!!!
+    Gamma_var_n = Gamma_var_n # !!!!!
   ))
   
 }

@@ -24,14 +24,16 @@
 #'     points
 #' @param points A vector representing the points to estimate
 #' @param dir Direction of monotonicity; one of c("incr", "decr")
+#' @param return_gcomp If true, returns a Cox model based gcomp estimator
 #' @return A list of lists of the form:
 #'     list(list(point=1, est=1, se=1), list(...), ...)
-est_curve <- function(dat_orig, estimator, params, points, dir="decr") {
+est_curve <- function(dat_orig, estimator, params, points, dir="decr",
+                      return_gcomp=F) {
   
   if (estimator=="Grenander") {
     
     if (params$edge_corr=="spread") {
-      noise <- runif(length(dat_orig$a))*0.05 # !!!!! dat_orig$noise
+      noise <- runif(length(dat_orig$a))*0.05
       dat_orig$a <- ifelse(dat_orig$a==0, noise, dat_orig$a)
     }
     
@@ -216,19 +218,10 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr") {
       }
       
     }
-
-    # Parse and return results
-    res <- list()
-    for (p in 1:length(points)) {
-      res[[p]] <- list(point=points[p], est=ests[p],
-                       ci_lo=ci_lo[p], ci_hi=ci_hi[p])
-    }
     
     # # Add extra return data
     # res[["Phi_n"]] <- Phi_n
     # res[["Gamma_os_n"]] <- Gamma_os_n
-    
-    return(res)
     
   }
   
@@ -284,15 +277,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr") {
     ci_hi <- ests + 1.96*sqrt(sigma2s/n_orig)
     # !!!!! Deal with CI truncation
     
-    # Parse and return results
-    res <- list()
-    for (p in 1:length(points)) {
-      res[[p]] <- list(point=points[p], est=ests[p],
-                       ci_lo=ci_lo[p], ci_hi=ci_hi[p])
-    }
-    
-    return(res)
-    
   }
   
   if (estimator=="gcomp") {
@@ -313,21 +297,26 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr") {
     ci_lo <- rep(0, length(ests))
     ci_hi <- rep(0, length(ests))
     
-    # Parse and return results
-    res <- list()
-    for (p in 1:length(points)) {
-      res[[p]] <- list(point=points[p], est=ests[p],
-                       ci_lo=ci_lo[p], ci_hi=ci_hi[p])
-    }
-    
     # Add extra return data
     # res[["ex_S_n"]] <- S_n(C$t_e, w=c(0.5,1), a=0.5)
     # res[["ex_gamma_n"]] <- 0
     # res[["ex_deriv_theta_n"]] <- 0
     # res[["ex_tau_n"]] <- 0
     
-    return(res)
-    
   }
-
+  
+  # Parse and return results
+  res <- list()
+  for (p in 1:length(points)) {
+    res[[p]] <- list(point=points[p], est=ests[p],
+                     ci_lo=ci_lo[p], ci_hi=ci_hi[p])
+  }
+  
+  if (return_gcomp) {
+    S_n2 <- construct_S_n(dat, vlist$S_n, type="Cox PH")
+    res[["gcomp"]] <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n=S_n2)
+  }
+  
+  return(res)
+  
 }

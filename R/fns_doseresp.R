@@ -283,11 +283,11 @@ ss <- function(dat_orig, indices) {
 #' 
 #' @param dat Subsample of dataset returned by ss() for which delta==1
 #' @param which One of c("ecdf", "inverse")
-#' @param type Defaults to "estimated". Override with "true" for debugging.
+#' @param type One of c("true", "step", "linear (top)", "linear (mid)")
 #' @return CDF or inverse CDF estimator function
 #' @notes
 #'   - Adaptation of stats::ecdf() source code
-construct_Phi_n <- function (dat, which="ecdf", type="estimated") {
+construct_Phi_n <- function (dat, which="ecdf", type="step") {
   
   if (type!="true") {
     
@@ -544,11 +544,19 @@ construct_S_n <- function(dat, vals, type, csf=F, return_model=F) {
     } else {
       fnc <- function(t, w, a) {
         if (L$surv_true=="Cox PH") {
-          lin <- C$alpha_1*w[1] + C$alpha_2*w[2] + alpha_3*a - 1.7
-          # lin <- C$alpha_1*w[1] + C$alpha_2*w[2] + alpha_3*(1-a) - 1.7
+          if (dir="decr") {
+            lin <- C$alpha_1*w[1] + C$alpha_2*w[2] + alpha_3*a - 1.7
+          } else {
+            lin <- C$alpha_1*w[1] + C$alpha_2*w[2] + alpha_3*(1-a) - 1.7
+          }
         } else if (L$surv_true=="complex") {
-          lin <- C$alpha_1*pmax(0,2-8*abs(w[1]-0.5)) + 2.5*alpha_3*w[2]*a +
-            0.7*alpha_3*(1-w[2])*a - 1.3
+          if (dir="decr") {
+            lin <- C$alpha_1*pmax(0,2-8*abs(w[1]-0.5)) +
+              2.5*alpha_3*w[2]*a + 0.7*alpha_3*(1-w[2])*a - 1.3
+          } else {
+            lin <- C$alpha_1*pmax(0,2-8*abs(w[1]-0.5)) +
+              2.5*alpha_3*w[2]*(1-a) + 0.7*alpha_3*(1-w[2])*(1-a) - 1.3
+          }
         }
         return(exp(-1*lmbd*(t^v)*exp(lin)))
       }
@@ -875,7 +883,11 @@ construct_omega_n <- function(vals=NA, S_n, Sc_n, type="estimated") {
       alpha_3 <- L$alpha_3
       
       # Construct linear predictors
-      lin <- C$alpha_1*w[1] + C$alpha_2*w[2] + alpha_3*a - 1.7
+      if (dir="decr") {
+        lin <- C$alpha_1*w[1] + C$alpha_2*w[2] + alpha_3*a - 1.7
+      } else {
+        lin <- C$alpha_1*w[1] + C$alpha_2*w[2] + alpha_3*(1-a) - 1.7
+      }
       lin2 <- C$alpha_1*w[1] + C$alpha_2*w[2] - 1
       
       # Compute omega_0
@@ -1331,11 +1343,11 @@ construct_Gamma_os_n <- function(dat, vals=NA, omega_n, S_n, g_n,
     
     fnc <- function(a) {
       
-      subpiece_1b <- as.integer(round(a_i_short,-log10(C$appx$a))<= # >=
+      subpiece_1b <- as.integer(round(a_i_short,-log10(C$appx$a))<=
                                   round(a,-log10(C$appx$a)))
       piece_1 <- (1/n_orig) * sum(subpiece_1a*subpiece_1b)
       
-      subpiece_2b <- as.integer(round(a_i_long,-log10(C$appx$a))<= # >=
+      subpiece_2b <- as.integer(round(a_i_long,-log10(C$appx$a))<=
                                   round(a,-log10(C$appx$a)))
       piece_2 <- (1/(n_orig^2)) * sum(subpiece_2a*subpiece_2b)
       

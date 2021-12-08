@@ -1,4 +1,63 @@
 
+# Testing infl_fn_1
+if (F) {
+  
+  L <- list(n=1000, alpha_3=-2, dir="decr",
+            sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5),
+            distr_A="Unif(0,1)", edge="none", surv_true="Cox PH", # Unif(0,1) N(0.5,0.04)
+            ecdf_type="true", sampling="iid", # two-phase (72%)
+            estimator=list(est="Grenander",params=params)
+  )
+  
+  n_reps <- 50
+  ests <- rep(NA,n_reps)
+  vars <- rep(NA,n_reps)
+  for (i in c(1:n_reps)) {
+    
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+                              L$sc_params, L$sampling, L$dir)
+    n_orig <- length(dat_orig$delta)
+    dat <- ss(dat_orig, which(dat_orig$delta==1))
+    weights <- dat$weights
+    vlist <- create_val_list(dat, C$appx)
+    
+    Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
+    lambda_2 <- lambda(dat,2,Phi_n)
+    lambda_3 <- lambda(dat,3,Phi_n)
+    xi_n <- construct_xi_n(Phi_n, lambda_2, lambda_3)
+    rho_n <- function(x) { 0 }
+    
+    # Partial stat
+    Gamma_0 <- Vectorize(function(a) {
+      Theta_true <- attr(dat_orig,"Theta_true")
+      grid <- seq(0,1,0.02)
+      index <- which.min(abs(a-seq(0,1,0.02)))
+      return(Theta_true[index])
+    })
+    partial_est <- (1/n_orig) * sum( weights * (
+      (lambda_2*(Phi_n(dat$a))^2 - lambda_3*Phi_n(dat$a)) * Gamma_0(dat$a)
+    ))
+    
+    # Variance estimate of partial stat
+    infl_fn_1b <- construct_infl_fn_1(dat, Gamma_0, Phi_n, xi_n, rho_n,
+                                      lambda_2, lambda_3)
+    partial_var <- (1/n_orig^2) * sum((weights * (infl_fn_1b(dat$a)))^2)
+    
+    ests[i] <- partial_est
+    vars[i] <- partial_var
+    
+    print(paste0("Rep ", i, " of ", n_reps))
+    
+  }
+  
+  # Process results
+  print(paste0("sd(ests), iid:", sd(ests)))
+  print(paste0("mean(sqrt(vars)), iid:", mean(sqrt(vars))))
+  ggplot(data.frame(x=ests), aes(x=x)) + geom_histogram() + labs(title="ests")
+  ggplot(data.frame(x=vars), aes(x=x)) + geom_histogram() + labs(title="var")
+  
+}
+
 # Figure out why returned functions are so large
 if (F) {
   

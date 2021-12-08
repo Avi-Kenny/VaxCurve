@@ -24,11 +24,11 @@
 #'     points
 #' @param points A vector representing the points to estimate
 #' @param dir Direction of monotonicity; one of c("incr", "decr")
-#' @param return_gcomp If true, returns a Cox model based gcomp estimator
+#' @param return_extra A character vector of additional components to return
 #' @return A list of lists of the form:
 #'     list(list(point=1, est=1, se=1), list(...), ...)
 est_curve <- function(dat_orig, estimator, params, points, dir="decr",
-                      return_gcomp=F) {
+                      return_extra=NULL) {
   
   if (estimator=="Grenander") {
     
@@ -43,11 +43,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     # Construct regular Gamma_0 estimator
     if (params$cf_folds==1) {
-      
-      # !!!!!
-      vlist$AW_grid <- NA
-      vlist$omega <- NA
-      vlist$W_grid <- NA
       
       # Construct component functions
       Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
@@ -204,6 +199,9 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
         ci_hi <- expit(
           logit(ests) + (qnt*tau_ns*deriv_logit(ests))/(n_orig^(1/3))
         )
+      } else if (params$ci_type=="trunc") {
+        ci_lo <- ests - (qnt*tau_ns)/(n_orig^(1/3)) %>% pmax(0) %>% pmin(1)
+        ci_hi <- ests + (qnt*tau_ns)/(n_orig^(1/3)) %>% pmax(0) %>% pmin(1)
       }
       
       # Edge correction
@@ -242,9 +240,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     # Create vlist
     vlist <- create_val_list(dat, C$appx, factor_A=unique(transform_a(dat$a)))
-    vlist$AW_grid <- NA # !!!!!
-    vlist$omega <- NA # !!!!!
-    vlist$W_grid <- NA # !!!!!
     
     # Construct f_aIw_n BEFORE transforming A values
     f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid,
@@ -306,16 +301,13 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   }
   
   # Parse and return results
-  res <- list()
-  for (p in 1:length(points)) {
-    res[[p]] <- list(point=points[p], est=ests[p],
-                     ci_lo=ci_lo[p], ci_hi=ci_hi[p])
-  }
-  
-  if (return_gcomp) {
+  res <- list(point=points, est=ests, ci_lo=ci_lo, ci_hi=ci_hi)
+  if ("gcomp" %in% return_extra) {
     S_n2 <- construct_S_n(dat, vlist$S_n, type="Cox PH")
-    res[["gcomp"]] <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n=S_n2)
+    res$gcomp <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n=S_n2)
   }
+  if ("f_a_n" %in% return_extra) { res$f_a_n <- f_a_n }
+  if ("Phi_n_inv" %in% return_extra) { res$Phi_n_inv <- Phi_n_inv }
   
   return(res)
   

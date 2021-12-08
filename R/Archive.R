@@ -1,4 +1,133 @@
 
+# Alternative (incorrect) rho_n and xi_n
+if (F) {
+  
+  rho_n <- Vectorize(function(k,a,a_i) {
+    (1/n_orig) * sum( weights * (
+      (Phi_n(a))^k * ( as.integer(a_i<=a) - Phi_n(a) ) * (Phi_n(a))^(3-k)
+    ))
+  })
+  xi_n <- Vectorize(function(a,a_i) {
+    (Phi_n(a_i)^2-4*lambda_2)*(Phi_n(a))^2 +
+      (3*lambda_3 - (Phi_n(a_i))^3 + 2*lambda_2*as.integer(a_i<=a))*Phi_n(a) -
+      lambda_3*as.integer(a_i<=a)
+  })
+  
+  construct_infl_fn_1b <- function(dat, Gamma_0, Phi_n, xi_n, rho_n,
+                                   lambda_2, lambda_3, vals=NA) {
+    
+    n_orig <- sum(dat$weights)
+    weights_j <- dat$weights
+    a_j <- dat$a
+    
+    fnc <- function(a_i) {
+      
+      rho_n(1,a_j,a_i)
+      rho_n(2,a_j,a_i)
+      
+      piece_1 <- (1/n_orig) * sum(
+        weights_j * 2*rho_n(rep(1,length(a_j)),a_j,rep(a_i,length(a_j))) -
+          3*rho_n(rep(1,length(a_j)),a_j,rep(a_i,length(a_j))) +
+          xi_n(a_j,rep(a_i,length(a_j))) *
+          Gamma_0(a_j) # Gamma_os_n(round(a_j, -log10(C$appx$a)))
+      )
+      
+      piece_2 <- (lambda_2*(Phi_n(a_i)^2) - lambda_3*Phi_n(a_i)) *
+        Gamma_0(a_i) # Gamma_os_n(round(a_j, -log10(C$appx$a)))
+      
+      return(piece_1+piece_2)
+      
+    }
+    
+    return(construct_superfunc(fnc, aux=NA, vec=c(1), vals=vals))
+    
+  }
+  
+}
+
+# Old GAM code inside construct_S_n()
+if (F) {
+  
+  fml <- "Surv(y_star,delta_star)~a"
+  for (i in 1:length(dat$w)) {
+    fml <- paste0(fml, "+w",i)
+  }
+  fml <- formula(fml)
+  df <- cbind("y_star"=dat$y_star, "delta_star"=dat$delta_star, "a"=dat$a,
+              dat$w, "weights"=dat$weights)
+
+  model <- gam(
+    formula = fml,
+    family = cox.ph(),
+    data = df,
+    weights = dat$weights
+  )
+
+  model <- gam(
+    time~s(age,by=sex)+sex+s(nodes)+perfor+rx+obstruct+adhere,
+           family=cox.ph(),data=col1,weights=status)
+
+  model <- rfsrc(fml, data=df, ntree=500, mtry=2, nodesize=100,
+                 splitrule="logrank", nsplit=0, case.wt=df$weights,
+                 samptype="swor")
+  if (return_model) { return(model) }
+
+
+
+  newX <- cbind(vals$w, a=vals$a)[which(vals$t==0),]
+  pred <- predict(model, newdata=newX)
+
+  fnc <- function(t, w, a) {
+    r <- list()
+    for (i in 1:length(w)) {
+      r[[i]] <- which(abs(w[i]-newX[[paste0("w",i)]])<1e-8)
+    }
+    r[[length(w)+1]] <- which(abs(a-newX[["a"]])<1e-8)
+    row <- Reduce(intersect, r)
+    col <- which.min(abs(t-pred$time.interest))
+    if (length(row)!=1) { stop("Error in construct_S_n (B)") }
+    if (length(col)!=1) { stop("Error in construct_S_n (C)") }
+    return(pred$survival[row,col])
+  }
+  
+}
+
+# Old Cox PH code inside construct_S_n()
+if (F) {
+  
+  if (type=="Cox PH") {
+
+    weights_m1 <- dat$weights * (length(dat$weights)/sum(dat$weights))
+
+    # Fit Cox model
+    model <- coxph(fml, data=df, weights=weights_m1)
+    if (return_model) { return(model) }
+    coeffs <- model$coefficients
+
+    # Get cumulative hazard estimate
+    bh <- basehaz(model, centered=FALSE)
+
+    # Pre-calculate H_0 vector
+    H_0 <- c()
+    for (t in 0:C$t_e) {
+      index <- which.min(abs(bh$time-t))
+      H_0[t+1] <- bh$hazard[index]
+    }
+
+    fnc <- function(t, w, a) {
+
+      if (length(w)!=(length(coeffs)-1)) { stop("Error in construct_S_n (A)") }
+      lin <- coeffs[["a"]]*a
+      for (i in 1:length(w)) {
+        lin <- lin + coeffs[[paste0("w",i)]]*w[i]
+      }
+      return(exp(-1*H_0[t+1]*exp(lin)))
+    }
+
+  }
+
+}
+
 # saving functions (analysis_705)
 if (F) {
   
@@ -27,7 +156,7 @@ if (F) {
   fns <- c("Gamma_os_n")
   if (cfg2$run_recomp_2) {
     print(paste("Check 6:",Sys.time()))
-    Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n) # type="plug-in"
+    Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n)
     print(paste("Check 7:",Sys.time()))
     if (cfg2$save_fns) { save_or_load(fns, cfg2$folder, "save") }
   } else {
@@ -39,7 +168,7 @@ if (F) {
   if (cfg2$run_recomp_3) {
     print(paste("Check 8:",Sys.time()))
     Psi_n <- Vectorize(function(x) {
-      Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a))) # Gamma_os_n(Phi_n_inv(x))
+      Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
     })
     gcm <- gcmlcm(x=seq(0,1,C$appx$a), y=Psi_n(seq(0,1,C$appx$a)), type="lcm")
     dGCM <- Vectorize(function(x) {

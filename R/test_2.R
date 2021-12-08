@@ -30,8 +30,8 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
     lambda_2 <- lambda(dat,2,Phi_n)
     lambda_3 <- lambda(dat,3,Phi_n)
-    f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=params$g_n_type, k=15)
-    f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
+    f_aIw_n <- 999 # construct_f_aIw_n(dat, vlist$AW_grid, type=params$g_n_type, k=15)
+    f_a_n <- 999 # construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
     g_n <- construct_g_n(f_aIw_n, f_a_n)
     S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
     Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
@@ -44,7 +44,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     
     # Construct cross-fitted Gamma_0 estimator
     if (params$cf_folds>1) {
-      Gamma_os_n <- construct_Gamma_cf(dat_orig, params, vlist)
+      # Gamma_os_n <- construct_Gamma_cf(dat_orig, params, vlist)
     }
     
     # Compute the test statistic
@@ -53,7 +53,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
         lambda_2*(Phi_n(dat$a))^2 -
           lambda_3*Phi_n(dat$a)
       ) *
-        (Gamma_os_n(dat$a))
+        Gamma_os_n(round(dat$a, -log10(C$appx$a)))
     )
     
     if (test_stat_only) {
@@ -65,10 +65,12 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
       
       # Use known values of nuisances to estimate variance more accurately
       # Note that we intentionally DO NOT use the exact values to construct beta_n
+      lambda_2_ <- lambda_2 # !!!!!
+      lambda_3_ <- lambda_3 # !!!!!
       if (params$est_known_nuis==FALSE) {
         lambda_2 <- 1/3
         lambda_3 <- 1/4
-        rho_n <- function(x) { 0 }
+        rho_n <- Vectorize(function(x) { 0 })
       } else {
         rho_n <- construct_rho_n(dat, Phi_n)
       }
@@ -87,13 +89,31 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
       # !!!!! Debugging
       if (T) {
         
-        Gamma_n_5 <- Gamma_os_n(0.5)
-        
         # Estimate variance and SD
-        Gamma_var_n <- mean((
-          infl_fn_Gamma(rep(0.5,length(dat$a)),
-                        dat$w,dat$y_star,dat$delta_star,dat$a)
-        )^2) / length(dat$a)
+        Gamma_var_n <- sum((
+          weights * infl_fn_Gamma(rep(0.5,length(dat$a)),
+                                  dat$w,dat$y_star,dat$delta_star,dat$a)
+        )^2) / n_orig^2
+        
+        # Calculate plug-in estimate of Gamma_0
+        Gamma_pi_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n,
+                                           type="plug-in")
+        
+        # Partial stat
+        Gamma_0 <- Vectorize(function(a) {
+          Theta_true <- attr(dat_orig,"Theta_true")
+          grid <- seq(0,1,0.02)
+          index <- which.min(abs(a-seq(0,1,0.02)))
+          return(Theta_true[index])
+        })
+        partial_est <- (1/n_orig) * sum( weights * (
+          (lambda_2_*(Phi_n(dat$a))^2 - lambda_3_*Phi_n(dat$a)) * Gamma_0(dat$a)
+        ))
+        
+        # Variance estimate of partial stat
+        infl_fn_1b <- construct_infl_fn_1(dat, Gamma_0, Phi_n, xi_n, rho_n,
+                                         lambda_2, lambda_3)
+        partial_var <- (1/n_orig^2) * sum((weights * (infl_fn_1b(dat$a)))^2)
         
       }
       
@@ -274,8 +294,24 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     p_val = p_val,
     beta_n = beta_n,
     sd_n = sd_n,
-    Gamma_n_5 = Gamma_n_5, # !!!!!
-    Gamma_var_n = Gamma_var_n # !!!!!
+    Gamma_n_5 = Gamma_os_n(0.5), # !!!!!
+    Gamma_var_n = Gamma_var_n, # !!!!!
+    lambda_2 = lambda_2_, # !!!!!
+    lambda_3 = lambda_3_, # !!!!!
+    g_n = g_n(0.5,c(1,1)), # !!!!!
+    S_n = S_n(100,c(1,1),0.5), # !!!!!
+    Sc_n = Sc_n(100,c(1,1),0.5), # !!!!!
+    omega_n1 = omega_n(c(1,1),0.5,80,1), # !!!!!
+    omega_n0 = omega_n(c(1,1),0.5,80,0), # !!!!!
+    gcomp_n = gcomp_n(0.5), # !!!!!
+    eta_n = eta_n(0.5,c(1,1)), # !!!!!
+    xi_n = xi_n(0.5,0.5), # !!!!!
+    infl_fn_1 = infl_fn_1(0.5), # !!!!!
+    infl_fn_Gamma = infl_fn_Gamma(0.5,c(1,1),80,1,0.5), # !!!!!
+    infl_fn_2 = infl_fn_2(c(1,1),80,1,0.5), # !!!!!
+    partial_est = partial_est, # !!!!!
+    partial_var = partial_var, # !!!!!
+    Phi_n_5 = Phi_n(0.5) # !!!!!
   ))
   
 }

@@ -13,9 +13,9 @@
                  deriv_type="m-spline", gamma_type="kernel")
   C <- sim$constants
   C$appx$t_e <- 10
-  L <- list(n=1000, alpha_3=-2, dir="decr", # !!!!! 5000
+  L <- list(n=1000, alpha_3=-2, dir="decr",
             sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5),
-            distr_A="N(0.5,0.04)", edge="none", surv_true="Cox PH", # Unif(0,1) N(0.5,0.04)
+            distr_A="Unif(0,1)", edge="none", surv_true="Cox PH", # Unif(0,1) N(0.5,0.04)
             ecdf_type="true", sampling="two-phase (72%)",
             estimator=list(est="Grenander",params=params)
   )
@@ -222,13 +222,13 @@
       
       lin <- function(w1,w2,a) {
         if (L$surv_true=="Cox PH") {
-          if (dir="decr") {
+          if (L$dir=="decr") {
             C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
           } else {
             C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*(1-a) - 1.7
           }
         } else if (L$surv_true=="complex") {
-          if (dir="decr") {
+          if (L$dir=="decr") {
             C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2.5*alpha_3*w2*a +
               0.7*alpha_3*(1-w2)*a - 1.3
           } else {
@@ -272,7 +272,9 @@
     Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n)
     
     # Construct additional component functions
-    Psi_n <- Vectorize(function(x) { Gamma_os_n(Phi_n_inv(x)) })
+    Psi_n <- Vectorize(function(x) {
+      Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
+    })
     gcm <- gcmlcm(x=seq(0,1,0.0001), y=Psi_n(seq(0,1,0.0001)), type="lcm")
     dGCM <- Vectorize(function(x) {
       if (x==0) {
@@ -292,7 +294,7 @@
                                  f_a_n, f_a_delta1_n)
     theta_n <- theta_n_Gr
     deriv_theta_n <- construct_deriv_theta_n(theta_n, type=params$deriv_type,
-                                             dir="decr")
+                                             L$dir="decr")
     
     # Compute estimates
     deriv_ests <- c(deriv_ests, deriv_theta_n(grid))
@@ -340,7 +342,7 @@
     alpha_3 <- L$alpha_3
     
     # Construct linear predictors
-    if (dir="decr") {
+    if (L$dir=="decr") {
       lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
     } else {
       lin <- C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*(1-a) - 1.7
@@ -632,7 +634,7 @@
         lambda_2*(Phi_n(dat$a))^2 -
           lambda_3*Phi_n(dat$a)
       ) *
-        (Gamma_os_n(dat$a))
+        Gamma_os_n(round(dat$a, -log10(C$appx$a)))
     )
     
     return (beta_n)
@@ -818,15 +820,10 @@
   
   # Return results
   theta_true <- attr(dat_orig, "theta_true")
-  theta_ests <- c()
-  ci_lo <- c()
-  ci_hi <- c()
+  theta_ests <- ests$est
+  ci_lo <- ests$ci_lo
+  ci_hi <- ests$ci_hi
   len <- length(C$points)
-  for (i in 1:len) {
-    theta_ests <- c(theta_ests, ests[[i]]$est)
-    ci_lo <- c(ci_lo, ests[[i]]$ci_lo)
-    ci_hi <- c(ci_hi, ests[[i]]$ci_hi)
-  }
   plot_data <- data.frame(
     x = rep(C$points, 2),
     theta = c(theta_ests, theta_true),

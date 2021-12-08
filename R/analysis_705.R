@@ -1,3 +1,6 @@
+
+# !!!!! Need to update this file based on analysis_janssen.R
+
 #################.
 ##### Setup #####
 #################.
@@ -177,12 +180,6 @@ if (cfg2$run_dqa) {
 # Create truncated data object
 dat <- ss(dat_orig, which(dat_orig$delta==1))
 
-# Create val_list
-vlist <- create_val_list(dat, C$appx)
-vlist$AW_grid <- NA
-vlist$omega <- NA
-vlist$W_grid <- NA
-
 # Obtain estimates
 p_grid <- seq(0,1,0.01)
 ests <- est_curve(
@@ -191,10 +188,10 @@ ests <- est_curve(
   params = params,
   points = p_grid,
   dir = "decr",
-  return_gcomp = TRUE
+  return_extra = c("gcomp")
 )
 
-# !!!!! continue
+# !!!!! continue (see Janssen)
 asdf
 
 # Calculate control group survival
@@ -424,7 +421,7 @@ if (cfg2$run_graphs) {
     ggplot(
       data.frame(
         x = p_grid*a_scale-a_shift,
-        y = Gamma_os_n(p_grid)
+        y = Gamma_os_n(round(p_grid, -log10(C$appx$a)))
       ),
       aes(x=x, y=y)
     ) +
@@ -440,7 +437,7 @@ if (cfg2$run_graphs) {
   # theta graph
   # Export: 6" x 5"
   if (F) {
-
+    
     df_marg <- data.frame(
       x = p_grid*a_scale-a_shift,
       ymin = 0,

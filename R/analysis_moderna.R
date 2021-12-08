@@ -1,4 +1,6 @@
 
+# !!!!! Need to update this file based on analysis_janssen.R
+
 #################.
 ##### Setup #####
 #################.
@@ -178,9 +180,6 @@ if (cfg2$run_dqa) {
   
   # Create val_list
   vlist <- create_val_list(dat, C$appx)
-  vlist$AW_grid <- NA
-  vlist$omega <- NA
-  vlist$W_grid <- NA
   
   # Set estimation tuning parameters
   params <- list(S_n_type="Super Learner", g_n_type="binning",
@@ -227,7 +226,7 @@ if (cfg2$run_recomp_2) {
 fns <- c("Psi_n","gcm","dGCM","theta_n_Gr","theta_n")
 if (cfg2$run_recomp_3) {
   Psi_n <- Vectorize(function(x) {
-    Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a))) # Gamma_os_n(Phi_n_inv(x))
+    Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
   })
   gcm <- gcmlcm(x=seq(0,1,C$appx$a), y=Psi_n(seq(0,1,C$appx$a)), type="lcm")
   dGCM <- Vectorize(function(x) {
@@ -364,7 +363,7 @@ if (cfg2$run_graphs) {
     
     # Gamma_os_n graph
     # Export: 6" x 5"
-    grid <- seq(0,1,0.01)
+    grid <- seq(0,1,C$appx$a)
     df_marg <- data.frame(
       x = grid*a_scale-a_shift,
       ymin = 0,

@@ -30,9 +30,9 @@ if (cfg$which_sim=="estimation") {
     for (i in 1:length(C$points)) {
       m <- format(C$points[i], nsmall=1)
       res_list[paste0("theta_",m)] <- theta_true[i]
-      res_list[paste0("est_",m)] <- ests[[i]]$est
-      res_list[paste0("ci_lo_",m)] <- ests[[i]]$ci_lo
-      res_list[paste0("ci_hi_",m)] <- ests[[i]]$ci_hi
+      res_list[paste0("est_",m)] <- ests$est[i]
+      res_list[paste0("ci_lo_",m)] <- ests$ci_lo[i]
+      res_list[paste0("ci_hi_",m)] <- ests$ci_hi[i]
     }
     
     # # Return extra results
@@ -132,9 +132,110 @@ if (cfg$which_sim=="testing") {
       "reject" = test_results$reject,
       "p_val" = test_results$p_val,
       "beta_n" = test_results$beta_n,
+      "sd_n" = test_results$sd_n,
       "Gamma_n_5" = test_results$Gamma_n_5, # !!!!!
+      "Gamma_true_5" = attr(dat_orig, "Theta_true")[26], # !!!!!
+      "theta_true_5" = attr(dat_orig, "theta_true")[26], # !!!!!
       "Gamma_var_n" = test_results$Gamma_var_n, # !!!!!
-      "sd_n" = test_results$sd_n
+      "lambda_2" = test_results$lambda_2, # !!!!!
+      "lambda_3" = test_results$lambda_3, # !!!!!
+      "g_n" = test_results$g_n, # !!!!!
+      "S_n" = test_results$S_n, # !!!!!
+      "Sc_n" = test_results$Sc_n, # !!!!!
+      "omega_n1" = test_results$omega_n1, # !!!!!
+      "omega_n0" = test_results$omega_n0, # !!!!!
+      "gcomp_n" = test_results$gcomp_n, # !!!!!
+      "eta_n" = test_results$eta_n, # !!!!!
+      "xi_n" = test_results$xi_n, # !!!!!
+      "infl_fn_1" = test_results$infl_fn_1, # !!!!!
+      "infl_fn_Gamma" = test_results$infl_fn_Gamma, # !!!!!
+      "infl_fn_2" = test_results$infl_fn_2, # !!!!!
+      "partial_est" = test_results$partial_est, # !!!!!
+      "partial_var" = test_results$partial_var, # !!!!!
+      "Phi_n_5" = test_results$Phi_n_5 # !!!!!
+    ))
+    
+  }
+  
+}
+
+
+
+##############################.
+##### Hypothesis testing #####
+##############################.
+
+if (cfg$which_sim=="infl_fn_1 (temp)") {
+  
+  one_simulation <- function() {
+    
+    # Generate dataset
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+                              L$sc_params, L$sampling, L$dir)
+    
+    # Prep
+    n_orig <- length(dat_orig$delta)
+    dat <- ss(dat_orig, which(dat_orig$delta==1))
+    weights <- dat$weights
+    
+    # Construct component functions
+    Phi_n <- construct_Phi_n(dat, type=L$test$params$ecdf_type)
+    # lambda_2 <- 1/3
+    # lambda_3 <- 1/4
+    # lambda_2 <- lambda(dat,2,Phi_n)
+    # lambda_3 <- lambda(dat,3,Phi_n)
+    # rho_n <- Vectorize(function(x) { 0 })
+    # rho_n <- construct_rho_n(dat, Phi_n)
+    # xi_n <- construct_xi_n(Phi_n, lambda_2, lambda_3)
+    
+    # Partial stat
+    Gamma_0 <- Vectorize(function(a) {
+      Theta_true <- attr(dat_orig,"Theta_true")
+      grid <- seq(0,1,0.02)
+      index <- which.min(abs(a-seq(0,1,0.02)))
+      return(Theta_true[index])
+    })
+    # partial_est <- (1/n_orig) * sum( weights * (
+    #   (lambda_2*(Phi_n(dat$a))^2 - lambda_3*Phi_n(dat$a)) * Gamma_0(dat$a)
+    # ))
+    
+    # Variance estimate of partial stat
+    # infl_fn_1b <- construct_infl_fn_1(dat, Gamma_0, Phi_n, xi_n, rho_n,
+    #                                   lambda_2, lambda_3)
+    
+    # partial_var <- (1/n_orig^2) * sum((weights*infl_fn_1b(dat$a))^2)
+    
+    # New stuff
+    Psi_4 <- (1/n_orig) * sum( weights * ( Phi_n(dat$a) * Gamma_0(dat$a) ))
+    construct_infl_fn_4 <- function(dat, Gamma_0, Phi_n) {
+      
+      n_orig <- sum(dat$weights)
+      weights_j <- dat$weights
+      a_j <- dat$a
+      
+      fnc <- function(a_i) {
+        piece_1 <- (1/n_orig) * sum(
+          weights_j * (as.integer(a_i<=a_j)-2*Phi_n(a_j)) * Gamma_0(a_j)
+        )
+        piece_2 <- Phi_n(a_i) * Gamma_0(a_i)
+        return(piece_1+piece_2)
+      }
+      
+      return(construct_superfunc(fnc, aux=NA, vec=c(1), vals=NA))
+      
+    }
+    infl_fn_Psi_4 <- construct_infl_fn_4(dat, Gamma_0, Phi_n)
+    Psi_4_var <- (1/n_orig^2) * sum((weights*infl_fn_Psi_4(dat$a))^2)
+    
+    # Return results
+    return (list(
+      # "partial_est" = partial_est,
+      # "partial_sd" = sqrt(partial_var),
+      # "rho_5" = rho_n(0.5),
+      # "lambda_2" = lambda_2,
+      # "lambda_3" = lambda_3,
+      "Psi_4" = Psi_4,
+      "Psi_4_sd" = sqrt(Psi_4_var)
     ))
     
   }

@@ -16,7 +16,8 @@
 #' @param sc_params Weibull parameters for the survival and censoring
 #'     distributions; a list of the form list(lmbd=1,v=1,lmbd2=1,v2=1)
 #' @param sampling Two-phase sampling mechanism; one of c("iid",
-#'     "two-phase (6%)", "two-phase (72%)")
+#'     "two-phase (6%)", "two-phase (72%)", "two-phase (70% random)", two-phase
+#'     (6% random))
 #' @param dir Direction of monotonicity; one of c("incr", "decr")
 #' @return A dataframe representing the study population
 generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
@@ -68,13 +69,13 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
       ((1/sc_params$lmbd)*t)^(1/sc_params$v)
     }
     if (surv_true=="Cox PH") {
-      if (dir="decr") {
+      if (dir=="decr") {
         lin <- C$alpha_1*w$w1 + C$alpha_2*w$w2 + alpha_3*a - 1.7
       } else {
         lin <- C$alpha_1*w$w1 + C$alpha_2*w$w2 + alpha_3*(1-a) - 1.7
       }
     } else if (surv_true=="complex") {
-      if (dir="decr") {
+      if (dir=="decr") {
         lin <- C$alpha_1*pmax(0,2-8*abs(w$w1-0.5)) + 2.5*alpha_3*w$w2*a +
           0.7*alpha_3*(1-w$w2)*a - 1.3
       } else {
@@ -119,33 +120,43 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
     w1 <- sample(seq(0,1,0.1), size=m, replace=T) # runif(m)
     w2 <- rbinom(m, size=1, prob=0.5)
     
-    theta_true_f <- Vectorize(function(a) {
-      
-      lin <- function(w1,w2,a) {
-        if (surv_true=="Cox PH") {
-          if (dir="decr") {
-            C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
-          } else {
-            C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*(1-a) - 1.7
-          }
-        } else if (surv_true=="complex") {
-          if (dir="decr") {
-            C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2.5*alpha_3*w2*a +
-              0.7*alpha_3*(1-w2)*a - 1.3
-          } else {
-            C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2.5*alpha_3*w2*(1-a) +
-              0.7*alpha_3*(1-w2)*(1-a) - 1.3
-          }
+    lin <- function(w1,w2,a) {
+      if (surv_true=="Cox PH") {
+        if (dir=="decr") {
+          C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
+        } else {
+          C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*(1-a) - 1.7
+        }
+      } else if (surv_true=="complex") {
+        if (dir=="decr") {
+          C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2.5*alpha_3*w2*a +
+            0.7*alpha_3*(1-w2)*a - 1.3
+        } else {
+          C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2.5*alpha_3*w2*(1-a) +
+            0.7*alpha_3*(1-w2)*(1-a) - 1.3
         }
       }
-      
-      S_0 <- function(t, w1, w2, a) {
-        exp( -1 * sc_params$lmbd * (t^sc_params$v) * exp(lin(w1,w2,a)) )
-      }
-      
-      return(1 - mean(S_0(C$t_e, w1, w2, a)))
-      
+    }
+    
+    S_0 <- function(t, w1, w2, a) {
+      exp( -1 * sc_params$lmbd * (t^sc_params$v) * exp(lin(w1,w2,a)) )
+    }
+    
+    theta_true_f <- Vectorize(function(a) {
+      return(1 - mean(S_0(C$t_e,w1,w2,a)))
     })
+    
+    # !!!!!
+    if (T) {
+      
+      a <- round(runif(m), -log10(C$appx$a))
+      Theta_true_f <- Vectorize(function(x) {
+        return(mean( as.integer(a<=x) * (1-S_0(C$t_e,w1,w2,a)) ))
+      })
+      attr(dat_orig, "Theta_true") <- Theta_true_f(C$points)
+      
+    }
+    
   }
   
   # Add attributes to dataframe

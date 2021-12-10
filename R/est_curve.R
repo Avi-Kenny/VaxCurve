@@ -39,7 +39,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     # Setup
     dat <- ss(dat_orig, which(dat_orig$delta==1))
-    vlist <- create_val_list(dat, C$appx)
+    vlist <- create_val_list(dat_orig, C$appx) # !!!!! vlist <- create_val_list(dat, C$appx)
     
     # Construct regular Gamma_0 estimator
     if (params$cf_folds==1) {
@@ -95,7 +95,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     # Compute GCM and extract its derivative
     gcm <- gcmlcm(
       x = seq(0,1,C$appx$a),
-      y = Psi_n(seq(0,1,C$appx$a)), # rev(Psi_n(seq(0,1,C$appx$a)))
+      y = Psi_n(seq(0,1,C$appx$a)),
       type = "gcm"
     )
     dGCM <- Vectorize(function(x) {
@@ -171,7 +171,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     deriv_theta_n <- construct_deriv_theta_n(theta_n, type=params$deriv_type,
                                              dir=dir)
     tau_n <- construct_tau_n(deriv_theta_n, gamma_n, f_a_n)
-
+    
     # Generate confidence limits
     if (params$ci_type=="none") {
       
@@ -200,8 +200,10 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
           logit(ests) + (qnt*tau_ns*deriv_logit(ests))/(n_orig^(1/3))
         )
       } else if (params$ci_type=="trunc") {
-        ci_lo <- ests - (qnt*tau_ns)/(n_orig^(1/3)) %>% pmax(0) %>% pmin(1)
-        ci_hi <- ests + (qnt*tau_ns)/(n_orig^(1/3)) %>% pmax(0) %>% pmin(1)
+        ci_lo <- ests - (qnt*tau_ns)/(n_orig^(1/3))
+        ci_hi <- ests + (qnt*tau_ns)/(n_orig^(1/3))
+        ci_lo %<>% pmax(0) %>% pmin(1)
+        ci_hi %<>% pmax(0) %>% pmin(1)
       }
       
       # Edge correction

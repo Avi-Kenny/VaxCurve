@@ -22,27 +22,31 @@
 ##### Setup #####
 #################.
 
-# Vector of markers
+# Setup
 markers <- c("Day29bindSpike", "Day29bindRBD", "Day29ADCP")
-
-# Set configuration
 cfg2 <- list(
-  # tid = 1,
-  # marker_num = 1,
-  tid = as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID")),
-  marker_num = as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID")),
-  S_n_type = "Cox PH", # !!!!! "Cox PH" "Super Learner"
   run_import_data = F,
-  run_recomp_1 = T,
-  run_recomp_2 = T,
-  run_recomp_3 = T,
-  run_recomp_4 = T,
-  run_recomp_5 = T,
-  save_fns = F,
   run_dqa = F,
-  run_graphs = T,
-  edge_spread = F
+  run_graphs = T
+  # edge_spread = F
 )
+
+# Catch TID and set config accordingly
+# !!!!! Temporary
+cfg2$tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
+# cfg2$tid <- 1
+cfg2_df <- data.frame(
+  tid = c(1:24),
+  S_n_type = rep(c("Cox PH", "Super Learner"), 12),
+  marker_num = rep(rep(c(1,2,3), each=2), 4),
+  jit_L = rep(0.25, 24),
+  jit_R = rep(c(0.6,0.75,0.9,1), each=6)
+)
+cfg2$S_n_type <- cfg2_df[cfg2$tid, "S_n_type"]
+cfg2$marker_num <- cfg2_df[cfg2$tid, "marker_num"]
+cfg2$jit_L <- cfg2_df[cfg2$tid, "jit_L"]
+cfg2$jit_R <- cfg2_df[cfg2$tid, "jit_R"]
+
 cfg2$folder = paste0("Janssen functions/Janssen (tid ",cfg2$tid,")")
 # cfg2$edge_spread <- ifelse(cfg2$marker_num==3, TRUE, FALSE) # !!!!!
 
@@ -219,7 +223,20 @@ if (cfg2$run_dqa) {
   # Kaplan-Meier plot
   # !!!!!
   
-  # Distribution of event times
+  # Distribution of event times (Ph2=0 vs. Ph2=1)
+  ggplot(
+    data.frame(
+      x = time_tx[which(ind_tx==1)],
+      ph2.D29 = df_trt_1$ph2.D29[which(ind_tx==1)]
+    ),
+    aes(x=x, fill=ph2.D29)
+  ) +
+    facet_wrap(~ph2.D29) +
+    geom_vline(xintercept=c(138,195), linetype="dashed", color="#333333") +
+    geom_histogram() +
+    labs(title="Distribution of event times, by Ph2 indicator", x="Time")
+  
+  # Distribution of event times (Tx vs. Ct)
   ggplot(
     data.frame(
       x = c(time_tx[which(ind_tx==1)], time_ct[which(ind_ct==1)]),
@@ -231,8 +248,8 @@ if (cfg2$run_dqa) {
     geom_vline(xintercept=195, linetype="dashed", color="grey") +
     geom_histogram() +
     labs("Distribution of event times")
-
-  # Distribution of censoring times
+  
+  # Distribution of censoring times (Tx vs. Ct)
   ggplot(
     data.frame(
       x = c(time_tx[which(ind_tx==0)], time_ct[which(ind_ct==0)]),
@@ -246,7 +263,15 @@ if (cfg2$run_dqa) {
     geom_histogram() +
     labs("Distribution of event times")
   
+  # Treatment group survival (entire cohort)
+  survfit(
+    Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
+         EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
+    data = filter(df_trt, ph2.D29==1),
+    weights = wt.D29
+  ) %>% autoplot()
   
+  # Treatment group survival (subcohort)
   
   
   # # !!!!!
@@ -275,6 +300,75 @@ if (cfg2$run_dqa) {
 
 
 
+###################.
+##### Scratch #####
+###################.
+
+if (F) {
+  # Alias markers
+  a <- list(
+    dat_orig_1$a_list[[1]],
+    dat_orig_1$a_list[[2]],
+    dat_orig_adcp$a_list[[3]]
+  )
+  a <- lapply(a, function(x) { x[!is.na(x)] }) # Remove NA values
+  a <- lapply(a, function(x) { 10^x }) # Re-express on natural scale
+  
+  # Check that min marker values equal one-half the positivity cutoff or LOD
+  lod <- c(
+    2*min(a[[1]], na.rm=T), # 10.84237 = PosCutoff/2
+    2*min(a[[2]], na.rm=T), # 14.08585 = PosCutoff/2
+    2*min(a[[3]], na.rm=T)  # 11.57 = LOD/2
+  )
+  
+  # Check marker quantiles
+  quantile(a[[1]], probs=seq(0,1,0.1))
+  quantile(a[[2]], probs=seq(0,1,0.1))
+  quantile(a[[3]], probs=seq(0,1,0.1))
+  
+  # Check percent mass at left edge
+  sum(a[[1]]==min(a[[1]]))/length(a[[1]])
+  sum(a[[2]]==min(a[[2]]))/length(a[[2]])
+  sum(a[[3]]==min(a[[3]]))/length(a[[3]])
+  
+  # Check percent mass at right edge
+  sum(a[[1]]==max(a[[1]]))/length(a[[1]])
+  sum(a[[2]]==max(a[[2]]))/length(a[[2]])
+  sum(a[[3]]==max(a[[3]]))/length(a[[3]])
+  
+  # Explore jittering values
+  sort(unique(a[[1]]))[1:5]
+  sort(unique(a[[2]]))[1:5]
+  sort(unique(a[[3]]))[1:5]
+  lens <- c(length(a[[1]]), length(a[[2]]), length(a[[3]]))
+  a_jit <- list()
+  # jit_1 <- runif(n=lens[1], min=0.25*lod[1], max=0.75*lod[1])
+  # jit_2 <- runif(n=lens[2], min=0.25*lod[2], max=0.75*lod[2])
+  # jit_3 <- runif(n=lens[3], min=0.25*lod[3], max=0.75*lod[3])
+  jit_1 <- runif(n=lens[1], min=0.4*lod[1], max=0.6*lod[1])
+  jit_2 <- runif(n=lens[2], min=0.4*lod[2], max=0.6*lod[2])
+  jit_3 <- runif(n=lens[3], min=0.4*lod[3], max=0.6*lod[3])
+  a_jit[[1]] <- ifelse(a[[1]]==min(a[[1]]), jit_1, a[[1]])
+  a_jit[[2]] <- ifelse(a[[2]]==min(a[[2]]), jit_1, a[[2]])
+  a_jit[[3]] <- ifelse(a[[3]]==min(a[[3]]), jit_1, a[[3]])
+  
+  # Histogram (unjittered vs. jittered)
+  ggplot(
+    data.frame(
+      x = log10(c(a[[1]],a[[2]],a[[3]],a_jit[[1]],a_jit[[2]],a_jit[[3]])),
+      # x = c(a[[1]],a[[2]],a[[3]],a_jit[[1]],a_jit[[2]],a_jit[[3]]),
+      which = rep(c("original","jittered"), each=sum(lens)),
+      marker = rep(c(rep(1,lens[1]), rep(2,lens[2]), rep(3,lens[3])),2)
+    ),
+    aes(x=x)
+  ) +
+    geom_histogram(bins=50) +
+    facet_grid(rows=dplyr::vars(which), cols=dplyr::vars(marker))
+  
+}
+
+
+
 ##############################.
 ##### Data analysis prep #####
 ##############################.
@@ -293,15 +387,29 @@ if (cfg2$run_dqa) {
   }
   
   # Set up end time of interest `t_e`
-  C <- list(appx=cfg$appx, t_e=195)
+  C <- list(appx=cfg$appx, t_e=138)
   
   # !!!!! Reset appx for `t_e` and `a`
   C$appx$t_e <- 10
-  C$appx$a <- 0.01 # !!!!!
+  C$appx$a <- 0.001 # !!!!!
   
   # Set `a` value from `a_list`
   dat_orig$a <- dat_orig$a_list[[cfg2$marker_num]]
   dat_orig$a_list <- NULL
+  
+  # Archive unjittered marker (for histogram)
+  a_orig <- dat_orig$a[!is.na(dat_orig$a)]
+  
+  # Jitter A values (left endpoint)
+  # !!!!! Experiment with different width values
+  dat_orig$a <- 10^dat_orig$a
+  lod <- 2*min(dat_orig$a, na.rm=T)
+  jit <- runif(n=length(dat_orig$a), min=cfg2$jit_L*lod, max=cfg2$jit_R*lod)
+  dat_orig$a <- ifelse(dat_orig$a==min(dat_orig$a, na.rm=T), jit, dat_orig$a)
+  dat_orig$a <- log10(dat_orig$a)
+  
+  # Jitter A values (right endpoint)
+  # !!!!! TO DO !!!!!
   
   # Rescale A to lie in [0,1]
   a2 <- 1/C$appx$a
@@ -312,23 +420,12 @@ if (cfg2$run_dqa) {
 
   # Round A, W3
   dat_orig$a <- round(dat_orig$a, -log10(C$appx$a))
-  dat_orig$w$w3 <- round(dat_orig$w$w2, 0) # !!!!! change to round(...,1)
+  dat_orig$w$w3 <- round(dat_orig$w$w3, 0) # !!!!! change to round(...,1)
   
-  # Perform "spread" edge correction
-  # !!!!! Should be symmetric around LLOD/2
-  if (cfg2$edge_spread) {
-    # width <- 0.02
-    # noise_0 <- round(runif(length(dat_orig$a))*width, -log10(C$appx$a))
-    # noise_1 <- round(1 - runif(length(dat_orig$a))*width, -log10(C$appx$a))
-    # dat_orig$a <- ifelse(dat_orig$a==0, noise_0, dat_orig$a)
-    # dat_orig$a <- ifelse(dat_orig$a==1, noise_1, dat_orig$a)
-    # # dat_orig$a <- round(dat_orig$a, -log10(C$appx$a))
-  }
-
   # Set estimation tuning parameters
   params <- list(S_n_type=cfg2$S_n_type, g_n_type="binning",
                  ecdf_type="linear (mid)", deriv_type="m-spline",
-                 gamma_type="kernel", ci_type="trunc", edge_corr="none",
+                 gamma_type="kernel", ci_type="regular", edge_corr="none",
                  cf_folds=1, n_bins=0)
   
 }
@@ -337,9 +434,6 @@ if (cfg2$run_dqa) {
 #########################.
 ##### Data analysis #####
 #########################.
-
-# Create truncated data object
-dat <- ss(dat_orig, which(dat_orig$delta==1))
 
 # Obtain estimates
 p_grid <- seq(0,1,0.01)
@@ -352,47 +446,69 @@ ests <- est_curve(
   return_extra = c("gcomp", "f_a_n", "Phi_n_inv")
 )
 
-# Calculate control group survival
-srv_ct <- survfit(
-  Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
-       EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
-  data = df_ctrl
-)
-rate_ct <- 1 - srv_ct$surv[which.min(abs(srv_ct$time-C$t_e))]
-ci_lo_ct <- 1 - srv_ct$upper[which.min(abs(srv_ct$time-C$t_e))]
-ci_hi_ct <- 1 - srv_ct$lower[which.min(abs(srv_ct$time-C$t_e))]
-var_ct <- ((ci_hi_ct-ci_lo_ct)/3.92)^2
+# Calculate control/vaccine group marginalized survival
+get.marginalized.risk.no.marker <- function(dat, tfinal.tpeak) {
+  fit.risk <- coxph(
+    Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
+         EventIndPrimaryIncludeNotMolecConfirmedD29) ~ risk_score +
+      as.factor(Region),
+    dat,
+    model = T
+  )
+  dat[["EventTimePrimaryIncludeNotMolecConfirmedD29"]] <- tfinal.tpeak
+  risks <- 1 - exp(-predict(fit.risk, newdata=dat, type="expected"))
+  mean(risks)
+}
+rate_ct <- get.marginalized.risk.no.marker(df_ctrl, C$t_e)
+rate_tx <- get.marginalized.risk.no.marker(df_trt, C$t_e)
+round(1-(rate_tx/rate_ct),3)
 
-# Calculate treatment group survival
-srv_tx <- survfit(
-  Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
-       EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
-  data = df_trt
-)
-rate_tx <- 1 - srv_tx$surv[which.min(abs(srv_tx$time-C$t_e))]
-ci_lo_tx <- 1 - srv_tx$upper[which.min(abs(srv_tx$time-C$t_e))]
-ci_hi_tx <- 1 - srv_tx$lower[which.min(abs(srv_tx$time-C$t_e))]
-var_tx <- ((ci_hi_tx-ci_lo_tx)/3.92)^2
-
-# Calculate overall vaccine efficacy
-ve_overall <- 1 - (rate_tx/rate_ct)
-ve_se <- sqrt(rate_ct^-2*var_tx + rate_tx^2*rate_ct^-4*var_ct)
-ve_overall_lo <- ve_overall - 1.96*ve_se
-ve_overall_hi <- ve_overall + 1.96*ve_se
-print(paste0("Overall VE: ", round(100*ve_overall,1), "% (",
-             round(100*ve_overall_lo,1), "% -- ", round(100*ve_overall_hi,1),
-             "%)"))
-
-# Calculate overall vaccine efficacy (within subcohort)
-srv_tx_sub <- survfit(coxph(
-  Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
-       EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
-  data = filter(df_trt, ph2.D29==1),
-  weights = wt.D29
-))
-rate_tx_sub <- 1 - srv_tx_sub$surv[which.min(abs(srv_tx_sub$time-C$t_e))]
-ve_subcohort <- 1 - (rate_tx_sub/rate_ct)
-print(paste0("Overall VE (subcohort): ", round(100*ve_subcohort,1), "%"))
+# !!!!! Move/reorganize everything in this section
+if (F) {
+  
+  # Calculate control group survival (OLD)
+  srv_ct <- survfit(
+    Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
+         EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
+    data = df_ctrl
+  )
+  rate_ct <- 1 - srv_ct$surv[which.min(abs(srv_ct$time-C$t_e))]
+  # ci_lo_ct <- 1 - srv_ct$upper[which.min(abs(srv_ct$time-C$t_e))]
+  # ci_hi_ct <- 1 - srv_ct$lower[which.min(abs(srv_ct$time-C$t_e))]
+  # var_ct <- ((ci_hi_ct-ci_lo_ct)/3.92)^2
+  
+  # Calculate treatment group survival
+  srv_tx <- survfit(
+    Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
+         EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
+    data = df_trt
+  )
+  rate_tx <- 1 - srv_tx$surv[which.min(abs(srv_tx$time-C$t_e))]
+  ci_lo_tx <- 1 - srv_tx$upper[which.min(abs(srv_tx$time-C$t_e))]
+  ci_hi_tx <- 1 - srv_tx$lower[which.min(abs(srv_tx$time-C$t_e))]
+  var_tx <- ((ci_hi_tx-ci_lo_tx)/3.92)^2
+  
+  # Calculate overall vaccine efficacy
+  ve_overall <- 1 - (rate_tx/rate_ct)
+  ve_se <- sqrt(rate_ct^-2*var_tx + rate_tx^2*rate_ct^-4*var_ct)
+  ve_overall_lo <- ve_overall - 1.96*ve_se
+  ve_overall_hi <- ve_overall + 1.96*ve_se
+  print(paste0("Overall VE: ", round(100*ve_overall,1), "% (",
+               round(100*ve_overall_lo,1), "% -- ", round(100*ve_overall_hi,1),
+               "%)"))
+  
+  # Calculate overall vaccine efficacy (within subcohort)
+  srv_tx_sub <- survfit(coxph(
+    Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
+         EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
+    data = filter(df_trt, ph2.D29==1),
+    weights = wt.D29
+  ))
+  rate_tx_sub <- 1 - srv_tx_sub$surv[which.min(abs(srv_tx_sub$time-C$t_e))]
+  ve_subcohort <- 1 - (rate_tx_sub/rate_ct)
+  print(paste0("Overall VE (subcohort): ", round(100*ve_subcohort,1), "%"))
+  
+}
 
 
 
@@ -407,36 +523,28 @@ if (cfg2$run_graphs) {
     
     # Extract results
     theta_ests_gren <- ests$est
-    ci_lo <- ests$ci_lo
-    ci_hi <- ests$ci_hi
+    ci_lo_gren <- ests$ci_lo
+    ci_hi_gren <- ests$ci_hi
     theta_ests_gcomp <- ests$gcomp(p_grid)
     cve <- Vectorize(function(x) { 1 - x/rate_ct })
     
     # Generate CIs
-    if (params$ci_type=="regular") {
-      ci_lo <- cve(ci_hi)
-      ci_hi <- cve(ci_lo)
-    } else if (params$ci_type=="trunc") {
-      ci_lo <- cve(ci_hi) %>% pmax(0) %>% pmin(1) # !!!!!
-      ci_hi <- cve(ci_lo) %>% pmax(0) %>% pmin(1) # !!!!!
-    }
+    ci_lo <- cve(ci_hi_gren) %>% pmax(0) %>% pmin(1)
+    ci_hi <- cve(ci_lo_gren) %>% pmax(0) %>% pmin(1)
     ests_gcomp <- cve(theta_ests_gcomp)
     ests_gren <- cve(theta_ests_gren)
     
-    # Marginal distribution of A
-    df_marg <- data.frame(
-      x = p_grid*a_scale-a_shift,
-      ymin = 0,
-      ymax = (0.6/max(ests$f_a_n(p_grid))) * ests$f_a_n(p_grid)
-    )
-    
     # Truncate at 5/95 or 10/90 quantiles
+    # which <- p_grid<=ests$Phi_n_inv(0.95)
     which <- p_grid>=ests$Phi_n_inv(0.05) & p_grid<=ests$Phi_n_inv(0.95)
     # if (cfg2$marker_num==3) {
     #   which <- p_grid<=Phi_n_inv(0.9)
     # } else {
     #   which <- p_grid>=Phi_n_inv(0.1) & p_grid<=Phi_n_inv(0.9)
     # }
+    
+    # !!!!! replace NA values with first non-NA value for point mass at left
+    
     ests_gren <- ifelse(which,ests_gren,NA)
     ci_lo <- ifelse(which,ci_lo,NA)
     ci_hi <- ifelse(which,ci_hi,NA)
@@ -448,72 +556,51 @@ if (cfg2$run_graphs) {
     y_lab <- "Controlled VE against COVID by day 195"
     
     # Plots
-    plot_1 <- ggplot(
-      data.frame(
-        x = rep(p_grid*a_scale-a_shift,2),
-        y = c(ests_gcomp,ests_gren),
-        which = rep(c("G-comp", "Grenander"), each=length(p_grid)),
-        ci_lo = c(ests_gcomp,ci_lo),
-        ci_hi = c(ests_gcomp,ci_hi)
-      ),
-      aes(x=x, y=y, color=which)
-    ) +
-      geom_hline(yintercept=0.465, alpha=0.3, size=0.4) + # !!!!! Later calculate this manually
-      geom_hline(yintercept=c(0.411,0.515), alpha=0.3, # !!!!! Later calculate this manually
+    plot_data_1 <- data.frame(
+      x = p_grid*a_scale-a_shift,
+      y = ests_gren,
+      which = rep("Grenander", length(p_grid)),
+      ci_lo = ci_lo,
+      ci_hi = ci_hi
+    )
+    plot_data_2 <- data.frame(
+      x = rep(p_grid*a_scale-a_shift,2),
+      y = c(ests_gcomp,ests_gren),
+      which = rep(c("G-comp", "Grenander"), each=length(p_grid)),
+      ci_lo = c(ests_gcomp,ci_lo),
+      ci_hi = c(ests_gcomp,ci_hi)
+    )
+    
+    plot_1 <- ggplot(plot_data_1, aes(x=x, y=y, color=which)) +
+      geom_hline(yintercept=0.501, alpha=0.3, size=0.4) + # !!!!! Later calculate this manually or pull from Youyi report
+      geom_hline(yintercept=c(0.437,0.564), alpha=0.3, # !!!!! Later calculate this manually or pull from Youyi report
                  size=0.4, linetype="dotted") +
-      geom_ribbon(
-        aes(ymin=ci_lo, ymax=ci_hi),
-        alpha = 0.1,
-        linetype = "dotted",
-        fill = "darkblue"
-      ) +
-      geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax), inherit.aes=F,
-                  data=df_marg, fill="forestgreen", color=NA, alpha=0.3) +
-      # !!!!!
-      scale_color_manual(values=c("purple", "darkblue")) +
+      geom_ribbon(aes(ymin=ci_lo,ymax=ci_hi), alpha=0.1,
+                  linetype="dotted", fill="darkblue") +
+      geom_histogram(mapping=aes(x=x,y=(0.6*..count..)/max(..count..)),
+                     data=data.frame(x=a_orig), bins=20, fill="forestgreen",
+                     alpha=0.3, inherit.aes=F) +
       scale_y_continuous(labels=label_percent(accuracy=1), limits=c(0,1),
                          breaks=seq(-1,1,0.1), minor_breaks=NULL) +
       theme(panel.grid.major=element_line(colour="white", size=0.3),
             panel.grid.minor=element_line(colour="white", size=0.3)) +
       scale_x_continuous(label=math_format(10^.x)) +
-      theme(legend.position="bottom") +
-      labs(x=x_lab, y=y_lab, color="Estimator") +
+      scale_color_manual(values=c("darkblue")) +
+      theme(legend.position="none") +
+      labs(x=x_lab, y=y_lab) +
       geom_line()
     
-    # !!!!! Consolodite this with the plot above
-    plot_2 <- ggplot(
-      data.frame(
-        x = p_grid*a_scale-a_shift,
-        y = ests_gren,
-        ci_lo = ci_lo,
-        ci_hi = ci_hi
-      ),
-      aes(x=x, y=y)
-    ) +
-      geom_hline(yintercept=0.465, alpha=0.3, size=0.4) + # !!!!! Later calculate this manually
-      geom_hline(yintercept=c(0.411,0.515), alpha=0.3, # !!!!! Later calculate this manually
-                 size=0.4, linetype="dotted") +
-      geom_ribbon(
-        aes(ymin=ci_lo, ymax=ci_hi),
-        alpha = 0.1,
-        linetype = "dotted",
-        fill = "darkblue",
-        color = "darkblue"
-      ) +
-      geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax), inherit.aes=F,
-                  data=df_marg, fill="forestgreen", color=NA, alpha=0.3) +
-      scale_y_continuous(labels=label_percent(accuracy=1), limits=c(0,1),
-                         breaks=seq(-1,1,0.1), minor_breaks=NULL) +
-      theme(panel.grid.major=element_line(colour="white", size=0.3),
-            panel.grid.minor=element_line(colour="white", size=0.3)) +
-      scale_x_continuous(label=math_format(10^.x)) +
-      theme(legend.position="bottom") +
-      labs(x=x_lab, y=y_lab, color="Estimator") +
-      geom_line(color="darkblue")
+    plot_2 <- plot_1 %+% plot_data_2
+    suppressMessages({
+      plot_2 <- plot_2 +
+        scale_color_manual(values=c("purple", "darkblue")) +
+        theme(legend.position="bottom") +
+        labs(color="Estimator")
+    })
     
     # Save plots
-    name_1 <- paste0("Janssen plots/plot1_",cfg2$tid,".pdf")
-    name_2 <- paste0("Janssen plots/plot2_",cfg2$tid,".pdf")
+    name_1 <- paste0("Janssen plots/plot_",cfg2$tid,".pdf")
+    name_2 <- paste0("Janssen plots/plot_w_Cox_",cfg2$tid,".pdf")
     ggsave(filename=name_1, plot=plot_1, device="pdf", width=6, height=4)
     ggsave(filename=name_2, plot=plot_2, device="pdf", width=6, height=4)
     

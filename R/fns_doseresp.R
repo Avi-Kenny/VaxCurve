@@ -654,7 +654,7 @@ construct_deriv_theta_n <- function(theta_n, type, dir="incr") {
     # Construct derivative function
     fnc <- function(a) {
       
-      width <- 0.1
+      width <- 0.2 # !!!!! changed from 0.1 to 0.2
       x1 <- a - width/2
       x2 <- a + width/2
       
@@ -669,7 +669,7 @@ construct_deriv_theta_n <- function(theta_n, type, dir="incr") {
       
       y1 <- theta_n_smoothed(x1)
       y2 <- theta_n_smoothed(x2)
-
+      
       if (dir=="incr") {
         return(max((y2-y1)/width,0))
       } else {
@@ -1157,7 +1157,8 @@ construct_f_a_n <- function(dat_orig, vals=NA, f_aIw_n) {
 construct_g_n <- function(f_aIw_n, f_a_n) {
   
   function(a,w) {
-    1 # f_aIw_n(a,w) / f_a_n(a)
+    f_aIw_n(a,w) / f_a_n(a)
+    # 1
   }
   
 }
@@ -1437,7 +1438,8 @@ beta_n_var_hat <- function(dat, infl_fn_1, infl_fn_2) {
 
 #' Construct lists of values to pre-compute functions on
 #' 
-#' @param dat Subsample of dataset returned by ss() for which delta==1
+#' @param dat Subsample of dataset returned by ss() for which delta==1;
+#'     !!!!! can also be dat_orig (needed for W), but formalize this later
 #' @param appx Approximation spec used for grids (stored in C$appx); !!!!!
 #' @param factor_A If true, factor_A is used instead of seq(0,1,appx$a) for the
 #'     S_n component only
@@ -1634,7 +1636,8 @@ construct_pi_n <- function(dat, vals=NA, type, f_aIw_n=NA, cutoffs=NA) {
     })
     coeffs <- model$coefficients
     
-    fnc <- function(w, val) { expit(as.numeric(coeffs) %*% c(1,w)) }
+    # !!!!! val is unused
+    fnc <- function(w, val) { as.numeric(expit(coeffs %*% c(1,w))) }
     
   } else if (type=="SL") {
     

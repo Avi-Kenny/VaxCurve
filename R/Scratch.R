@@ -1,4 +1,79 @@
 
+# Testing infl_fn_1
+if (F) {
+  
+  L <- list(n=1000, alpha_3=-2, dir="decr",
+            sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5),
+            distr_A="Unif(0,1)", edge="none", surv_true="Cox PH", # Unif(0,1) N(0.5,0.04)
+            ecdf_type="true", sampling="iid", # two-phase (72%)
+            estimator=list(est="Grenander",params=params)
+  )
+  
+  n_reps <- 50
+  ests <- rep(NA,n_reps)
+  vars <- rep(NA,n_reps)
+  for (i in c(1:n_reps)) {
+    
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+                              L$sc_params, L$sampling, L$dir)
+    n_orig <- length(dat_orig$delta)
+    dat <- ss(dat_orig, which(dat_orig$delta==1))
+    weights <- dat$weights
+    vlist <- create_val_list(dat, C$appx)
+    
+    Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
+    lambda_2 <- lambda(dat,2,Phi_n)
+    lambda_3 <- lambda(dat,3,Phi_n)
+    xi_n <- construct_xi_n(Phi_n, lambda_2, lambda_3)
+    rho_n <- function(x) { 0 }
+    
+    # Partial stat
+    Gamma_0 <- Vectorize(function(a) {
+      Theta_true <- attr(dat_orig,"Theta_true")
+      grid <- seq(0,1,0.02)
+      index <- which.min(abs(a-seq(0,1,0.02)))
+      return(Theta_true[index])
+    })
+    partial_est <- (1/n_orig) * sum( weights * (
+      (lambda_2*(Phi_n(dat$a))^2 - lambda_3*Phi_n(dat$a)) * Gamma_0(dat$a)
+    ))
+    
+    # Variance estimate of partial stat
+    infl_fn_1b <- construct_infl_fn_1(dat, Gamma_0, Phi_n, xi_n, rho_n,
+                                      lambda_2, lambda_3)
+    partial_var <- (1/n_orig^2) * sum((weights * (infl_fn_1b(dat$a)))^2)
+    
+    ests[i] <- partial_est
+    vars[i] <- partial_var
+    
+    print(paste0("Rep ", i, " of ", n_reps))
+    
+  }
+  
+  # Process results
+  print(paste0("sd(ests), iid:", sd(ests)))
+  print(paste0("mean(sqrt(vars)), iid:", mean(sqrt(vars))))
+  ggplot(data.frame(x=ests), aes(x=x)) + geom_histogram() + labs(title="ests")
+  ggplot(data.frame(x=vars), aes(x=x)) + geom_histogram() + labs(title="var")
+  
+}
+
+# Figure out why returned functions are so large
+if (F) {
+  
+  S_n <- readRDS("705 (SL, marker 8)/S_n.rds")
+  
+  objs <- ls(environment(get("fnc",envir=environment(gamma_n))))
+  for (obj in objs) {
+    print(obj)
+    print(object.size(get(
+      obj,
+      envir = environment(get("fnc",envir=environment(gamma_n)))
+    )))
+  }
+
+}
+
 # Debugging
 if (F) {
   
@@ -10,43 +85,60 @@ if (F) {
     "Gamma_n" = double(),
     "Psi_n" = double()
   )
+  df_list <- list()
   
   # Run for-loop
-  for (i in 1:20) {
+  for (i in 1:2) {
     
     print(paste0("Rep ",i,": ",Sys.time()))
-    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge,
-                              L$surv_true, L$sc_params, L$sampling)
+    set.seed(i)
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+                              L$sc_params, L$sampling, L$dir)
     dat <- ss(dat_orig, which(dat_orig$delta==1))
     vlist <- create_val_list(dat, C$appx)
     vlist$AW_grid <- NA; vlist$omega <- NA; vlist$W_grid <- NA;
     Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n)
     Psi_n <- Vectorize(function(x) {
-      Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
+      -1 * Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
     })
     gcm <- gcmlcm(
       x = seq(0,1,C$appx$a),
-      y = rev(Psi_n(seq(0,1,C$appx$a))),
-      type = ifelse(dir=="decr", "lcm", "gcm")
+      y = Psi_n(seq(0,1,C$appx$a)), # rev(Psi_n(seq(0,1,C$appx$a)))
+      type = "gcm"
     )
     dGCM <- Vectorize(function(x) {
+      # The round deals with a floating point issue
       index <- which(round(x,5)<=gcm$x.knots)[1]-1
       if (index==0) { index <- 1 }
       return(gcm$slope.knots[index])
     })
-    theta_n_Gr <- Vectorize(function(x) { dGCM(Phi_n(1-x)) })
+    theta_n_Gr <- Vectorize(function(x) { min(max(-1 * dGCM(Phi_n(x)),0),1) })
     
     for (j in 1:51) {
-      df[nrow(df)+1,] <- c(i,points[j],theta_n_Gr(points[j]),
-                           Gamma_os_n(points[j]), Psi_n(points[j]))
+      df[nrow(df)+1,] <- c(
+        i, points[j], theta_n_Gr(points[j]), Gamma_os_n(points[j]),
+        Psi_n(points[j])
+      )
     }
+    
+    df_list[[i]] <- list(
+      dat_orig = dat_orig,
+      Phi_n = Phi_n,
+      Phi_n_inv = Phi_n_inv,
+      S_n = S_n,
+      Sc_n = Sc_n,
+      g_n = g_n,
+      omega_n = omega_n,
+      Gamma_os_n = Gamma_os_n
+    )
     
   }
   
   # Plot results
-  ggplot(df, aes(x=point, y=Gamma_n, group=rep)) + # Gamma_n Psi_n
+  df$Psi_n <- -1 * df$Psi_n
+  ggplot(df, aes(x=point, y=Psi_n, group=rep)) + # Gamma_n Psi_n
     geom_line(alpha=0.4) +
-    ylim(c(0,1)) # 0.4
+    ylim(c(0,0.4)) # 0.4
   
   # !!!!!
   ggplot(
@@ -58,7 +150,35 @@ if (F) {
     aes(x=x, y=y, color=factor(grp))) +
     geom_line()
   
-
+  # !!!!!
+  identical(
+    sim$results_complex$sim_uid_1$dat_orig,
+    df_list[[1]]$dat_orig
+  )
+  sim$results_complex$sim_uid_1$Phi_n(seq(0,1,0.1))
+  df_list[[1]]$Phi_n(seq(0,1,0.1))
+  
+  # !!!!!
+  sim$results_complex$sim_uid_1$Phi_n(seq(0,1,0.1))
+  ggplot(
+    data.frame(
+      x = seq(0,1,0.01),
+      y = sim$results_complex$sim_uid_1$Phi_n(seq(0,1,0.01))
+    ),
+    aes(x=x, y=y)
+  ) + geom_line()
+  df_list[[1]]$Phi_n(seq(0,1,0.1))
+  ggplot(
+    data.frame(
+      x = seq(0,1,0.01),
+      y = df_list[[1]]$Phi_n(seq(0,1,0.01))
+    ),
+    aes(x=x, y=y)
+  ) + geom_line()
+  
+  # return(function(a) { ptruncnorm(a, a=0, b=1, mean=0.5, sd=0.2) })
+  
+  
 }
 
 # Unit tests for superfunc
@@ -306,7 +426,8 @@ if (F) {
     edge = "none",
     surv_true = "complex",
     sc_params = L$sc_params,
-    sampling = "two-phase (72%)"
+    sampling = "two-phase (72%)",
+    dir = "decr"
   )
   
   # Prep
@@ -361,7 +482,8 @@ if (F) {
       edge = edge,
       surv_true = "Cox PH",
       sc_params = L$sc_params,
-      sampling = "two-phase (72%)"
+      sampling = "two-phase (72%)",
+      dir = "decr"
     )
     
     n_orig <- nrow(dat_orig)
@@ -400,7 +522,8 @@ if (F) {
       edge = edge,
       surv_true = "Cox PH",
       sc_params = L$sc_params,
-      sampling = "two-phase (72%)"
+      sampling = "two-phase (72%)",
+      dir = "decr"
     )
     
     n_orig <- nrow(dat_orig)

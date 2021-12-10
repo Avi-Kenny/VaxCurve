@@ -24,28 +24,25 @@
 #'     points
 #' @param points A vector representing the points to estimate
 #' @param dir Direction of monotonicity; one of c("incr", "decr")
+#' @param return_extra A character vector of additional components to return
 #' @return A list of lists of the form:
 #'     list(list(point=1, est=1, se=1), list(...), ...)
-est_curve <- function(dat_orig, estimator, params, points, dir="decr") {
+est_curve <- function(dat_orig, estimator, params, points, dir="decr",
+                      return_extra=NULL) {
   
   if (estimator=="Grenander") {
     
     if (params$edge_corr=="spread") {
-      dat_orig$noise <- runif(length(dat_orig$a))*0.05
+      noise <- runif(length(dat_orig$a))*0.05
       dat_orig$a <- ifelse(dat_orig$a==0, noise, dat_orig$a)
     }
     
     # Setup
     dat <- ss(dat_orig, which(dat_orig$delta==1))
-    vlist <- create_val_list(dat, C$appx)
+    vlist <- create_val_list(dat_orig, C$appx) # !!!!! vlist <- create_val_list(dat, C$appx)
     
     # Construct regular Gamma_0 estimator
     if (params$cf_folds==1) {
-      
-      # !!!!!
-      vlist$AW_grid <- NA
-      vlist$omega <- NA
-      vlist$W_grid <- NA
       
       # Construct component functions
       Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
@@ -84,18 +81,22 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr") {
       
     }
     
-    Psi_n <- Vectorize(function(x) {
-      # Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
-      -1 * Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
-      # Gamma_os_n(round(Phi_n_inv(1-x), -log10(C$appx$a)))
-    })
+    # Construct Psi_n
+    if (dir=="incr") {
+      Psi_n <- Vectorize(function(x) {
+        Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
+      })
+    } else {
+      Psi_n <- Vectorize(function(x) {
+        -1 * Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
+      })
+    }
+    
+    # Compute GCM and extract its derivative
     gcm <- gcmlcm(
       x = seq(0,1,C$appx$a),
-      # x = seq(0,1,C$appx$a),
       y = Psi_n(seq(0,1,C$appx$a)),
-      # y = rev(Psi_n(seq(0,1,C$appx$a))),
-      # y = rev(Psi_n(seq(0,1,0.0001))),
-      type = ifelse(dir=="decr", "lcm", "gcm")
+      type = "gcm"
     )
     dGCM <- Vectorize(function(x) {
       # The round deals with a floating point issue
@@ -105,13 +106,11 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr") {
     })
     
     # Construct Grenander-based theta_n
-    # theta_n_Gr <- Vectorize(function(x) { min(max(dGCM(Phi_n(x)),0),1) })
-    theta_n_Gr <- Vectorize(function(x) { min(max(-1 * dGCM(Phi_n(x)),0),1) })
-    # theta_n_Gr <- Vectorize(function(x) { min(max(dGCM(Phi_n(1-x)),0),1) })
-    # theta_n_Gr <- Vectorize(function(x) {
-    #   dGCM(Phi_n(round(1-x,-log10(C$appx$a)))) # Phi_n(1-x)
-    # })
-    # theta_n_Gr <- Vectorize(function(x) { dGCM(Phi_n(x)) })
+    if (dir=="incr") {
+      theta_n_Gr <- Vectorize(function(x) { min(max(dGCM(Phi_n(x)),0),1) })
+    } else {
+      theta_n_Gr <- Vectorize(function(x) { min(max(-1 * dGCM(Phi_n(x)),0),1) })
+    }
     
     # Recompute functions on full dataset
     if (params$cf_folds>1) {
@@ -166,15 +165,13 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr") {
     }
     
     # Generate estimates for each point
-    # The pmax() prevents errors when estimates are outside [0,1]
-    # ests <- pmin(pmax(theta_n(points),0),0)
     ests <- theta_n(points)
     
     # Construct variance scale factor
     deriv_theta_n <- construct_deriv_theta_n(theta_n, type=params$deriv_type,
                                              dir=dir)
     tau_n <- construct_tau_n(deriv_theta_n, gamma_n, f_a_n)
-
+    
     # Generate confidence limits
     if (params$ci_type=="none") {
       
@@ -202,6 +199,11 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr") {
         ci_hi <- expit(
           logit(ests) + (qnt*tau_ns*deriv_logit(ests))/(n_orig^(1/3))
         )
+      } else if (params$ci_type=="trunc") {
+        ci_lo <- ests - (qnt*tau_ns)/(n_orig^(1/3))
+        ci_hi <- ests + (qnt*tau_ns)/(n_orig^(1/3))
+        ci_lo %<>% pmax(0) %>% pmin(1)
+        ci_hi %<>% pmax(0) %>% pmin(1)
       }
       
       # Edge correction
@@ -216,23 +218,61 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr") {
       }
       
     }
-
-    # Parse and return results
-    res <- list()
-    for (p in 1:length(points)) {
-      res[[p]] <- list(point=points[p], est=ests[p],
-                       ci_lo=ci_lo[p], ci_hi=ci_hi[p])
+    
+    # # Add extra return data
+    # res[["Phi_n"]] <- Phi_n
+    # res[["Gamma_os_n"]] <- Gamma_os_n
+    
+  }
+  
+  if (estimator=="Qbins") {
+    
+    # !!!!! Handle case in which marginal distribution has mass
+    # !!!!! Implement cross-fitted version
+    
+    # Construct bin cutoffs
+    dat <- ss(dat_orig, which(dat_orig$delta==1))
+    Phi_n_inv <- construct_Phi_n(dat, which="inverse", type=params$ecdf_type)
+    cutoffs <- Phi_n_inv(seq(0,1,length.out=params$n_bins+1))
+    
+    # Function to transform A values to categorical bins values
+    transform_a <- function(a) {
+      cut(a, breaks=cutoffs, right=F, include.lowest=T)
     }
     
-    # Add extra return data
-    # res[["timestamps"]] <- simlog()
-    # res[["theta_n"]] <- theta_n
-    # res[["Gamma_os_n"]] <- Gamma_os_n
-    # res[["gcm"]] <- gcm
-    # res[["dGCM"]] <- dGCM
-    # res[["Psi_n"]] <- Psi_n
+    # Create vlist
+    vlist <- create_val_list(dat, C$appx, factor_A=unique(transform_a(dat$a)))
     
-    return(res)
+    # Construct f_aIw_n BEFORE transforming A values
+    f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid,
+                                 type=params$g_n_type, k=15)
+    
+    # Transform A values
+    dat$a <- transform_a(dat$a)
+    
+    # !!!!! Check to see if these need to be modified to handle factor A (including different S_n types)
+    # Note: S_n and Sc_n will not work with type="true"
+    S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
+    Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
+    omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
+    pi_n <- construct_pi_n(dat, vlist$W_grid, type="generalized",
+                           f_aIw_n=f_aIw_n, cutoffs=cutoffs)
+    
+    # Generate estimates and standard deviations for each point
+    ests <- sapply(c(1:length(points)), function(i) {
+      a_binned <- transform_a(points[i])
+      return(theta_os_n(dat, pi_n, S_n, omega_n, val=a_binned))
+    })
+    sigma2s <- sapply(c(1:length(points)), function(i) {
+      a_binned <- transform_a(points[i])
+      return(sigma2_os_n(dat, pi_n, S_n, omega_n, ests[i], val=a_binned))
+    })
+    
+    # Construct CIs
+    n_orig <- length(dat_orig$delta)
+    ci_lo <- ests - 1.96*sqrt(sigma2s/n_orig)
+    ci_hi <- ests + 1.96*sqrt(sigma2s/n_orig)
+    # !!!!! Deal with CI truncation
     
   }
   
@@ -254,21 +294,23 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr") {
     ci_lo <- rep(0, length(ests))
     ci_hi <- rep(0, length(ests))
     
-    # Parse and return results
-    res <- list()
-    for (p in 1:length(points)) {
-      res[[p]] <- list(point=points[p], est=ests[p],
-                       ci_lo=ci_lo[p], ci_hi=ci_hi[p])
-    }
-    
     # Add extra return data
     # res[["ex_S_n"]] <- S_n(C$t_e, w=c(0.5,1), a=0.5)
     # res[["ex_gamma_n"]] <- 0
     # res[["ex_deriv_theta_n"]] <- 0
     # res[["ex_tau_n"]] <- 0
     
-    return(res)
-    
   }
-
+  
+  # Parse and return results
+  res <- list(point=points, est=ests, ci_lo=ci_lo, ci_hi=ci_hi)
+  if ("gcomp" %in% return_extra) {
+    S_n2 <- construct_S_n(dat, vlist$S_n, type="Cox PH")
+    res$gcomp <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n=S_n2)
+  }
+  if ("f_a_n" %in% return_extra) { res$f_a_n <- f_a_n }
+  if ("Phi_n_inv" %in% return_extra) { res$Phi_n_inv <- Phi_n_inv }
+  
+  return(res)
+  
 }

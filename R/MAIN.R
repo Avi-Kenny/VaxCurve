@@ -9,11 +9,11 @@
 # GitHub packages: tedwestling/ctsCausal, tedwestling/CFsurvival, 
 #                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
-  main_task = "run", # run update analysis_moderna.R
-  which_sim = "estimation", # estimation edge testing
-  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
+  main_task = "analysis_janssen.R", # run update analysis_moderna.R analysis_705.R analysis_Janssen.R
+  which_sim = "infl_fn_1 (temp)", # estimation edge testing
+  level_set_which = "level_set_testing_1", # level_set_estimation_1 level_set_testing_1
   # keep = c(1:3,7:9,16:18,22:24),
-  num_sim = 500,
+  num_sim = 4000,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm"),
@@ -21,7 +21,7 @@ cfg <- list(
                      "data.table", "latex2exp", "tidyr"),
   parallel = "none",
   stop_at_error = FALSE,
-  appx = list(t_e=1, w1=0.1, w1b=0.1, a=0.001)
+  appx = list(t_e=1, w1=0.1, w1b=0.1, a=0.01) # !!!!! a=0.001
 )
 
 # Set cluster config
@@ -84,11 +84,13 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     level_bank <- list(
       n = 5000,
       alpha_3 = c(0,-2,-4),
+      dir = "decr",
       sc_params = list("sc_params"=list(lmbd=9e-7, v=1.5, lmbd2=1e-5, v2=1.5)),
       distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
       edge = c("none", "expit", "complex"),
       surv_true = c("Cox PH", "complex"),
-      sampling = c("iid", "two-phase (6%)", "two-phase (72%)"),
+      sampling = c("iid", "two-phase (6%)", "two-phase (72%)",
+                   "two-phase (70% random)"),
       estimator = list(
         "G-comp" = list(
           est = "gcomp", cf_folds = 1,
@@ -123,16 +125,57 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   }
   
   # Estimation: ideal params
+  level_set_temp <- list(
+    n = 2000,
+    alpha_3 = -2,
+    dir = "decr",
+    sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
+    distr_A = "Unif(0,1)",
+    edge = "none",
+    surv_true = "Cox PH",
+    sampling = "two-phase (72%)",
+    estimator = list(
+      "Qbins (3)" = list(
+        est = "Qbins",
+        params = list(S_n_type="Cox PH", g_n_type="true",
+                      ci_type="regular", cf_folds=1, edge_corr="none",
+                      ecdf_type="linear (mid)", deriv_type="m-spline",
+                      gamma_type="kernel", n_bins=3)
+      ),
+      "Qbins (6)" = list(
+        est = "Qbins",
+        params = list(S_n_type="Cox PH", g_n_type="true",
+                      ci_type="regular", cf_folds=1, edge_corr="none",
+                      ecdf_type="linear (mid)", deriv_type="m-spline",
+                      gamma_type="kernel", n_bins=6)
+      ),
+      "Qbins (9)" = list(
+        est = "Qbins",
+        params = list(S_n_type="Cox PH", g_n_type="true",
+                      ci_type="regular", cf_folds=1, edge_corr="none",
+                      ecdf_type="linear (mid)", deriv_type="m-spline",
+                      gamma_type="kernel", n_bins=9)
+      ),
+      "Grenander" = list(
+        est = "Grenander",
+        params = list(S_n_type="Cox PH", g_n_type="true",
+                      ci_type="regular", cf_folds=1, edge_corr="none",
+                      ecdf_type="linear (mid)", deriv_type="m-spline",
+                      gamma_type="kernel", n_bins=0)
+      )
+    )
+  )
+  
+  # Estimation: ideal params
   level_set_estimation_1 <- list(
     n = 5000,
     alpha_3 = -2,
+    dir = "decr",
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_A = "N(0.5,0.04)",
-    # distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
+    distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
     edge = "none",
     # edge = c("none", "expit"),
-    surv_true = "Cox PH",
-    # surv_true = c("Cox PH", "complex"),
+    surv_true = c("Cox PH", "complex"),
     sampling = "two-phase (72%)",
     estimator = list(
       # "Grenander (no edge corr)" = list(
@@ -149,13 +192,13 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       #                 ecdf_type="linear (mid)", deriv_type="m-spline",
       #                 gamma_type="kernel")
       # )
-      # "Grenander (estimated nuisances)" = list(
-      #   est = "Grenander",
-      #   params = list(S_n_type="Random Forest", g_n_type="binning",
-      #                 ci_type="regular", cf_folds=1, edge_corr="none",
-      #                 ecdf_type="linear (mid)", deriv_type="m-spline",
-      #                 gamma_type="kernel")
-      # ),
+      "Grenander (estimated nuisances)" = list(
+        est = "Grenander",
+        params = list(S_n_type="Random Forest", g_n_type="binning",
+                      ci_type="regular", cf_folds=1, edge_corr="none",
+                      ecdf_type="linear (mid)", deriv_type="m-spline",
+                      gamma_type="kernel")
+      ),
       "Grenander (true nuisances)" = list(
         est = "Grenander",
         params = list(S_n_type="true", g_n_type="true",
@@ -170,6 +213,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   level_set_estimation_2 <- list(
     n = 14000,
     alpha_3 = -4,
+    dir = "decr",
     sc_params = list("sc_params"=list(lmbd=3e-5, v=1.5, lmbd2=3e-5, v2=1.5)),
     distr_A = "N(0.5,0.01)",
     edge = "none",
@@ -194,21 +238,36 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   )
   
   # Testing: compare all methods
-  # !!!!! Update these level sets; possibly merge with above
   level_set_testing_1 <- list(
-    n = c(1000,2000),
-    alpha_3 = c(0,-2,-4),
-    sc_params = list("sc_params"=list(lmbd=9e-7, v=1.5, lmbd2=1e-5, v2=1.5)),
-    distr_A = c("Unif(0,1)"),
+    n = 5000,
+    # n = c(1000,2000),
+    alpha_3 = 0,
+    # alpha_3 = c(0,-0.25,-0.5),
+    dir = "decr",
+    # dir = c("decr","incr"),
+    sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
+    distr_A = "Unif(0,1)",
     edge = "none",
     surv_true = "Cox PH",
-    sampling = "two-phase (72%)",
+    sampling = "iid",
+    # sampling = c("iid", "two-phase (72%)", "two-phase (70% random)"),
     test = list(
-      "Slope (one-step Gamma_os_n)" = list(
+      "Slope (two-tailed)" = list(
         type = "test_2",
-        params = list(var="asymptotic", S_n_type="Cox PH", cf_folds=1,
-                      g_n_type="parametric", est_known_nuis=FALSE)
+        alt_type = "two-tailed",
+        test_stat_only = FALSE,
+        params = list(var="asymptotic", ecdf_type="step", # "step" "linear (mid)"
+                      g_n_type="binning", S_n_type="true", cf_folds=1, # Cox PH
+                      est_known_nuis=FALSE)
       )
+      # "Slope (decr)" = list(
+      #   type = "test_2",
+      #   alt_type = "decr",
+      #   test_stat_only = FALSE,
+      #   params = list(var="asymptotic", ecdf_type="step", # "step" "linear (mid)"
+      #                 g_n_type="binning", S_n_type="Cox PH", cf_folds=1,
+      #                 est_known_nuis=FALSE)
+      # )
     )
   )
   
@@ -508,6 +567,84 @@ if (FALSE) {
     labs(title="Testing", color="Sample size")
     # labs(title = paste0("alpha_3: ",alpha_3_,"; Sampling: ",sampling_),
     #      color = "Test")
+  
+  # Diagnostics
+  if (F) {
+    
+    # Filter (if necessary)
+    r <- filter(sim$results, level_id==1)
+    r1 <- filter(sim$results, level_id==1)
+    r2 <- filter(sim$results, level_id==2)
+    r3 <- filter(sim$results, level_id==3)
+    
+    # Print rejection rate
+    mean(r$reject)
+    
+    # Histograms
+    ggplot(data.frame(x=r$beta_n), aes(x=x)) +
+      geom_histogram(bins=50) +
+      labs(title="beta_n")
+    ggplot(data.frame(x=r$Gamma_n_5), aes(x=x)) +
+      geom_histogram(bins=50) +
+      labs(title="Gamma_n_5") +
+      xlim(0.24,0.38)
+    # ggplot(data.frame(x=r$p_vals), aes(x=x)) +
+    #   geom_histogram(bins=50) +
+    #   labs(title="p_vals")
+    ggplot(data.frame(x=r2$sd_n), aes(x=x)) +
+      geom_histogram(bins=50, alpha=0.7) +
+      geom_vline(xintercept=sd(r2$beta_n), color="forestgreen", linetype="dashed") +
+      labs(title="sd(beta_n)")
+    ggplot(data.frame(x=sqrt(r2$Gamma_var_n)), aes(x=x)) +
+      geom_histogram(bins=50, alpha=0.7) +
+      geom_vline(xintercept=sd(r2$Gamma_n_5), color="forestgreen", linetype="dashed") +
+      labs(title="sd(Gamma_n(0.5))")
+    ggplot(data.frame(x=r$Phi_n_5), aes(x=x)) +
+      geom_histogram(bins=50, alpha=0.7) +
+      geom_vline(xintercept=0.5, color="forestgreen", linetype="dashed") +
+      labs(title="Phi_n(0.5)") # + xlim(0.4,0.6)
+    
+    # Comparing component function distributions
+    names <- c("two-phase (72%)", "two-phase (70% random)")
+    cmp <- "sd_n" # Gamma_n_5 Gamma_var_n sd_n beta_n
+    ggplot(data.frame(x=c(r1[[cmp]],r2[[cmp]]),
+                      grp=c(rep(names[1], nrow(r1)),rep(names[2], nrow(r2)))),
+           aes(x=x)) +
+      facet_wrap(~grp, ncol=2) +
+      geom_histogram(bins=25, alpha=0.7) +
+      geom_vline(aes(xintercept=x), data.frame(
+        x=c(quantile(r1[[cmp]])[2:4],quantile(r2[[cmp]])[2:4]),
+        grp=rep(names,each=3)),
+        color="grey", linetype="dashed") +
+      labs(title=cmp)
+    
+    # Comparisons of SDs
+    print(paste0("Actual SD(beta_n): ", sd(r1$beta_n)))
+    print(paste0("Estimated SD(beta_n): ", mean(r1$sd_n)))
+    print(paste0("Actual SD(Gamma_n): ", sd(r1$Gamma_n_5)))
+    print(paste0("Estimated SD(Gamma_n): ", mean(sqrt(r1$Gamma_var_n))))
+    
+    # Checking infl_fn_1
+    sd(r1$partial_est)
+    mean(r1$partial_sd)
+    sd(r2$partial_est)
+    mean(r2$partial_sd)
+    sd(r3$partial_est)
+    mean(r3$partial_sd)
+    ggplot(data.frame(x=r1$partial_sd), aes(x=x)) +
+      geom_histogram(bins=50, alpha=0.7) +
+      geom_vline(xintercept=sd(r1$partial_est), color="forestgreen", linetype="dashed") +
+      labs(title="sd(partial_est)")
+    
+    # Checking infl_fn_4
+    sd(r1$Psi_4)
+    mean(r1$Psi_4_sd)
+    ggplot(data.frame(x=r1$Psi_4_sd), aes(x=x)) +
+      geom_histogram(bins=50, alpha=0.7) +
+      geom_vline(xintercept=sd(r1$Psi_4), color="forestgreen", linetype="dashed") +
+      labs(title="sd(partial_est)")
+    
+  }
   
 }
 

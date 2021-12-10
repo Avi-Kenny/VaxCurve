@@ -1,22 +1,6 @@
 # SAP: https://www.overleaf.com/project/604a54625b885d0da667de4b
 
-# !!!!! EventIndPrimaryD29 --> EventIndPrimaryIncludeNotMolecConfirmedD29
-# !!!!! EventTimePrimaryD29 --> EventTimePrimaryIncludeNotMolecConfirmedD29
-
 # !!!!! Standardize trt vs. tx, ctrl vs. ct, etc.
-
-# 2*(10^0.7340943) # Should equal LOD
-# 2*(10^0.847753) # Should equal LOD
-
-# # !!!!!
-# ggplot(data.frame(x=dat_orig_1$a_list[[1]]), aes(x=x)) + # page 20
-#   geom_histogram(bins=40) +
-#   xlim(0,3) +
-#   labs(title="Day29bindSpike")
-# ggplot(data.frame(x=dat_orig_1$a_list[[2]]), aes(x=x)) + # page 27
-#   geom_histogram(bins=40) +
-#   xlim(-1,3) +
-#   labs(title="Day29bindRBD")
 
 #################.
 ##### Setup #####

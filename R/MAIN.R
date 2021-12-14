@@ -255,6 +255,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     distr_A = "Unif(0,1)",
     edge = "none",
     surv_true = "Cox PH",
+    # sampling = "iid",
     sampling = c("iid", "two-phase (72%)", "two-phase (70% random)"),
     test = list(
       "Slope (two-tailed)" = list(

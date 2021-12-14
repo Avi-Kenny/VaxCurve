@@ -1343,17 +1343,33 @@ construct_infl_fn_1 <- function(dat, Gamma_os_n, Phi_n, lambda_2,
   weights_j <- dat$weights
   a_j <- dat$a
   
-  piece_2 <- (1/n_orig) * sum(
-    weights_j * (lambda_2*(Phi_n(a_j)^2) - lambda_3*Phi_n(a_j)) *
-      Gamma_os_n(round(a_j, -log10(C$appx$a)))
-  )
+  rho_n <- function(a,x) {
+    (1/n_orig)*sum(
+      weights_j * (Phi_n(a))^x * Gamma_os_n(round(a,-log10(C$appx$a)))
+    )
+  }
+  
+  a_j <- a
+  rho_1 <- rho_n(a_j,1)
+  rho_2 <- rho_n(a_j,2)
+  piece_01 <- Gamma_os_n(round(a_j,-log10(C$appx$a)))
+  piece_20 <- (Phi_n(a_j))^2
+  piece_10 <- Phi_n(a_j)
+  piece_11 <- Phi_n(a_j) * Gamma_os_n(round(a_j,-log10(C$appx$a)))
   
   fnc <- function(a_i) {
     
-    piece_1 <- (lambda_2*(Phi_n(a_i)^2) - lambda_3*Phi_n(a_i)) *
-      Gamma_os_n(round(a_i, -log10(C$appx$a)))
+    piece_1 <- (2*(1/n_orig)*sum(weights_j*as.integer(a_i<=a_j)*piece_10)+
+                  (Phi_n(a_i))^2-6*lambda_2)*rho_2
+    piece_2 <- lambda_2*(2*mean(as.integer(a_i<=a_j)*piece_11)+(Phi_n(a_i))^2*
+                           Gamma_os_n(round(a_i,-log10(C$appx$a))))
+    piece_3 <- (3*mean(as.integer(a_i<=a_j)*piece_20)+
+                  (Phi_n(a_i))^3-6*lambda_3)*rho_1
+    piece_4 <- lambda_3*((1/n_orig)*sum(weights_j*as.integer(a_i<=a_j)*
+                                          piece_01)+Phi_n(a_i)*
+                           Gamma_os_n(round(a_i,-log10(C$appx$a))))
     
-    return(piece_1-piece_2)
+    return(piece_1+piece_2-piece_3-piece_4)
     
   }
   

@@ -225,14 +225,6 @@ if (F) {
   rho_n <- function(a,Phi_n,Gamma_0,x) {
     mean( (Phi_n(a))^x * Gamma_0(a) )
   }
-  # construct_xi_n <- function(a,Phi_n,Gamma_0,x,y) {
-  #   a_j <- a
-  #   piece_1 <- (Phi_n(a_j))^x * Gamma_0(a_j)^y
-  #   fnc <- Vectorize(function(a_i) {
-  #     mean( as.integer(a_i<=a_j) * piece_1 )
-  #   })
-  #   return(fnc)
-  # }
   construct_infl_fn_1 <- function(a,Phi_n,Gamma_0,lambda_2n,lambda_3n) {
     a_j <- a
     rho_1 <- rho_n(a,Phi_n,Gamma_0,1)
@@ -252,12 +244,6 @@ if (F) {
         (3*mean(as.integer(a_i<=a_j)*piece_20)+(Phi_n(a_i))^3-6*lambda_3n)*rho_1 -
         lambda_3n*(mean(as.integer(a_i<=a_j)*piece_01)+Phi_n(a_i)*Gamma_0(a_i))
     }
-    # fnc <- function(a_i) {
-    #   (2*xi_10(a_i)+(Phi_n(a_i))^2-6*lambda_2n)*rho_2 +
-    #     lambda_2n*(2*xi_11(a_i)+(Phi_n(a_i))^2*Gamma_0(a_i)) -
-    #     (3*xi_20(a_i)+(Phi_n(a_i))^3-6*lambda_3n)*rho_1 -
-    #     lambda_3n*(xi_01(a_i)+Phi_n(a_i)*Gamma_0(a_i))
-    # }
     return(construct_superfunc(fnc, aux=NA, vec=c(1), vals=NA))
   }
   

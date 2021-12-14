@@ -9,11 +9,11 @@
 # GitHub packages: tedwestling/ctsCausal, tedwestling/CFsurvival, 
 #                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
-  main_task = "analysis_janssen.R", # run update analysis_moderna.R analysis_705.R analysis_Janssen.R
-  which_sim = "infl_fn_1 (temp)", # estimation edge testing
+  main_task = "run", # run update analysis_moderna.R analysis_705.R analysis_Janssen.R
+  which_sim = "testing", # "estimation" "edge" "testing" "infl_fn_1 (temp)"
   level_set_which = "level_set_testing_1", # level_set_estimation_1 level_set_testing_1
   # keep = c(1:3,7:9,16:18,22:24),
-  num_sim = 4000,
+  num_sim = 1000,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm"),
@@ -105,7 +105,8 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
             g_n_type = c("parametric", "binning"),
             edge_corr = c("none", "point", "spread", "min"),
             deriv_type = c("line", "spline", "m-spline", "linear", "gcomp"),
-            ecdf_type = c("step", "linear", "true")
+            ecdf_type = c("step", "linear", "true"),
+            omega_n_type = c("estimated", "true")
           )
         )
       ),
@@ -117,7 +118,8 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
             cf_folds = c(1,10),
             S_n_type = c("Cox PH", "Random Forest"),
             g_n_type = c("parametric", "binning"),
-            est_known_nuis = c(TRUE,FALSE)
+            est_known_nuis = c(TRUE,FALSE),
+            omega_n_type = c("estimated", "true")
           )
         )
       )
@@ -140,28 +142,32 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
         params = list(S_n_type="Cox PH", g_n_type="true",
                       ci_type="regular", cf_folds=1, edge_corr="none",
                       ecdf_type="linear (mid)", deriv_type="m-spline",
-                      gamma_type="kernel", n_bins=3)
+                      gamma_type="kernel", omega_n_type="estimated",
+                      n_bins=3)
       ),
       "Qbins (6)" = list(
         est = "Qbins",
         params = list(S_n_type="Cox PH", g_n_type="true",
                       ci_type="regular", cf_folds=1, edge_corr="none",
                       ecdf_type="linear (mid)", deriv_type="m-spline",
-                      gamma_type="kernel", n_bins=6)
+                      gamma_type="kernel", omega_n_type="estimated",
+                      n_bins=6)
       ),
       "Qbins (9)" = list(
         est = "Qbins",
         params = list(S_n_type="Cox PH", g_n_type="true",
                       ci_type="regular", cf_folds=1, edge_corr="none",
                       ecdf_type="linear (mid)", deriv_type="m-spline",
-                      gamma_type="kernel", n_bins=9)
+                      gamma_type="kernel", omega_n_type="estimated",
+                      n_bins=9)
       ),
       "Grenander" = list(
         est = "Grenander",
         params = list(S_n_type="Cox PH", g_n_type="true",
                       ci_type="regular", cf_folds=1, edge_corr="none",
                       ecdf_type="linear (mid)", deriv_type="m-spline",
-                      gamma_type="kernel", n_bins=0)
+                      gamma_type="kernel", omega_n_type="estimated",
+                      n_bins=0)
       )
     )
   )
@@ -183,28 +189,28 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       #   params = list(S_n_type="Random Forest", g_n_type="binning",
       #                 ci_type="regular", cf_folds=1, edge_corr="none",
       #                 ecdf_type="linear (mid)", deriv_type="m-spline",
-      #                 gamma_type="kernel")
+      #                 gamma_type="kernel", omega_n_type="estimated")
       # ),
       # "Grenander (edge corr)" = list(
       #   est = "Grenander",
       #   params = list(S_n_type="Random Forest", g_n_type="binning",
       #                 ci_type="regular", cf_folds=1, edge_corr="min",
       #                 ecdf_type="linear (mid)", deriv_type="m-spline",
-      #                 gamma_type="kernel")
+      #                 gamma_type="kernel", omega_n_type="estimated")
       # )
       "Grenander (estimated nuisances)" = list(
         est = "Grenander",
         params = list(S_n_type="Random Forest", g_n_type="binning",
                       ci_type="regular", cf_folds=1, edge_corr="none",
                       ecdf_type="linear (mid)", deriv_type="m-spline",
-                      gamma_type="kernel")
+                      gamma_type="kernel", omega_n_type="estimated")
       ),
       "Grenander (true nuisances)" = list(
         est = "Grenander",
         params = list(S_n_type="true", g_n_type="true",
                       ci_type="regular", cf_folds=1, edge_corr="none",
                       ecdf_type="true", deriv_type="m-spline",
-                      gamma_type="kernel")
+                      gamma_type="kernel", omega_n_type="estimated")
       )
     )
   )
@@ -225,21 +231,21 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
         params = list(S_n_type="true", g_n_type="true",
                       ci_type="regular", cf_folds=1, edge_corr="none",
                       ecdf_type="true", deriv_type="m-spline",
-                      gamma_type="kernel")
+                      gamma_type="kernel", omega_n_type="estimated")
       ),
       "Grenander (est nuisances)" = list(
         est = "Grenander",
         params = list(S_n_type="Cox PH", g_n_type="binning",
                       ci_type="regular", cf_folds=1, edge_corr="none",
                       ecdf_type="linear (mid)", deriv_type="m-spline",
-                      gamma_type="kernel")
+                      gamma_type="kernel", omega_n_type="estimated")
       )
     )
   )
   
   # Testing: compare all methods
   level_set_testing_1 <- list(
-    n = 5000,
+    n = 1000,
     # n = c(1000,2000),
     alpha_3 = 0,
     # alpha_3 = c(0,-0.25,-0.5),
@@ -249,16 +255,15 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     distr_A = "Unif(0,1)",
     edge = "none",
     surv_true = "Cox PH",
-    sampling = "iid",
-    # sampling = c("iid", "two-phase (72%)", "two-phase (70% random)"),
+    sampling = c("iid", "two-phase (72%)", "two-phase (70% random)"),
     test = list(
       "Slope (two-tailed)" = list(
         type = "test_2",
         alt_type = "two-tailed",
         test_stat_only = FALSE,
         params = list(var="asymptotic", ecdf_type="step", # "step" "linear (mid)"
-                      g_n_type="binning", S_n_type="true", cf_folds=1, # Cox PH
-                      est_known_nuis=FALSE)
+                      g_n_type="true", S_n_type="true", cf_folds=1, # Cox PH
+                      est_known_nuis=FALSE, omega_n_type="estimated")
       )
       # "Slope (decr)" = list(
       #   type = "test_2",
@@ -266,7 +271,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       #   test_stat_only = FALSE,
       #   params = list(var="asymptotic", ecdf_type="step", # "step" "linear (mid)"
       #                 g_n_type="binning", S_n_type="Cox PH", cf_folds=1,
-      #                 est_known_nuis=FALSE)
+      #                 est_known_nuis=FALSE, omega_n_type="estimated")
       # )
     )
   )
@@ -625,23 +630,30 @@ if (FALSE) {
     print(paste0("Estimated SD(Gamma_n): ", mean(sqrt(r1$Gamma_var_n))))
     
     # Checking infl_fn_1
-    sd(r1$partial_est)
-    mean(r1$partial_sd)
-    sd(r2$partial_est)
-    mean(r2$partial_sd)
-    sd(r3$partial_est)
-    mean(r3$partial_sd)
-    ggplot(data.frame(x=r1$partial_sd), aes(x=x)) +
+    r1 <- filter(sim$results, level_id==1)
+    sd(r1$Psi_1_n)
+    mean(r1$Psi_1_sd)
+    ggplot(data.frame(x=r1$Psi_1_sd), aes(x=x)) +
       geom_histogram(bins=50, alpha=0.7) +
-      geom_vline(xintercept=sd(r1$partial_est), color="forestgreen", linetype="dashed") +
+      geom_vline(xintercept=sd(r1$Psi_1_n), color="forestgreen", linetype="dashed") +
       labs(title="sd(partial_est)")
     
     # Checking infl_fn_4
-    sd(r1$Psi_4)
+    r1 <- filter(sim$results, level_id==1)
+    sd(r1$Psi_4_n)
     mean(r1$Psi_4_sd)
     ggplot(data.frame(x=r1$Psi_4_sd), aes(x=x)) +
       geom_histogram(bins=50, alpha=0.7) +
-      geom_vline(xintercept=sd(r1$Psi_4), color="forestgreen", linetype="dashed") +
+      geom_vline(xintercept=sd(r1$Psi_4_n), color="forestgreen", linetype="dashed") +
+      labs(title="sd(partial_est)")
+    
+    # Checking infl_fn_5
+    # True variance is (1/3)/n; SD is sqrt(1/(3*5000))
+    sd(r1$Psi_5_n)
+    mean(r1$Psi_5_sd)
+    ggplot(data.frame(x=r1$Psi_5_sd), aes(x=x)) +
+      geom_histogram(bins=50, alpha=0.7) +
+      geom_vline(xintercept=sd(r1$Psi_5_n), color="forestgreen", linetype="dashed") +
       labs(title="sd(partial_est)")
     
   }

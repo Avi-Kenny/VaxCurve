@@ -1336,32 +1336,69 @@ construct_xi_n <- function(Phi_n, lambda_2, lambda_3, vals=NA) {
 #' 
 #' @param x x
 #' @return x
-construct_infl_fn_1 <- function(dat, Gamma_os_n, Phi_n, xi_n, rho_n,
-                                lambda_2, lambda_3, vals=NA) {
+construct_infl_fn_1 <- function(dat, Gamma_os_n, Phi_n, lambda_2,
+                                lambda_3, vals=NA) {
   
   n_orig <- sum(dat$weights)
   weights_j <- dat$weights
   a_j <- dat$a
   
-  fnc <- function(a) {
+  piece_2 <- (1/n_orig) * sum(
+    weights_j * (lambda_2*(Phi_n(a_j)^2) - lambda_3*Phi_n(a_j)) *
+      Gamma_os_n(round(a_j, -log10(C$appx$a)))
+  )
+  
+  fnc <- function(a_i) {
     
-    a_i <- rep(a,length(a_j))
+    piece_1 <- (lambda_2*(Phi_n(a_i)^2) - lambda_3*Phi_n(a_i)) *
+      Gamma_os_n(round(a_i, -log10(C$appx$a)))
     
-    piece_1 <- (1/n_orig) * sum(
-      weights_j * (xi_n(a_i,a_j) - rho_n(a_i)) *
-        Gamma_os_n(round(a_j, -log10(C$appx$a)))
-    )
-    
-    piece_2 <- (lambda_2*(Phi_n(a)^2) - lambda_3*Phi_n(a)) *
-      Gamma_os_n(round(a, -log10(C$appx$a)))
-    
-    return(piece_1+piece_2)
+    return(piece_1-piece_2)
     
   }
   
   return(construct_superfunc(fnc, aux=NA, vec=c(1), vals=vals))
   
 }
+
+
+
+#' #' !!!!! document
+#' #' 
+#' #' @param x x
+#' #' @return x
+#' construct_infl_fn_1 <- function(dat, Gamma_os_n, Phi_n, xi_n, rho_n,
+#'                                 lambda_2, lambda_3, vals=NA) {
+#'   
+#'   n_orig <- sum(dat$weights)
+#'   weights_j <- dat$weights
+#'   a_j <- dat$a
+#'   
+#'   fnc <- function(a_i) {
+#'     
+#'     piece_1 <- (lambda_2*(Phi_n(a_i)^2) - lambda_3*Phi_n(a_i)) *
+#'       Gamma_os_n(round(a_i, -log10(C$appx$a)))
+#'     
+#'     piece_2 <- (1/n_orig) * sum(
+#'       weights_j * (lambda_2*(Phi_n(a_j)^2) - lambda_3*Phi_n(a_j)) *
+#'         Gamma_os_n(round(a_j, -log10(C$appx$a)))
+#'     )
+#'     
+#'     # piece_1 <- (1/n_orig) * sum(
+#'     #   weights_j * (xi_n(a_i,a_j) - rho_n(a_i)) *
+#'     #     Gamma_os_n(round(a_j, -log10(C$appx$a)))
+#'     # )
+#'     
+#'     # piece_2 <- (lambda_2*(Phi_n(a)^2) - lambda_3*Phi_n(a)) *
+#'     #   Gamma_os_n(round(a, -log10(C$appx$a)))
+#'     
+#'     return(piece_1-piece_2)
+#'     
+#'   }
+#'   
+#'   return(construct_superfunc(fnc, aux=NA, vec=c(1), vals=vals))
+#'   
+#' }
 
 
 
@@ -1426,6 +1463,7 @@ beta_n_var_hat <- function(dat, infl_fn_1, infl_fn_2) {
   for (i in c(1:length(dat$a))) {
     b_sum <- b_sum + (dat$weights[i] * (
       infl_fn_1(dat$a[i]) +
+      # infl_fn_1(dat$a[i]) +
         infl_fn_2(dat$w[i,], dat$y_star[i], dat$delta_star[i], dat$a[i])
     ))^2
   }
@@ -1557,7 +1595,8 @@ construct_Gamma_cf <- function(dat_orig, params, vlist) {
                                  k=15)
     f_a_n <- construct_f_a_n(dat_orig_train, vlist$A_grid, f_aIw_n)
     g_n <- construct_g_n(f_aIw_n, f_a_n)
-    omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
+    omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n,
+                                 type=params$omega_n_type)
     
     # Construct K functions
     Gamma_cf_k[[k]] <- construct_Gamma_cf_k(

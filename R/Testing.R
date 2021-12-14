@@ -10,7 +10,8 @@
   # 2. Set global constants
   params <- list(S_n_type="true", g_n_type="true", ci_type="regular",
                  cf_folds=1, edge_corr="none", ecdf_type="true",
-                 deriv_type="m-spline", gamma_type="kernel")
+                 deriv_type="m-spline", gamma_type="kernel",
+                 omega_n_type="estimated")
   C <- sim$constants
   C$appx$t_e <- 10
   L <- list(n=1000, alpha_3=-2, dir="decr",

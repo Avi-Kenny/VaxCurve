@@ -53,7 +53,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
                                    type=params$g_n_type, k=15)
       f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
       g_n <- construct_g_n(f_aIw_n, f_a_n)
-      omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
+      omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n,
+                                   type=params$omega_n_type)
       Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n)
       
       # Construct one-step edge estimator
@@ -119,7 +120,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid,
                                    type=params$g_n_type, k=15)
       f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
-      omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
+      omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n,
+                                   type=params$omega_n_type)
     }
     
     # Compute new functions
@@ -254,7 +256,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     # Note: S_n and Sc_n will not work with type="true"
     S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
     Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
-    omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
+    omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n,
+                                 type=params$omega_n_type)
     pi_n <- construct_pi_n(dat, vlist$W_grid, type="generalized",
                            f_aIw_n=f_aIw_n, cutoffs=cutoffs)
     

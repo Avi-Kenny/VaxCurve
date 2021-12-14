@@ -1,4 +1,302 @@
 
+# Debugging infl_fn_1
+if (F) {
+  
+  ######################################################.
+  ##### Old plot of estimated Var against true Var #####
+  ######################################################.
+  
+  if (F) {
+    # Var estimates (True Var is 0.00025)
+    ggplot(data.frame(x=Psi_6_var_est), aes(x=x)) +
+      geom_histogram(alpha=0.7) +
+      geom_vline(xintercept=var(Psi_6_est), color="forestgreen", linetype="dashed")
+    
+    # Var estimates (True Var is ???)
+    print(paste("Observed variance:", round(var(Psi_4_est),7)))
+    print(paste("Estimated variance:", round(mean(Psi_4_var_est),7)))
+  }
+  
+  
+  
+  #################.
+  ##### Psi_6 #####
+  #################.
+  
+  # IF constructor
+  construct_infl_fn_6 <- function(Phi_n) {
+    fnc <- function(a_i) {
+      as.integer(a_i<=0.5) - Phi_n(0.5)
+    }
+    return(fnc) # return(construct_superfunc(fnc, aux=NA, vec=c(1), vals=NA))
+  }
+  
+  n_reps <- 1000
+  Psi_6_est <- rep(NA, n_reps)
+  Psi_6_var_est <- rep(NA, n_reps)
+  reject <- rep(NA, n_reps)
+  for (i in c(1:n_reps)) {
+    
+    # Generate data, construct ECDF
+    n_orig <- 1000
+    a <- round(runif(n_orig), 3)
+    Phi_n <- ecdf(a)
+    
+    # Construct estimator, IF, and variance estimator
+    Psi_6_est[i] <- Phi_n(0.5)
+    infl_fn_Psi_6 <- construct_infl_fn_6(Phi_n)
+    Psi_6_var_est[i] <- (1/n_orig^2) * sum((infl_fn_Psi_6(a))^2)
+    
+    # Hypothesis test (Null: Phi_0(0.5)=0.5)
+    Phi_0 <- 0.5
+    test_stat <- (Psi_6_est[i]-Phi_0)^2/Psi_6_var_est[i]
+    p_val <- pchisq(test_stat, df=1, lower.tail=FALSE)
+    reject[i] <- as.integer(p_val<0.05)
+    
+  }
+  
+  # False positive rate
+  mean(reject)
+  
+  
+  
+  #################.
+  ##### Psi_4 #####
+  #################.
+  
+  # Approximate Gamma_0
+  Gamma_0 <- function(x) { sqrt(x)/3 }
+  
+  # IF constructor
+  construct_infl_fn_4 <- function(a,Phi_n,Gamma_0) {
+    a_j <- a
+    piece_1 <- Gamma_0(a_j)
+    piece_2 <- 2*mean(Phi_n(a_j)*Gamma_0(a_j))
+    fnc <- function(a_i) {
+      Phi_n(a_i)*Gamma_0(a_i) + mean(as.integer(a_i<=a_j)*piece_1) - piece_2
+    }
+    return(construct_superfunc(fnc, aux=NA, vec=c(1), vals=NA))
+  }
+  
+  n_reps <- 1000
+  Psi_4_est <- rep(NA, n_reps)
+  Psi_4_var_est <- rep(NA, n_reps)
+  reject <- rep(NA, n_reps)
+  for (i in c(1:n_reps)) {
+    
+    # Generate data, construct ECDF
+    n_orig <- 1000
+    a <- round(runif(n_orig), 3)
+    Phi_n <- ecdf(a)
+    
+    # Construct estimator, IF, and variance estimator
+    Psi_4_est[i] <- mean(Phi_n(a)*Gamma_0(a))
+    infl_fn_Psi_4 <- construct_infl_fn_4(a,Phi_n,Gamma_0)
+    Psi_4_var_est[i] <- (1/n_orig^2) * sum((infl_fn_Psi_4(a))^2)
+    
+    # Hypothesis test
+    Phi_0 <- 0.13335
+    test_stat <- (Psi_4_est[i]-Phi_0)^2/Psi_4_var_est[i]
+    p_val <- pchisq(test_stat, df=1, lower.tail=FALSE)
+    reject[i] <- as.integer(p_val<0.05)
+    
+  }
+  
+  # False positive rate
+  mean(reject)
+  
+  
+  
+  #################.
+  ##### Psi_7 #####
+  #################.
+  
+  # Approximate Gamma_0
+  Gamma_0 <- function(x) { sqrt(x)/3 }
+  
+  # IF constructor
+  construct_infl_fn_7 <- function(a,Phi_n,Gamma_0,lambda_3n) {
+    a_j <- a
+    piece_1 <- (Phi_n(a_j))^2
+    piece_2 <- mean(Phi_n(a_j)*Gamma_0(a_j))
+    piece_3 <- Gamma_0(a_j)
+    fnc <- function(a_i) {
+      (3*mean(as.integer(a_i<=a_j)*piece_1) + (Phi_n(a_i))^3 - 6*lambda_3n) *
+        piece_2 +
+        lambda_3n * (
+          mean(as.integer(a_i<=a_j)*piece_3) + Phi_n(a_i)*Gamma_0(a_i)
+        )
+    }
+    return(construct_superfunc(fnc, aux=NA, vec=c(1), vals=NA))
+  }
+  
+  n_reps <- 1000
+  Psi_7_est <- rep(NA, n_reps)
+  Psi_7_var_est <- rep(NA, n_reps)
+  reject <- rep(NA, n_reps)
+  for (i in c(1:n_reps)) {
+    
+    # Generate data, construct ECDF and lambda_3
+    n_orig <- 1000
+    # a <- round(runif(n_orig), 3)
+    a <- runif(n_orig)
+    Phi_n <- ecdf(a)
+    lambda_3n <- mean((Phi_n(a))^3)
+    
+    # Construct estimator, IF, and variance estimator
+    Psi_7_est[i] <- mean(lambda_3n*Phi_n(a)*Gamma_0(a))
+    infl_fn_Psi_7 <- construct_infl_fn_7(a,Phi_n,Gamma_0,lambda_3n)
+    Psi_7_var_est[i] <- (1/n_orig^2) * sum((infl_fn_Psi_7(a))^2)
+    
+    # Hypothesis test
+    Phi_0 <- 0.03333
+    test_stat <- (Psi_7_est[i]-Phi_0)^2/Psi_7_var_est[i]
+    p_val <- pchisq(test_stat, df=1, lower.tail=FALSE)
+    reject[i] <- as.integer(p_val<0.05)
+    
+  }
+  
+  # False positive rate
+  mean(reject)
+  
+  
+  
+  #################.
+  ##### Psi_8 #####
+  #################.
+  
+  # Approximate Gamma_0
+  Gamma_0 <- function(x) { sqrt(x)/3 }
+  
+  # IF constructor
+  construct_infl_fn_8 <- function(a,Phi_n,Gamma_0,lambda_2n) {
+    a_j <- a
+    piece_1 <- Phi_n(a_j)
+    piece_2 <- mean((Phi_n(a_j))^2*Gamma_0(a_j))
+    piece_3 <- Phi_n(a_j)*Gamma_0(a_j)
+    fnc <- function(a_i) {
+      (2*mean(as.integer(a_i<=a_j)*piece_1) + (Phi_n(a_i))^2 - 6*lambda_2n) * 
+        piece_2 +
+        lambda_2n *
+        (2*mean(as.integer(a_i<=a_j)*piece_3) + (Phi_n(a_i))^2*Gamma_0(a_i))
+    }
+    return(construct_superfunc(fnc, aux=NA, vec=c(1), vals=NA))
+  }
+  
+  n_reps <- 1000
+  Psi_8_est <- rep(NA, n_reps)
+  Psi_8_var_est <- rep(NA, n_reps)
+  reject <- rep(NA, n_reps)
+  for (i in c(1:n_reps)) {
+    
+    # Generate data, construct ECDF and lambda_3
+    n_orig <- 1000
+    # a <- round(runif(n_orig), 3)
+    a <- runif(n_orig)
+    Phi_n <- ecdf(a)
+    lambda_2n <- mean((Phi_n(a))^2)
+    
+    # Construct estimator, IF, and variance estimator
+    Psi_8_est[i] <- mean(lambda_2n*(Phi_n(a))^2*Gamma_0(a))
+    infl_fn_Psi_8 <- construct_infl_fn_8(a,Phi_n,Gamma_0,lambda_2n)
+    Psi_8_var_est[i] <- (1/n_orig^2) * sum((infl_fn_Psi_8(a))^2)
+    
+    # Hypothesis test
+    Phi_0 <- 0.031746
+    test_stat <- (Psi_8_est[i]-Phi_0)^2/Psi_8_var_est[i]
+    p_val <- pchisq(test_stat, df=1, lower.tail=FALSE)
+    reject[i] <- as.integer(p_val<0.05)
+    
+  }
+  
+  # False positive rate
+  mean(reject)
+  
+  
+  
+  #################.
+  ##### Psi_1 #####
+  #################.
+  
+  # Approximate Gamma_0
+  Gamma_0 <- function(x) { sqrt(x)/3 }
+  
+  # IF constructor
+  rho_n <- function(a,Phi_n,Gamma_0,x) {
+    mean( (Phi_n(a))^x * Gamma_0(a) )
+  }
+  # construct_xi_n <- function(a,Phi_n,Gamma_0,x,y) {
+  #   a_j <- a
+  #   piece_1 <- (Phi_n(a_j))^x * Gamma_0(a_j)^y
+  #   fnc <- Vectorize(function(a_i) {
+  #     mean( as.integer(a_i<=a_j) * piece_1 )
+  #   })
+  #   return(fnc)
+  # }
+  construct_infl_fn_1 <- function(a,Phi_n,Gamma_0,lambda_2n,lambda_3n) {
+    a_j <- a
+    rho_1 <- rho_n(a,Phi_n,Gamma_0,1)
+    rho_2 <- rho_n(a,Phi_n,Gamma_0,2)
+    # xi_01 <- construct_xi_n(a,Phi_n,Gamma_0,0,1)
+    # xi_20 <- construct_xi_n(a,Phi_n,Gamma_0,2,0)
+    # xi_10 <- construct_xi_n(a,Phi_n,Gamma_0,1,0)
+    # xi_11 <- construct_xi_n(a,Phi_n,Gamma_0,1,1)
+    piece_01 <- Gamma_0(a_j)
+    piece_20 <- (Phi_n(a_j))^2
+    piece_10 <- Phi_n(a_j)
+    piece_11 <- Phi_n(a_j) * Gamma_0(a_j)
+    
+    fnc <- function(a_i) {
+      (2*mean(as.integer(a_i<=a_j)*piece_10)+(Phi_n(a_i))^2-6*lambda_2n)*rho_2 +
+        lambda_2n*(2*mean(as.integer(a_i<=a_j)*piece_11)+(Phi_n(a_i))^2*Gamma_0(a_i)) -
+        (3*mean(as.integer(a_i<=a_j)*piece_20)+(Phi_n(a_i))^3-6*lambda_3n)*rho_1 -
+        lambda_3n*(mean(as.integer(a_i<=a_j)*piece_01)+Phi_n(a_i)*Gamma_0(a_i))
+    }
+    # fnc <- function(a_i) {
+    #   (2*xi_10(a_i)+(Phi_n(a_i))^2-6*lambda_2n)*rho_2 +
+    #     lambda_2n*(2*xi_11(a_i)+(Phi_n(a_i))^2*Gamma_0(a_i)) -
+    #     (3*xi_20(a_i)+(Phi_n(a_i))^3-6*lambda_3n)*rho_1 -
+    #     lambda_3n*(xi_01(a_i)+Phi_n(a_i)*Gamma_0(a_i))
+    # }
+    return(construct_superfunc(fnc, aux=NA, vec=c(1), vals=NA))
+  }
+  
+  n_reps <- 1000
+  Psi_1_est <- rep(NA, n_reps)
+  Psi_1_var_est <- rep(NA, n_reps)
+  reject <- rep(NA, n_reps)
+  for (i in c(1:n_reps)) {
+    
+    # Generate data, construct ECDF and lambda_3
+    n_orig <- 1000 # !!!!! 1000
+    # a <- round(runif(n_orig), 3)
+    a <- runif(n_orig)
+    Phi_n <- ecdf(a)
+    lambda_2n <- mean((Phi_n(a))^2)
+    lambda_3n <- mean((Phi_n(a))^3)
+    
+    # Construct estimator, IF, and variance estimator
+    Psi_1_est[i] <- mean(
+      lambda_2n*(Phi_n(a))^2*Gamma_0(a) - lambda_3n*Phi_n(a)*Gamma_0(a)
+    )
+    infl_fn_Psi_1 <- construct_infl_fn_1(a,Phi_n,Gamma_0,lambda_2n,lambda_3n)
+    Psi_1_var_est[i] <- (1/n_orig^2) * sum((infl_fn_Psi_1(a))^2)
+    
+    # Hypothesis test
+    Phi_0 <- -0.0015878
+    test_stat <- (Psi_1_est[i]-Phi_0)^2/Psi_1_var_est[i]
+    p_val <- pchisq(test_stat, df=1, lower.tail=FALSE)
+    reject[i] <- as.integer(p_val<0.05)
+    
+  }
+  
+  # False positive rate
+  mean(reject)
+  
+}
+
+
+
 # Testing infl_fn_1
 if (F) {
   

@@ -375,7 +375,7 @@ if (F) {
   
   # !!!!! Reset appx for `t_e` and `a`
   C$appx$t_e <- 10
-  C$appx$a <- 0.001 # !!!!!
+  C$appx$a <- 0.01 # !!!!!
   
   # Set `a` value from `a_list`
   dat_orig$a <- dat_orig$a_list[[cfg2$marker_num]]
@@ -505,6 +505,9 @@ if (cfg2$run_graphs) {
   # CVE graph
   {
     
+    # ests <- readRDS("ests.rds")
+    # ests_gcomp <- readRDS("ests_gcomp.rds")
+    
     # Extract results
     theta_ests_gren <- ests$est
     ci_lo_gren <- ests$ci_lo
@@ -518,20 +521,18 @@ if (cfg2$run_graphs) {
     ests_gcomp <- cve(theta_ests_gcomp)
     ests_gren <- cve(theta_ests_gren)
     
-    # Truncate at 5/95 or 10/90 quantiles
-    # which <- p_grid<=ests$Phi_n_inv(0.95)
-    which <- p_grid>=ests$Phi_n_inv(0.05) & p_grid<=ests$Phi_n_inv(0.95)
-    # if (cfg2$marker_num==3) {
-    #   which <- p_grid<=Phi_n_inv(0.9)
-    # } else {
-    #   which <- p_grid>=Phi_n_inv(0.1) & p_grid<=Phi_n_inv(0.9)
-    # }
-    
+    # Truncate at 5/95 quantiles and at histogram edges
     # !!!!! replace NA values with first non-NA value for point mass at left
-    
+    which1 <- p_grid>=ests$Phi_n_inv(0.05) & p_grid<=ests$Phi_n_inv(0.95)
+    a_grid <- p_grid*a_scale-a_shift
+    which2 <- a_grid>=min(a_orig) & a_grid<=max(a_orig)
+    which <- which1 & which2
     ests_gren <- ifelse(which,ests_gren,NA)
+    ests_gcomp <- ifelse(which,ests_gcomp,NA)
     ci_lo <- ifelse(which,ci_lo,NA)
     ci_hi <- ifelse(which,ci_hi,NA)
+    x1 <- a_grid[min(which(which))]
+    x2 <- a_grid[max(which(which))]
     
     # Labels
     x_labs <- c("Anti Spike IgG (BAU/ml) (=s)", "Anti RBD IgG (BAU/ml) (=s)",
@@ -539,48 +540,59 @@ if (cfg2$run_graphs) {
     x_lab <- x_labs[cfg2$marker_num]
     y_lab <- "Controlled VE against COVID by day 195"
     
-    # Plots
+    # VE overall est/ci
+    ve_overall <- 0.501 # !!!!! Later calculate the overall VE numbers manually or pull from Youyi report
+    ve_ci <- c(0.437,0.564) # !!!!! Later calculate the overall VE numbers manually or pull from Youyi report
+    
+    # Plots: setup
+    n_bins <- 20
+    xlim <- c(min(a_orig)-(max(a_orig)-min(a_orig))/n_bins,
+              max(a_orig)+(max(a_orig)-min(a_orig))/n_bins)
+    
+    # Plots: data
     plot_data_1 <- data.frame(
-      x = p_grid*a_scale-a_shift,
-      y = ests_gren,
-      which = rep("Grenander", length(p_grid)),
-      ci_lo = ci_lo,
-      ci_hi = ci_hi
+      x = c(a_grid,x1,x2),
+      # x = c(a_grid,xlim),
+      y = c(ests_gren,rep(ve_overall,2)),
+      which = c(rep("Controlled VE", length(p_grid)),rep("Overall VE",2)),
+      ci_lo = c(ci_lo,rep(ve_ci[1],2)),
+      ci_hi = c(ci_hi,rep(ve_ci[2],2))
     )
     plot_data_2 <- data.frame(
-      x = rep(p_grid*a_scale-a_shift,2),
-      y = c(ests_gcomp,ests_gren),
-      which = rep(c("G-comp", "Grenander"), each=length(p_grid)),
-      ci_lo = c(ests_gcomp,ci_lo),
-      ci_hi = c(ests_gcomp,ci_hi)
+      x = c(rep(a_grid,2),x1,x2),
+      # x = c(rep(a_grid,2),xlim),
+      y = c(ests_gcomp,ests_gren,rep(ve_overall,2)),
+      which = c(rep(c("Cox model","Controlled VE"), each=length(p_grid)),
+                rep("Overall VE",2)),
+      ci_lo = c(ests_gcomp,ci_lo,rep(ve_ci[1],2)),
+      ci_hi = c(ests_gcomp,ci_hi,rep(ve_ci[2],2))
     )
     
     plot_1 <- ggplot(plot_data_1, aes(x=x, y=y, color=which)) +
-      geom_hline(yintercept=0.501, alpha=0.3, size=0.4) + # !!!!! Later calculate this manually or pull from Youyi report
-      geom_hline(yintercept=c(0.437,0.564), alpha=0.3, # !!!!! Later calculate this manually or pull from Youyi report
-                 size=0.4, linetype="dotted") +
-      geom_ribbon(aes(ymin=ci_lo,ymax=ci_hi), alpha=0.1,
-                  linetype="dotted", fill="darkblue") +
+      geom_ribbon(aes(ymin=ci_lo,ymax=ci_hi,fill=which), alpha=0.1,
+                  linetype="dotted") +
       geom_histogram(mapping=aes(x=x,y=(0.6*..count..)/max(..count..)),
-                     data=data.frame(x=a_orig), bins=20, fill="forestgreen",
+                     data=data.frame(x=a_orig), bins=n_bins, fill="forestgreen",
                      alpha=0.3, inherit.aes=F) +
       scale_y_continuous(labels=label_percent(accuracy=1), limits=c(0,1),
                          breaks=seq(-1,1,0.1), minor_breaks=NULL) +
       theme(panel.grid.major=element_line(colour="white", size=0.3),
             panel.grid.minor=element_line(colour="white", size=0.3)) +
-      scale_x_continuous(label=math_format(10^.x)) +
-      scale_color_manual(values=c("darkblue")) +
-      theme(legend.position="none") +
-      labs(x=x_lab, y=y_lab) +
+      # scale_x_continuous(label=math_format(10^.x)) +
+      scale_x_continuous(label=math_format(10^.x),limits=xlim) +
+      scale_color_manual(values=c("darkblue","darkgrey")) +
+      scale_fill_manual(values=c("darkblue","darkgrey")) +
+      theme(legend.position="bottom") +
+      labs(x=x_lab, y=y_lab, color=NULL, fill=NULL) +
       geom_line()
-    
+    plot_1 # !!!!!
     plot_2 <- plot_1 %+% plot_data_2
     suppressMessages({
       plot_2 <- plot_2 +
-        scale_color_manual(values=c("purple", "darkblue")) +
-        theme(legend.position="bottom") +
-        labs(color="Estimator")
+        scale_color_manual(values=c("darkblue","purple","darkgrey")) +
+        scale_fill_manual(values=c("darkblue","purple","darkgrey"))
     })
+    plot_2 # !!!!!
     
     # Save plots
     name_1 <- paste0("Janssen plots/plot_",cfg2$tid,".pdf")
@@ -621,13 +633,13 @@ if (cfg2$run_graphs) {
 
     # Export: 6" x 5"
     df_marg <- data.frame(
-      x = p_grid*a_scale-a_shift,
+      x = a_grid,
       ymin = 0,
       ymax = ests$f_a_n(p_grid)*0.001
     )
     ggplot(
       data.frame(
-        x = p_grid*a_scale-a_shift,
+        x = a_grid,
         y = Gamma_os_n(round(p_grid, -log10(C$appx$a)))
       ),
       aes(x=x, y=y)
@@ -646,7 +658,7 @@ if (cfg2$run_graphs) {
   if (F) {
     
     df_marg <- data.frame(
-      x = p_grid*a_scale-a_shift,
+      x = a_grid,
       ymin = 0,
       ymax = ests$f_a_n(p_grid)*0.01
     )
@@ -654,7 +666,7 @@ if (cfg2$run_graphs) {
     ests_gren <- theta_n(p_grid)
     ggplot(
       data.frame(
-        x = rep(p_grid*a_scale-a_shift,2),
+        x = rep(a_grid,2),
         y = c(ests_gcomp,ests_gren),
         which = rep(c("G-comp", "Grenander"), each=length(p_grid))
       ),

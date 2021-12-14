@@ -1349,7 +1349,6 @@ construct_infl_fn_1 <- function(dat, Gamma_os_n, Phi_n, lambda_2,
     )
   }
   
-  a_j <- a
   rho_1 <- rho_n(a_j,1)
   rho_2 <- rho_n(a_j,2)
   piece_01 <- Gamma_os_n(round(a_j,-log10(C$appx$a)))

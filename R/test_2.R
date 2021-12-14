@@ -64,15 +64,15 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
       
     } else {
       
-      # Use known values of nuisances to estimate variance more accurately
-      # Note that we intentionally DO NOT use the exact values to construct beta_n
-      if (params$est_known_nuis==FALSE) {
-        lambda_2 <- 1/3
-        lambda_3 <- 1/4
-        rho_n <- Vectorize(function(x) { 0 })
-      } else {
-        rho_n <- construct_rho_n(dat, Phi_n)
-      }
+      # # Use known values of nuisances to estimate variance more accurately
+      # # Note that we intentionally DO NOT use the exact values to construct beta_n
+      # if (params$est_known_nuis==FALSE) {
+      #   lambda_2 <- 1/3
+      #   lambda_3 <- 1/4
+      #   rho_n <- Vectorize(function(x) { 0 })
+      # } else {
+      #   rho_n <- construct_rho_n(dat, Phi_n)
+      # }
       
       # Construct additional component functions
       gcomp_n <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n)

@@ -1,14 +1,18 @@
 # SAP: https://www.overleaf.com/project/604a54625b885d0da667de4b
 
-# !!!!! Standardize trt vs. tx, ctrl vs. ct, etc.
-
 #################.
 ##### Setup #####
 #################.
 
-# Setup
-markers <- c("Day29bindSpike", "Day29bindRBD", "Day29ADCP")
+# Set up configuration variables
+C <- list(
+  t_e=66,
+  appx = list(t_e=1, w1=0.1, w1b=0.1, w3=1, a=0.01) # !!!!! a=0.001, w3=0.1
+)
 cfg2 <- list(
+  markers = c("Day29bindSpike", "Day29bindRBD", "Day29ADCP",
+              "Day29pseudoneutid50"),
+  datasets = c("1", "adcp", "psv"),
   run_import_data = F,
   run_dqa = F,
   run_graphs = T
@@ -16,39 +20,38 @@ cfg2 <- list(
 )
 
 # Catch TID and set config accordingly
-# !!!!! Temporary
 cfg2$tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
 # cfg2$tid <- 1
 cfg2_df <- data.frame(
-  tid = c(1:24),
-  S_n_type = rep(c("Cox PH", "Super Learner"), 12),
-  marker_num = rep(rep(c(1,2,3), each=2), 4),
-  jit_L = rep(0.25, 24),
-  jit_R = rep(c(0.6,0.75,0.9,1), each=6)
+  # tid = c(1:32),
+  # S_n_type = rep(c("Cox PH", "Super Learner"), 16),
+  # marker_num = rep(rep(c(1:4), each=2), 4),
+  # jit_L = rep(0.25, 32),
+  # jit_R = rep(c(0.6,0.75,0.9,1), each=8)
+  tid = c(1:48),
+  S_n_type = rep(c("Cox PH", "Super Learner", "Random Forest"), 16),
+  marker_num = rep(rep(c(1:4), each=2), 6),
+  jit_L = rep(0.25, 48),
+  jit_R = rep(c(0.6,0.75,0.9,1), each=12)
 )
+cfg2_df <- rbind(cfg2_df,cfg2_df) # !!!!!
+cfg2_df <- arrange(cfg2_df, marker_num, jit_L, jit_R, S_n_type) # !!!!!
+cfg2_df$tid <- c(1:nrow(cfg2_df)) #!!!!!
 cfg2$S_n_type <- cfg2_df[cfg2$tid, "S_n_type"]
 cfg2$marker_num <- cfg2_df[cfg2$tid, "marker_num"]
 cfg2$jit_L <- cfg2_df[cfg2$tid, "jit_L"]
 cfg2$jit_R <- cfg2_df[cfg2$tid, "jit_R"]
+cfg2$d <- case_when(
+  cfg2$marker_num<=2 ~ cfg2$datasets[1],
+  cfg2$marker_num==3 ~ cfg2$datasets[2],
+  cfg2$marker_num==4 ~ cfg2$datasets[3],
+)
 
 cfg2$folder = paste0("Janssen functions/Janssen (tid ",cfg2$tid,")")
 # cfg2$edge_spread <- ifelse(cfg2$marker_num==3, TRUE, FALSE) # !!!!!
 
 # Create directory if it doesn't exist
 if (!dir.exists(cfg2$folder)) { dir.create(cfg2$folder) }
-
-# Helper function: save or load functions
-save_or_load <- function(fns, folder, which) {
-  if (which=="load") {
-    for (fn in fns) {
-      assign(fn, readRDS(paste0(folder,"/",fn,".rds")), envir=parent.frame())
-    }
-  } else if (which=="save") {
-    for (fn in fns) {
-      saveRDS(eval(as.name(fn)), paste0(folder,"/",fn,".rds"))
-    }
-  }
-}
 
 
 
@@ -59,79 +62,84 @@ save_or_load <- function(fns, folder, which) {
 if (cfg2$run_import_data) {
   
   df_raw_1 <- read.csv(paste0("Z:/covpn/p3003/analysis/correlates/Part_A_Blind",
-                            "ed_Phase_Data/adata/janssen_pooled_real_data_proc",
-                            "essed_with_riskscore.csv"))
+                              "ed_Phase_Data/adata/janssen_pooled_real_data_pr",
+                              "ocessed_with_riskscore.csv"))
   df_raw_adcp <- read.csv(paste0("Z:/covpn/p3003/analysis/correlates/Part_A_Bl",
-                            "inded_Phase_Data/adata/janssen_pooled_realADCP_da",
-                            "ta_processed_with_riskscore.csv"))
+                                 "inded_Phase_Data/adata/janssen_pooled_realAD",
+                                 "CP_data_processed_with_riskscore.csv"))
+  df_raw_psv <- read.csv(paste0("Z:/covpn/p3003/analysis/correlates/Part_A_Bli",
+                                "nded_Phase_Data/adata/janssen_pooled_realPsV_",
+                                "data_processed_with_riskscore.csv"))
   
-  # Subset data frames
-  df_ph1_1 <- filter(df_raw_1, ph1.D29==T)
-  df_ctrl_1 <- filter(df_ph1_1, Trt==0)
-  df_trt_1 <- filter(df_ph1_1, Trt==1)
-  df_ph1_adcp <- filter(df_raw_adcp, ph1.D29==T)
-  df_ctrl_adcp <- filter(df_ph1_adcp, Trt==0)
-  df_trt_adcp <- filter(df_ph1_adcp, Trt==1)
-  
-  # Create data structures for analysis
-  dat_orig_1 <- list(
-    "id" = df_trt_1[["Ptid"]],
-    "y_star" = df_trt_1[["EventTimePrimaryIncludeNotMolecConfirmedD29"]],
-    "delta_star" = df_trt_1[["EventIndPrimaryIncludeNotMolecConfirmedD29"]],
-    "w" = data.frame(
-      "w1" = as.integer(df_trt_1[["Region"]]==1),
-      "w2" = as.integer(df_trt_1[["Region"]]==2),
-      "w3" = df_trt_1[["risk_score"]]
-    ),
-    "weights" = df_trt_1[["wt.D29"]],
-    "a_list" = list(df_trt_1[[markers[1]]], df_trt_1[[markers[2]]], NA),
-    "delta" = as.integer(df_trt_1[["ph2.D29"]])
-  )
-  dat_orig_adcp <- list(
-    "id" = df_trt_adcp[["Ptid"]],
-    "y_star" = df_trt_adcp[["EventTimePrimaryIncludeNotMolecConfirmedD29"]],
-    "delta_star" = df_trt_adcp[["EventIndPrimaryIncludeNotMolecConfirmedD29"]],
-    "w" = data.frame(
-      "w1" = as.integer(df_trt_adcp[["Region"]]==1),
-      "w2" = as.integer(df_trt_adcp[["Region"]]==2),
-      "w3" = df_trt_adcp[["risk_score"]]
-    ),
-    "weights" = df_trt_adcp[["wt.D29"]],
-    "a_list" = list(NA, NA, df_trt_adcp[[markers[3]]]),
-    "delta" = as.integer(df_trt_adcp[["ph2.D29"]])
-  )
-  
-  # Stabilize weights (rescale to sum to sample size)
-  dat_orig_1$weights <- ifelse(dat_orig_1$delta==1,
-                               dat_orig_1$weights, 0)
-  s <- sum(dat_orig_1$weights) / length(dat_orig_1$delta)
-  dat_orig_1$weights <- dat_orig_1$weights / s
-  dat_orig_adcp$weights <- ifelse(dat_orig_adcp$delta==1,
-                                  dat_orig_adcp$weights, 0)
-  s <- sum(dat_orig_adcp$weights) / length(dat_orig_adcp$delta)
-  dat_orig_adcp$weights <- dat_orig_adcp$weights / s
-  
-  # Save datasets
-  saveRDS(dat_orig_1, file="Janssen data/dat_orig_1_Janssen.rds")
-  saveRDS(df_ph1_1, file="Janssen data/df_ph1_1_Janssen.rds")
-  saveRDS(df_ctrl_1, file="Janssen data/df_ctrl_1_Janssen.rds")
-  saveRDS(df_trt_1, file="Janssen data/df_trt_1_Janssen.rds")
-  saveRDS(dat_orig_adcp, file="Janssen data/dat_orig_adcp_Janssen.rds")
-  saveRDS(df_ph1_adcp, file="Janssen data/df_ph1_adcp_Janssen.rds")
-  saveRDS(df_ctrl_adcp, file="Janssen data/df_ctrl_adcp_Janssen.rds")
-  saveRDS(df_trt_adcp, file="Janssen data/df_trt_adcp_Janssen.rds")
+  for (d in cfg2$datasets) {
+    
+    # Subset data frames
+    assign(paste0("df_ph1_",d),
+           filter(eval(as.name(paste0("df_raw_",d))), ph1.D29==T))
+    assign(paste0("df_ct_",d),
+           filter(eval(as.name(paste0("df_ph1_",d))), Trt==0))
+    assign(paste0("df_tx_",d),
+           filter(eval(as.name(paste0("df_ph1_",d))), Trt==1))
+    
+    # Create data structures for analysis
+    df <- get(paste0("df_tx_",d))
+    if (d=="1") {
+      a_list <- list(df[[cfg2$markers[1]]], df[[cfg2$markers[2]]], NA, NA)
+    } else if (d=="adcp") {
+      a_list <- list(NA, NA, df[[cfg2$markers[3]]], NA)
+    } else if (d=="psv") {
+      a_list <- list(NA, NA, NA, df[[cfg2$markers[4]]])
+    }
+    dorig <- list(
+      "id" = df[["Ptid"]],
+      "y_star" = df[["EventTimePrimaryIncludeNotMolecConfirmedD29"]],
+      "delta_star" = df[["EventIndPrimaryIncludeNotMolecConfirmedD29"]],
+      "w" = data.frame(
+        "w1" = as.integer(df[["Region"]]==1),
+        "w2" = as.integer(df[["Region"]]==2),
+        "w3" = df[["risk_score"]]
+      ),
+      "weights" = df[["wt.D29"]],
+      "a_list" = a_list,
+      "delta" = as.integer(df[["ph2.D29"]])
+    )
+    
+    # Stabilize weights (rescale to sum to sample size)
+    dorig$weights <- ifelse(dorig$delta==1, dorig$weights, 0)
+    s <- sum(dorig$weights) / length(dorig$delta)
+    dorig$weights <- dorig$weights / s
+    
+    # Write to object
+    assign(paste0("dat_orig_",d), dorig)
+    rm(dorig)
+    
+    # Save datasets
+    saveRDS(get(paste0("dat_orig_",d)),
+            file=paste0("Janssen data/dat_orig_",d,"_Janssen.rds"))
+    saveRDS(get(paste0("df_ph1_",d)),
+            file=paste0("Janssen data/df_ph1_",d,"_Janssen.rds"))
+    saveRDS(get(paste0("df_ct_",d)),
+            file=paste0("Janssen data/df_ct_",d,"_Janssen.rds"))
+    saveRDS(get(paste0("df_tx_",d)),
+            file=paste0("Janssen data/df_tx_",d,"_Janssen.rds"))
+    
+  }
   
 } else {
 
-  # Read datasets
-  dat_orig_1 <- readRDS("Janssen data/dat_orig_1_Janssen.rds")
-  df_ph1_1 <- readRDS("Janssen data/df_ph1_1_Janssen.rds")
-  df_ctrl_1 <- readRDS("Janssen data/df_ctrl_1_Janssen.rds")
-  df_trt_1 <- readRDS("Janssen data/df_trt_1_Janssen.rds")
-  dat_orig_adcp <- readRDS("Janssen data/dat_orig_adcp_Janssen.rds")
-  df_ph1_adcp <- readRDS("Janssen data/df_ph1_adcp_Janssen.rds")
-  df_ctrl_adcp <- readRDS("Janssen data/df_ctrl_adcp_Janssen.rds")
-  df_trt_adcp <- readRDS("Janssen data/df_trt_adcp_Janssen.rds")
+  for (d in cfg2$datasets) {
+    
+    # Read datasets
+    assign(paste0("dat_orig_",d),
+           readRDS(paste0("Janssen data/dat_orig_",d,"_Janssen.rds")))
+    assign(paste0("df_ph1_",d),
+           readRDS(paste0("Janssen data/df_ph1_",d,"_Janssen.rds")))
+    assign(paste0("df_ct_",d),
+           readRDS(paste0("Janssen data/df_ct_",d,"_Janssen.rds")))
+    assign(paste0("df_tx_",d),
+           readRDS(paste0("Janssen data/df_tx_",d,"_Janssen.rds")))
+    
+  }
   
 }
 
@@ -144,31 +152,31 @@ if (cfg2$run_import_data) {
 if (cfg2$run_dqa) {
   
   # Alias vectors
-  ind_tx <- df_trt_1$EventIndPrimaryIncludeNotMolecConfirmedD29
-  ind_ct <- df_ctrl_1$EventIndPrimaryIncludeNotMolecConfirmedD29
-  time_tx <- df_trt_1$EventTimePrimaryIncludeNotMolecConfirmedD29
-  time_ct <- df_ctrl_1$EventTimePrimaryIncludeNotMolecConfirmedD29
+  ind_tx <- df_tx_1$EventIndPrimaryIncludeNotMolecConfirmedD29
+  ind_ct <- df_ct_1$EventIndPrimaryIncludeNotMolecConfirmedD29
+  time_tx <- df_tx_1$EventTimePrimaryIncludeNotMolecConfirmedD29
+  time_ct <- df_ct_1$EventTimePrimaryIncludeNotMolecConfirmedD29
   
   # Number of cases in each group
   num_case_tx <- sum(ind_tx)
   num_case_ct <- sum(ind_ct)
-  num_case_tx_195 <- sum(ind_tx[time_tx<=195])
-  num_case_ct_195 <- sum(ind_ct[time_ct<=195])
+  num_case_tx_66 <- sum(ind_tx[time_tx<=66])
+  num_case_ct_66 <- sum(ind_ct[time_ct<=66])
   num_atrisk_tx <- length(ind_tx)
   num_atrisk_ct <- length(ind_ct)
   print(paste("Number of cases in vaccine group:", num_case_tx))
   print(paste("Number of cases in control group:", num_case_ct))
-  print(paste("Number of cases by day 195 in vaccine group:", num_case_tx_195))
-  print(paste("Number of cases by day 195 in control group:", num_case_ct_195))
+  print(paste("Number of cases by day 66 in vaccine group:", num_case_tx_66))
+  print(paste("Number of cases by day 66 in control group:", num_case_ct_66))
   print(paste("Number at-risk in vaccine group:", num_atrisk_tx))
   print(paste("Number at-risk in control group:", num_atrisk_ct))
-  print(paste("Naive P(COVID by day 195) in vaccine group:",
-              round(num_case_tx_195/num_atrisk_tx,3)))
-  print(paste("Naive P(COVID by day 195) in control group:",
-              round(num_case_ct_195/num_atrisk_ct,3)))
+  print(paste("Naive P(COVID by day 66) in vaccine group:",
+              round(num_case_tx_66/num_atrisk_tx,3)))
+  print(paste("Naive P(COVID by day 66) in control group:",
+              round(num_case_ct_66/num_atrisk_ct,3)))
   print(paste("Naive vaccine efficacy:",
-              round(1 - (num_case_tx_195/num_atrisk_tx) /
-                      (num_case_ct_195/num_atrisk_ct),3)))
+              round(1 - (num_case_tx_66/num_atrisk_tx) /
+                      (num_case_ct_66/num_atrisk_ct),3)))
   
   # !!!!!
   get.marginalized.risk.no.marker <- function(dat) {
@@ -179,30 +187,30 @@ if (cfg2$run_dqa) {
       dat,
       model = T
     )
-    dat[["EventTimePrimaryIncludeNotMolecConfirmedD29"]] <- 195
+    dat[["EventTimePrimaryIncludeNotMolecConfirmedD29"]] <- 66
     risks = 1 - exp(-predict(fit.risk, newdata=dat, type="expected"))
     mean(risks)
   }
-  res.plac.cont <- get.marginalized.risk.no.marker(df_ctrl_1)
-  res.vacc.cont <- get.marginalized.risk.no.marker(df_trt_1)
+  res.plac.cont <- get.marginalized.risk.no.marker(df_ct_1)
+  res.vacc.cont <- get.marginalized.risk.no.marker(df_tx_1)
   overall.ve <- 1 - res.vacc.cont/res.plac.cont
   print(overall.ve)
   
   # srv_ct <- survfit(
   #   Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
   #        EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
-  #   data = df_ctrl_1
+  #   data = df_ct_1
   # )
-  # rate195_ct <- 1-srv_ct$surv[which(srv_ct$time==195)]
+  # rate66_ct <- 1-srv_ct$surv[which(srv_ct$time==66)]
   # srv_tx <- survfit(
   #   Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
   #        EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
-  #   data = df_trt_1
+  #   data = df_tx_1
   # )
-  # rate195_tx <- 1-srv_tx$surv[which(srv_tx$time==195)]
-  # print(rate195_ct)
-  # print(rate195_tx)
-  # print(1-(rate195_tx/rate195_ct))
+  # rate66_tx <- 1-srv_tx$surv[which(srv_tx$time==66)]
+  # print(rate66_ct)
+  # print(rate66_tx)
+  # print(1-(rate66_tx/rate66_ct))
   
   # Kaplan-Meier plot
   # !!!!!
@@ -211,7 +219,7 @@ if (cfg2$run_dqa) {
   ggplot(
     data.frame(
       x = time_tx[which(ind_tx==1)],
-      ph2.D29 = df_trt_1$ph2.D29[which(ind_tx==1)]
+      ph2.D29 = df_tx_1$ph2.D29[which(ind_tx==1)]
     ),
     aes(x=x, fill=ph2.D29)
   ) +
@@ -251,7 +259,7 @@ if (cfg2$run_dqa) {
   survfit(
     Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
          EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
-    data = filter(df_trt, ph2.D29==1),
+    data = filter(df_tx, ph2.D29==1),
     weights = wt.D29
   ) %>% autoplot()
   
@@ -270,13 +278,13 @@ if (cfg2$run_dqa) {
   srv_ct <- survfit(
     Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
          EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
-    data = df_ctrl
+    data = df_ct
   )
   
   survfit(
     Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
          EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
-    data = filter(df_trt, ph2.D29==1),
+    data = filter(df_tx, ph2.D29==1),
     weights = wt.D29
   ) %>% autoplot()
   
@@ -360,22 +368,9 @@ if (F) {
 {
   
   # Set the analysis dataframes
-  if (cfg2$marker_num<=2) {
-    dat_orig <- dat_orig_1
-    df_ctrl <- df_ctrl_1
-    df_trt <- df_trt_1
-  } else {
-    dat_orig <- dat_orig_adcp
-    df_ctrl <- df_ctrl_adcp
-    df_trt <- df_trt_adcp
-  }
-  
-  # Set up end time of interest `t_e`
-  C <- list(appx=cfg$appx, t_e=138)
-  
-  # !!!!! Reset appx for `t_e` and `a`
-  C$appx$t_e <- 10
-  C$appx$a <- 0.01 # !!!!!
+  dat_orig <- get(paste0("dat_orig_",cfg2$d))
+  df_ct <- get(paste0("df_ct_",cfg2$d))
+  df_tx <- get(paste0("df_tx_",cfg2$d))
   
   # Set `a` value from `a_list`
   dat_orig$a <- dat_orig$a_list[[cfg2$marker_num]]
@@ -385,15 +380,11 @@ if (F) {
   a_orig <- dat_orig$a[!is.na(dat_orig$a)]
   
   # Jitter A values (left endpoint)
-  # !!!!! Experiment with different width values
   dat_orig$a <- 10^dat_orig$a
   lod <- 2*min(dat_orig$a, na.rm=T)
   jit <- runif(n=length(dat_orig$a), min=cfg2$jit_L*lod, max=cfg2$jit_R*lod)
   dat_orig$a <- ifelse(dat_orig$a==min(dat_orig$a, na.rm=T), jit, dat_orig$a)
   dat_orig$a <- log10(dat_orig$a)
-  
-  # Jitter A values (right endpoint)
-  # !!!!! TO DO !!!!!
   
   # Rescale A to lie in [0,1]
   a2 <- 1/C$appx$a
@@ -404,13 +395,13 @@ if (F) {
 
   # Round A, W3
   dat_orig$a <- round(dat_orig$a, -log10(C$appx$a))
-  dat_orig$w$w3 <- round(dat_orig$w$w3, 0) # !!!!! change to round(...,1)
+  dat_orig$w$w3 <- round(dat_orig$w$w3, -log10(C$appx$w3))
   
   # Set estimation tuning parameters
   params <- list(S_n_type=cfg2$S_n_type, g_n_type="binning",
                  ecdf_type="linear (mid)", deriv_type="m-spline",
                  gamma_type="kernel", ci_type="regular", edge_corr="none",
-                 cf_folds=1, n_bins=0)
+                 omega_n_type="estimated", cf_folds=1, n_bins=0)
   
 }
 
@@ -427,25 +418,44 @@ ests <- est_curve(
   params = params,
   points = p_grid,
   dir = "decr",
-  return_extra = c("gcomp", "f_a_n", "Phi_n_inv")
+  return_extra = c("gcomp", "Phi_n_inv")
 )
 
 # Calculate control/vaccine group marginalized survival
-get.marginalized.risk.no.marker <- function(dat, tfinal.tpeak) {
-  fit.risk <- coxph(
-    Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
-         EventIndPrimaryIncludeNotMolecConfirmedD29) ~ risk_score +
-      as.factor(Region),
-    dat,
-    model = T
-  )
+get.marginalized.risk.no.marker <- function(dat, tfinal.tpeak, wts=F) {
+  if (!wts) {
+    fit.risk <- coxph(
+      Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
+           EventIndPrimaryIncludeNotMolecConfirmedD29) ~ risk_score +
+        as.factor(Region),
+      dat,
+      model = T
+    )
+  } else {
+    fit.risk <- coxph(
+      Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
+           EventIndPrimaryIncludeNotMolecConfirmedD29) ~ risk_score +
+        as.factor(Region),
+      dat,
+      model = T,
+      weights = wt.D29
+    )
+  }
   dat[["EventTimePrimaryIncludeNotMolecConfirmedD29"]] <- tfinal.tpeak
   risks <- 1 - exp(-predict(fit.risk, newdata=dat, type="expected"))
   mean(risks)
 }
-rate_ct <- get.marginalized.risk.no.marker(df_ctrl, C$t_e)
-rate_tx <- get.marginalized.risk.no.marker(df_trt, C$t_e)
-round(1-(rate_tx/rate_ct),3)
+rate_ct <- get.marginalized.risk.no.marker(df_ct, C$t_e)
+rate_tx <- get.marginalized.risk.no.marker(df_tx, C$t_e)
+rate_tx_0 <- get.marginalized.risk.no.marker( # !!!!! Need to incorporate weights
+  filter(df_tx, Day29bindSpike==min(df_tx$Day29bindSpike, na.rm=T)),
+  C$t_e, wts=T) # !!!!!
+rate_tx_1 <- get.marginalized.risk.no.marker( # !!!!! Need to incorporate weights
+  filter(df_tx, Day29bindSpike!=min(df_tx$Day29bindSpike, na.rm=T)),
+  C$t_e, wts=T) # !!!!!
+round(1-(rate_tx/rate_ct),3) # Overall VE
+# round(1-(rate_tx_0/rate_ct),3)
+round(1-(rate_tx_1/rate_ct),3)
 
 # !!!!! Move/reorganize everything in this section
 if (F) {
@@ -454,7 +464,7 @@ if (F) {
   srv_ct <- survfit(
     Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
          EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
-    data = df_ctrl
+    data = df_ct
   )
   rate_ct <- 1 - srv_ct$surv[which.min(abs(srv_ct$time-C$t_e))]
   # ci_lo_ct <- 1 - srv_ct$upper[which.min(abs(srv_ct$time-C$t_e))]
@@ -465,7 +475,7 @@ if (F) {
   srv_tx <- survfit(
     Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
          EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
-    data = df_trt
+    data = df_tx
   )
   rate_tx <- 1 - srv_tx$surv[which.min(abs(srv_tx$time-C$t_e))]
   ci_lo_tx <- 1 - srv_tx$upper[which.min(abs(srv_tx$time-C$t_e))]
@@ -485,7 +495,7 @@ if (F) {
   srv_tx_sub <- survfit(coxph(
     Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
          EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
-    data = filter(df_trt, ph2.D29==1),
+    data = filter(df_tx, ph2.D29==1),
     weights = wt.D29
   ))
   rate_tx_sub <- 1 - srv_tx_sub$surv[which.min(abs(srv_tx_sub$time-C$t_e))]
@@ -522,7 +532,6 @@ if (cfg2$run_graphs) {
     ests_gren <- cve(theta_ests_gren)
     
     # Truncate at 5/95 quantiles and at histogram edges
-    # !!!!! replace NA values with first non-NA value for point mass at left
     which1 <- p_grid>=ests$Phi_n_inv(0.05) & p_grid<=ests$Phi_n_inv(0.95)
     a_grid <- p_grid*a_scale-a_shift
     which2 <- a_grid>=min(a_orig) & a_grid<=max(a_orig)
@@ -536,13 +545,13 @@ if (cfg2$run_graphs) {
     
     # Labels
     x_labs <- c("Anti Spike IgG (BAU/ml) (=s)", "Anti RBD IgG (BAU/ml) (=s)",
-                "Phagocytic Score (=s)")
+                "Phagocytic Score (=s)", "Pseudovirus-nAb ID50 (IU50/ml) (=s)")
     x_lab <- x_labs[cfg2$marker_num]
-    y_lab <- "Controlled VE against COVID by day 195"
+    y_lab <- paste("Controlled VE against COVID by day", C$t_e)
     
     # VE overall est/ci
-    ve_overall <- 0.501 # !!!!! Later calculate the overall VE numbers manually or pull from Youyi report
-    ve_ci <- c(0.437,0.564) # !!!!! Later calculate the overall VE numbers manually or pull from Youyi report
+    ve_overall <- 0.650 # !!!!! Later calculate the overall VE numbers manually or pull from Youyi report
+    ve_ci <- c(0.451,0.772) # !!!!! Later calculate the overall VE numbers manually or pull from Youyi report
     
     # Plots: setup
     n_bins <- 20
@@ -551,16 +560,14 @@ if (cfg2$run_graphs) {
     
     # Plots: data
     plot_data_1 <- data.frame(
-      x = c(a_grid,x1,x2),
-      # x = c(a_grid,xlim),
+      x = c(a_grid,x1,x2), # x = c(a_grid,xlim),
       y = c(ests_gren,rep(ve_overall,2)),
       which = c(rep("Controlled VE", length(p_grid)),rep("Overall VE",2)),
       ci_lo = c(ci_lo,rep(ve_ci[1],2)),
       ci_hi = c(ci_hi,rep(ve_ci[2],2))
     )
     plot_data_2 <- data.frame(
-      x = c(rep(a_grid,2),x1,x2),
-      # x = c(rep(a_grid,2),xlim),
+      x = c(rep(a_grid,2),x1,x2), # x = c(rep(a_grid,2),xlim),
       y = c(ests_gcomp,ests_gren,rep(ve_overall,2)),
       which = c(rep(c("Cox model","Controlled VE"), each=length(p_grid)),
                 rep("Overall VE",2)),
@@ -578,21 +585,20 @@ if (cfg2$run_graphs) {
                          breaks=seq(-1,1,0.1), minor_breaks=NULL) +
       theme(panel.grid.major=element_line(colour="white", size=0.3),
             panel.grid.minor=element_line(colour="white", size=0.3)) +
-      # scale_x_continuous(label=math_format(10^.x)) +
       scale_x_continuous(label=math_format(10^.x),limits=xlim) +
       scale_color_manual(values=c("darkblue","darkgrey")) +
       scale_fill_manual(values=c("darkblue","darkgrey")) +
       theme(legend.position="bottom") +
       labs(x=x_lab, y=y_lab, color=NULL, fill=NULL) +
       geom_line()
-    plot_1 # !!!!!
+    # plot_1 # !!!!!
     plot_2 <- plot_1 %+% plot_data_2
     suppressMessages({
       plot_2 <- plot_2 +
         scale_color_manual(values=c("darkblue","purple","darkgrey")) +
         scale_fill_manual(values=c("darkblue","purple","darkgrey"))
     })
-    plot_2 # !!!!!
+    # plot_2 # !!!!!
     
     # Save plots
     name_1 <- paste0("Janssen plots/plot_",cfg2$tid,".pdf")
@@ -616,11 +622,11 @@ if (cfg2$run_graphs) {
     x_labs <- c("IgG Vx-VT-C", "ADCP Vx-C97ZA",
                 "IgG3 V1V2 Breadth", "IgG3 Env Breadth",
                 "Multi-Epitopes Functions")
-    mrk <- paste0(x_labs[which], " (", markers[which], ")")
+    mrk <- paste0(x_labs[which], " (", cfg2$markers[which], ")")
     mrk <- "IgG3 gp41 (Day210IgG3gp4140delta)" # !!!!!
 
     ggplot(
-      data.frame(x=df_trt[["Day210IgG3gp4140delta"]]),
+      data.frame(x=df_tx[["Day210IgG3gp4140delta"]]),
       aes(x=x)
     ) +
       geom_histogram(bins=50) +

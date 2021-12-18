@@ -9,7 +9,7 @@
 # GitHub packages: tedwestling/ctsCausal, tedwestling/CFsurvival, 
 #                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
-  main_task = "run", # run update analysis_moderna.R analysis_705.R analysis_Janssen.R
+  main_task = "analysis_janssen.R", # run update analysis_moderna.R analysis_705.R analysis_janssen.R
   which_sim = "testing", # "estimation" "edge" "testing" "infl_fn_1 (temp)"
   level_set_which = "level_set_testing_1", # level_set_estimation_1 level_set_testing_1
   # keep = c(1:3,7:9,16:18,22:24),
@@ -29,7 +29,7 @@ cluster_config <- list(
   # js = "ge",
   # dir = "/home/users/avikenny/Desktop/z.VaxCurve"
   js = "slurm",
-  dir = "/home/akenny/z.VaxCurve"
+  dir = "/home/akenny/z.VaxCurve" # !!!!! this should be read from an environment variable
 )
 
 
@@ -46,7 +46,7 @@ if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
   load_pkgs_local <- TRUE
 } else {
   # Cluster
-  setwd("z.VaxCurve/R")
+  setwd("z.VaxCurve2/R") # !!!!! read from cluster_config ?????
   if (cfg$main_task %in% c("run", "update")) {
     load_pkgs_local <- FALSE
   } else {

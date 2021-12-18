@@ -46,7 +46,7 @@ if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
   load_pkgs_local <- TRUE
 } else {
   # Cluster
-  setwd("z.VaxCurve2/R") # !!!!! read from cluster_config ?????
+  setwd("z.VaxCurve/R") # !!!!! read from cluster_config ?????
   if (cfg$main_task %in% c("run", "update")) {
     load_pkgs_local <- FALSE
   } else {
@@ -57,7 +57,9 @@ if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
 # Load packages (if running locally)
 if (load_pkgs_local) {
   for (pkg in c(cfg$pkgs,cfg$pkgs_nocluster)) {
-    do.call("library", list(pkg))
+    suppressMessages({
+      do.call("library", list(pkg))
+    })
   }
 }
 

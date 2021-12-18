@@ -23,20 +23,13 @@ cfg2 <- list(
 cfg2$tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
 # cfg2$tid <- 1
 cfg2_df <- data.frame(
-  # tid = c(1:32),
-  # S_n_type = rep(c("Cox PH", "Super Learner"), 16),
-  # marker_num = rep(rep(c(1:4), each=2), 4),
-  # jit_L = rep(0.25, 32),
-  # jit_R = rep(c(0.6,0.75,0.9,1), each=8)
-  tid = c(1:48),
-  S_n_type = rep(c("Cox PH", "Super Learner", "Random Forest"), 16),
-  marker_num = rep(rep(c(1:4), each=2), 6),
-  jit_L = rep(0.25, 48),
-  jit_R = rep(c(0.6,0.75,0.9,1), each=12)
+  tid = c(1:4),
+  S_n_type = rep("Super Learner", 4), # c("Cox PH", "Super Learner")
+  marker_num = c(1:4),
+  jit_L = rep(0.25, 4),
+  jit_R = rep(0.75, 4) # c(0.6,0.75,0.9,1)
 )
-cfg2_df <- rbind(cfg2_df,cfg2_df) # !!!!!
-cfg2_df <- arrange(cfg2_df, marker_num, jit_L, jit_R, S_n_type) # !!!!!
-cfg2_df$tid <- c(1:nrow(cfg2_df)) #!!!!!
+set.seed(1234)
 cfg2$S_n_type <- cfg2_df[cfg2$tid, "S_n_type"]
 cfg2$marker_num <- cfg2_df[cfg2$tid, "marker_num"]
 cfg2$jit_L <- cfg2_df[cfg2$tid, "jit_L"]
@@ -420,6 +413,8 @@ ests <- est_curve(
   dir = "decr",
   return_extra = c("gcomp", "Phi_n_inv")
 )
+# saveRDS(ests, "ests.rds") # !!!!!
+# ests <- readRDS("ests.rds") # !!!!!
 
 # Calculate control/vaccine group marginalized survival
 get.marginalized.risk.no.marker <- function(dat, tfinal.tpeak, wts=F) {
@@ -447,15 +442,15 @@ get.marginalized.risk.no.marker <- function(dat, tfinal.tpeak, wts=F) {
 }
 rate_ct <- get.marginalized.risk.no.marker(df_ct, C$t_e)
 rate_tx <- get.marginalized.risk.no.marker(df_tx, C$t_e)
-rate_tx_0 <- get.marginalized.risk.no.marker( # !!!!! Need to incorporate weights
-  filter(df_tx, Day29bindSpike==min(df_tx$Day29bindSpike, na.rm=T)),
-  C$t_e, wts=T) # !!!!!
-rate_tx_1 <- get.marginalized.risk.no.marker( # !!!!! Need to incorporate weights
-  filter(df_tx, Day29bindSpike!=min(df_tx$Day29bindSpike, na.rm=T)),
-  C$t_e, wts=T) # !!!!!
-round(1-(rate_tx/rate_ct),3) # Overall VE
+# rate_tx_0 <- get.marginalized.risk.no.marker( # !!!!! Need to incorporate weights
+#   filter(df_tx, Day29bindSpike==min(df_tx$Day29bindSpike, na.rm=T)),
+#   C$t_e, wts=T) # !!!!!
+# rate_tx_1 <- get.marginalized.risk.no.marker( # !!!!! Need to incorporate weights
+#   filter(df_tx, Day29bindSpike!=min(df_tx$Day29bindSpike, na.rm=T)),
+#   C$t_e, wts=T) # !!!!!
+# round(1-(rate_tx/rate_ct),3) # Overall VE
 # round(1-(rate_tx_0/rate_ct),3)
-round(1-(rate_tx_1/rate_ct),3)
+# round(1-(rate_tx_1/rate_ct),3)
 
 # !!!!! Move/reorganize everything in this section
 if (F) {
@@ -555,8 +550,8 @@ if (cfg2$run_graphs) {
     
     # Plots: setup
     n_bins <- 20
-    xlim <- c(min(a_orig)-(max(a_orig)-min(a_orig))/n_bins,
-              max(a_orig)+(max(a_orig)-min(a_orig))/n_bins)
+    xlim <- c(min(a_orig)-(max(a_orig)-min(a_orig))/(n_bins*(2/3)),
+              max(a_orig)+(max(a_orig)-min(a_orig))/(n_bins*(2/3)))
     
     # Plots: data
     plot_data_1 <- data.frame(

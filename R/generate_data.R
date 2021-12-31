@@ -8,9 +8,9 @@
 #'     The Normals are truncated to lie in [0,1].
 #' @param edge Propensity mechanism for point mass at edge. The distribution of
 #'     A will be (1-pi(w))*distr_A. One of the following: "none" (no point mass
-#'     at the edge), "expit" (expit propensity model), "complex" (non-logit
-#'     propensity model). Both "expit" and "complex" put roughly 10% of the mass
-#'     on the edge.s
+#'     at the edge), "expit 0.2" (expit propensity model, prob=0.2), "expit 0.5"
+#'     (expit propensity model, prob=0.5), "complex 0.2" (non-logit propensity
+#'     model, prob=0.2).
 #' @param surv_true True form of the survival function; one c("Cox PH",
 #'     "complex")
 #' @param sc_params Weibull parameters for the survival and censoring
@@ -49,12 +49,12 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
   a <- round(a, -log10(C$appx$a))
   
   # Adjust A for point mass at the edge
-  if (edge=="expit") {
-    edge_probs <- expit(w$w1+w$w2-3.3)
-  } else if (edge=="expit2") {
-    edge_probs <- expit(w$w1+w$w2-1)
-  } else if (edge=="complex") {
-    edge_probs <- 0.84*w$w2*pmax(0,1-4*abs(w$w1-0.5))
+  if (edge=="expit 0.2") {
+    edge_probs <- expit(w$w1+w$w2-2.5)
+  } else if (edge=="expit 0.5") {
+    edge_probs <- expit(w$w1+w$w2-1.0)
+  } else if (edge=="complex 0.2") {
+    edge_probs <- 1.7*w$w2*pmax(0,1-4*abs(w$w1-0.5))
   } else if (edge=="none") {
     edge_probs <- 0
   }
@@ -116,7 +116,7 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
   # Set up function to calculate true regression values over C$points
   # These are Monte Carlo approximations
   {
-    m <- 10^5
+    m <- 10^6 # 10^5
     w1 <- sample(seq(0,1,0.1), size=m, replace=T) # runif(m)
     w2 <- rbinom(m, size=1, prob=0.5)
     
@@ -146,16 +146,11 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
       return(1 - mean(S_0(C$t_e,w1,w2,a)))
     })
     
-    # !!!!!
-    if (T) {
-      
-      a <- round(runif(m), -log10(C$appx$a))
-      Theta_true_f <- Vectorize(function(x) {
-        return(mean( as.integer(a<=x) * (1-S_0(C$t_e,w1,w2,a)) ))
-      })
-      attr(dat_orig, "Theta_true") <- Theta_true_f(C$points)
-      
-    }
+    a <- round(runif(m), -log10(C$appx$a))
+    Theta_true_f <- Vectorize(function(x) {
+      return(mean( as.integer(a<=x) * (1-S_0(C$t_e,w1,w2,a)) ))
+    })
+    attr(dat_orig, "Theta_true") <- Theta_true_f(C$points)
     
   }
   

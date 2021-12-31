@@ -1,4 +1,46 @@
 
+# Old infl_fn_1
+if (F) {
+  
+  #' !!!!! document
+  #'
+  #' @param x x
+  #' @return x
+  construct_infl_fn_1 <- function(dat, Gamma_os_n, Phi_n, xi_n, rho_n,
+                                  lambda_2, lambda_3, vals=NA) {
+
+    n_orig <- sum(dat$weights)
+    weights_j <- dat$weights
+    a_j <- dat$a
+
+    fnc <- function(a_i) {
+
+      piece_1 <- (lambda_2*(Phi_n(a_i)^2) - lambda_3*Phi_n(a_i)) *
+        Gamma_os_n(round(a_i, -log10(C$appx$a)))
+
+      piece_2 <- (1/n_orig) * sum(
+        weights_j * (lambda_2*(Phi_n(a_j)^2) - lambda_3*Phi_n(a_j)) *
+          Gamma_os_n(round(a_j, -log10(C$appx$a)))
+      )
+
+      # piece_1 <- (1/n_orig) * sum(
+      #   weights_j * (xi_n(a_i,a_j) - rho_n(a_i)) *
+      #     Gamma_os_n(round(a_j, -log10(C$appx$a)))
+      # )
+
+      # piece_2 <- (lambda_2*(Phi_n(a)^2) - lambda_3*Phi_n(a)) *
+      #   Gamma_os_n(round(a, -log10(C$appx$a)))
+
+      return(piece_1-piece_2)
+
+    }
+
+    return(construct_superfunc(fnc, aux=NA, vec=c(1), vals=vals))
+
+  }
+  
+}
+
 # Alternative (incorrect) rho_n and xi_n
 if (F) {
   

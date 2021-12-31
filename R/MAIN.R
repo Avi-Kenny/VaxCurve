@@ -9,11 +9,11 @@
 # GitHub packages: tedwestling/ctsCausal, tedwestling/CFsurvival, 
 #                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
-  main_task = "analysis_janssen.R", # run update analysis_moderna.R analysis_705.R analysis_janssen.R
+  main_task = "run", # run update analysis_moderna.R analysis_705.R analysis_janssen.R
   which_sim = "testing", # "estimation" "edge" "testing" "infl_fn_1 (temp)"
   level_set_which = "level_set_testing_1", # level_set_estimation_1 level_set_testing_1
   # keep = c(1:3,7:9,16:18,22:24),
-  num_sim = 1000,
+  num_sim = 500,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm"),
@@ -21,7 +21,7 @@ cfg <- list(
                      "data.table", "latex2exp", "tidyr"),
   parallel = "none",
   stop_at_error = FALSE,
-  appx = list(t_e=1, w1=0.1, w1b=0.1, a=0.01) # !!!!! a=0.001
+  appx = list(t_e=10, w1=0.1, w1b=0.1, a=0.01) # !!!!! t_e=1, a=0.001
 )
 
 # Set cluster config
@@ -65,7 +65,7 @@ if (load_pkgs_local) {
 
 # Load SimEngine + functions
 {
-  library(SimEngine)
+  suppressMessages({ library(SimEngine) })
   source("one_simulation.R", local=TRUE)
   source("generate_data.R", local=TRUE)
   source("est_curve.R", local=TRUE)
@@ -124,54 +124,50 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
             omega_n_type = c("estimated", "true")
           )
         )
-      )
+      ),
+      which = c("Gamma", "Theta")
     )
   }
   
   # Estimation: ideal params
   level_set_temp <- list(
-    n = 2000,
+    n = 1000,
     alpha_3 = -2,
     dir = "decr",
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
     distr_A = "Unif(0,1)",
-    edge = "none",
+    # distr_A = "N(0.5,0.04)",
+    edge = c("none", "expit 0.2"), # "expit 0.5"
     surv_true = "Cox PH",
     sampling = "two-phase (72%)",
     estimator = list(
-      "Qbins (3)" = list(
-        est = "Qbins",
-        params = list(S_n_type="Cox PH", g_n_type="true",
-                      ci_type="regular", cf_folds=1, edge_corr="none",
-                      ecdf_type="linear (mid)", deriv_type="m-spline",
-                      gamma_type="kernel", omega_n_type="estimated",
-                      n_bins=3)
-      ),
-      "Qbins (6)" = list(
-        est = "Qbins",
-        params = list(S_n_type="Cox PH", g_n_type="true",
-                      ci_type="regular", cf_folds=1, edge_corr="none",
-                      ecdf_type="linear (mid)", deriv_type="m-spline",
-                      gamma_type="kernel", omega_n_type="estimated",
-                      n_bins=6)
-      ),
-      "Qbins (9)" = list(
-        est = "Qbins",
-        params = list(S_n_type="Cox PH", g_n_type="true",
-                      ci_type="regular", cf_folds=1, edge_corr="none",
-                      ecdf_type="linear (mid)", deriv_type="m-spline",
-                      gamma_type="kernel", omega_n_type="estimated",
-                      n_bins=9)
-      ),
-      "Grenander" = list(
+      # "Qbins (9)" = list(
+      #   est = "Qbins",
+      #   params = list(S_n_type="Cox PH", g_n_type="true",
+      #                 ci_type="regular", cf_folds=1, edge_corr="none",
+      #                 ecdf_type="linear (mid)", deriv_type="m-spline",
+      #                 gamma_type="kernel", omega_n_type="estimated",
+      #                 n_bins=9)
+      # ),
+      "Gren (edge corr: none)" = list(
         est = "Grenander",
-        params = list(S_n_type="Cox PH", g_n_type="true",
+        params = list(S_n_type="Cox PH", g_n_type="binning",
                       ci_type="regular", cf_folds=1, edge_corr="none",
                       ecdf_type="linear (mid)", deriv_type="m-spline",
                       gamma_type="kernel", omega_n_type="estimated",
                       n_bins=0)
+      ),
+      "Gren (edge corr: min)" = list(
+        est = "Grenander",
+        params = list(S_n_type="Cox PH", g_n_type="binning",
+                      ci_type="regular", cf_folds=1, edge_corr="min",
+                      ecdf_type="linear (mid)", deriv_type="m-spline",
+                      gamma_type="kernel", omega_n_type="estimated",
+                      n_bins=0)
       )
-    )
+    ),
+    which = "Theta"
+    # which = c("Theta", "Gamma")
   )
   
   # Estimation: ideal params
@@ -214,7 +210,8 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
                       ecdf_type="true", deriv_type="m-spline",
                       gamma_type="kernel", omega_n_type="estimated")
       )
-    )
+    ),
+    which = "Gamma"
   )
   
   # Estimation: trial params
@@ -242,7 +239,8 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
                       ecdf_type="linear (mid)", deriv_type="m-spline",
                       gamma_type="kernel", omega_n_type="estimated")
       )
-    )
+    ),
+    which = "Gamma"
   )
   
   # Testing: compare all methods
@@ -252,13 +250,14 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     alpha_3 = 0,
     # alpha_3 = c(0,-0.25,-0.5),
     dir = "decr",
-    # dir = c("decr","incr"),
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
     distr_A = "Unif(0,1)",
     edge = "none",
     surv_true = "Cox PH",
-    # sampling = "iid",
-    sampling = c("iid", "two-phase (72%)", "two-phase (70% random)"),
+    sampling = c("iid", "two-phase (72%)"),
+    # sampling = c("iid", "two-phase (72%)", "two-phase (70% random)"),
+    temp_which = "Psi_1",
+    # temp_which = c("Psi_1","Psi_2","Psi_1+Psi_2"), # Gamma, beta_n
     test = list(
       "Slope (two-tailed)" = list(
         type = "test_2",
@@ -266,7 +265,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
         test_stat_only = FALSE,
         params = list(var="asymptotic", ecdf_type="step", # "step" "linear (mid)"
                       g_n_type="true", S_n_type="true", cf_folds=1, # Cox PH
-                      est_known_nuis=FALSE, omega_n_type="estimated")
+                      est_known_nuis=FALSE, omega_n_type="true")
       )
       # "Slope (decr)" = list(
       #   type = "test_2",
@@ -276,7 +275,8 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       #                 g_n_type="binning", S_n_type="Cox PH", cf_folds=1,
       #                 est_known_nuis=FALSE, omega_n_type="estimated")
       # )
-    )
+    ),
+    which = "Gamma"
   )
   
   level_set <- eval(as.name(cfg$level_set_which))
@@ -329,7 +329,7 @@ if (cfg$main_task=="run") {
         "construct_infl_fn_1", "construct_infl_fn_Gamma", "construct_infl_fn_2",
         "beta_n_var_hat", "create_val_list", "construct_Gamma_cf_k",
         "construct_Gamma_cf", "construct_pi_n", "theta_os_n", "sigma2_os_n",
-        "ss",
+        "ss", "construct_Theta_os_n", "construct_etastar_n",
         
         "est_curve", "generate_data",
         "lambda", "one_simulation", "test_2"
@@ -438,7 +438,7 @@ if (FALSE) {
   p_data <- pivot_longer(
     data = summ,
     cols = -c(level_id,n,alpha_3,sc_params,distr_A,edge,
-              surv_true,sampling,Estimator),
+              surv_true,sampling,Estimator,dir, which),
     names_to = c("stat","point"),
     names_sep = "_"
   )
@@ -466,24 +466,27 @@ if (FALSE) {
     distr_A = rep(c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"),2)
   )
   
-  # distr_A_ <- "N(0.5,0.04)" # "Unif(0,1)"
-  # df_distr_A1 %<>% filter(distr_A==distr_A_)
-  # df_distr_A2 %<>% filter(distr_A==distr_A_)
-  # df_vlines %<>% filter(distr_A==distr_A_)
+  if (T) {
+    distr_A_ <- "N(0.5,0.04)" # "Unif(0,1)"
+    df_distr_A1 %<>% filter(distr_A==distr_A_)
+    df_distr_A2 %<>% filter(distr_A==distr_A_)
+    df_vlines %<>% filter(distr_A==distr_A_)
+  }
   
   # Bias plots
   # Export: 8" x 5"
   ggplot(
     filter(p_data, stat=="bias"),
-    aes(x=point, y=value)
-    # aes(x=point, y=value, color=Estimator, group=Estimator)
+    # aes(x=point, y=value)
+    aes(x=point, y=value, color=Estimator, group=Estimator)
+    # aes(x=point, y=value, color=which, group=which)
   ) +
     geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
                 data=df_distr_A1, fill="grey", color=NA, alpha=0.4) +
     geom_vline(aes(xintercept=x), data=df_vlines, color="orange",
                linetype="dashed") +
     geom_line() +
-    facet_grid(rows=dplyr::vars(surv_true), cols=dplyr::vars(distr_A)) +
+    facet_grid(rows=dplyr::vars(surv_true), cols=dplyr::vars(edge)) + # distr_A
     scale_y_continuous(labels=percent, limits=c(-0.2,0.2)) +
     # scale_y_continuous(labels=percent) +
     # scale_color_manual(values=m_colors) +
@@ -494,8 +497,9 @@ if (FALSE) {
   # Export: 8" x 5"
   ggplot(
     filter(p_data, stat=="cov"),
-    aes(x=point, y=value)
-    # aes(x=point, y=value, color=Estimator, group=Estimator)
+    # aes(x=point, y=value)
+    aes(x=point, y=value, color=Estimator, group=Estimator)
+    # aes(x=point, y=value, color=which, group=which)
   ) +
     geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
                 data=df_distr_A2, fill="grey", color=NA, alpha=0.4) +
@@ -503,7 +507,7 @@ if (FALSE) {
                linetype="dashed") +
     geom_hline(aes(yintercept=0.95), linetype="longdash", color="grey") +
     geom_line() +
-    facet_grid(rows=dplyr::vars(surv_true), cols=dplyr::vars(distr_A)) +
+    facet_grid(rows=dplyr::vars(surv_true), cols=dplyr::vars(edge)) + # distr_A
     scale_y_continuous(labels=percent, limits=c(0.7,1)) +
     # scale_y_continuous(labels=percent) +
     # scale_color_manual(values=m_colors) +
@@ -516,10 +520,11 @@ if (FALSE) {
     filter(p_data, stat=="mse"),
     # aes(x=point, y=value)
     aes(x=point, y=value, color=Estimator, group=Estimator)
+    # aes(x=point, y=value, color=which, group=which)
   ) +
     geom_hline(aes(yintercept=0.95), linetype="longdash", color="grey") +
     geom_line() +
-    facet_grid(rows=dplyr::vars(surv_true), cols=dplyr::vars(distr_A)) +
+    facet_grid(rows=dplyr::vars(surv_true), cols=dplyr::vars(edge)) + # distr_A
     ylim(0,0.003) +
     # scale_color_manual(values=m_colors) +
     theme(legend.position="bottom") +
@@ -706,13 +711,8 @@ if (FALSE) {
   sim <- readRDS("../SimEngine.out/sim_est_20210922.rds") # edge_corr="max"
   
   # Filter data
-  distr_A_ <- "N(0.5,0.04)"
-  surv_true_ <- "complex"
-  d <- sim$results %>% filter(
-    n==5000 & distr_A==distr_A_ & surv_true==surv_true_
-  )
-  d %<>% filter(estimator=="Grenander (Est S_n/g_n)")
-  if (length(unique(d$level_id))!=1) { stop("adjust filtering") }
+  d <- sim$results
+  d %<>% filter(level_id==2)
   
   # Set up vector containers
   theta_true <- c()
@@ -766,7 +766,7 @@ if (FALSE) {
     ) +
     facet_wrap(~which, ncol=3) +
     # xlim(c(0.2,0.8)) +
-    ylim(c(0,0.01)) +
+    # ylim(c(0,0.01)) +
     theme(
       legend.position = "none",
       strip.background = element_blank(),
@@ -787,45 +787,38 @@ if (FALSE) {
   sim <- readRDS("../SimEngine.out/sim_est_20211004.rds")
   
   # Filter data
-  # distr_A_ <- "N(0.5,0.04)"
-  # surv_true_ <- "complex"
-  # d <- sim$results %>% filter(
-  #   n==5000 & distr_A==distr_A_ & surv_true==surv_true_
-  # )
-  # d %<>% filter(estimator=="Grenander (Est S_n/g_n)")
   d <- sim$results
-  if (length(unique(d$level_id))!=1) { stop("adjust filtering") }
+  d %<>% filter(level_id==4)
   
   # Set up vector containers
   theta_true <- c()
+  # Theta_true <- c()
   theta_est <- c()
+  # Theta_est <- c()
   which <- c()
   
   # Extract simulation data into vectors
-  n_paths <- 500 # nrow(sim$results)
+  n_paths <- 500
   row_offset <- 0
   for (i in c(1:51)) {
     m <- format(round(i/50-0.02,2), nsmall=1)
     theta_true <- c(theta_true, d[1,paste0("theta_",m)])
+    # Theta_true <- c(Theta_true, d[1,paste0("Theta_",m)])
   }
   for (i in 1:n_paths) {
     for (j in c(1:51)) {
       m <- format(round(j/50-0.02,2), nsmall=1)
       theta_est <- c(theta_est, d[i+row_offset,paste0("est_",m)])
+      # Theta_est <- c(Theta_est, d[i+row_offset,paste0("esT_",m)])
       which <- c(which, i)
     }
   }
   
-  plot_data <- data.frame(
-    x = rep(sim$constants$points, n_paths),
-    y = theta_est,
-    which = which
-  )
   ggplot(
-    plot_data,
+    data.frame(x=rep(sim$constants$points, n_paths), y=theta_est, which=which),
     aes(x=x, y=y, group=which)
   ) +
-    geom_line(alpha=0.05) + # 0.4
+    geom_line(alpha=0.05) +
     geom_line(
       data = data.frame(x=sim$constants$points, y=theta_true),
       aes(x=x, y=y),
@@ -837,8 +830,7 @@ if (FALSE) {
       color = "orange",
       linetype = "dashed"
     ) +
-    # scale_x_continuous(breaks=seq(0.5,0.8,0.01), limits=c(0.5,0.8)) +
-    ylim(c(0,1)) + # 0.4
+    ylim(c(0,1)) +
     theme(legend.position="none")
   
 }

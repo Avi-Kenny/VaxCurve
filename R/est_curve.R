@@ -25,10 +25,12 @@
 #' @param points A vector representing the points to estimate
 #' @param dir Direction of monotonicity; one of c("incr", "decr")
 #' @param return_extra A character vector of additional components to return
+#' @param which One of c("Gamma", "Theta"); whether or not to transform by the
+#'     marginal distribution of A
 #' @return A list of lists of the form:
 #'     list(list(point=1, est=1, se=1), list(...), ...)
 est_curve <- function(dat_orig, estimator, params, points, dir="decr",
-                      return_extra=NULL) {
+                      return_extra=NULL, which="Gamma") {
   
   if (estimator=="Grenander") {
     
@@ -39,7 +41,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     # Setup
     dat <- ss(dat_orig, which(dat_orig$delta==1))
-    vlist <- create_val_list(dat_orig, C$appx) # !!!!! vlist <- create_val_list(dat, C$appx)
+    vlist <- create_val_list(dat_orig, C$appx)
     
     # Construct regular Gamma_0 estimator
     if (params$cf_folds==1) {
@@ -52,10 +54,32 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid,
                                    type=params$g_n_type, k=15)
       f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
-      g_n <- construct_g_n(f_aIw_n, f_a_n)
       omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n,
                                    type=params$omega_n_type)
-      Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n)
+      if (which=="Theta") {
+        etastar_n <- construct_etastar_n(S_n)
+        Theta_os_n <- construct_Theta_os_n(dat, vlist$A_grid, omega_n,
+                                           f_aIw_n, etastar_n)
+      } else if (which=="Gamma") {
+        g_n <- construct_g_n(f_aIw_n, f_a_n)
+        Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n)
+      } else {
+        stop("`which` must equal either 'Theta' or 'Gamma'")
+      }
+      
+      # # !!!!! Debugging
+      # print("S_n(C$t_e,dat$w[1,],0.5)")
+      # print(S_n(C$t_e,dat$w[1,],0.5))
+      # print("Sc_n(C$t_e,dat$w[1,],0.5)")
+      # print(Sc_n(C$t_e,dat$w[1,],0.5))
+      # print("f_aIw_n(0.5,dat$w[1,])")
+      # print(f_aIw_n(0.5,dat$w[1,]))
+      # print("omega_n(dat$w[1,],0.5,10,1)")
+      # print(omega_n(dat$w[1,],0.5,10,1))
+      # print("etastar_n(0.5,dat$w[1,])")
+      # print(etastar_n(0.5,dat$w[1,]))
+      # print("Theta_os_n(0.5)")
+      # print(Theta_os_n(0.5))
       
       # Construct one-step edge estimator
       if (params$edge_corr!="none") {
@@ -83,14 +107,22 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     }
     
     # Construct Psi_n
-    if (dir=="incr") {
-      Psi_n <- Vectorize(function(x) {
-        Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
-      })
-    } else {
-      Psi_n <- Vectorize(function(x) {
-        -1 * Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
-      })
+    if (which=="Gamma") {
+      if (dir=="incr") {
+        Psi_n <- Vectorize(function(x) {
+          Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
+        })
+      } else {
+        Psi_n <- Vectorize(function(x) {
+          -1 * Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
+        })
+      }
+    } else if (which=="Theta") {
+      if (dir=="incr") {
+        Psi_n <- Theta_os_n
+      } else {
+        Psi_n <- Vectorize(function(x) { -1 * Theta_os_n(x) })
+      }
     }
     
     # Compute GCM and extract its derivative
@@ -107,14 +139,23 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     })
     
     # Construct Grenander-based theta_n
-    if (dir=="incr") {
-      theta_n_Gr <- Vectorize(function(x) { min(max(dGCM(Phi_n(x)),0),1) })
-    } else {
-      theta_n_Gr <- Vectorize(function(x) { min(max(-1 * dGCM(Phi_n(x)),0),1) })
+    if (which=="Gamma") {
+      if (dir=="incr") {
+        theta_n_Gr <- Vectorize(function(x) { min(max(dGCM(Phi_n(x)),0),1) })
+      } else {
+        theta_n_Gr <- Vectorize(function(x) { min(max(-1 * dGCM(Phi_n(x)),0),1) })
+      }
+    } else if (which=="Theta") {
+      if (dir=="incr") {
+        theta_n_Gr <- Vectorize(function(x) { min(max(dGCM(x),0),1) })
+      } else {
+        theta_n_Gr <- Vectorize(function(x) { min(max(-1*dGCM(x),0),1) })
+      }
     }
     
     # Recompute functions on full dataset
     if (params$cf_folds>1) {
+      # !!!!! Update to incorporate which=="Theta"
       S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
       Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
       f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid,
@@ -174,6 +215,56 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
                                              dir=dir)
     tau_n <- construct_tau_n(deriv_theta_n, gamma_n, f_a_n)
     
+    # !!!!! Debugging
+    if (F) {
+      
+      grid <- seq(0,1,0.01)
+      
+      {
+        
+        # Estimate entire function on grid
+        grid <- seq(0,1,0.01)
+        theta_ns <- theta_n(grid)
+        
+        # Identify jump points of step function
+        jump_points <- c(0) # !!!!!
+        # jump_points <- c()
+        for (i in 2:length(grid)) {
+          if (theta_ns[i]!=theta_ns[i-1]) {
+            jump_points <- c(jump_points, mean(c(grid[i],grid[i-1])))
+          }
+        }
+        jump_points <- c(jump_points,grid[length(grid)]) # !!!!!
+        
+        # Identify midpoints of jump points
+        midpoints <- jump_points[1:(length(jump_points)-1)]+(diff(jump_points)/2)
+        
+        if (length(midpoints)>=2) {
+          # Fit monotone cubic smoothing spline
+          theta_n_smoothed <- splinefun(x=midpoints,y=theta_n(midpoints),method="monoH.FC")
+        } else {
+          # Fit a straight line instead if there are <2 midpoints
+          theta_n_smoothed <- function(x) {
+            slope <- theta_n(1) - theta_n(0)
+            intercept <- theta_n(0)
+            return(intercept + slope*x)
+          }
+        }
+        
+      }
+      
+      ggplot(
+        data.frame(
+          x = rep(grid,3),
+          y = c(theta_n(grid), theta_n_smoothed(grid), deriv_theta_n(grid)),
+          which = rep(c("theta", "theta_sm", "deriv"), each=101)
+        ),
+        aes(x=x, y=y, color=which)
+      ) +
+        geom_line()
+      
+    }
+    
     # Generate confidence limits
     if (params$ci_type=="none") {
       
@@ -189,7 +280,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       # The 0.975 quantile of the Chernoff distribution occurs at roughly 1.00
       # The Normal approximation would use qnorm(0.975, sd=0.52) instead
       qnt <- 1.00
-      # qnt <- qnorm(0.975, sd=0.52)
       n_orig <- length(dat_orig$delta)
       if (params$ci_type=="regular") {
         ci_lo <- ests - (qnt*tau_ns)/(n_orig^(1/3))
@@ -243,7 +333,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     }
     
     # Create vlist
-    vlist <- create_val_list(dat, C$appx, factor_A=unique(transform_a(dat$a)))
+    vlist <- create_val_list(dat_orig, C$appx,
+                             factor_A=unique(transform_a(dat$a)))
     
     # Construct f_aIw_n BEFORE transforming A values
     f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid,
@@ -286,7 +377,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     # Setup
     dat <- ss(dat_orig, which(dat_orig$delta==1))
-    vlist <- create_val_list(dat, C$appx)
+    vlist <- create_val_list(dat_orig, C$appx)
     
     # Construct component functions
     S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
@@ -299,9 +390,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     # Add extra return data
     # res[["ex_S_n"]] <- S_n(C$t_e, w=c(0.5,1), a=0.5)
-    # res[["ex_gamma_n"]] <- 0
-    # res[["ex_deriv_theta_n"]] <- 0
-    # res[["ex_tau_n"]] <- 0
     
   }
   
@@ -312,7 +400,10 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     res$gcomp <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n=S_n2)
   }
   if ("f_a_n" %in% return_extra) { res$f_a_n <- f_a_n }
+  if ("gamma_n" %in% return_extra) { res$gamma_n <- gamma_n }
+  if ("deriv_theta_n" %in% return_extra) { res$deriv_theta_n <- deriv_theta_n }
   if ("Phi_n_inv" %in% return_extra) { res$Phi_n_inv <- Phi_n_inv }
+  if ("Theta_os_n" %in% return_extra) { res$Theta_os_n <- Theta_os_n }
   
   return(res)
   

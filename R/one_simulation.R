@@ -21,26 +21,28 @@ if (cfg$which_sim=="estimation") {
       estimator = L$estimator$est,
       params = L$estimator$params,
       points = C$points,
-      dir = L$dir
+      dir = L$dir,
+      # return_extra = "Theta_os_n",
+      which = L$which
     )
     
     # Return results
     theta_true <- attr(dat_orig, "theta_true")
+    # Theta_true <- attr(dat_orig, "Theta_true") # !!!!!
     res_list <- list()
     for (i in 1:length(C$points)) {
       m <- format(C$points[i], nsmall=1)
+      # res_list[paste0("Theta_",m)] <- Theta_true[i] # !!!!!
       res_list[paste0("theta_",m)] <- theta_true[i]
       res_list[paste0("est_",m)] <- ests$est[i]
+      # res_list[paste0("esT_",m)] <- ests$Theta_os_n(C$points[i]) # !!!!!
       res_list[paste0("ci_lo_",m)] <- ests$ci_lo[i]
       res_list[paste0("ci_hi_",m)] <- ests$ci_hi[i]
     }
     
     # # Return extra results
     # res_list[[".complex"]] <- list(
-    #   res_list = res_list,
-    #   dat_orig = dat_orig,
-    #   Phi_n = ests$Phi_n,
-    #   Gamma_os_n = ests$Gamma_os_n
+    #   Theta_os_n = ests$Theta_os_n
     # )
     
     return(res_list)

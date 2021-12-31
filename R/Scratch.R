@@ -1,4 +1,80 @@
 
+# !!!!! DWD !!!!!
+if (F) {
+  
+  # Psi_1
+  {
+    # Theta_true <- attr(dat_orig,"Theta_true")
+    # Gamma_0 <- Vectorize(function(x) {
+    #   Theta_true[which.min(abs(x-seq(0,1,0.02)))[1]]
+    # })
+    # infl_fn_1 <- construct_infl_fn_1(dat, Gamma_0, Phi_n,
+    #                                  lambda_2, lambda_3)
+    Psi_1_var_est <- (1/n_orig^2) * sum((weights*infl_fn_1(dat$a))^2)
+    # Psi_1_est <- (1/n_orig) * sum(weights*(
+    #   lambda_2*(Phi_n(dat$a))^2*Gamma_0(dat$a) -
+    #     lambda_3*Phi_n(dat$a)*Gamma_0(dat$a)
+    # ))
+    test_stat <- Psi_1_est^2/Psi_1_var_est
+    p_val <- pchisq(test_stat, df=1, lower.tail=FALSE)
+  }
+  
+  # Psi_2
+  {
+    # Phi_0 <- function(x) {x}
+    # infl_fn_Gamma <- construct_infl_fn_Gamma(omega_n, g_n, gcomp_n,
+    #                                          eta_n, Gamma_os_n)
+    # infl_fn_2 <- construct_infl_fn_2(dat, Phi_0, infl_fn_Gamma, 1/3, 1/4)
+    Psi_2_var_est <- (1/n_orig^2) * sum((
+      weights*infl_fn_2(dat$w,dat$y_star,dat$delta_star,dat$a)
+    )^2)
+    # a_mc <- runif(10^6)
+    # Psi_2_est <- mean(
+    #   (1/3)*(Phi_0(a_mc))^2*Gamma_os_n(round(a_mc,-log10(C$appx$a))) -
+    #     (1/4)*Phi_0(a_mc)*Gamma_os_n(round(a_mc,-log10(C$appx$a)))
+    # )
+    test_stat <- Psi_2_est^2/Psi_2_var_est
+    p_val <- pchisq(test_stat, df=1, lower.tail=FALSE)
+  }
+  
+  # Psi_1+Psi_2
+  {
+    # Psi_1
+    Theta_true <- attr(dat_orig,"Theta_true")
+    Gamma_0 <- Vectorize(function(x) {
+      Theta_true[which.min(abs(x-seq(0,1,0.02)))[1]]
+    })
+    infl_fn_1 <- construct_infl_fn_1(dat, Gamma_0, Phi_n,
+                                     lambda_2, lambda_3)
+    Psi_1_est <- (1/n_orig) * sum(weights*(
+      lambda_2*(Phi_n(dat$a))^2*Gamma_0(dat$a) -
+        lambda_3*Phi_n(dat$a)*Gamma_0(dat$a)
+    ))
+    
+    # Psi_2
+    Phi_0 <- function(x) {x}
+    infl_fn_Gamma <- construct_infl_fn_Gamma(omega_n, g_n, gcomp_n,
+                                             eta_n, Gamma_os_n)
+    infl_fn_2 <- construct_infl_fn_2(dat, Phi_0, infl_fn_Gamma, 1/3, 1/4)
+    a_mc <- runif(10^6)
+    Psi_2_est <- mean(
+      (1/3)*(Phi_0(a_mc))^2*Gamma_os_n(round(a_mc,-log10(C$appx$a))) -
+        (1/4)*Phi_0(a_mc)*Gamma_os_n(round(a_mc,-log10(C$appx$a)))
+    )
+    
+    # Combined
+    infl_fn_beta <- function(a,w,y_star,delta_star) {
+      infl_fn_1(a) + infl_fn_2(w,y_star,delta_star,a)
+    }
+    beta_var_est <- (1/n_orig^2) * sum((
+      weights*infl_fn_beta(dat$a,dat$w,dat$y_star,dat$delta_star)
+    )^2)
+    test_stat <- (Psi_1_est+Psi_2_est)^2/beta_var_est
+    p_val <- pchisq(test_stat, df=1, lower.tail=FALSE)
+  }
+  
+}
+
 # Debugging infl_fn_1
 if (F) {
   
@@ -183,7 +259,7 @@ if (F) {
     return(construct_superfunc(fnc, aux=NA, vec=c(1), vals=NA))
   }
   
-  n_reps <- 1000
+  n_reps <- 100
   Psi_8_est <- rep(NA, n_reps)
   Psi_8_var_est <- rep(NA, n_reps)
   reject <- rep(NA, n_reps)
@@ -254,7 +330,7 @@ if (F) {
   for (i in c(1:n_reps)) {
     
     # Generate data, construct ECDF and lambda_3
-    n_orig <- 1000 # !!!!! 1000
+    n_orig <- 1000
     # a <- round(runif(n_orig), 3)
     a <- runif(n_orig)
     Phi_n <- ecdf(a)
@@ -267,6 +343,83 @@ if (F) {
     )
     infl_fn_Psi_1 <- construct_infl_fn_1(a,Phi_n,Gamma_0,lambda_2n,lambda_3n)
     Psi_1_var_est[i] <- (1/n_orig^2) * sum((infl_fn_Psi_1(a))^2)
+    
+    # Hypothesis test
+    Phi_0 <- -0.0015878
+    test_stat <- (Psi_1_est[i]-Phi_0)^2/Psi_1_var_est[i]
+    p_val <- pchisq(test_stat, df=1, lower.tail=FALSE)
+    reject[i] <- as.integer(p_val<0.05)
+    
+  }
+  
+  # False positive rate
+  mean(reject)
+  
+  
+  
+  ################################.
+  ##### Psi_1 (with weights) #####
+  ################################.
+  
+  # Setup
+  
+  C <- list(points=seq(0,1,0.02), alpha_1=0.5, alpha_2=0.7, t_e=200,
+            appx=list(t_e=10,w1=0.1,w1b=0.1,a=0.01))
+  
+  # Approximate Gamma_0
+  Gamma_0 <- function(x) { sqrt(x)/3 }
+  
+  # IF constructor
+  rho_n <- function(a,Phi_n,Gamma_0,x) {
+    mean( (Phi_n(a))^x * Gamma_0(a) )
+  }
+  construct_infl_fn_1 <- function(a,Phi_n,Gamma_0,lambda_2n,lambda_3n) {
+    a_j <- a
+    rho_1 <- rho_n(a,Phi_n,Gamma_0,1)
+    rho_2 <- rho_n(a,Phi_n,Gamma_0,2)
+    # xi_01 <- construct_xi_n(a,Phi_n,Gamma_0,0,1)
+    # xi_20 <- construct_xi_n(a,Phi_n,Gamma_0,2,0)
+    # xi_10 <- construct_xi_n(a,Phi_n,Gamma_0,1,0)
+    # xi_11 <- construct_xi_n(a,Phi_n,Gamma_0,1,1)
+    piece_01 <- Gamma_0(a_j)
+    piece_20 <- (Phi_n(a_j))^2
+    piece_10 <- Phi_n(a_j)
+    piece_11 <- Phi_n(a_j) * Gamma_0(a_j)
+    
+    fnc <- function(a_i) {
+      (2*mean(as.integer(a_i<=a_j)*piece_10)+(Phi_n(a_i))^2-6*lambda_2n)*rho_2 +
+        lambda_2n*(2*mean(as.integer(a_i<=a_j)*piece_11)+(Phi_n(a_i))^2*Gamma_0(a_i)) -
+        (3*mean(as.integer(a_i<=a_j)*piece_20)+(Phi_n(a_i))^3-6*lambda_3n)*rho_1 -
+        lambda_3n*(mean(as.integer(a_i<=a_j)*piece_01)+Phi_n(a_i)*Gamma_0(a_i))
+    }
+    return(construct_superfunc(fnc, aux=NA, vec=c(1), vals=NA))
+  }
+  
+  n_reps <- 10
+  Psi_1_est <- rep(NA, n_reps)
+  Psi_1_var_est <- rep(NA, n_reps)
+  reject <- rep(NA, n_reps)
+  for (i in c(1:n_reps)) {
+    
+    # Generate data, construct ECDF and lambda_3
+    n_orig <- 1000
+    dat_orig <- generate_data(1000, 0, "Unif(0,1)", "none", "Cox PH",
+                              list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5),
+                              "iid", "decr") # "two-phase (72%)"
+    dat <- ss(dat_orig, which(dat_orig$delta==1))
+    a <- dat$a
+    weights <- dat$weights
+    
+    Phi_n <- construct_Phi_n(dat, type="step")
+    lambda_2n <- (1/n_orig) * sum(weights*(Phi_n(a))^2)
+    lambda_3n <- (1/n_orig) * sum(weights*(Phi_n(a))^3)
+    
+    # Construct estimator, IF, and variance estimator
+    Psi_1_est[i] <- (1/n_orig) * sum(weights*(
+      lambda_2n*(Phi_n(a))^2*Gamma_0(a) - lambda_3n*Phi_n(a)*Gamma_0(a)
+    ))
+    infl_fn_Psi_1 <- construct_infl_fn_1(a,Phi_n,Gamma_0,lambda_2n,lambda_3n)
+    Psi_1_var_est[i] <- (1/n_orig^2) * sum(weights*(infl_fn_Psi_1(a))^2)
     
     # Hypothesis test
     Phi_0 <- -0.0015878

@@ -18,7 +18,7 @@
             sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5),
             distr_A="Unif(0,1)", edge="none", surv_true="Cox PH", # Unif(0,1) N(0.5,0.04)
             ecdf_type="true", sampling="two-phase (72%)",
-            estimator=list(est="Grenander",params=params)
+            estimator=list(est="Grenander",params=params), which="Gamma"
   )
   
   # 3. Generate dataset

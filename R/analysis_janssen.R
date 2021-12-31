@@ -16,8 +16,13 @@ cfg2 <- list(
   run_import_data = F,
   run_dqa = F,
   run_graphs = T
-  # edge_spread = F
+  # vars = list(
+  #   wt = "wt.D29start1",
+  #   ph1 = "ph1.D29start1",
+  #   ph2 = "ph2.D29start1"
+  # )
 )
+set.seed(1)
 
 # Catch TID and set config accordingly
 cfg2$tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
@@ -26,22 +31,20 @@ cfg2_df <- data.frame(
   tid = c(1:4),
   S_n_type = rep("Super Learner", 4), # c("Cox PH", "Super Learner")
   marker_num = c(1:4),
-  jit_L = rep(0.25, 4),
-  jit_R = rep(0.75, 4) # c(0.6,0.75,0.9,1)
+  edge_corr = rep("min", 4),
+  lod_shift = rep(T, 4)
 )
-set.seed(1234)
 cfg2$S_n_type <- cfg2_df[cfg2$tid, "S_n_type"]
 cfg2$marker_num <- cfg2_df[cfg2$tid, "marker_num"]
-cfg2$jit_L <- cfg2_df[cfg2$tid, "jit_L"]
-cfg2$jit_R <- cfg2_df[cfg2$tid, "jit_R"]
+cfg2$edge_corr <- cfg2_df[cfg2$tid, "edge_corr"]
+cfg2$lod_shift <- cfg2_df[cfg2$tid, "lod_shift"]
 cfg2$d <- case_when(
   cfg2$marker_num<=2 ~ cfg2$datasets[1],
   cfg2$marker_num==3 ~ cfg2$datasets[2],
   cfg2$marker_num==4 ~ cfg2$datasets[3],
 )
 
-cfg2$folder = paste0("Janssen functions/Janssen (tid ",cfg2$tid,")")
-# cfg2$edge_spread <- ifelse(cfg2$marker_num==3, TRUE, FALSE) # !!!!!
+cfg2$folder <- paste0("Janssen functions/Janssen (tid ",cfg2$tid,")")
 
 # Create directory if it doesn't exist
 if (!dir.exists(cfg2$folder)) { dir.create(cfg2$folder) }
@@ -68,7 +71,7 @@ if (cfg2$run_import_data) {
     
     # Subset data frames
     assign(paste0("df_ph1_",d),
-           filter(eval(as.name(paste0("df_raw_",d))), ph1.D29==T))
+           filter(eval(as.name(paste0("df_raw_",d))), ph1.D29start1==T))
     assign(paste0("df_ct_",d),
            filter(eval(as.name(paste0("df_ph1_",d))), Trt==0))
     assign(paste0("df_tx_",d),
@@ -92,9 +95,9 @@ if (cfg2$run_import_data) {
         "w2" = as.integer(df[["Region"]]==2),
         "w3" = df[["risk_score"]]
       ),
-      "weights" = df[["wt.D29"]],
+      "weights" = df[["wt.D29start1"]],
       "a_list" = a_list,
-      "delta" = as.integer(df[["ph2.D29"]])
+      "delta" = as.integer(df[["ph2.D29start1"]])
     )
     
     # Stabilize weights (rescale to sum to sample size)
@@ -171,6 +174,16 @@ if (cfg2$run_dqa) {
               round(1 - (num_case_tx_66/num_atrisk_tx) /
                       (num_case_ct_66/num_atrisk_ct),3)))
   
+  # Fractions of point mass at edge
+  a1 <- dat_orig_1$a_list[[1]]
+  a2 <- dat_orig_1$a_list[[2]]
+  a3 <- dat_orig_adcp$a_list[[3]]
+  a4 <- dat_orig_psv$a_list[[4]]
+  round(sum(a1==min(a1,na.rm=T),na.rm=T) / sum(!is.na(a1)), 3)
+  round(sum(a2==min(a2,na.rm=T),na.rm=T) / sum(!is.na(a2)), 3)
+  round(sum(a3==min(a3,na.rm=T),na.rm=T) / sum(!is.na(a3)), 3)
+  round(sum(a4==min(a4,na.rm=T),na.rm=T) / sum(!is.na(a4)), 3)
+  
   # !!!!!
   get.marginalized.risk.no.marker <- function(dat) {
     fit.risk <- coxph(
@@ -212,11 +225,11 @@ if (cfg2$run_dqa) {
   ggplot(
     data.frame(
       x = time_tx[which(ind_tx==1)],
-      ph2.D29 = df_tx_1$ph2.D29[which(ind_tx==1)]
+      ph2.D29start1 = df_tx_1$ph2.D29start1[which(ind_tx==1)]
     ),
-    aes(x=x, fill=ph2.D29)
+    aes(x=x, fill=ph2.D29start1)
   ) +
-    facet_wrap(~ph2.D29) +
+    facet_wrap(~ph2.D29start1) +
     geom_vline(xintercept=c(138,195), linetype="dashed", color="#333333") +
     geom_histogram() +
     labs(title="Distribution of event times, by Ph2 indicator", x="Time")
@@ -252,8 +265,8 @@ if (cfg2$run_dqa) {
   survfit(
     Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
          EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
-    data = filter(df_tx, ph2.D29==1),
-    weights = wt.D29
+    data = filter(df_tx, ph2.D29start1==1),
+    weights = wt.D29start1
   ) %>% autoplot()
   
   # Treatment group survival (subcohort)
@@ -277,8 +290,8 @@ if (cfg2$run_dqa) {
   survfit(
     Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
          EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
-    data = filter(df_tx, ph2.D29==1),
-    weights = wt.D29
+    data = filter(df_tx, ph2.D29start1==1),
+    weights = wt.D29start1
   ) %>% autoplot()
   
 }
@@ -321,35 +334,6 @@ if (F) {
   sum(a[[2]]==max(a[[2]]))/length(a[[2]])
   sum(a[[3]]==max(a[[3]]))/length(a[[3]])
   
-  # Explore jittering values
-  sort(unique(a[[1]]))[1:5]
-  sort(unique(a[[2]]))[1:5]
-  sort(unique(a[[3]]))[1:5]
-  lens <- c(length(a[[1]]), length(a[[2]]), length(a[[3]]))
-  a_jit <- list()
-  # jit_1 <- runif(n=lens[1], min=0.25*lod[1], max=0.75*lod[1])
-  # jit_2 <- runif(n=lens[2], min=0.25*lod[2], max=0.75*lod[2])
-  # jit_3 <- runif(n=lens[3], min=0.25*lod[3], max=0.75*lod[3])
-  jit_1 <- runif(n=lens[1], min=0.4*lod[1], max=0.6*lod[1])
-  jit_2 <- runif(n=lens[2], min=0.4*lod[2], max=0.6*lod[2])
-  jit_3 <- runif(n=lens[3], min=0.4*lod[3], max=0.6*lod[3])
-  a_jit[[1]] <- ifelse(a[[1]]==min(a[[1]]), jit_1, a[[1]])
-  a_jit[[2]] <- ifelse(a[[2]]==min(a[[2]]), jit_1, a[[2]])
-  a_jit[[3]] <- ifelse(a[[3]]==min(a[[3]]), jit_1, a[[3]])
-  
-  # Histogram (unjittered vs. jittered)
-  ggplot(
-    data.frame(
-      x = log10(c(a[[1]],a[[2]],a[[3]],a_jit[[1]],a_jit[[2]],a_jit[[3]])),
-      # x = c(a[[1]],a[[2]],a[[3]],a_jit[[1]],a_jit[[2]],a_jit[[3]]),
-      which = rep(c("original","jittered"), each=sum(lens)),
-      marker = rep(c(rep(1,lens[1]), rep(2,lens[2]), rep(3,lens[3])),2)
-    ),
-    aes(x=x)
-  ) +
-    geom_histogram(bins=50) +
-    facet_grid(rows=dplyr::vars(which), cols=dplyr::vars(marker))
-  
 }
 
 
@@ -369,15 +353,17 @@ if (F) {
   dat_orig$a <- dat_orig$a_list[[cfg2$marker_num]]
   dat_orig$a_list <- NULL
   
-  # Archive unjittered marker (for histogram)
+  # Archive original marker (for histogram)
   a_orig <- dat_orig$a[!is.na(dat_orig$a)]
   
-  # Jitter A values (left endpoint)
-  dat_orig$a <- 10^dat_orig$a
-  lod <- 2*min(dat_orig$a, na.rm=T)
-  jit <- runif(n=length(dat_orig$a), min=cfg2$jit_L*lod, max=cfg2$jit_R*lod)
-  dat_orig$a <- ifelse(dat_orig$a==min(dat_orig$a, na.rm=T), jit, dat_orig$a)
-  dat_orig$a <- log10(dat_orig$a)
+  # !!!!! NEW CODE !!!!!
+  if (cfg2$lod_shift) {
+    # Move LOD/2 values to LOD*(3/4)
+    # lod <- log10(2*(10^min(dat_orig$a,na.rm=T)))
+    lod12 <- min(dat_orig$a,na.rm=T)
+    lod34 <- log10(1.5*(10^lod12))
+    dat_orig$a[dat_orig$a==lod12] <- lod34
+  }
   
   # Rescale A to lie in [0,1]
   a2 <- 1/C$appx$a
@@ -393,8 +379,9 @@ if (F) {
   # Set estimation tuning parameters
   params <- list(S_n_type=cfg2$S_n_type, g_n_type="binning",
                  ecdf_type="linear (mid)", deriv_type="m-spline",
-                 gamma_type="kernel", ci_type="regular", edge_corr="none",
-                 omega_n_type="estimated", cf_folds=1, n_bins=0)
+                 gamma_type="kernel", ci_type="regular",
+                 edge_corr=cfg2$edge_corr, omega_n_type="estimated",
+                 cf_folds=1, n_bins=0)
   
 }
 
@@ -411,10 +398,31 @@ ests <- est_curve(
   params = params,
   points = p_grid,
   dir = "decr",
-  return_extra = c("gcomp", "Phi_n_inv")
+  return_extra = c("gcomp", "Phi_n_inv", "deriv_theta_n", "f_a_n", "gamma_n"),
+  which = "Theta"
 )
 # saveRDS(ests, "ests.rds") # !!!!!
 # ests <- readRDS("ests.rds") # !!!!!
+
+# !!!!!
+if (F) {
+  print("Variance scale factor components")
+  print("deriv_theta_n")
+  print(ests$deriv_theta_n(seq(0,1,0.05)))
+  print("f_a_n")
+  print(ests$f_a_n(seq(0,1,0.05)))
+  print("gamma_n")
+  print(ests$gamma_n(seq(0,1,0.05)))
+  print("deriv_theta_n*f_a_n")
+  print(ests$deriv_theta_n(seq(0,1,0.05))*ests$f_a_n(seq(0,1,0.05)))
+  print("deriv_theta_n*gamma_n")
+  print(ests$deriv_theta_n(seq(0,1,0.05))*ests$gamma_n(seq(0,1,0.05)))
+  print("f_a_n*gamma_n")
+  print(ests$f_a_n(seq(0,1,0.05))*ests$gamma_n(seq(0,1,0.05)))
+  print("deriv_theta_n*f_a_n*gamma_n")
+  print(ests$deriv_theta_n(seq(0,1,0.05))*ests$f_a_n(seq(0,1,0.05))*
+          ests$gamma_n(seq(0,1,0.05)))
+}
 
 # Calculate control/vaccine group marginalized survival
 get.marginalized.risk.no.marker <- function(dat, tfinal.tpeak, wts=F) {
@@ -433,7 +441,7 @@ get.marginalized.risk.no.marker <- function(dat, tfinal.tpeak, wts=F) {
         as.factor(Region),
       dat,
       model = T,
-      weights = wt.D29
+      weights = wt.D29start1
     )
   }
   dat[["EventTimePrimaryIncludeNotMolecConfirmedD29"]] <- tfinal.tpeak
@@ -490,8 +498,8 @@ if (F) {
   srv_tx_sub <- survfit(coxph(
     Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
          EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
-    data = filter(df_tx, ph2.D29==1),
-    weights = wt.D29
+    data = filter(df_tx, ph2.D29start1==1),
+    weights = wt.D29start1
   ))
   rate_tx_sub <- 1 - srv_tx_sub$surv[which.min(abs(srv_tx_sub$time-C$t_e))]
   ve_subcohort <- 1 - (rate_tx_sub/rate_ct)
@@ -526,16 +534,19 @@ if (cfg2$run_graphs) {
     ests_gcomp <- cve(theta_ests_gcomp)
     ests_gren <- cve(theta_ests_gren)
     
-    # Truncate at 5/95 quantiles and at histogram edges
-    which1 <- p_grid>=ests$Phi_n_inv(0.05) & p_grid<=ests$Phi_n_inv(0.95)
+    # Truncate at 10/90 quantiles and at histogram edges
+    # which1 <- p_grid>=ests$Phi_n_inv(0.1) & p_grid<=ests$Phi_n_inv(0.9)
+    which1 <- p_grid<=ests$Phi_n_inv(0.9)
     a_grid <- p_grid*a_scale-a_shift
-    which2 <- a_grid>=min(a_orig) & a_grid<=max(a_orig)
+    which2 <- a_grid<=max(a_orig) # ?????
+    # which2 <- a_grid>=min(a_orig) & a_grid<=max(a_orig) # ?????
     which <- which1 & which2
     ests_gren <- ifelse(which,ests_gren,NA)
     ests_gcomp <- ifelse(which,ests_gcomp,NA)
     ci_lo <- ifelse(which,ci_lo,NA)
     ci_hi <- ifelse(which,ci_hi,NA)
-    x1 <- a_grid[min(which(which))]
+    # x1 <- a_grid[min(which(which))]
+    x1 <- lod12
     x2 <- a_grid[max(which(which))]
     
     # Labels
@@ -555,19 +566,20 @@ if (cfg2$run_graphs) {
     
     # Plots: data
     plot_data_1 <- data.frame(
-      x = c(a_grid,x1,x2), # x = c(a_grid,xlim),
-      y = c(ests_gren,rep(ve_overall,2)),
-      which = c(rep("Controlled VE", length(p_grid)),rep("Overall VE",2)),
-      ci_lo = c(ci_lo,rep(ve_ci[1],2)),
-      ci_hi = c(ci_hi,rep(ve_ci[2],2))
+      x = c(x1,a_grid,x1,x2),
+      y = c(ests_gren[1],ests_gren,rep(ve_overall,2)),
+      which = c(rep("Controlled VE", length(p_grid)+1),rep("Overall VE",2)),
+      ci_lo = c(ci_lo[1],ci_lo,rep(ve_ci[1],2)),
+      ci_hi = c(ci_hi[1],ci_hi,rep(ve_ci[2],2))
     )
     plot_data_2 <- data.frame(
-      x = c(rep(a_grid,2),x1,x2), # x = c(rep(a_grid,2),xlim),
-      y = c(ests_gcomp,ests_gren,rep(ve_overall,2)),
-      which = c(rep(c("Cox model","Controlled VE"), each=length(p_grid)),
+      x = c(x1,rep(a_grid,2),x1,x2),
+      y = c(ests_gren[1],ests_gren,ests_gcomp,rep(ve_overall,2)),
+      which = c("Controlled VE",rep(c("Controlled VE","Cox model"),
+                                    each=length(p_grid)),
                 rep("Overall VE",2)),
-      ci_lo = c(ests_gcomp,ci_lo,rep(ve_ci[1],2)),
-      ci_hi = c(ests_gcomp,ci_hi,rep(ve_ci[2],2))
+      ci_lo = c(ci_lo[1],ci_lo,ests_gcomp,rep(ve_ci[1],2)),
+      ci_hi = c(ci_hi[1],ci_hi,ests_gcomp,rep(ve_ci[2],2))
     )
     
     plot_1 <- ggplot(plot_data_1, aes(x=x, y=y, color=which)) +

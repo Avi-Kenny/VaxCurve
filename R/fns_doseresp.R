@@ -623,14 +623,14 @@ construct_deriv_theta_n <- function(theta_n, type, dir="incr") {
     theta_ns <- theta_n(grid)
     
     # Identify jump points of step function
-    # jump_points <- c(0)
-    jump_points <- c()
+    jump_points <- c(0) # !!!!!
+    # jump_points <- c()
     for (i in 2:length(grid)) {
       if (theta_ns[i]!=theta_ns[i-1]) {
         jump_points <- c(jump_points, mean(c(grid[i],grid[i-1])))
       }
     }
-    # jump_points <- c(jump_points,grid[length(grid)])
+    jump_points <- c(jump_points,grid[length(grid)]) # !!!!!
     
     # Identify midpoints of jump points
     midpoints <- jump_points[1:(length(jump_points)-1)]+(diff(jump_points)/2)
@@ -722,7 +722,6 @@ construct_deriv_theta_n <- function(theta_n, type, dir="incr") {
 construct_tau_n <- function(deriv_theta_n, gamma_n, f_a_n) {
   
   return(Vectorize(function(a){
-    # (4*deriv_theta_n(a)*f_a_n(a)*gamma_n(a))^(1/3) # !!!!!
     abs(4*deriv_theta_n(a)*f_a_n(a)*gamma_n(a))^(1/3)
   }))
   
@@ -1195,6 +1194,28 @@ construct_eta_n <- function(dat, vals=NA, S_n) {
 
 
 
+#' Construct nuisance estimator eta*_n
+#' 
+#' @param S_n Conditional survival function estimator returned by construct_S_n
+#' @param vals List of values to pre-compute function on; passed to
+#'     construct_superfunc()
+#' @return Estimator function of nuisance eta*_0
+construct_etastar_n <- function(S_n, vals=NA) {
+  
+  fnc <- function(x,w) {
+    integral <- mean(sapply(seq(0.01,1,0.01), function(a) {
+      as.integer(a<=x) * S_n(C$t_e, w, a)
+    }))
+    return(x-integral)
+  }
+  
+  # round_args <- c(-log10(C$appx$a), -log10(C$appx$w1), 0)
+  return(construct_superfunc(fnc, aux=NA, vec=c(1,2), vals=vals))
+  
+}
+
+
+
 #' lambda estimator
 #' 
 #' @param k Power k
@@ -1206,6 +1227,43 @@ lambda <- function(dat, k, G) {
   n_orig <- sum(dat$weights)
   lambda <- (1/n_orig) * sum( dat$weights * (G(dat$a))^k )
   return(lambda)
+  
+}
+
+
+
+#' Construct Theta_os_n primitive one-step estimator
+#' 
+#' @param dat Subsample of dataset returned by ss() for which delta==1
+#' @param vals List of values to pre-compute function on; passed to
+#'     construct_superfunc()
+#' @param omega_n A nuisance influence function returned by construct_omega_n()
+#' @param f_aIw_n Conditional density estimator returned by construct_f_aIw_n
+#' @param etastar_n A nuisance estimator returned by construct_etastar_n()
+#' @return Gamma_os_n estimator
+#' @notes This is a generalization of the one-step estimator from Westling &
+#'     Carone 2020
+construct_Theta_os_n <- function(dat, vals=NA, omega_n, f_aIw_n, etastar_n) {
+  
+  weights_i <- dat$weights
+  n_orig <- sum(weights_i)
+  a_i <- dat$a
+  w_i <- dat$w
+  piece_1 <- omega_n(dat$w,dat$a,dat$y_star,dat$delta_star) /
+    f_aIw_n(dat$a,dat$w)
+  
+  # Remove large intermediate objects
+  objs <- c("dat", "omega_n", "f_aIw_n")
+  for (obj in objs) { rm(obj) }
+  
+  fnc <- function(x) {
+    (1/n_orig) * sum(weights_i * (
+      as.integer(a_i<=x) * piece_1 + etastar_n(rep(x,nrow(w_i)),w_i)
+    ))
+  }
+  
+  # round_args <- -log10(C$appx$a)
+  return(construct_superfunc(fnc, aux=NA, vec=T, vals=vals))
   
 }
 
@@ -1378,45 +1436,6 @@ construct_infl_fn_1 <- function(dat, Gamma_os_n, Phi_n, lambda_2,
 
 
 
-#' #' !!!!! document
-#' #' 
-#' #' @param x x
-#' #' @return x
-#' construct_infl_fn_1 <- function(dat, Gamma_os_n, Phi_n, xi_n, rho_n,
-#'                                 lambda_2, lambda_3, vals=NA) {
-#'   
-#'   n_orig <- sum(dat$weights)
-#'   weights_j <- dat$weights
-#'   a_j <- dat$a
-#'   
-#'   fnc <- function(a_i) {
-#'     
-#'     piece_1 <- (lambda_2*(Phi_n(a_i)^2) - lambda_3*Phi_n(a_i)) *
-#'       Gamma_os_n(round(a_i, -log10(C$appx$a)))
-#'     
-#'     piece_2 <- (1/n_orig) * sum(
-#'       weights_j * (lambda_2*(Phi_n(a_j)^2) - lambda_3*Phi_n(a_j)) *
-#'         Gamma_os_n(round(a_j, -log10(C$appx$a)))
-#'     )
-#'     
-#'     # piece_1 <- (1/n_orig) * sum(
-#'     #   weights_j * (xi_n(a_i,a_j) - rho_n(a_i)) *
-#'     #     Gamma_os_n(round(a_j, -log10(C$appx$a)))
-#'     # )
-#'     
-#'     # piece_2 <- (lambda_2*(Phi_n(a)^2) - lambda_3*Phi_n(a)) *
-#'     #   Gamma_os_n(round(a, -log10(C$appx$a)))
-#'     
-#'     return(piece_1-piece_2)
-#'     
-#'   }
-#'   
-#'   return(construct_superfunc(fnc, aux=NA, vec=c(1), vals=vals))
-#'   
-#' }
-
-
-
 #' !!!!! document
 #' 
 #' @param x x
@@ -1430,7 +1449,7 @@ construct_infl_fn_Gamma <- function(omega_n, g_n, gcomp_n, eta_n,
         gcomp_n(a)
     ) +
       eta_n(x,w) -
-      2*Gamma_os_n(round(x, -log10(C$appx$a)))
+      2*Gamma_os_n(round(x,-log10(C$appx$a)))
   }
   
   return(construct_superfunc(fnc, vec=c(1,2,1,1,1)))
@@ -1478,7 +1497,6 @@ beta_n_var_hat <- function(dat, infl_fn_1, infl_fn_2) {
   for (i in c(1:length(dat$a))) {
     b_sum <- b_sum + (dat$weights[i] * (
       infl_fn_1(dat$a[i]) +
-      # infl_fn_1(dat$a[i]) +
         infl_fn_2(dat$w[i,], dat$y_star[i], dat$delta_star[i], dat$a[i])
     ))^2
   }

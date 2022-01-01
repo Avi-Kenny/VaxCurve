@@ -1,77 +1,19 @@
 
-# !!!!! DWD !!!!!
+# Checking variance components
 if (F) {
   
-  # Psi_1
-  {
-    # Theta_true <- attr(dat_orig,"Theta_true")
-    # Gamma_0 <- Vectorize(function(x) {
-    #   Theta_true[which.min(abs(x-seq(0,1,0.02)))[1]]
-    # })
-    # infl_fn_1 <- construct_infl_fn_1(dat, Gamma_0, Phi_n,
-    #                                  lambda_2, lambda_3)
-    Psi_1_var_est <- (1/n_orig^2) * sum((weights*infl_fn_1(dat$a))^2)
-    # Psi_1_est <- (1/n_orig) * sum(weights*(
-    #   lambda_2*(Phi_n(dat$a))^2*Gamma_0(dat$a) -
-    #     lambda_3*Phi_n(dat$a)*Gamma_0(dat$a)
-    # ))
-    test_stat <- Psi_1_est^2/Psi_1_var_est
-    p_val <- pchisq(test_stat, df=1, lower.tail=FALSE)
-  }
-  
-  # Psi_2
-  {
-    # Phi_0 <- function(x) {x}
-    # infl_fn_Gamma <- construct_infl_fn_Gamma(omega_n, g_n, gcomp_n,
-    #                                          eta_n, Gamma_os_n)
-    # infl_fn_2 <- construct_infl_fn_2(dat, Phi_0, infl_fn_Gamma, 1/3, 1/4)
-    Psi_2_var_est <- (1/n_orig^2) * sum((
-      weights*infl_fn_2(dat$w,dat$y_star,dat$delta_star,dat$a)
-    )^2)
-    # a_mc <- runif(10^6)
-    # Psi_2_est <- mean(
-    #   (1/3)*(Phi_0(a_mc))^2*Gamma_os_n(round(a_mc,-log10(C$appx$a))) -
-    #     (1/4)*Phi_0(a_mc)*Gamma_os_n(round(a_mc,-log10(C$appx$a)))
-    # )
-    test_stat <- Psi_2_est^2/Psi_2_var_est
-    p_val <- pchisq(test_stat, df=1, lower.tail=FALSE)
-  }
-  
-  # Psi_1+Psi_2
-  {
-    # Psi_1
-    Theta_true <- attr(dat_orig,"Theta_true")
-    Gamma_0 <- Vectorize(function(x) {
-      Theta_true[which.min(abs(x-seq(0,1,0.02)))[1]]
-    })
-    infl_fn_1 <- construct_infl_fn_1(dat, Gamma_0, Phi_n,
-                                     lambda_2, lambda_3)
-    Psi_1_est <- (1/n_orig) * sum(weights*(
-      lambda_2*(Phi_n(dat$a))^2*Gamma_0(dat$a) -
-        lambda_3*Phi_n(dat$a)*Gamma_0(dat$a)
-    ))
-    
-    # Psi_2
-    Phi_0 <- function(x) {x}
-    infl_fn_Gamma <- construct_infl_fn_Gamma(omega_n, g_n, gcomp_n,
-                                             eta_n, Gamma_os_n)
-    infl_fn_2 <- construct_infl_fn_2(dat, Phi_0, infl_fn_Gamma, 1/3, 1/4)
-    a_mc <- runif(10^6)
-    Psi_2_est <- mean(
-      (1/3)*(Phi_0(a_mc))^2*Gamma_os_n(round(a_mc,-log10(C$appx$a))) -
-        (1/4)*Phi_0(a_mc)*Gamma_os_n(round(a_mc,-log10(C$appx$a)))
+  sim %>% summarize(
+    mean = list(
+      list(x="psi1psi2_var", name="var_est_psi1psi2"),
+      list(x="Psi_1_var_est", name="var_est_psi1"),
+      list(x="Psi_2_var_est", name="var_est_psi2")
+    ),
+    var = list(
+      list(x="psi1psi2", name="var_emp_psi1psi2"),
+      list(x="Psi_1_est", name="var_emp_psi1"),
+      list(x="Psi_2_est", name="var_emp_psi2")
     )
-    
-    # Combined
-    infl_fn_beta <- function(a,w,y_star,delta_star) {
-      infl_fn_1(a) + infl_fn_2(w,y_star,delta_star,a)
-    }
-    beta_var_est <- (1/n_orig^2) * sum((
-      weights*infl_fn_beta(dat$a,dat$w,dat$y_star,dat$delta_star)
-    )^2)
-    test_stat <- (Psi_1_est+Psi_2_est)^2/beta_var_est
-    p_val <- pchisq(test_stat, df=1, lower.tail=FALSE)
-  }
+  )
   
 }
 

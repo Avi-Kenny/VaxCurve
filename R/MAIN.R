@@ -13,7 +13,7 @@ cfg <- list(
   which_sim = "testing", # "estimation" "edge" "testing" "infl_fn_1 (temp)"
   level_set_which = "level_set_testing_1", # level_set_estimation_1 level_set_testing_1
   # keep = c(1:3,7:9,16:18,22:24),
-  num_sim = 500,
+  num_sim = 8000,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm"),
@@ -245,7 +245,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Testing: compare all methods
   level_set_testing_1 <- list(
-    n = 1000,
+    n = 4000,
     # n = c(1000,2000),
     alpha_3 = 0,
     # alpha_3 = c(0,-0.25,-0.5),
@@ -256,8 +256,8 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     surv_true = "Cox PH",
     sampling = c("iid", "two-phase (72%)"),
     # sampling = c("iid", "two-phase (72%)", "two-phase (70% random)"),
-    temp_which = "Psi_1",
-    # temp_which = c("Psi_1","Psi_2","Psi_1+Psi_2"), # Gamma, beta_n
+    # temp_which = "Psi_1+Psi_2",
+    temp_which = c("Psi_1","Psi_2","Psi_1+Psi_2"), # Gamma, beta_n
     test = list(
       "Slope (two-tailed)" = list(
         type = "test_2",

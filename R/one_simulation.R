@@ -135,7 +135,10 @@ if (cfg$which_sim=="testing") {
       "reject" = test_results$reject,
       "p_val" = test_results$p_val,
       "beta_n" = test_results$beta_n,
-      "sd_n" = test_results$sd_n
+      "sd_n" = test_results$sd_n,
+      "psi1psi2" = test_results$psi1psi2, # !!!!!
+      "Psi_1_est" = test_results$Psi_1_est, # !!!!!
+      "Psi_2_est" = test_results$Psi_2_est # !!!!!
       # "Gamma_n_5" = test_results$Gamma_n_5, # !!!!!
       # "Gamma_true_5" = attr(dat_orig, "Theta_true")[26], # !!!!!
       # "theta_true_5" = attr(dat_orig, "theta_true")[26], # !!!!!

@@ -25,8 +25,11 @@ cfg2 <- list(
 set.seed(1)
 
 # Catch TID and set config accordingly
-cfg2$tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
-# cfg2$tid <- 1
+if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
+  cfg2$tid <- 1
+} else {
+  cfg2$tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
+}
 cfg2_df <- data.frame(
   tid = c(1:4),
   S_n_type = rep("Super Learner", 4), # c("Cox PH", "Super Learner")

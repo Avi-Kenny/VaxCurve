@@ -138,6 +138,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
           })
           infl_fn_1 <- construct_infl_fn_1(dat, Gamma_0, Phi_n,
                                            lambda_2, lambda_3)
+          Psi_1_var_est <- (1/n_orig^2) * sum((weights*infl_fn_1(dat$a))^2) # !!!!!
           Psi_1_est <- (1/n_orig) * sum(weights*(
             lambda_2*(Phi_n(dat$a))^2*Gamma_0(dat$a) -
               lambda_3*Phi_n(dat$a)*Gamma_0(dat$a)
@@ -148,6 +149,9 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
           infl_fn_Gamma <- construct_infl_fn_Gamma(omega_n, g_n, gcomp_n,
                                                    eta_n, Gamma_os_n)
           infl_fn_2 <- construct_infl_fn_2(dat, Phi_0, infl_fn_Gamma, 1/3, 1/4)
+          Psi_2_var_est <- (1/n_orig^2) * sum(( # !!!!!
+            weights*infl_fn_2(dat$w,dat$y_star,dat$delta_star,dat$a) # !!!!!
+          )^2) # !!!!!
           a_mc <- runif(10^6)
           Psi_2_est <- mean(
             (1/3)*(Phi_0(a_mc))^2*Gamma_os_n(round(a_mc,-log10(C$appx$a))) -
@@ -356,7 +360,9 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     sd_n = sd_n,
     psi1psi2 = Psi_1_est+Psi_2_est, # !!!!!
     Psi_1_est = Psi_1_est, # !!!!!
-    Psi_2_est = Psi_2_est # !!!!!
+    Psi_2_est = Psi_2_est, # !!!!!
+    Psi_1_sd = sqrt(Psi_1_var_est),
+    Psi_2_sd = sqrt(Psi_2_var_est)
     # Gamma_n_5 = Gamma_os_n(0.5), # !!!!!
     # Gamma_var_n = Gamma_var_n, # !!!!!
     # lambda_2 = lambda_2_, # !!!!!

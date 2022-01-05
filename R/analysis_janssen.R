@@ -4,31 +4,78 @@
 ##### Setup #####
 #################.
 
-# Set up configuration variables
-C <- list(
-  t_e=66,
-  appx = list(t_e=1, w1=0.1, w1b=0.1, w3=1, a=0.01) # !!!!! a=0.001, w3=0.1
-)
-cfg2 <- list(
-  markers = c("Day29bindSpike", "Day29bindRBD", "Day29ADCP",
-              "Day29pseudoneutid50"),
-  datasets = c("1", "adcp", "psv"),
-  run_import_data = F,
-  run_dqa = F,
-  run_graphs = T
-  # vars = list(
-  #   wt = "wt.D29start1",
-  #   ph1 = "ph1.D29start1",
-  #   ph2 = "ph2.D29start1"
-  # )
-)
+# Set seed
 set.seed(1)
 
-# Catch TID and set config accordingly
+# Set configuration variables
+cfg2 <- list(
+  analysis = "Janssen",
+  x_labs = c("Anti Spike IgG (BAU/ml) (=s)", "Anti RBD IgG (BAU/ml) (=s)",
+             "Phagocytic Score (=s)", "Pseudovirus-nAb ID50 (IU50/ml) (=s)"),
+  # datasets = c("1", "adcp", "psv"),
+  run_dqa = F,
+  run_debug = list(gren_var=F),
+  run_graphs = T,
+  params = list(
+    # Note: NA values are set below based on task ID
+    S_n_type=NA, g_n_type="binning", ecdf_type="linear (mid)",
+    deriv_type="m-spline", gamma_type="kernel", ci_type="regular",
+    edge_corr=NA, omega_n_type="estimated", cf_folds=1, n_bins=0
+  )
+)
+
+# Set up analysis-specific configuration variables
+if (cfg2$analysis=="Janssen") {
+  
+  cfg2$t_e <- 66 # !!!!! In the correlates repo, this is set to zero and inferred from the data
+  cfg2$markers = c("Day29bindSpike", "Day29bindRBD", "Day29ADCP",
+                   "Day29pseudoneutid50")
+  cfg2$datasets <- c(
+    "janssen_pooled_real_data_processed_with_riskscore.csv",
+    "janssen_pooled_realADCP_data_processed_with_riskscore.csv",
+    "janssen_pooled_realPsV_data_processed_with_riskscore.csv"
+  )
+  cfg2$folder_local <- "Janssen data/"
+  cfg2$folder_cluster <- paste0("Z:/covpn/p3003/analysis/correlates/Part_A_Bli",
+                                "nded_Phase_Data/adata/")
+  cfg2$dataset_map <- c(1,1,2,3)
+  cfg2$vars <- list(
+    id = "Ptid",
+    time = "EventTimePrimaryIncludeNotMolecConfirmedD29",
+    event = "EventIndPrimaryIncludeNotMolecConfirmedD29",
+    wt = "wt.D29start1",
+    ph1 = "ph1.D29start1",
+    ph2 = "ph2.D29start1",
+    covariates = formula("~. + risk_score + as.factor(Region)")
+  )
+  
+} else if (cfg2$analysis=="Moderna") {
+  
+  cfg2$t_e <- 999 # !!!!!
+  cfg2$markers <- 999 # !!!!!
+  cfg2$vars <- 999 # !!!!!
+  
+} else if (cfg2$analysis=="HVTN 705") {
+  
+  cfg2$t_e <- 999 # !!!!!
+  cfg2$markers <- 999 # !!!!!
+  cfg2$vars <- 999 # !!!!!
+  
+}
+
+# Set up constants (shared with simulation code)
+C <- list(
+  t_e = cfg2$t_e,
+  appx = list(t_e=1, w1=0.1, w1b=0.1, w3=1, a=0.01) # !!!!! a=0.001, w3=0.1
+)
+
+# Set config based on local vs. cluster
 if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
   cfg2$tid <- 1
+  cfg2$datasets <- paste0(cfg2$folder_cluster,cfg2$datasets)
 } else {
   cfg2$tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
+  cfg2$datasets <- paste0(cfg2$folder_local,cfg2$datasets)
 }
 cfg2_df <- data.frame(
   tid = c(1:4),
@@ -37,9 +84,9 @@ cfg2_df <- data.frame(
   edge_corr = rep("min", 4),
   lod_shift = rep(T, 4)
 )
-cfg2$S_n_type <- cfg2_df[cfg2$tid, "S_n_type"]
+cfg2$params$S_n_type <- cfg2_df[cfg2$tid, "S_n_type"]
 cfg2$marker_num <- cfg2_df[cfg2$tid, "marker_num"]
-cfg2$edge_corr <- cfg2_df[cfg2$tid, "edge_corr"]
+cfg2$params$edge_corr <- cfg2_df[cfg2$tid, "edge_corr"]
 cfg2$lod_shift <- cfg2_df[cfg2$tid, "lod_shift"]
 cfg2$d <- case_when(
   cfg2$marker_num<=2 ~ cfg2$datasets[1],
@@ -47,7 +94,7 @@ cfg2$d <- case_when(
   cfg2$marker_num==4 ~ cfg2$datasets[3],
 )
 
-cfg2$folder <- paste0("Janssen functions/Janssen (tid ",cfg2$tid,")")
+cfg2$folder <- paste0(cfg2$analysis," functions/tid ",cfg2$tid)
 
 # Create directory if it doesn't exist
 if (!dir.exists(cfg2$folder)) { dir.create(cfg2$folder) }
@@ -58,87 +105,73 @@ if (!dir.exists(cfg2$folder)) { dir.create(cfg2$folder) }
 ##### Data processing #####
 ###########################.
 
-if (cfg2$run_import_data) {
+{
   
-  df_raw_1 <- read.csv(paste0("Z:/covpn/p3003/analysis/correlates/Part_A_Blind",
-                              "ed_Phase_Data/adata/janssen_pooled_real_data_pr",
-                              "ocessed_with_riskscore.csv"))
-  df_raw_adcp <- read.csv(paste0("Z:/covpn/p3003/analysis/correlates/Part_A_Bl",
-                                 "inded_Phase_Data/adata/janssen_pooled_realAD",
-                                 "CP_data_processed_with_riskscore.csv"))
-  df_raw_psv <- read.csv(paste0("Z:/covpn/p3003/analysis/correlates/Part_A_Bli",
-                                "nded_Phase_Data/adata/janssen_pooled_realPsV_",
-                                "data_processed_with_riskscore.csv"))
+  df_raw <- read.csv(cfg2$datasets[cfg2$dataset_map[cfg2$marker_num]])
   
-  for (d in cfg2$datasets) {
-    
-    # Subset data frames
-    assign(paste0("df_ph1_",d),
-           filter(eval(as.name(paste0("df_raw_",d))), ph1.D29start1==T))
-    assign(paste0("df_ct_",d),
-           filter(eval(as.name(paste0("df_ph1_",d))), Trt==0))
-    assign(paste0("df_tx_",d),
-           filter(eval(as.name(paste0("df_ph1_",d))), Trt==1))
-    
-    # Create data structures for analysis
-    df <- get(paste0("df_tx_",d))
-    if (d=="1") {
-      a_list <- list(df[[cfg2$markers[1]]], df[[cfg2$markers[2]]], NA, NA)
-    } else if (d=="adcp") {
-      a_list <- list(NA, NA, df[[cfg2$markers[3]]], NA)
-    } else if (d=="psv") {
-      a_list <- list(NA, NA, NA, df[[cfg2$markers[4]]])
+  # Subset data frames
+  df_ph1 <- filter(df_raw, ph1.D29start1==T)
+  df_ct <- filter(df_ph1, Trt==0)
+  df_tx <- filter(df_ph1, Trt==1)
+  
+  # Parse covariate data frame
+  f <- (function(f) {
+    f <- deparse(rlang::f_rhs(f))
+    f <- gsub(" ","",f)
+    f <- strsplit(f, "+", fixed=T)[[1]]
+    f <- f[f!="."]
+    factors <- c()
+    vars <- c()
+    for (i in 1:length(f)) {
+      c1 <- (substr(f[i],1,10)=="as.factor(")
+      c2 <- (substr(f[i],1,7)=="factor(")
+      factors[i] <- as.integer(c1 || c2)
+      if (c1) {
+        vars[i] <- substr(f[i],11,nchar(f[i])-1)
+      } else if (c2) {
+        vars[i] <- substr(f[i],8,nchar(f[i])-1)
+      } else {
+        vars[i] <- f[i]
+      }
     }
-    dorig <- list(
-      "id" = df[["Ptid"]],
-      "y_star" = df[["EventTimePrimaryIncludeNotMolecConfirmedD29"]],
-      "delta_star" = df[["EventIndPrimaryIncludeNotMolecConfirmedD29"]],
-      "w" = data.frame(
-        "w1" = as.integer(df[["Region"]]==1),
-        "w2" = as.integer(df[["Region"]]==2),
-        "w3" = df[["risk_score"]]
-      ),
-      "weights" = df[["wt.D29start1"]],
-      "a_list" = a_list,
-      "delta" = as.integer(df[["ph2.D29start1"]])
-    )
-    
-    # Stabilize weights (rescale to sum to sample size)
-    dorig$weights <- ifelse(dorig$delta==1, dorig$weights, 0)
-    s <- sum(dorig$weights) / length(dorig$delta)
-    dorig$weights <- dorig$weights / s
-    
-    # Write to object
-    assign(paste0("dat_orig_",d), dorig)
-    rm(dorig)
-    
-    # Save datasets
-    saveRDS(get(paste0("dat_orig_",d)),
-            file=paste0("Janssen data/dat_orig_",d,"_Janssen.rds"))
-    saveRDS(get(paste0("df_ph1_",d)),
-            file=paste0("Janssen data/df_ph1_",d,"_Janssen.rds"))
-    saveRDS(get(paste0("df_ct_",d)),
-            file=paste0("Janssen data/df_ct_",d,"_Janssen.rds"))
-    saveRDS(get(paste0("df_tx_",d)),
-            file=paste0("Janssen data/df_tx_",d,"_Janssen.rds"))
-    
+    return(list("vars"=vars, "factors"=factors))
+  })(cfg2$vars$covariates)
+  df_w <- data.frame(x=c(1:length(df_tx[[f$vars[1]]])))
+  col <- 1
+  for (i in c(1:length(f$vars))) {
+    if (f$factors[i]==0) {
+      df_w[[paste0("w",col)]] <- df_tx[[f$vars[i]]]
+      col <- col + 1
+    } else {
+      w_col <- as.factor(df_tx[[f$vars[i]]])
+      levs <- unique(w_col)
+      if (length(levs)==1) {
+        stop(paste("Covariate", f$vars[i], "only has one unique level"))
+      } else {
+        for (j in c(1:(length(levs)-1))) {
+          df_w[[paste0("w",col)]] <- as.integer(df_tx[[f$vars[i]]]==levs[j])
+          col <- col + 1
+        }
+      }
+    }
   }
+  df_w$x <- NULL
   
-} else {
-
-  for (d in cfg2$datasets) {
-    
-    # Read datasets
-    assign(paste0("dat_orig_",d),
-           readRDS(paste0("Janssen data/dat_orig_",d,"_Janssen.rds")))
-    assign(paste0("df_ph1_",d),
-           readRDS(paste0("Janssen data/df_ph1_",d,"_Janssen.rds")))
-    assign(paste0("df_ct_",d),
-           readRDS(paste0("Janssen data/df_ct_",d,"_Janssen.rds")))
-    assign(paste0("df_tx_",d),
-           readRDS(paste0("Janssen data/df_tx_",d,"_Janssen.rds")))
-    
-  }
+  # Create data structures for analysis
+  dat_orig <- list(
+    "id" = df_tx[[cfg2$vars$id]],
+    "y_star" = df_tx[[cfg2$vars$time]],
+    "delta_star" = df_tx[[cfg2$vars$event]],
+    "w" = df_w,
+    "weights" = df_tx[[cfg2$vars$wt]],
+    "a" = df_tx[[cfg2$markers[cfg2$marker_num]]],
+    "delta" = as.integer(df_tx[[cfg2$vars$ph2]])
+  )
+  
+  # Stabilize weights (rescale to sum to sample size)
+  dat_orig$weights <- ifelse(dat_orig$delta==1, dat_orig$weights, 0)
+  s <- sum(dat_orig$weights) / length(dat_orig$delta)
+  dat_orig$weights <- dat_orig$weights / s
   
 }
 
@@ -151,31 +184,33 @@ if (cfg2$run_import_data) {
 if (cfg2$run_dqa) {
   
   # Alias vectors
-  ind_tx <- df_tx_1$EventIndPrimaryIncludeNotMolecConfirmedD29
-  ind_ct <- df_ct_1$EventIndPrimaryIncludeNotMolecConfirmedD29
-  time_tx <- df_tx_1$EventTimePrimaryIncludeNotMolecConfirmedD29
-  time_ct <- df_ct_1$EventTimePrimaryIncludeNotMolecConfirmedD29
+  ind_tx <- df_tx_1[[cfg2$vars$event]]
+  ind_ct <- df_ct_1[[cfg2$vars$event]]
+  time_tx <- df_tx_1[[cfg2$vars$time]]
+  time_ct <- df_ct_1[[cfg2$vars$time]]
   
   # Number of cases in each group
   num_case_tx <- sum(ind_tx)
   num_case_ct <- sum(ind_ct)
-  num_case_tx_66 <- sum(ind_tx[time_tx<=66])
-  num_case_ct_66 <- sum(ind_ct[time_ct<=66])
+  num_case_tx_t_e <- sum(ind_tx[time_tx<=C$t_e])
+  num_case_ct_t_e <- sum(ind_ct[time_ct<=C$t_e])
   num_atrisk_tx <- length(ind_tx)
   num_atrisk_ct <- length(ind_ct)
-  print(paste("Number of cases in vaccine group:", num_case_tx))
-  print(paste("Number of cases in control group:", num_case_ct))
-  print(paste("Number of cases by day 66 in vaccine group:", num_case_tx_66))
-  print(paste("Number of cases by day 66 in control group:", num_case_ct_66))
-  print(paste("Number at-risk in vaccine group:", num_atrisk_tx))
-  print(paste("Number at-risk in control group:", num_atrisk_ct))
-  print(paste("Naive P(COVID by day 66) in vaccine group:",
-              round(num_case_tx_66/num_atrisk_tx,3)))
-  print(paste("Naive P(COVID by day 66) in control group:",
-              round(num_case_ct_66/num_atrisk_ct,3)))
-  print(paste("Naive vaccine efficacy:",
-              round(1 - (num_case_tx_66/num_atrisk_tx) /
-                      (num_case_ct_66/num_atrisk_ct),3)))
+  print(paste0("Number of cases in vaccine group: ", num_case_tx))
+  print(paste0("Number of cases in control group: ", num_case_ct))
+  print(paste0("Number of cases by day ", C$t_e, " in vaccine group: ",
+              num_case_tx_t_e))
+  print(paste0("Number of cases by day ", C$t_e, " in control group: ",
+              num_case_ct_t_e))
+  print(paste0("Number at-risk in vaccine group: ", num_atrisk_tx))
+  print(paste0("Number at-risk in control group: ", num_atrisk_ct))
+  print(paste0("Naive P(COVID by day ", C$t_e, ") in vaccine group: ",
+              round(num_case_tx_t_e/num_atrisk_tx,3)))
+  print(paste0("Naive P(COVID by day ", C$t_e, ") in control group: ",
+              round(num_case_ct_t_e/num_atrisk_ct,3)))
+  print(paste0("Naive vaccine efficacy: ",
+              round(1 - (num_case_tx_t_e/num_atrisk_tx) /
+                      (num_case_ct_t_e/num_atrisk_ct),3)))
   
   # Fractions of point mass at edge
   a1 <- dat_orig_1$a_list[[1]]
@@ -186,43 +221,6 @@ if (cfg2$run_dqa) {
   round(sum(a2==min(a2,na.rm=T),na.rm=T) / sum(!is.na(a2)), 3)
   round(sum(a3==min(a3,na.rm=T),na.rm=T) / sum(!is.na(a3)), 3)
   round(sum(a4==min(a4,na.rm=T),na.rm=T) / sum(!is.na(a4)), 3)
-  
-  # !!!!!
-  get.marginalized.risk.no.marker <- function(dat) {
-    fit.risk <- coxph(
-      Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
-           EventIndPrimaryIncludeNotMolecConfirmedD29) ~ risk_score +
-        as.factor(Region),
-      dat,
-      model = T
-    )
-    dat[["EventTimePrimaryIncludeNotMolecConfirmedD29"]] <- 66
-    risks = 1 - exp(-predict(fit.risk, newdata=dat, type="expected"))
-    mean(risks)
-  }
-  res.plac.cont <- get.marginalized.risk.no.marker(df_ct_1)
-  res.vacc.cont <- get.marginalized.risk.no.marker(df_tx_1)
-  overall.ve <- 1 - res.vacc.cont/res.plac.cont
-  print(overall.ve)
-  
-  # srv_ct <- survfit(
-  #   Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
-  #        EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
-  #   data = df_ct_1
-  # )
-  # rate66_ct <- 1-srv_ct$surv[which(srv_ct$time==66)]
-  # srv_tx <- survfit(
-  #   Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
-  #        EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
-  #   data = df_tx_1
-  # )
-  # rate66_tx <- 1-srv_tx$surv[which(srv_tx$time==66)]
-  # print(rate66_ct)
-  # print(rate66_tx)
-  # print(1-(rate66_tx/rate66_ct))
-  
-  # Kaplan-Meier plot
-  # !!!!!
   
   # Distribution of event times (Ph2=0 vs. Ph2=1)
   ggplot(
@@ -266,76 +264,16 @@ if (cfg2$run_dqa) {
   
   # Treatment group survival (entire cohort)
   survfit(
-    Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
-         EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
-    data = filter(df_tx, ph2.D29start1==1),
-    weights = wt.D29start1
+    formula(paste0("Surv(",cfg2$vars$time,",",cfg2$vars$event,")~1")),
+    data = df_tx
   ) %>% autoplot()
   
   # Treatment group survival (subcohort)
-  
-  
-  # # !!!!!
-  # library(ggfortify)
-  # survfit(
-  #   Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
-  #        EventIndPrimaryIncludeNotMolecConfirmedD29)~Trt,
-  #   data = df_ph1_1
-  # ) %>% autoplot()
-  
-  # Calculate control group survival
-  srv_ct <- survfit(
-    Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
-         EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
-    data = df_ct
-  )
-  
   survfit(
-    Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
-         EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
-    data = filter(df_tx, ph2.D29start1==1),
+    formula(paste0("Surv(",cfg2$vars$time,",",cfg2$vars$event,")~1")),
+    data = df_tx,
     weights = wt.D29start1
   ) %>% autoplot()
-  
-}
-
-
-
-###################.
-##### Scratch #####
-###################.
-
-if (F) {
-  # Alias markers
-  a <- list(
-    dat_orig_1$a_list[[1]],
-    dat_orig_1$a_list[[2]],
-    dat_orig_adcp$a_list[[3]]
-  )
-  a <- lapply(a, function(x) { x[!is.na(x)] }) # Remove NA values
-  a <- lapply(a, function(x) { 10^x }) # Re-express on natural scale
-  
-  # Check that min marker values equal one-half the positivity cutoff or LOD
-  lod <- c(
-    2*min(a[[1]], na.rm=T), # 10.84237 = PosCutoff/2
-    2*min(a[[2]], na.rm=T), # 14.08585 = PosCutoff/2
-    2*min(a[[3]], na.rm=T)  # 11.57 = LOD/2
-  )
-  
-  # Check marker quantiles
-  quantile(a[[1]], probs=seq(0,1,0.1))
-  quantile(a[[2]], probs=seq(0,1,0.1))
-  quantile(a[[3]], probs=seq(0,1,0.1))
-  
-  # Check percent mass at left edge
-  sum(a[[1]]==min(a[[1]]))/length(a[[1]])
-  sum(a[[2]]==min(a[[2]]))/length(a[[2]])
-  sum(a[[3]]==min(a[[3]]))/length(a[[3]])
-  
-  # Check percent mass at right edge
-  sum(a[[1]]==max(a[[1]]))/length(a[[1]])
-  sum(a[[2]]==max(a[[2]]))/length(a[[2]])
-  sum(a[[3]]==max(a[[3]]))/length(a[[3]])
   
 }
 
@@ -347,19 +285,10 @@ if (F) {
 
 {
   
-  # Set the analysis dataframes
-  dat_orig <- get(paste0("dat_orig_",cfg2$d))
-  df_ct <- get(paste0("df_ct_",cfg2$d))
-  df_tx <- get(paste0("df_tx_",cfg2$d))
-  
-  # Set `a` value from `a_list`
-  dat_orig$a <- dat_orig$a_list[[cfg2$marker_num]]
-  dat_orig$a_list <- NULL
-  
   # Archive original marker (for histogram)
   a_orig <- dat_orig$a[!is.na(dat_orig$a)]
   
-  # !!!!! NEW CODE !!!!!
+  # Shift LOD*(1/2) to LOD*(3/4)
   if (cfg2$lod_shift) {
     # Move LOD/2 values to LOD*(3/4)
     # lod <- log10(2*(10^min(dat_orig$a,na.rm=T)))
@@ -379,13 +308,6 @@ if (F) {
   dat_orig$a <- round(dat_orig$a, -log10(C$appx$a))
   dat_orig$w$w3 <- round(dat_orig$w$w3, -log10(C$appx$w3))
   
-  # Set estimation tuning parameters
-  params <- list(S_n_type=cfg2$S_n_type, g_n_type="binning",
-                 ecdf_type="linear (mid)", deriv_type="m-spline",
-                 gamma_type="kernel", ci_type="regular",
-                 edge_corr=cfg2$edge_corr, omega_n_type="estimated",
-                 cf_folds=1, n_bins=0)
-  
 }
 
 
@@ -393,120 +315,62 @@ if (F) {
 ##### Data analysis #####
 #########################.
 
-# Obtain estimates
-p_grid <- seq(0,1,0.01)
-ests <- est_curve(
-  dat_orig = dat_orig,
-  estimator = "Grenander",
-  params = params,
-  points = p_grid,
-  dir = "decr",
-  return_extra = c("gcomp", "Phi_n_inv", "deriv_theta_n", "f_a_n", "gamma_n"),
-  which = "Theta"
-)
-# saveRDS(ests, "ests.rds") # !!!!!
-# ests <- readRDS("ests.rds") # !!!!!
-
-# !!!!!
-if (F) {
-  print("Variance scale factor components")
-  print("deriv_theta_n")
-  print(ests$deriv_theta_n(seq(0,1,0.05)))
-  print("f_a_n")
-  print(ests$f_a_n(seq(0,1,0.05)))
-  print("gamma_n")
-  print(ests$gamma_n(seq(0,1,0.05)))
-  print("deriv_theta_n*f_a_n")
-  print(ests$deriv_theta_n(seq(0,1,0.05))*ests$f_a_n(seq(0,1,0.05)))
-  print("deriv_theta_n*gamma_n")
-  print(ests$deriv_theta_n(seq(0,1,0.05))*ests$gamma_n(seq(0,1,0.05)))
-  print("f_a_n*gamma_n")
-  print(ests$f_a_n(seq(0,1,0.05))*ests$gamma_n(seq(0,1,0.05)))
-  print("deriv_theta_n*f_a_n*gamma_n")
-  print(ests$deriv_theta_n(seq(0,1,0.05))*ests$f_a_n(seq(0,1,0.05))*
-          ests$gamma_n(seq(0,1,0.05)))
-}
-
-# Calculate control/vaccine group marginalized survival
-get.marginalized.risk.no.marker <- function(dat, tfinal.tpeak, wts=F) {
-  if (!wts) {
+{
+  
+  # Obtain estimates
+  p_grid <- seq(0,1,0.01)
+  ests <- est_curve(
+    dat_orig = dat_orig,
+    estimator = "Grenander",
+    params = cfg2$params,
+    points = p_grid,
+    dir = "decr",
+    return_extra = c("gcomp", "Phi_n_inv", "deriv_theta_n", "f_a_n", "gamma_n"),
+    which = "Theta"
+  )
+  
+  # Debugging: Grenander variance scale factor components
+  if (cfg2$run_debug$gren_var) {
+    print("Grenander variance scale factor components")
+    print("deriv_theta_n")
+    print(ests$deriv_theta_n(seq(0,1,0.05)))
+    print("f_a_n")
+    print(ests$f_a_n(seq(0,1,0.05)))
+    print("gamma_n")
+    print(ests$gamma_n(seq(0,1,0.05)))
+    print("deriv_theta_n*f_a_n")
+    print(ests$deriv_theta_n(seq(0,1,0.05))*ests$f_a_n(seq(0,1,0.05)))
+    print("deriv_theta_n*gamma_n")
+    print(ests$deriv_theta_n(seq(0,1,0.05))*ests$gamma_n(seq(0,1,0.05)))
+    print("f_a_n*gamma_n")
+    print(ests$f_a_n(seq(0,1,0.05))*ests$gamma_n(seq(0,1,0.05)))
+    print("deriv_theta_n*f_a_n*gamma_n")
+    print(ests$deriv_theta_n(seq(0,1,0.05))*ests$f_a_n(seq(0,1,0.05))*
+            ests$gamma_n(seq(0,1,0.05)))
+  }
+  
+  # Calculate control/vaccine group marginalized survival
+  get.marginalized.risk.no.marker <- function(dat, tfinal.tpeak) {
     fit.risk <- coxph(
-      Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
-           EventIndPrimaryIncludeNotMolecConfirmedD29) ~ risk_score +
-        as.factor(Region),
+      update(as.formula(paste0("Surv(",cfg2$vars$time,",",cfg2$vars$event,")~1")),
+             as.formula(cfg2$vars$covariates)),
       dat,
+      # weights = cfg2$vars$wt,
       model = T
     )
-  } else {
-    fit.risk <- coxph(
-      Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
-           EventIndPrimaryIncludeNotMolecConfirmedD29) ~ risk_score +
-        as.factor(Region),
-      dat,
-      model = T,
-      weights = wt.D29start1
-    )
+    dat[[cfg2$vars$time]] <- tfinal.tpeak
+    risks <- 1 - exp(-predict(fit.risk, newdata=dat, type="expected"))
+    mean(risks)
   }
-  dat[["EventTimePrimaryIncludeNotMolecConfirmedD29"]] <- tfinal.tpeak
-  risks <- 1 - exp(-predict(fit.risk, newdata=dat, type="expected"))
-  mean(risks)
-}
-rate_ct <- get.marginalized.risk.no.marker(df_ct, C$t_e)
-rate_tx <- get.marginalized.risk.no.marker(df_tx, C$t_e)
-# rate_tx_0 <- get.marginalized.risk.no.marker( # !!!!! Need to incorporate weights
-#   filter(df_tx, Day29bindSpike==min(df_tx$Day29bindSpike, na.rm=T)),
-#   C$t_e, wts=T) # !!!!!
-# rate_tx_1 <- get.marginalized.risk.no.marker( # !!!!! Need to incorporate weights
-#   filter(df_tx, Day29bindSpike!=min(df_tx$Day29bindSpike, na.rm=T)),
-#   C$t_e, wts=T) # !!!!!
-# round(1-(rate_tx/rate_ct),3) # Overall VE
-# round(1-(rate_tx_0/rate_ct),3)
-# round(1-(rate_tx_1/rate_ct),3)
-
-# !!!!! Move/reorganize everything in this section
-if (F) {
-  
-  # Calculate control group survival (OLD)
-  srv_ct <- survfit(
-    Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
-         EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
-    data = df_ct
-  )
-  rate_ct <- 1 - srv_ct$surv[which.min(abs(srv_ct$time-C$t_e))]
-  # ci_lo_ct <- 1 - srv_ct$upper[which.min(abs(srv_ct$time-C$t_e))]
-  # ci_hi_ct <- 1 - srv_ct$lower[which.min(abs(srv_ct$time-C$t_e))]
-  # var_ct <- ((ci_hi_ct-ci_lo_ct)/3.92)^2
-  
-  # Calculate treatment group survival
-  srv_tx <- survfit(
-    Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
-         EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
-    data = df_tx
-  )
-  rate_tx <- 1 - srv_tx$surv[which.min(abs(srv_tx$time-C$t_e))]
-  ci_lo_tx <- 1 - srv_tx$upper[which.min(abs(srv_tx$time-C$t_e))]
-  ci_hi_tx <- 1 - srv_tx$lower[which.min(abs(srv_tx$time-C$t_e))]
-  var_tx <- ((ci_hi_tx-ci_lo_tx)/3.92)^2
-  
-  # Calculate overall vaccine efficacy
-  ve_overall <- 1 - (rate_tx/rate_ct)
-  ve_se <- sqrt(rate_ct^-2*var_tx + rate_tx^2*rate_ct^-4*var_ct)
-  ve_overall_lo <- ve_overall - 1.96*ve_se
-  ve_overall_hi <- ve_overall + 1.96*ve_se
-  print(paste0("Overall VE: ", round(100*ve_overall,1), "% (",
-               round(100*ve_overall_lo,1), "% -- ", round(100*ve_overall_hi,1),
-               "%)"))
-  
-  # Calculate overall vaccine efficacy (within subcohort)
-  srv_tx_sub <- survfit(coxph(
-    Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
-         EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
-    data = filter(df_tx, ph2.D29start1==1),
-    weights = wt.D29start1
-  ))
-  rate_tx_sub <- 1 - srv_tx_sub$surv[which.min(abs(srv_tx_sub$time-C$t_e))]
-  ve_subcohort <- 1 - (rate_tx_sub/rate_ct)
-  print(paste0("Overall VE (subcohort): ", round(100*ve_subcohort,1), "%"))
+  rate_ct <- get.marginalized.risk.no.marker(df_ct, C$t_e)
+  rate_tx <- get.marginalized.risk.no.marker(df_tx, C$t_e)
+  # print(paste0("Overall VE: ", round(1-rate_tx/rate_ct, 3)))
+  # rate_tx_0 <- get.marginalized.risk.no.marker(
+  #   filter(df_tx, Day29bindSpike==min(df_tx$Day29bindSpike, na.rm=T)),
+  #   C$t_e, wts=T) # !!!!!
+  # rate_tx_1 <- get.marginalized.risk.no.marker(
+  #   filter(df_tx, Day29bindSpike!=min(df_tx$Day29bindSpike, na.rm=T)),
+  #   C$t_e, wts=T) # !!!!!
   
 }
 
@@ -553,9 +417,7 @@ if (cfg2$run_graphs) {
     x2 <- a_grid[max(which(which))]
     
     # Labels
-    x_labs <- c("Anti Spike IgG (BAU/ml) (=s)", "Anti RBD IgG (BAU/ml) (=s)",
-                "Phagocytic Score (=s)", "Pseudovirus-nAb ID50 (IU50/ml) (=s)")
-    x_lab <- x_labs[cfg2$marker_num]
+    x_lab <- cfg2$x_labs[cfg2$marker_num]
     y_lab <- paste("Controlled VE against COVID by day", C$t_e)
     
     # VE overall est/ci
@@ -568,24 +430,15 @@ if (cfg2$run_graphs) {
               max(a_orig)+(max(a_orig)-min(a_orig))/(n_bins*(2/3)))
     
     # Plots: data
-    plot_data_1 <- data.frame(
+    plot_data <- data.frame(
       x = c(x1,a_grid,x1,x2),
       y = c(ests_gren[1],ests_gren,rep(ve_overall,2)),
       which = c(rep("Controlled VE", length(p_grid)+1),rep("Overall VE",2)),
       ci_lo = c(ci_lo[1],ci_lo,rep(ve_ci[1],2)),
       ci_hi = c(ci_hi[1],ci_hi,rep(ve_ci[2],2))
     )
-    plot_data_2 <- data.frame(
-      x = c(x1,rep(a_grid,2),x1,x2),
-      y = c(ests_gren[1],ests_gren,ests_gcomp,rep(ve_overall,2)),
-      which = c("Controlled VE",rep(c("Controlled VE","Cox model"),
-                                    each=length(p_grid)),
-                rep("Overall VE",2)),
-      ci_lo = c(ci_lo[1],ci_lo,ests_gcomp,rep(ve_ci[1],2)),
-      ci_hi = c(ci_hi[1],ci_hi,ests_gcomp,rep(ve_ci[2],2))
-    )
     
-    plot_1 <- ggplot(plot_data_1, aes(x=x, y=y, color=which)) +
+    plot <- ggplot(plot_data, aes(x=x, y=y, color=which)) +
       geom_ribbon(aes(ymin=ci_lo,ymax=ci_hi,fill=which), alpha=0.1,
                   linetype="dotted") +
       geom_histogram(mapping=aes(x=x,y=(0.6*..count..)/max(..count..)),
@@ -601,20 +454,12 @@ if (cfg2$run_graphs) {
       theme(legend.position="bottom") +
       labs(x=x_lab, y=y_lab, color=NULL, fill=NULL) +
       geom_line()
-    # plot_1 # !!!!!
-    plot_2 <- plot_1 %+% plot_data_2
-    suppressMessages({
-      plot_2 <- plot_2 +
-        scale_color_manual(values=c("darkblue","purple","darkgrey")) +
-        scale_fill_manual(values=c("darkblue","purple","darkgrey"))
-    })
-    # plot_2 # !!!!!
     
-    # Save plots
-    name_1 <- paste0("Janssen plots/plot_",cfg2$tid,".pdf")
-    name_2 <- paste0("Janssen plots/plot_w_Cox_",cfg2$tid,".pdf")
-    ggsave(filename=name_1, plot=plot_1, device="pdf", width=6, height=4)
-    ggsave(filename=name_2, plot=plot_2, device="pdf", width=6, height=4)
+    # Save plot
+    ggsave(
+      filename = paste0(cfg2$analysis," plots/plot_",cfg2$tid,".pdf"),
+      plot=plot, device="pdf", width=6, height=4
+    )
     
   }
 
@@ -710,3 +555,158 @@ if (cfg2$run_graphs) {
 
 # Component function check: marginal distribution
 # !!!!! Update
+
+
+
+###################.
+##### Archive #####
+###################.
+
+if (F) {
+  
+  # Data processing
+  {
+    # Read in raw data
+    df_raw_1 <- read.csv(paste0("Z:/covpn/p3003/analysis/correlates/Part_A_Blind",
+                                "ed_Phase_Data/adata/janssen_pooled_real_data_pr",
+                                "ocessed_with_riskscore.csv"))
+    df_raw_adcp <- read.csv(paste0("Z:/covpn/p3003/analysis/correlates/Part_A_Bl",
+                                   "inded_Phase_Data/adata/janssen_pooled_realAD",
+                                   "CP_data_processed_with_riskscore.csv"))
+    df_raw_psv <- read.csv(paste0("Z:/covpn/p3003/analysis/correlates/Part_A_Bli",
+                                  "nded_Phase_Data/adata/janssen_pooled_realPsV_",
+                                  "data_processed_with_riskscore.csv"))
+    
+    # Save datasets
+    saveRDS(get(paste0("dat_orig_",d)),
+            file=paste0("Janssen data/dat_orig_",d,"_Janssen.rds"))
+    saveRDS(get(paste0("df_ph1_",d)),
+            file=paste0("Janssen data/df_ph1_",d,"_Janssen.rds"))
+    saveRDS(get(paste0("df_ct_",d)),
+            file=paste0("Janssen data/df_ct_",d,"_Janssen.rds"))
+    saveRDS(get(paste0("df_tx_",d)),
+            file=paste0("Janssen data/df_tx_",d,"_Janssen.rds"))
+    
+    # Read datasets
+    assign(paste0("dat_orig_",d),
+           readRDS(paste0("Janssen data/dat_orig_",d,"_Janssen.rds")))
+    assign(paste0("df_ph1_",d),
+           readRDS(paste0("Janssen data/df_ph1_",d,"_Janssen.rds")))
+    assign(paste0("df_ct_",d),
+           readRDS(paste0("Janssen data/df_ct_",d,"_Janssen.rds")))
+    assign(paste0("df_tx_",d),
+           readRDS(paste0("Janssen data/df_tx_",d,"_Janssen.rds")))
+    
+  }
+  
+  # Use Kaplan-Meier to calculate survival and efficacy with CI
+  {
+    # Calculate control group survival (KM; with SE)
+    srv_ct <- survfit(
+      Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
+           EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
+      data = df_ct
+    )
+    rate_ct <- 1 - srv_ct$surv[which.min(abs(srv_ct$time-C$t_e))]
+    ci_lo_ct <- 1 - srv_ct$upper[which.min(abs(srv_ct$time-C$t_e))]
+    ci_hi_ct <- 1 - srv_ct$lower[which.min(abs(srv_ct$time-C$t_e))]
+    var_ct <- ((ci_hi_ct-ci_lo_ct)/3.92)^2
+    
+    # Calculate treatment group survival (KM; with SE)
+    srv_tx <- survfit(
+      Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
+           EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
+      data = df_tx
+    )
+    rate_tx <- 1 - srv_tx$surv[which.min(abs(srv_tx$time-C$t_e))]
+    ci_lo_tx <- 1 - srv_tx$upper[which.min(abs(srv_tx$time-C$t_e))]
+    ci_hi_tx <- 1 - srv_tx$lower[which.min(abs(srv_tx$time-C$t_e))]
+    var_tx <- ((ci_hi_tx-ci_lo_tx)/3.92)^2
+    
+    # Calculate overall vaccine efficacy (KM; delta method; with SE+CI)
+    ve_overall <- 1 - (rate_tx/rate_ct)
+    ve_se <- sqrt(rate_ct^-2*var_tx + rate_tx^2*rate_ct^-4*var_ct)
+    ve_overall_lo <- ve_overall - 1.96*ve_se
+    ve_overall_hi <- ve_overall + 1.96*ve_se
+    print(paste0("Overall VE: ", round(100*ve_overall,1), "% (",
+                 round(100*ve_overall_lo,1), "% -- ", round(100*ve_overall_hi,1),
+                 "%)"))
+    
+    # Calculate overall vaccine efficacy (KM; within subcohort)
+    srv_tx_sub <- survfit(coxph(
+      Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
+           EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
+      data = filter(df_tx, ph2.D29start1==1),
+      weights = wt.D29start1
+    ))
+    rate_tx_sub <- 1 - srv_tx_sub$surv[which.min(abs(srv_tx_sub$time-C$t_e))]
+    ve_subcohort <- 1 - (rate_tx_sub/rate_ct)
+    print(paste0("Overall VE (subcohort): ", round(100*ve_subcohort,1), "%"))
+    
+    # Plot KM curve
+    library(ggfortify)
+    survfit(
+      Surv(EventTimePrimaryIncludeNotMolecConfirmedD29,
+           EventIndPrimaryIncludeNotMolecConfirmedD29)~Trt,
+      data = df_ph1_1
+    ) %>% autoplot()
+    
+  }
+  
+  # Check marker quantiles and edge mass
+  {
+    # Alias markers
+    a <- list(
+      dat_orig_1$a_list[[1]],
+      dat_orig_1$a_list[[2]],
+      dat_orig_adcp$a_list[[3]]
+    )
+    a <- lapply(a, function(x) { x[!is.na(x)] }) # Remove NA values
+    a <- lapply(a, function(x) { 10^x }) # Re-express on natural scale
+    
+    # Check that min marker values equal one-half the positivity cutoff or LOD
+    lod <- c(
+      2*min(a[[1]], na.rm=T), # 10.84237 = PosCutoff/2
+      2*min(a[[2]], na.rm=T), # 14.08585 = PosCutoff/2
+      2*min(a[[3]], na.rm=T)  # 11.57 = LOD/2
+    )
+    
+    # Check marker quantiles
+    quantile(a[[1]], probs=seq(0,1,0.1))
+    quantile(a[[2]], probs=seq(0,1,0.1))
+    quantile(a[[3]], probs=seq(0,1,0.1))
+    
+    # Check percent mass at left edge
+    sum(a[[1]]==min(a[[1]]))/length(a[[1]])
+    sum(a[[2]]==min(a[[2]]))/length(a[[2]])
+    sum(a[[3]]==min(a[[3]]))/length(a[[3]])
+    
+    # Check percent mass at right edge
+    sum(a[[1]]==max(a[[1]]))/length(a[[1]])
+    sum(a[[2]]==max(a[[2]]))/length(a[[2]])
+    sum(a[[3]]==max(a[[3]]))/length(a[[3]])
+  }
+  
+  # Extra pieces to overlay Cox model gcomp estimator in plot
+  {
+    plot_data_2 <- data.frame(
+      x = c(x1,rep(a_grid,2),x1,x2),
+      y = c(ests_gren[1],ests_gren,ests_gcomp,rep(ve_overall,2)),
+      which = c("Controlled VE",rep(c("Controlled VE","Cox model"),
+                                    each=length(p_grid)),
+                rep("Overall VE",2)),
+      ci_lo = c(ci_lo[1],ci_lo,ests_gcomp,rep(ve_ci[1],2)),
+      ci_hi = c(ci_hi[1],ci_hi,ests_gcomp,rep(ve_ci[2],2))
+    )
+    plot_2 <- plot_1 %+% plot_data_2
+    suppressMessages({
+      plot_2 <- plot_2 +
+        scale_color_manual(values=c("darkblue","purple","darkgrey")) +
+        scale_fill_manual(values=c("darkblue","purple","darkgrey"))
+    })
+    name_2 <- paste0(cfg2$analysis," plots/plot_w_Cox_",cfg2$tid,".pdf")
+    ggsave(filename=name_2, plot=plot_2, device="pdf", width=6, height=4)
+    
+  }
+  
+}

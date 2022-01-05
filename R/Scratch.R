@@ -306,7 +306,7 @@ if (F) {
   # Setup
   
   C <- list(points=seq(0,1,0.02), alpha_1=0.5, alpha_2=0.7, t_e=200,
-            appx=list(t_e=10,w1=0.1,w1b=0.1,a=0.01))
+            appx=list(t_e=10,w1=0.1,a=0.01))
   
   # Approximate Gamma_0
   Gamma_0 <- function(x) { sqrt(x)/3 }

@@ -21,7 +21,7 @@ cfg <- list(
                      "data.table", "latex2exp", "tidyr"),
   parallel = "none",
   stop_at_error = FALSE,
-  appx = list(t_e=10, w1=0.1, w1b=0.1, a=0.01) # !!!!! t_e=1, a=0.001
+  appx = list(t_e=10, w1=0.1, a=0.01) # !!!!! t_e=1, a=0.001
 )
 
 # Set cluster config
@@ -339,7 +339,6 @@ if (cfg$main_task=="run") {
       }
       
       # Add constants
-      # For the approximations, w1b is used for S_n and w1 is used elsewhere
       sim %<>% add_constants(
         points = seq(0,1,0.02),
         alpha_1 = 0.5,

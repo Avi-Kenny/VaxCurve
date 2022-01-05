@@ -67,20 +67,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
         stop("`which` must equal either 'Theta' or 'Gamma'")
       }
       
-      # # !!!!! Debugging
-      # print("S_n(C$t_e,dat$w[1,],0.5)")
-      # print(S_n(C$t_e,dat$w[1,],0.5))
-      # print("Sc_n(C$t_e,dat$w[1,],0.5)")
-      # print(Sc_n(C$t_e,dat$w[1,],0.5))
-      # print("f_aIw_n(0.5,dat$w[1,])")
-      # print(f_aIw_n(0.5,dat$w[1,]))
-      # print("omega_n(dat$w[1,],0.5,10,1)")
-      # print(omega_n(dat$w[1,],0.5,10,1))
-      # print("etastar_n(0.5,dat$w[1,])")
-      # print(etastar_n(0.5,dat$w[1,]))
-      # print("Theta_os_n(0.5)")
-      # print(Theta_os_n(0.5))
-      
       # Construct one-step edge estimator
       if (params$edge_corr!="none") {
         pi_n <- construct_pi_n(dat, vlist$W_grid, type="logistic")

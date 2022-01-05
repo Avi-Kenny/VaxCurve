@@ -48,6 +48,8 @@ if (cfg2$analysis=="Janssen") {
     ph2 = "ph2.D29start1",
     covariates = formula("~. + risk_score + as.factor(Region)")
   )
+  C <- list(t_e = cfg2$t_e,
+            appx = list(t_e=1, w_tol=25, a=0.01)) # !!!!! a=0.001, w_tol=75
   
 } else if (cfg2$analysis=="Moderna") {
   
@@ -62,12 +64,6 @@ if (cfg2$analysis=="Janssen") {
   cfg2$vars <- 999 # !!!!!
   
 }
-
-# Set up constants (shared with simulation code)
-C <- list(
-  t_e = cfg2$t_e,
-  appx = list(t_e=1, w1=0.1, w1b=0.1, w3=1, a=0.01) # !!!!! a=0.001, w3=0.1
-)
 
 # Set config based on local vs. cluster
 if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
@@ -113,6 +109,7 @@ if (!dir.exists(cfg2$folder)) { dir.create(cfg2$folder) }
   df_ph1 <- filter(df_raw, ph1.D29start1==T)
   df_ct <- filter(df_ph1, Trt==0)
   df_tx <- filter(df_ph1, Trt==1)
+  rm(df_raw)
   
   # Parse covariate data frame
   f <- (function(f) {
@@ -304,9 +301,19 @@ if (cfg2$run_dqa) {
   a_scale <- ceiling(a2*max(dat_orig$a, na.rm=T))/a2
   dat_orig$a <- dat_orig$a / a_scale
 
-  # Round A, W3
+  # Round A, W
   dat_orig$a <- round(dat_orig$a, -log10(C$appx$a))
-  dat_orig$w$w3 <- round(dat_orig$w$w3, -log10(C$appx$w3))
+  for (i in c(1:length(dat_orig$w))) {
+    rnd <- 8
+    tol <- C$appx$w_tol
+    n_unique <- tol + 1
+    while(n_unique>tol) {
+      rnd <- rnd - 1
+      n_unique <- length(unique(round(dat_orig$w[,i],rnd)))
+    }
+    dat_orig$w[,i] <- round(dat_orig$w[,i],rnd)
+  }
+  # dat_orig$w$w3 <- round(dat_orig$w$w3, -log10(C$appx$w3))
   
 }
 

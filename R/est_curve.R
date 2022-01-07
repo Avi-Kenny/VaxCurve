@@ -385,11 +385,12 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     S_n2 <- construct_S_n(dat, vlist$S_n, type="Cox PH")
     res$gcomp <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n=S_n2)
   }
-  if ("f_a_n" %in% return_extra) { res$f_a_n <- f_a_n }
-  if ("gamma_n" %in% return_extra) { res$gamma_n <- gamma_n }
-  if ("deriv_theta_n" %in% return_extra) { res$deriv_theta_n <- deriv_theta_n }
-  if ("Phi_n_inv" %in% return_extra) { res$Phi_n_inv <- Phi_n_inv }
-  if ("Theta_os_n" %in% return_extra) { res$Theta_os_n <- Theta_os_n }
+  fns_extra <- c("f_a_n", "gamma_n", "deriv_theta_n", "Phi_n_inv", "Theta_os_n",
+                 "Psi_n", "omega_n", "f_aIw_n", "etastar_n", "S_n", "gcm",
+                 "dGCM")
+  for (fn in fns_extra) {
+    if (fn %in% return_extra) { res[[fn]] <- eval(as.name(fn)) }
+  }
   
   return(res)
   

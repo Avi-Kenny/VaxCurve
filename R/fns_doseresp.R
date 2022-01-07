@@ -1203,9 +1203,14 @@ construct_eta_n <- function(dat, vals=NA, S_n) {
 construct_etastar_n <- function(S_n, vals=NA) {
   
   fnc <- function(x,w) {
-    integral <- mean(sapply(seq(0.01,1,0.01), function(a) {
-      as.integer(a<=x) * S_n(C$t_e, w, a)
-    }))
+    x <- round(x,-log10(C$appx$a))
+    if (x==0) {
+      integral <- 0
+    } else {
+      integral <- sum(sapply(seq(C$appx$a,x,C$appx$a), function(a) {
+        C$appx$a * S_n(C$t_e, w, round(a,-log10(C$appx$a)))
+      }))
+    }
     return(x-integral)
   }
   
@@ -1259,6 +1264,7 @@ construct_Theta_os_n <- function(dat, vals=NA, omega_n, f_aIw_n, etastar_n) {
   fnc <- function(x) {
     (1/n_orig) * sum(weights_i * (
       as.integer(a_i<=x) * piece_1 + etastar_n(rep(x,nrow(w_i)),w_i)
+      # as.integer(a_i<x) * piece_1 + etastar_n(rep(x,nrow(w_i)),w_i)
     ))
   }
   

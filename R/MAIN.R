@@ -9,11 +9,11 @@
 # GitHub packages: tedwestling/ctsCausal, tedwestling/CFsurvival, 
 #                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
-  main_task = "analysis_janssen.R", # run update analysis_moderna.R analysis_705.R analysis_janssen.R
-  which_sim = "testing", # "estimation" "edge" "testing" "infl_fn_1 (temp)"
-  level_set_which = "level_set_testing_1", # level_set_estimation_1 level_set_testing_1
+  main_task = "run", # run update analysis.R
+  which_sim = "estimation", # "estimation" "edge" "testing" "infl_fn_1 (temp)"
+  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
   # keep = c(1:3,7:9,16:18,22:24),
-  num_sim = 5000,
+  num_sim = 1000,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm"),
@@ -21,7 +21,7 @@ cfg <- list(
                      "data.table", "latex2exp", "tidyr"),
   parallel = "none",
   stop_at_error = FALSE,
-  appx = list(t_e=10, w1=0.1, a=0.01) # !!!!! t_e=1, a=0.001
+  appx = list(t_e=10, w_tol=25, a=0.01) # !!!!! t_e=1, a=0.001
 )
 
 # Set cluster config

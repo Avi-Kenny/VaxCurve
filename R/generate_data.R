@@ -4,8 +4,8 @@
 #' @param alpha_3 Dose-response "relationship strength" parameter; should be
 #'     zero or negative.
 #' @param distr_A Distribution of A, possibly dependent on covariates; one of
-#'     c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)", "N(0.4+0.2w1+0.1w2,0.01)").
-#'     The Normals are truncated to lie in [0,1].
+#'     c("Unif(0,1)", "Unif(0.3,0.7)", "N(0.5,0.01)", "N(0.5,0.04)",
+#'     "N(0.4+0.2w1+0.1w2,0.01)"). The Normals are truncated to lie in [0,1].
 #' @param edge Propensity mechanism for point mass at edge. The distribution of
 #'     A will be (1-pi(w))*distr_A. One of the following: "none" (no point mass
 #'     at the edge), "expit 0.2" (expit propensity model, prob=0.2), "expit 0.5"
@@ -32,21 +32,20 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
   # Sample A (before point mass)
   if (distr_A=="Unif(0,1)") {
     a <- runif(n)
+  } else if (distr_A=="Unif(0.3,0.7)") {
+    a <- runif(n, min=0.3, max=0.7)
   } else if (distr_A=="N(0.5,0.01)") {
-    a <- rnorm(n, mean=0.5, sd=0.1)
-    a <- ifelse(a>1,1,ifelse(a<0,0,a))
+    a <- rtruncnorm(n, a=0, b=1, mean=0.5, sd=0.1)
   } else if (distr_A=="N(0.5,0.04)") {
-    a <- rnorm(n, mean=0.5, sd=0.2)
-    a <- ifelse(a>1,1,ifelse(a<0,0,a))
+    a <- rtruncnorm(n, a=0, b=1, mean=0.5, sd=0.2)
   } else if (distr_A=="N(0.4+0.2w1+0.1w2,0.01)") {
-    a <- rnorm(n, mean=0.4+0.2*w$w1+0.1*w$w2, sd=0.1)
-    a <- ifelse(a>1,1,ifelse(a<0,0,a))
+    a <- rtruncnorm(n, a=0, b=1, mean=0.4+0.2*w$w1+0.1*w$w2, sd=0.1)
   } else {
     stop("distr_A incorrectly specified")
   }
   
-  # Round A values to speed computation
-  a <- round(a, -log10(C$appx$a))
+  # # Round A values to speed computation
+  # a <- round(a, -log10(C$appx$a))
   
   # Adjust A for point mass at the edge
   if (edge=="expit 0.2") {

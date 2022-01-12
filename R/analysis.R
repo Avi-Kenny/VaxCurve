@@ -25,8 +25,10 @@
     
     cfg2$marker <- c("Day29bindSpike", "Day29bindRBD", "Day29ADCP",
                      "Day29pseudoneutid50")
-    cfg2$x_lab <- c("Anti Spike IgG (BAU/ml) (=s)", "Anti RBD IgG (BAU/ml) (=s)",
-                    "Phagocytic Score (=s)", "Pseudovirus-nAb ID50 (IU50/ml) (=s)")
+    cfg2$x_lab <- c("Anti Spike IgG (BAU/ml) (=s)",
+                    "Anti RBD IgG (BAU/ml) (=s)",
+                    "Phagocytic Score (=s)",
+                    "Pseudovirus-nAb ID50 (IU50/ml) (=s)")
     cfg2$day <- c(29)
     cfg2$t_e <- c(66)
     cfg2$dataset <- c(
@@ -43,16 +45,16 @@
       ph2 = c("ph2.D29start1"),
       covariates = c("~. + risk_score + as.factor(Region)")
     )
-    cfg2$lod_shift <- TRUE
     cfg2$qnt_cutoffs <- c(0,0.9)
     cfg2$ve_overall <- c(0.650, 0.451, 0.772) # !!!!! Later calculate the overall VE numbers manually or pull from Youyi report
     cfg2$folder_local <- "Janssen data/"
-    cfg2$folder_cluster <- paste0("Z:/covpn/p3003/analysis/correlates/Part_A_Bli",
-                                  "nded_Phase_Data/adata/")
+    cfg2$folder_cluster <- paste0("Z:/covpn/p3003/analysis/correlates/Part_A_B",
+                                  "linded_Phase_Data/adata/")
     cfg2$params = list(
       S_n_type=NA, g_n_type="binning", ecdf_type="linear (mid)",
       deriv_type="m-spline", gamma_type="kernel", ci_type="regular",
-      edge_corr="min", omega_n_type="estimated", cf_folds=1, n_bins=0
+      edge_corr="min", omega_n_type="estimated", cf_folds=1, n_bins=0,
+      marg=NA, lod_shift="3/4"
     )
     C <- list(appx=list(t_e=1,w_tol=25,a=0.01)) # !!!!! a=0.001, w_tol=75
     
@@ -90,7 +92,6 @@
       ph2 = c("ph2.D29", "ph2.D57"),
       covariates = c("~. + MinorityInd + HighRiskInd + risk_score")
     )
-    cfg2$lod_shift <- FALSE
     # cfg2$qnt_cutoffs <- c(0.05,0.95)
     cfg2$qnt_cutoffs <- c(0.05,0.95)
     cfg2$ve_overall <- c(0.923, 0.899, 0.945) # !!!!! Later calculate the overall VE numbers manually or pull from Youyi report
@@ -100,7 +101,8 @@
     cfg2$params = list(
       S_n_type=NA, g_n_type="binning", ecdf_type="linear (mid)",
       deriv_type="m-spline", gamma_type="kernel", ci_type="regular",
-      edge_corr="none", omega_n_type="estimated", cf_folds=1, n_bins=0
+      edge_corr="none", omega_n_type="estimated", cf_folds=1, n_bins=0,
+      marg=NA, lod_shift="none"
     )
     C <- list(appx=list(t_e=1,w_tol=25,a=0.01)) # !!!!! a=0.001, w_tol=75
     
@@ -127,17 +129,26 @@
   
   # Secondary map for variations within an analysis. map_row corresponds to
   #     which row of cfg2$map to use
+  # cfg2$map2 <- data.frame(
+  #   tid = c(1:4),
+  #   map_row = c(1:4),
+  #   S_n_type = rep("Super Learner",4), # c("Super Learner","Random Forest")
+  #   marg = rep("Theta",4),
+  #   trim = rep(F,4)
+  # )
+  # cfg2$map2 <- data.frame(
+  #   tid = c(1:16),
+  #   map_row = c(1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4),
+  #   S_n_type = rep("Super Learner",16),
+  #   marg = rep(c("Theta", "Gamma"),8),
+  #   trim = rep(c(F,F,T,T),4)
+  # )
   cfg2$map2 <- data.frame(
-    # tid = c(1:4),
-    # map_row = c(1:4),
-    # S_n_type = rep("Super Learner",4)
-    # tid = c(1:8),
-    # map_row = c(1,1,2,2,3,3,4,4),
-    # S_n_type = rep(c("Super Learner","Random Forest"),4)
-    tid = c(1:8),
-    map_row = c(1,1,2,2,3,3,4,4),
-    S_n_type = rep("Super Learner",8),
-    which = rep(c("Theta","Gamma"),4)
+    tid = c(1:4),
+    map_row = c(1,2,3,4),
+    S_n_type = rep("Super Learner",4),
+    marg = rep("Gamma",4),
+    trim = rep(F,4)
   )
   
   # Set config based on local vs. cluster
@@ -159,7 +170,8 @@
   }
   cfg2$v$covariates <- formula(cfg2$v$covariates)
   cfg2$params$S_n_type <- cfg2$map2[cfg2$tid,"S_n_type"]
-  cfg2$which <- cfg2$map2[cfg2$tid,"which"]
+  cfg2$params$marg <- cfg2$map2[cfg2$tid,"marg"]
+  cfg2$params$trim <- cfg2$map2[cfg2$tid,"trim"] # !!!!!
   C$t_e <- cfg2$t_e
   
 }
@@ -175,8 +187,6 @@
   df_raw <- read.csv(cfg2$dataset)
   
   # Subset data frames
-  # cfg2$v$ph1
-  # filter(x,!!rlang::sym("y")==1)
   df_ph1 <- dplyr::filter(df_raw, !!rlang::sym(cfg2$v$ph1)==T)
   df_ct <- dplyr::filter(df_ph1, Trt==0)
   df_tx <- dplyr::filter(df_ph1, Trt==1)
@@ -343,67 +353,39 @@ if (cfg2$run_dqa) {
 
 
 
-##############################.
-##### Data analysis prep #####
-##############################.
-
-{
-  
-  # Archive original marker and lod*1/2 value (for plot)
-  a_orig <- dat_orig$a[!is.na(dat_orig$a)]
-  lod12 <- min(dat_orig$a,na.rm=T)
-  
-  # Shift LOD*(1/2) to LOD*(3/4)
-  if (cfg2$lod_shift) {
-    # Move LOD/2 values to LOD*(3/4)
-    # lod <- log10(2*(10^min(dat_orig$a,na.rm=T)))
-    lod34 <- log10(1.5*(10^lod12))
-    dat_orig$a[dat_orig$a==lod12] <- lod34
-  }
-  
-  # Rescale A to lie in [0,1]
-  a2 <- 1/C$appx$a
-  a_shift <- -1 * floor(a2*min(dat_orig$a, na.rm=T))/a2
-  dat_orig$a <- dat_orig$a + a_shift
-  a_scale <- ceiling(a2*max(dat_orig$a, na.rm=T))/a2
-  dat_orig$a <- dat_orig$a / a_scale
-
-  # Round A, W
-  dat_orig$a <- round(dat_orig$a, -log10(C$appx$a))
-  for (i in c(1:length(dat_orig$w))) {
-    rnd <- 8
-    tol <- C$appx$w_tol
-    n_unique <- tol + 1
-    while(n_unique>tol) {
-      rnd <- rnd - 1
-      n_unique <- length(unique(round(dat_orig$w[,i],rnd)))
-    }
-    dat_orig$w[,i] <- round(dat_orig$w[,i],rnd)
-  }
-  
-}
-
-
-
 #########################.
 ##### Data analysis #####
 #########################.
 
 {
   
+  if (cfg2$params$trim) {
+    q02 <- quantile(dat_orig$a, na.rm=T, probs=0.02)[[1]]
+    if (length(which(dat_orig$a<q02))>0) {
+      indicies_to_keep <- c(1:length(dat_orig$a))[-(which(dat_orig$a<q02))]
+      dat_orig <- ss(dat_orig, indicies_to_keep)
+    }
+  }
+  
+  # Archive original marker and lod*1/2 value (for plot)
+  a_orig <- dat_orig$a[!is.na(dat_orig$a)]
+  lod12 <- min(dat_orig$a,na.rm=T)
+  
   # Obtain estimates
   p_grid <- seq(0,1,0.01)
   return_extra <- c("Phi_n_inv", "deriv_theta_n", "f_a_n", "gamma_n", "Psi_n",
                     "omega_n", "f_aIw_n", "S_n", "gcm", "dGCM")
-  if (cfg2$which=="Theta") { return_extra <- c(return_extra, "etastar_n") }
+  if (cfg2$params$marg=="Theta") {
+    return_extra <- c(return_extra, "etastar_n")
+  }
+  a_grid <- seq(from=min(a_orig), to=max(a_orig), length.out=101)
   ests <- est_curve(
     dat_orig = dat_orig,
     estimator = "Grenander",
     params = cfg2$params,
-    points = p_grid,
+    points = a_grid,
     dir = "decr",
-    return_extra = return_extra,
-    which = cfg2$which
+    return_extra = return_extra
   )
   
   # Debugging: Grenander variance scale factor components
@@ -459,18 +441,16 @@ if (cfg2$run_dqa) {
 
 if (cfg2$run_debug$objs) {
   
-  # !!!!! plots of f_aIw_n and deriv_theta_n
-  
   grid <- seq(0,1,0.01)
   gcm <- approxfun(x=ests$gcm$x.knots, y=ests$gcm$y.knots, ties="ordered")
   omega_n <- Vectorize(function(a) {
-    ests$omega_n(w=c(0,0,-3),a,y_star=100,delta_star=0)
+    ests$omega_n(w=c(0,0),a,y_star=100,delta_star=0)
   })
   etastar_n <- Vectorize(function(a) {
-    ests$etastar_n(a,w=c(0,0,-3))
+    ests$etastar_n(a,w=c(0,0))
   })
   S_n <- Vectorize(function(a) {
-    ests$S_n(t=C$t_e, w=c(0,0,-3), a)
+    ests$S_n(t=C$t_e, w=c(0,0), a)
   })
   
   plot_data <- data.frame(
@@ -551,7 +531,6 @@ if (cfg2$run_graphs) {
     # Truncate at 10/90 quantiles and at histogram edges
     which1 <- p_grid>=ests$Phi_n_inv(cfg2$qnt_cutoffs[1]) &
       p_grid<=ests$Phi_n_inv(cfg2$qnt_cutoffs[2])
-    a_grid <- p_grid*a_scale-a_shift
     which2 <- a_grid<=max(a_orig) # ?????
     # which2 <- a_grid>=min(a_orig) & a_grid<=max(a_orig) # ?????
     which12 <- which1 & which2
@@ -574,7 +553,10 @@ if (cfg2$run_graphs) {
     plot_data <- data.frame(
       x = c(x1,a_grid,x1,x2),
       y = c(ests_gren[1],ests_gren,rep(cfg2$ve_overall[1],2)),
-      curve = factor(c(rep("Controlled VE", length(p_grid)+1),rep("Overall VE",2)), levels=c("Overall VE","Controlled VE")),
+      curve = factor(
+        c(rep("Controlled VE", length(p_grid)+1),rep("Overall VE",2)),
+        levels=c("Overall VE","Controlled VE")
+      ),
       ci_lo = c(ci_lo[1],ci_lo,rep(cfg2$ve_overall[2],2)),
       ci_hi = c(ci_hi[1],ci_hi,rep(cfg2$ve_overall[3],2))
     )
@@ -628,15 +610,15 @@ if (F) {
   # Data processing
   {
     # Read in raw data
-    df_raw_1 <- read.csv(paste0("Z:/covpn/p3003/analysis/correlates/Part_A_Blind",
-                                "ed_Phase_Data/adata/janssen_pooled_real_data_pr",
-                                "ocessed_with_riskscore.csv"))
-    df_raw_adcp <- read.csv(paste0("Z:/covpn/p3003/analysis/correlates/Part_A_Bl",
-                                   "inded_Phase_Data/adata/janssen_pooled_realAD",
-                                   "CP_data_processed_with_riskscore.csv"))
-    df_raw_psv <- read.csv(paste0("Z:/covpn/p3003/analysis/correlates/Part_A_Bli",
-                                  "nded_Phase_Data/adata/janssen_pooled_realPsV_",
-                                  "data_processed_with_riskscore.csv"))
+    df_raw_1 <- read.csv(paste0("Z:/covpn/p3003/analysis/correlates/Part_A_Bli",
+                                "nded_Phase_Data/adata/janssen_pooled_real_dat",
+                                "a_processed_with_riskscore.csv"))
+    df_raw_adcp <- read.csv(paste0("Z:/covpn/p3003/analysis/correlates/Part_A_",
+                                   "Blinded_Phase_Data/adata/janssen_pooled_re",
+                                   "alADCP_data_processed_with_riskscore.csv"))
+    df_raw_psv <- read.csv(paste0("Z:/covpn/p3003/analysis/correlates/Part_A_B",
+                                  "linded_Phase_Data/adata/janssen_pooled_real",
+                                  "PsV_data_processed_with_riskscore.csv"))
     
     # Save datasets
     saveRDS(get(paste0("dat_orig_",d)),
@@ -689,8 +671,8 @@ if (F) {
     ve_se <- sqrt(rate_ct^-2*var_tx + rate_tx^2*rate_ct^-4*var_ct)
     ve_overall_lo <- ve_overall - 1.96*ve_se
     ve_overall_hi <- ve_overall + 1.96*ve_se
-    print(paste0("Overall VE: ", round(100*ve_overall,1), "% (",
-                 round(100*ve_overall_lo,1), "% -- ", round(100*ve_overall_hi,1),
+    print(paste0("Overall VE: ",round(100*ve_overall,1),"% (",
+                 round(100*ve_overall_lo,1),"% -- ",round(100*ve_overall_hi,1),
                  "%)"))
     
     # Calculate overall vaccine efficacy (KM; within subcohort)

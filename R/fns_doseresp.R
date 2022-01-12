@@ -880,18 +880,50 @@ construct_gamma_n <- function(dat_orig, dat, vals=NA, type, omega_n, f_aIw_n,
 
   } else if (type=="kernel") {
     
-    ks <- ksmooth(
-      x = df$a,
-      y = df$po,
-      kernel = "normal",
-      bandwidth = 0.2,
-      n.points = 100 # !!!!! check this
-    )
+    # Select bandwidth via cross-validation
+    {
+      # CV prep
+      n_folds <- 5
+      folds <- sample(cut(c(1:nrow(df)), breaks=n_folds, labels=FALSE))
+      bws <- seq(2*C$appx$a, 0.3, length.out=30)
+      
+      # Conduct CV
+      best <- list(bw=999, sum_sse=999)
+      for (bw in bws) {
+        sum_sse <- 0
+        for (i in c(1:n_folds)) {
+          df_train <- df[-which(folds==i),]
+          df_test <- df[which(folds==i),]
+          ks <- ksmooth(x=df_train$a, y=df_train$po, kernel="normal", bandwidth=bw)
+          reg <- Vectorize(function(a) {
+            index <- which.min(abs(a-ks$x))
+            return(ks$y[index])
+          })
+          sum_sse <- sum_sse + sum((reg(df_test$a)-df_test$po)^2, na.rm=T)
+        }
+        if (sum_sse<best$sum_sse || best$sum_sse==999) {
+          best$bw <- bw
+          best$sum_sse <- sum_sse
+        }
+        
+      }
+      
+    }
     
+    # Construct optimal function from true data
+    ks <- ksmooth(x=df_train$a, y=df_train$po, kernel="normal",
+                  bandwidth=best$bw)
     reg <- function(a) {
       index <- which.min(abs(a-ks$x))
       return(ks$y[index])
     }
+    
+    # # !!!!! Debugging
+    # print("Debugging gamma_n kernel regression")
+    # print("best")
+    # print(best)
+    # print("sapply(seq(0,1,0.1), reg)")
+    # print(sapply(seq(0,1,0.1), reg))
     
   } else if (type=="kernel2") {
     
@@ -902,7 +934,7 @@ construct_gamma_n <- function(dat_orig, dat, vals=NA, type, omega_n, f_aIw_n,
       x = df_0$a,
       y = df_0$po,
       kernel = "normal",
-      bandwidth = 0.2,
+      bandwidth = 0.2, # !!!!! Select via CV
       x.points = vals$a
     )
     
@@ -910,7 +942,7 @@ construct_gamma_n <- function(dat_orig, dat, vals=NA, type, omega_n, f_aIw_n,
       x = df_1$a,
       y = df_1$po,
       kernel = "normal",
-      bandwidth = 0.2,
+      bandwidth = 0.2, # !!!!! Select via CV
       x.points = vals$a
     )
     
@@ -1204,6 +1236,13 @@ construct_etastar_n <- function(S_n, vals=NA) {
   
   fnc <- function(x,w) {
     x <- round(x,-log10(C$appx$a))
+    # if (x<=0.2) {
+    #   integral <- 0
+    # } else {
+    #   integral <- sum(sapply(seq(0.2,x,C$appx$a), function(a) {
+    #     C$appx$a * S_n(C$t_e, w, round(a,-log10(C$appx$a)))
+    #   }))
+    # }
     if (x==0) {
       integral <- 0
     } else {
@@ -1263,8 +1302,8 @@ construct_Theta_os_n <- function(dat, vals=NA, omega_n, f_aIw_n, etastar_n) {
   
   fnc <- function(x) {
     (1/n_orig) * sum(weights_i * (
+      # as.integer(a_i<=x&0.2<=x) * piece_1 + etastar_n(rep(x,nrow(w_i)),w_i)
       as.integer(a_i<=x) * piece_1 + etastar_n(rep(x,nrow(w_i)),w_i)
-      # as.integer(a_i<x) * piece_1 + etastar_n(rep(x,nrow(w_i)),w_i)
     ))
   }
   

@@ -1,4 +1,66 @@
 
+# Cross-validation wrapper
+if (F) {
+  
+  # CV prep
+  n_folds <- 5
+  folds <- sample(cut(c(1:nrow(df)), breaks=n_folds, labels=FALSE))
+  bws <- seq(2*C$appx$a, 0.3, length.out=30)
+  
+  best <- list(bw=999, sum_sse=999)
+  for (bw in bws) {
+    
+    sum_sse <- 0
+    for (i in c(1:n_folds)) {
+      
+      df_train <- df[-which(folds==i),]
+      df_test <- df[which(folds==i),]
+      
+      ks <- ksmooth(x=df_train$a, y=df_train$po, kernel="normal", bandwidth=bw)
+      reg <- Vectorize(function(a) {
+        index <- which.min(abs(a-ks$x))
+        return(ks$y[index])
+      })
+      
+      sum_sse <- sum_sse + sum((reg(df_test$a)-df_test$po)^2, na.rm=T)
+      
+    }
+    
+    # print(paste0("bw: ",bw,", sum_sse: ",sum_sse))
+    if (sum_sse<best$sum_sse || best$sum_sse==999) {
+      best$bw <- bw
+      best$sum_sse <- sum_sse
+    }
+    
+    
+  }
+  
+  # Construct optimal function from true data
+  ks <- ksmooth(x=df_train$a, y=df_train$po, kernel="normal",
+                bandwidth=best$bw)
+  reg <- Vectorize(function(a) {
+    index <- which.min(abs(a-ks$x))
+    return(ks$y[index])
+  })
+  
+  # !!!!!
+  # x <- runif(100)
+  # y <- sin(x*10)+rnorm(100,sd=0.1)+1
+  # df=data.frame(a=x,po=y)
+  print(best)
+  grid <- seq(0,1,0.01)
+  y_range <- c(0,1)
+  ggplot(df, aes(x=a, y=po)) +
+    geom_point() +
+    geom_line(
+      aes(x=x, y=y),
+      data.frame(x=grid, y=reg(grid))
+    ) +
+    ylim(y_range) +
+    labs(title=paste0("Regression (CV; ",y_range[1],"--",y_range[2],")"))
+  
+}
+
 # Checking variance components
 if (F) {
   

@@ -186,7 +186,7 @@ ests <- est_curve(
   dat_orig = dat_orig,
   estimator = "Grenander",
   params = params,
-  points = p_grid,
+  n_points = 101,
   dir = "decr",
   return_extra = c("gcomp")
 )

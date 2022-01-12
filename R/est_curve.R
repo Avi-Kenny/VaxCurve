@@ -4,11 +4,16 @@
 #' @param estimator Which estimator to use; currently only "Grenander"
 #' @param params A list, containing the following:
 #'   - `S_n_type` Type of survival function estimator; corresponds to
-#'     construct_S_n(type=...)
+#'     construct_S_n()
 #'   - `g_n_type` Type of conditional density ratio estimator; corresponds to
-#'     construct_f_aIw_n(type...)
+#'     construct_f_aIw_n()
+#'   - `ecdf_type` Type of CDF estimator; corresponds to construct_Phi_n()
 #'   - `deriv_type` Type of derivative estimator; corresponds to
-#'     construct_deriv_theta_n(type=...)
+#'     construct_deriv_theta_n()
+#'   - `gamma_type` Type of nuisance estimator; corresponds to
+#'     construct_gamma_n()
+#'   - `omega_n_type` Type of nuisance estimator; corresponds to
+#'     construct_omega_n()
 #'   - `boot_reps` Used for G-comp; number of bootstrap replicates
 #'   - `ci_type` One of c("regular", "logit", "sample split", "none"). "regular"
 #'     is the standard approach. "logit" transforms the CIs so that the bounds
@@ -22,19 +27,71 @@
 #'     precision-weighted estimator to adjust both the leftmost point and the
 #'     rest of the curve. "spread" adds a small amount of noise to the edge
 #'     points
-#' @param points A vector representing the points to estimate
+#'   - `marg` One of c("Gamma", "Theta"); whether or not to transform by the
+#'     marginal distribution of A
+#' @param points A vector representing the points at which estimates and CIs
+#'     should be calculated. This should be a unique increasing sequence.
 #' @param dir Direction of monotonicity; one of c("incr", "decr")
 #' @param return_extra A character vector of additional components to return
-#' @param which One of c("Gamma", "Theta"); whether or not to transform by the
-#'     marginal distribution of A
 #' @return A list of lists of the form:
 #'     list(list(point=1, est=1, se=1), list(...), ...)
 est_curve <- function(dat_orig, estimator, params, points, dir="decr",
-                      return_extra=NULL, which="Gamma") {
+                      return_extra=NULL) {
+  
+  # Set default params
+  .default_params <- list(
+    S_n_type="Super Learner", g_n_type="binning", deriv_type="m-spline",
+    ecdf_type="linear (mid)", gamma_type="kernel", omega_n_type="estimated",
+    boot_reps=1000, ci_type="trunc", cf_folds=1, m=5, edge_corr="none",
+    marg="Theta", lod_shift="none"
+  )
+  for (i in c(1:length(.default_params))) {
+    if (is.null(params[[names(.default_params)[i]]])) {
+      params[[names(.default_params)[i]]] <- .default_params[[i]]
+    }
+  }
   
   if (estimator=="Grenander") {
     
+    # LOD shift
+    lod12 <- min(dat_orig$a,na.rm=T)
+    if (params$lod_shift=="3/4") {
+      lod34 <- log10(1.5*(10^lod12))
+      dat_orig$a[dat_orig$a==lod12] <- lod34
+    } else if (params$lod_shift=="1") {
+      lod <- log10(2*(10^lod12))
+      dat_orig$a[dat_orig$a==lod12] <- lod
+    }
+    
+    # Rescale A to lie in [0,1]
+    a_lims <- c(min(dat_orig$a,na.rm=T),max(dat_orig$a,na.rm=T))
+    a_shift <- -1 * a_lims[1]
+    a_scale <- 1/(a_lims[2]-a_lims[1])
+    dat_orig$a <- (dat_orig$a+a_shift)*a_scale
+    
+    # Round values
+    dat_orig$a <- round(dat_orig$a, -log10(C$appx$a))
+    for (i in c(1:length(dat_orig$w))) {
+      rnd <- 8
+      tol <- C$appx$w_tol
+      n_unique <- tol + 1
+      while(n_unique>tol) {
+        rnd <- rnd - 1
+        n_unique <- length(unique(round(dat_orig$w[,i],rnd)))
+      }
+      dat_orig$w[,i] <- round(dat_orig$w[,i],rnd)
+    }
+    
+    # Rescale points and remove points outside the range of A
+    points_orig <- points
+    points <- round((points+a_shift)*a_scale, -log10(C$appx$a))
+    na_head <- sum(points<0)
+    na_tail <- sum(points>1)
+    points <- points[-c((length(points)-na_tail+1):length(points))]
+    points <- points[-c(1:na_head)]
+    
     if (params$edge_corr=="spread") {
+      # !!!!! If needed, fix this to do two-sided spread
       noise <- runif(length(dat_orig$a))*0.05
       dat_orig$a <- ifelse(dat_orig$a==0, noise, dat_orig$a)
     }
@@ -56,15 +113,15 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
       omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n,
                                    type=params$omega_n_type)
-      if (which=="Theta") {
+      if (params$marg=="Theta") {
         etastar_n <- construct_etastar_n(S_n)
         Theta_os_n <- construct_Theta_os_n(dat, vlist$A_grid, omega_n,
                                            f_aIw_n, etastar_n)
-      } else if (which=="Gamma") {
+      } else if (params$marg=="Gamma") {
         g_n <- construct_g_n(f_aIw_n, f_a_n)
         Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n)
       } else {
-        stop("`which` must equal either 'Theta' or 'Gamma'")
+        stop("`params$marg` must equal either 'Theta' or 'Gamma'")
       }
       
       # Construct one-step edge estimator
@@ -93,7 +150,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     }
     
     # Construct Psi_n
-    if (which=="Gamma") {
+    if (params$marg=="Gamma") {
       if (dir=="incr") {
         Psi_n <- Vectorize(function(x) {
           Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
@@ -103,7 +160,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
           -1 * Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
         })
       }
-    } else if (which=="Theta") {
+    } else if (params$marg=="Theta") {
       if (dir=="incr") {
         Psi_n <- Theta_os_n
       } else {
@@ -112,26 +169,25 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     }
     
     # Compute GCM and extract its derivative
-    gcm <- gcmlcm(
-      x = seq(0,1,C$appx$a),
-      y = Psi_n(seq(0,1,C$appx$a)),
-      type = "gcm"
+    # grid <- round(seq(0,1,C$appx$a),-log10(C$appx$a))
+    grid <- round(seq(0,1,C$appx$a),-log10(C$appx$a))
+    gcm <- gcmlcm(x=grid, y=Psi_n(grid), type="gcm")
+    dGCM <- approxfun(
+      x = gcm$x.knots[-length(gcm$x.knots)],
+      y = gcm$slope.knots,
+      method = "constant",
+      rule = 2,
+      f = 0
     )
-    dGCM <- Vectorize(function(x) {
-      # The round deals with a floating point issue
-      index <- which(round(x,5)<=gcm$x.knots)[1]-1
-      if (index==0) { index <- 1 }
-      return(gcm$slope.knots[index])
-    })
     
     # Construct Grenander-based theta_n
-    if (which=="Gamma") {
+    if (params$marg=="Gamma") {
       if (dir=="incr") {
         theta_n_Gr <- Vectorize(function(x) { min(max(dGCM(Phi_n(x)),0),1) })
       } else {
         theta_n_Gr <- Vectorize(function(x) { min(max(-1 * dGCM(Phi_n(x)),0),1) })
       }
-    } else if (which=="Theta") {
+    } else if (params$marg=="Theta") {
       if (dir=="incr") {
         theta_n_Gr <- Vectorize(function(x) { min(max(dGCM(x),0),1) })
       } else {
@@ -139,9 +195,20 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       }
     }
     
+    # # !!!!!
+    # gcm2 <- approxfun(x=gcm$x.knots, y=gcm$y.knots, ties="ordered")
+    # plot_data <- data.frame(
+    #   x = rep(grid,3),
+    #   y = c(Psi_n(grid), gcm2(grid), dGCM(grid)),
+    #   which = rep(c("Psi_n (-1*Theta_os_n)","gcm","dGCM (-1*theta_n)"), each=101)
+    # )
+    # ggplot(plot_data, aes(x=x, y=y, color=which)) +
+    #   geom_line() +
+    #   theme(legend.position="bottom")
+    
     # Recompute functions on full dataset
     if (params$cf_folds>1) {
-      # !!!!! Update to incorporate which=="Theta"
+      # !!!!! Update to incorporate params$marg=="Theta"
       S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
       Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
       f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid,
@@ -201,56 +268,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
                                              dir=dir)
     tau_n <- construct_tau_n(deriv_theta_n, gamma_n, f_a_n)
     
-    # !!!!! Debugging
-    if (F) {
-      
-      grid <- seq(0,1,0.01)
-      
-      {
-        
-        # Estimate entire function on grid
-        grid <- seq(0,1,0.01)
-        theta_ns <- theta_n(grid)
-        
-        # Identify jump points of step function
-        jump_points <- c(0) # !!!!!
-        # jump_points <- c()
-        for (i in 2:length(grid)) {
-          if (theta_ns[i]!=theta_ns[i-1]) {
-            jump_points <- c(jump_points, mean(c(grid[i],grid[i-1])))
-          }
-        }
-        jump_points <- c(jump_points,grid[length(grid)]) # !!!!!
-        
-        # Identify midpoints of jump points
-        midpoints <- jump_points[1:(length(jump_points)-1)]+(diff(jump_points)/2)
-        
-        if (length(midpoints)>=2) {
-          # Fit monotone cubic smoothing spline
-          theta_n_smoothed <- splinefun(x=midpoints,y=theta_n(midpoints),method="monoH.FC")
-        } else {
-          # Fit a straight line instead if there are <2 midpoints
-          theta_n_smoothed <- function(x) {
-            slope <- theta_n(1) - theta_n(0)
-            intercept <- theta_n(0)
-            return(intercept + slope*x)
-          }
-        }
-        
-      }
-      
-      ggplot(
-        data.frame(
-          x = rep(grid,3),
-          y = c(theta_n(grid), theta_n_smoothed(grid), deriv_theta_n(grid)),
-          which = rep(c("theta", "theta_sm", "deriv"), each=101)
-        ),
-        aes(x=x, y=y, color=which)
-      ) +
-        geom_line()
-      
-    }
-    
     # Generate confidence limits
     if (params$ci_type=="none") {
       
@@ -307,6 +324,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     # !!!!! Handle case in which marginal distribution has mass
     # !!!!! Implement cross-fitted version
+    # !!!!! Implement isotonized version
+    # !!!!! Adapt for `points` as above; make sure NA calues can be handled
     
     # Construct bin cutoffs
     dat <- ss(dat_orig, which(dat_orig$delta==1))
@@ -380,7 +399,12 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   }
   
   # Parse and return results
-  res <- list(point=points, est=ests, ci_lo=ci_lo, ci_hi=ci_hi)
+  res <- list(
+    point = points_orig,
+    est = c(rep(NA,na_head), ests, rep(NA,na_tail)),
+    ci_lo = c(rep(NA,na_head), ci_lo, rep(NA,na_tail)),
+    ci_hi = c(rep(NA,na_head), ci_hi, rep(NA,na_tail))
+  )
   if ("gcomp" %in% return_extra) {
     S_n2 <- construct_S_n(dat, vlist$S_n, type="Cox PH")
     res$gcomp <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n=S_n2)

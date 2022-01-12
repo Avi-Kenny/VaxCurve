@@ -8,24 +8,23 @@
   # 1. Run beginning of MAIN.R
   
   # 2. Set global constants
-  params <- list(S_n_type="true", g_n_type="true", ci_type="regular",
-                 cf_folds=1, edge_corr="none", ecdf_type="true",
-                 deriv_type="m-spline", gamma_type="kernel",
-                 omega_n_type="estimated")
-  C <- sim$constants
-  C$appx$t_e <- 10
-  L <- list(n=1000, alpha_3=-2, dir="decr",
-            sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5),
-            distr_A="Unif(0,1)", edge="none", surv_true="Cox PH", # Unif(0,1) N(0.5,0.04)
-            ecdf_type="true", sampling="two-phase (72%)",
-            estimator=list(est="Grenander",params=params), which="Gamma"
+  params <- list(
+    S_n_type="Cox PH", g_n_type="binning", ci_type="regular", cf_folds=1,
+    edge_corr="none", ecdf_type="linear (mid)", deriv_type="m-spline",
+    gamma_type="kernel", omega_n_type="estimated", marg="Gamma"
+  )
+  C <- sim$constants # !!!!! Change this
+  # C$appx$t_e <- 10
+  L <- list(
+    n=1000, alpha_3=-2, dir="decr",
+    sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5),
+    distr_A="Unif(0.3,0.7)", edge="none", surv_true="Cox PH", # N(0.5,0.01)
+    sampling="two-phase (72%)", estimator=list(est="Grenander",params=params)
   )
   
   # 3. Generate dataset
   dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
                             L$sc_params, L$sampling, L$dir)
-  dat <- ss(dat_orig, which(dat_orig$delta==1))
-  vlist <- create_val_list(dat, C$appx)
   
 }
 
@@ -812,36 +811,105 @@
 {
   
   # Obtain estimates
-  ests <- est_curve(
-    dat_orig = dat_orig,
-    estimator = "Grenander",
-    params = params,
-    points = C$points
-  )
+  for (i in c(1:10)) {
+    
+    # !!!!! START !!!!!
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true, # !!!!!
+                              L$sc_params, L$sampling, L$dir) # !!!!!
+    dat <- ss(dat_orig, which(dat_orig$delta==1)) # !!!!!
+    vlist <- create_val_list(dat, C$appx) # !!!!!
+    # !!!!! END !!!!!
+    
+    # dat_orig1 <- dat_orig
+    ests <- est_curve(
+      dat_orig = dat_orig,
+      estimator = "Grenander",
+      params = params,
+      points = C$points,
+      dir = L$dir,
+      return_extra = c("Phi_n_inv", "deriv_theta_n", "f_a_n", "gamma_n", "Psi_n",
+                       "omega_n", "f_aIw_n", "S_n", "gcm", "dGCM", "etastar_n")
+    )
+    
+    assign(paste0("ests",i), ests)
+    assign(paste0("dat_orig",i), dat_orig)
+    
+  }
   
   # Return results
-  theta_true <- attr(dat_orig, "theta_true")
-  theta_ests <- ests$est
-  ci_lo <- ests$ci_lo
-  ci_hi <- ests$ci_hi
-  len <- length(C$points)
-  plot_data <- data.frame(
-    x = rep(C$points, 2),
-    theta = c(theta_ests, theta_true),
-    which = rep(c("Est","Truth"), each=len),
-    ci_lo = c(ci_lo, theta_true),
-    ci_hi = c(ci_hi, theta_true)
-  )
-  ggplot(plot_data, aes(x=x, y=theta, color=factor(which))) +
-    geom_line() +
-    labs(color="Which") +
-    # ylim(c(0.3,0.7)) +
-    geom_ribbon(
-      aes(ymin=ci_lo, ymax=ci_hi),
-      alpha = 0.2,
-      fill = NA,
-      linetype = "dotted"
+  # Good: 1,2
+  # Bad: 5,7
+  {
+    i=7
+    ests<-eval(as.name(paste0("ests",i)))
+    theta_true <- attr(dat_orig, "theta_true")
+    theta_ests <- ests$est
+    ci_lo <- ests$ci_lo
+    ci_hi <- ests$ci_hi
+    len <- length(C$points)
+    
+    # Plot theta_n (estimate vs. truth)
+    plot_data <- data.frame(
+      x = rep(C$points, 2),
+      theta = c(theta_ests, theta_true),
+      which = rep(c("Est","Truth"), each=len),
+      ci_lo = c(ci_lo, theta_true),
+      ci_hi = c(ci_hi, theta_true)
     )
+    ggplot(plot_data, aes(x=x, y=theta, color=factor(which))) +
+      geom_line() +
+      # labs(color="Which", title=paste("ests",i)) +
+      geom_ribbon(
+        aes(ymin=ci_lo, ymax=ci_hi),
+        alpha = 0.2,
+        fill = NA,
+        linetype = "dotted"
+      )
+    
+    # Analyze intermediate objects
+    grid <- round(seq(0,1,0.01),2)
+    gcm <- approxfun(x=ests$gcm$x.knots, y=ests$gcm$y.knots, ties="ordered")
+    plot_data <- data.frame(
+      x = rep(grid,3),
+      y = c(ests$Psi_n(grid), gcm(grid), ests$dGCM(grid)),
+      which = rep(c("Psi_n (-1*Theta_os_n)","gcm","dGCM (-1*theta_n)"), each=101)
+    )
+    ggplot(plot_data, aes(x=x, y=y, color=which)) +
+      geom_line() +
+      labs(title=paste("ests",i)) +
+      theme(legend.position="bottom") + ylim(c(-0.55,0.1))
+    
+    # # omega_n, etastar_n, and S_n all look fine
+    # ggplot(data.frame(x=grid, y=omega_n(grid)), aes(x=x, y=y)) +
+    #   geom_line()+theme(legend.position="bottom")+labs(title="omega_n (ests 7)")
+    # ggplot(data.frame(x=grid, y=etastar_n(grid)), aes(x=x, y=y)) +
+    #   geom_line()+theme(legend.position="bottom")+labs(title="etastar_n (ests 7)")
+    # ggplot(data.frame(x=grid, y=S_n(grid)), aes(x=x, y=y)) +
+    #   geom_line()+theme(legend.position="bottom")+labs(title="S_n (ests 7)")
+    
+  }
+  
+  # Analysis of ests 7
+  
+  # > quantile(dat$a)
+  # 0%  25%  50%  75% 100% 
+  # 0.15 0.43 0.49 0.56 0.83  
+  
+  # > grid[c(15,16)]
+  # [1] 0.14 0.15
+  # > ests$Psi_n(grid)[c(15,16)]
+  # [1] -0.08357442  0.01014071
+  
+  # What is causing the shape of the curve on [0,0.14] ?????
+  
+  # piece_1 <- omega_n(dat$w,dat$a,dat$y_star,dat$delta_star) /
+  #   f_aIw_n(dat$a,dat$w)
+  # fnc <- function(x) {
+  #   (1/n_orig) * sum(weights_i * (
+  #     as.integer(a_i<=x) * piece_1 + etastar_n(rep(x,nrow(w_i)),w_i)
+  #   ))
+  # }
+  # etastar_n(x,c(0,1))
   
 }
 

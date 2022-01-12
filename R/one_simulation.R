@@ -21,9 +21,8 @@ if (cfg$which_sim=="estimation") {
       estimator = L$estimator$est,
       params = L$estimator$params,
       points = C$points,
-      dir = L$dir,
-      # return_extra = "Theta_os_n",
-      which = L$which
+      dir = L$dir
+      # return_extra = "Theta_os_n"
     )
     
     # Return results

@@ -123,7 +123,7 @@
       edge_corr=NA, omega_n_type="estimated", cf_folds=1, n_bins=0,
       marg=NA, lod_shift="none"
     )
-    C <- list(appx=list(t_e=1,w_tol=25,a=0.01)) # !!!!! a=0.001, w_tol=75
+    C <- list(appx=list(t_e=1,w_tol=25,a=0.001)) # !!!!! a=0.001, w_tol=75
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
@@ -132,7 +132,8 @@
       day = c(1,2,1,2,1,2,1,2),
       t_e = c(1,2,1,2,1,2,1,2),
       dataset = c(1,1,1,1,1,1,1,1),
-      edge_corr = c(1,1,1,1,1,1,2,1),
+      # edge_corr = c(1,1,1,1,1,1,2,1),
+      edge_corr = c(1,1,1,1,2,1,2,1),
       v_id = c(1,1,1,1,1,1,1,1),
       v_time = c(1,2,1,2,1,2,1,2),
       v_event = c(1,2,1,2,1,2,1,2),
@@ -148,13 +149,9 @@
       tid = c(1:8),
       map_row = c(1:8),
       S_n_type = rep("Super Learner",8),
-      marg = c(rep("Gamma",6),"Theta","Gamma"),
+      marg = c("Gamma","Gamma","Gamma","Gamma","Theta","Gamma","Theta","Gamma"),
+      # marg = c(rep("Gamma",6),"Theta","Gamma"),
       trim = rep(F,8) # c(T,F)
-      # tid = c(1:16),
-      # map_row = rep(c(1:8), each=2),
-      # S_n_type = rep("Super Learner",16),
-      # marg = rep(c("Theta", "Gamma"),8),
-      # trim = rep(F,16) # c(T,F)
     )
     
   } else if (cfg2$analysis=="HVTN 705") {
@@ -165,7 +162,7 @@
   
   # Set config based on local vs. cluster
   if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
-    cfg2$tid <- 7
+    cfg2$tid <- 1
     cfg2$dataset <- paste0(cfg2$folder_cluster,cfg2$dataset)
   } else {
     cfg2$tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
@@ -186,7 +183,7 @@
   cfg2$params$marg <- cfg2$map2[cfg2$tid,"marg"]
   cfg2$params$trim <- cfg2$map2[cfg2$tid,"trim"] # !!!!!
   C$t_e <- cfg2$t_e
-  if (i==7) { cfg2$qnt_lo <- 0 } # !!!!! hack
+  if (i %in% c(5,7)) { cfg2$qnt_lo <- 0 } # !!!!! hack
   
 }
 

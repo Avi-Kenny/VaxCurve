@@ -173,7 +173,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     }
     
     # Compute GCM and extract its derivative
-    # grid <- round(seq(0,1,C$appx$a),-log10(C$appx$a))
     grid <- round(seq(0,1,C$appx$a),-log10(C$appx$a))
     gcm <- gcmlcm(x=grid, y=Psi_n(grid), type="gcm")
     dGCM <- approxfun(
@@ -250,9 +249,17 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       
       theta_n <- Vectorize(function(x) {
         if (dir=="incr") {
-          max(theta_os_n_est, theta_n_Gr(x))
+          if(x==0) {
+            theta_os_n_est
+          } else {
+            max(theta_os_n_est, theta_n_Gr(x))
+          }
         } else {
-          min(theta_os_n_est, theta_n_Gr(x))
+          if(x==0) {
+            theta_os_n_est
+          } else {
+            min(theta_os_n_est, theta_n_Gr(x))
+          }
         }
       })
       

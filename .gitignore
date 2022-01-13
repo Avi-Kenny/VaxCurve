@@ -37,18 +37,13 @@ rsconnect/
 
 # AK additions
 SimENgine.out
-moderna (SL, ID50-29)
-moderna (RF, ID50-29)
-moderna (RF, ID50-57)
-moderna (RF, spike-29)
-moderna (RF, spike-57)
-705 data
-705 functions
 _Archive
 R/*.pdf
 Debugging sampling issue
-Janssen data
+705 plots
 Janssen plots
+Moderna plots
 Snapshot - Janssen 2021-12-09.zip
 Snapshot - Janssen 2021-12-17.zip
 Snapshot - Janssen 2021-12-20.zip
+R/sim.rds

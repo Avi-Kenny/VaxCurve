@@ -87,8 +87,12 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     points <- round((points+a_shift)*a_scale, -log10(C$appx$a))
     na_head <- sum(points<0)
     na_tail <- sum(points>1)
-    points <- points[-c((length(points)-na_tail+1):length(points))]
-    points <- points[-c(1:na_head)]
+    if (na_head>0) {
+      points <- points[-c(1:na_head)]
+    }
+    if (na_tail>0) {
+      points <- points[-c((length(points)-na_tail+1):length(points))]
+    }
     
     if (params$edge_corr=="spread") {
       # !!!!! If needed, fix this to do two-sided spread
@@ -245,16 +249,20 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     } else if (params$edge_corr=="min") {
       
       theta_n <- Vectorize(function(x) {
-        if (dir=="decr") {
-          min(theta_os_n_est, theta_n_Gr(x))
-        } else {
+        if (dir=="incr") {
           max(theta_os_n_est, theta_n_Gr(x))
+        } else {
+          min(theta_os_n_est, theta_n_Gr(x))
         }
       })
       
       gren_ests <- theta_n_Gr(points)
       gren_points <- sapply(c(1:length(points)), function(i) {
-        as.numeric(gren_ests[i]>theta_os_n_est)
+        if (dir=="incr") {
+          as.numeric(gren_ests[i]>theta_os_n_est)
+        } else {
+          as.numeric(gren_ests[i]<theta_os_n_est)
+        }
       })
       gren_points[1] <- 0
       

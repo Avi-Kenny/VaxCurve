@@ -14,7 +14,7 @@
   cfg2 <- list(
     analysis = "Moderna", # Janssen Moderna
     run_dqa = F,
-    run_debug = list(gren_var=F, objs=T),
+    run_debug = list(gren_var=F, objs=F),
     run_graphs = T
   )
   
@@ -36,6 +36,7 @@
       "janssen_pooled_realADCP_data_processed_with_riskscore.csv",
       "janssen_pooled_realPsV_data_processed_with_riskscore.csv"
     )
+    cfg2$edge_corr <- c("min")
     cfg2$v <- list(
       id = c("Ptid"),
       time = c("EventTimePrimaryIncludeNotMolecConfirmedD29"),
@@ -45,7 +46,8 @@
       ph2 = c("ph2.D29start1"),
       covariates = c("~. + risk_score + as.factor(Region)")
     )
-    cfg2$qnt_cutoffs <- c(0,0.9)
+    cfg2$qnt_lo <- c(0)
+    cfg2$qnt_hi <- c(0.9)
     cfg2$ve_overall <- c(0.650, 0.451, 0.772) # !!!!! Later calculate the overall VE numbers manually or pull from Youyi report
     cfg2$folder_local <- "Janssen data/"
     cfg2$folder_cluster <- paste0("Z:/covpn/p3003/analysis/correlates/Part_A_B",
@@ -53,17 +55,19 @@
     cfg2$params = list(
       S_n_type=NA, g_n_type="binning", ecdf_type="linear (mid)",
       deriv_type="m-spline", gamma_type="kernel", ci_type="regular",
-      edge_corr="min", omega_n_type="estimated", cf_folds=1, n_bins=0,
+      edge_corr=NA, omega_n_type="estimated", cf_folds=1, n_bins=0,
       marg=NA, lod_shift="3/4"
     )
     C <- list(appx=list(t_e=1,w_tol=25,a=0.01)) # !!!!! a=0.001, w_tol=75
     
+    # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
       marker = c(1,2,3,4),
       x_lab = c(1,2,3,4),
       day = c(1,1,1,1),
       t_e = c(1,1,1,1),
       dataset = c(1,1,2,3),
+      edge_corr = c(1,1,1,1),
       v_id = c(1,1,1,1),
       v_time = c(1,1,1,1),
       v_event = c(1,1,1,1),
@@ -73,16 +77,31 @@
       v_covariates = c(1,1,1,1)
     )
     
+    # Secondary map for variations within a graph; map_row corresponds to which
+    #     row of cfg2$map to use
+    cfg2$map2 <- data.frame(
+      tid = c(1:4),
+      map_row = c(1:4),
+      S_n_type = rep("Super Learner",4),
+      marg = rep("Theta",4), # c("Theta", "Gamma")
+      trim = rep(F,4) # c(T,F)
+    )
+    
   } else if (cfg2$analysis=="Moderna") {
     
-    cfg2$marker <- c("Day29bindSpike", "Day29pseudoneutid50", "Day57bindSpike",
-                     "Day57pseudoneutid50")
+    cfg2$marker <- c("Day29bindSpike", "Day57bindSpike", "Day29bindRBD",
+                     "Day57bindRBD", "Day29pseudoneutid50",
+                     "Day57pseudoneutid50", "Day29pseudoneutid80",
+                     "Day57pseudoneutid80")
     cfg2$x_lab <- c("Anti Spike IgG (BAU/ml) (=s)",
-                    "Pseudovirus-nAb ID50 (IU50/ml) (=s)")
+                    "Anti RBD IgG (BAU/ml) (=s)",
+                    "Pseudovirus-nAb ID50 (IU50/ml) (=s)",
+                    "Pseudovirus-nAb ID80 (IU80/ml) (=s)")
     cfg2$day <- c(29,57)
     cfg2$t_e <- c(126,100)
     cfg2$dataset <- c(paste0("P3001ModernaCOVEimmunemarkerdata_correlates_proc",
                              "essed_v1.0_Oct28_2021.csv"))
+    cfg2$edge_corr <- c("none", "min")
     cfg2$v <- list(
       id = c("Ptid"),
       time = c("EventTimePrimaryD29", "EventTimePrimaryD57"),
@@ -92,8 +111,8 @@
       ph2 = c("ph2.D29", "ph2.D57"),
       covariates = c("~. + MinorityInd + HighRiskInd + risk_score")
     )
-    # cfg2$qnt_cutoffs <- c(0.05,0.95)
-    cfg2$qnt_cutoffs <- c(0.05,0.95)
+    cfg2$qnt_lo <- c(0.05)
+    cfg2$qnt_hi <- c(0.95)
     cfg2$ve_overall <- c(0.923, 0.899, 0.945) # !!!!! Later calculate the overall VE numbers manually or pull from Youyi report
     cfg2$folder_local <- "Moderna data/"
     cfg2$folder_cluster <- paste0("Z:/covpn/p3001/analysis/correlates/Part_A_B",
@@ -101,24 +120,41 @@
     cfg2$params = list(
       S_n_type=NA, g_n_type="binning", ecdf_type="linear (mid)",
       deriv_type="m-spline", gamma_type="kernel", ci_type="regular",
-      edge_corr="none", omega_n_type="estimated", cf_folds=1, n_bins=0,
+      edge_corr=NA, omega_n_type="estimated", cf_folds=1, n_bins=0,
       marg=NA, lod_shift="none"
     )
     C <- list(appx=list(t_e=1,w_tol=25,a=0.01)) # !!!!! a=0.001, w_tol=75
     
+    # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
-      marker = c(1,2,3,4),
-      x_lab = c(1,2,1,2),
-      day = c(1,1,2,2),
-      t_e = c(1,1,2,2),
-      dataset = c(1,1,1,1),
-      v_id = c(1,1,1,1),
-      v_time = c(1,1,2,2),
-      v_event = c(1,1,2,2),
-      v_wt = c(1,1,2,2),
-      v_ph1 = c(1,1,2,2),
-      v_ph2 = c(1,1,2,2),
-      v_covariates = c(1,1,1,1)
+      marker = c(1,2,3,4,5,6,7,8),
+      x_lab = c(1,1,2,2,3,3,4,4),
+      day = c(1,2,1,2,1,2,1,2),
+      t_e = c(1,2,1,2,1,2,1,2),
+      dataset = c(1,1,1,1,1,1,1,1),
+      edge_corr = c(1,1,1,1,1,1,2,1),
+      v_id = c(1,1,1,1,1,1,1,1),
+      v_time = c(1,2,1,2,1,2,1,2),
+      v_event = c(1,2,1,2,1,2,1,2),
+      v_wt = c(1,2,1,2,1,2,1,2),
+      v_ph1 = c(1,2,1,2,1,2,1,2),
+      v_ph2 = c(1,2,1,2,1,2,1,2),
+      v_covariates = c(1,1,1,1,1,1,1,1)
+    )
+    
+    # Secondary map for variations within a graph; map_row corresponds to which
+    #     row of cfg2$map to use
+    cfg2$map2 <- data.frame(
+      tid = c(1:8),
+      map_row = c(1:8),
+      S_n_type = rep("Super Learner",8),
+      marg = c(rep("Gamma",6),"Theta","Gamma"),
+      trim = rep(F,8) # c(T,F)
+      # tid = c(1:16),
+      # map_row = rep(c(1:8), each=2),
+      # S_n_type = rep("Super Learner",16),
+      # marg = rep(c("Theta", "Gamma"),8),
+      # trim = rep(F,16) # c(T,F)
     )
     
   } else if (cfg2$analysis=="HVTN 705") {
@@ -127,33 +163,9 @@
     
   }
   
-  # Secondary map for variations within an analysis. map_row corresponds to
-  #     which row of cfg2$map to use
-  # cfg2$map2 <- data.frame(
-  #   tid = c(1:4),
-  #   map_row = c(1:4),
-  #   S_n_type = rep("Super Learner",4), # c("Super Learner","Random Forest")
-  #   marg = rep("Theta",4),
-  #   trim = rep(F,4)
-  # )
-  # cfg2$map2 <- data.frame(
-  #   tid = c(1:16),
-  #   map_row = c(1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4),
-  #   S_n_type = rep("Super Learner",16),
-  #   marg = rep(c("Theta", "Gamma"),8),
-  #   trim = rep(c(F,F,T,T),4)
-  # )
-  cfg2$map2 <- data.frame(
-    tid = c(1:4),
-    map_row = c(1,2,3,4),
-    S_n_type = rep("Super Learner",4),
-    marg = rep("Gamma",4),
-    trim = rep(F,4)
-  )
-  
   # Set config based on local vs. cluster
   if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
-    cfg2$tid <- 1
+    cfg2$tid <- 7
     cfg2$dataset <- paste0(cfg2$folder_cluster,cfg2$dataset)
   } else {
     cfg2$tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
@@ -168,11 +180,13 @@
   for (x in c("id", "time", "event", "wt", "ph1", "ph2", "covariates")) {
     cfg2$v[[x]] <- cfg2$v[[x]][cfg2$map[i,paste0("v_",x)]]
   }
+  cfg2$params$edge_corr <- cfg2$edge_corr[cfg2$map[i,"edge_corr"]]
   cfg2$v$covariates <- formula(cfg2$v$covariates)
   cfg2$params$S_n_type <- cfg2$map2[cfg2$tid,"S_n_type"]
   cfg2$params$marg <- cfg2$map2[cfg2$tid,"marg"]
   cfg2$params$trim <- cfg2$map2[cfg2$tid,"trim"] # !!!!!
   C$t_e <- cfg2$t_e
+  if (i==7) { cfg2$qnt_lo <- 0 } # !!!!! hack
   
 }
 
@@ -529,8 +543,8 @@ if (cfg2$run_graphs) {
     ests_gren <- cve(theta_ests_gren)
     
     # Truncate at 10/90 quantiles and at histogram edges
-    which1 <- p_grid>=ests$Phi_n_inv(cfg2$qnt_cutoffs[1]) &
-      p_grid<=ests$Phi_n_inv(cfg2$qnt_cutoffs[2])
+    which1 <- p_grid>=ests$Phi_n_inv(cfg2$qnt_lo) &
+      p_grid<=ests$Phi_n_inv(cfg2$qnt_hi)
     which2 <- a_grid<=max(a_orig) # ?????
     # which2 <- a_grid>=min(a_orig) & a_grid<=max(a_orig) # ?????
     which12 <- which1 & which2

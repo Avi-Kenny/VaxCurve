@@ -1208,9 +1208,11 @@ construct_eta_n <- function(dat, vals=NA, S_n) {
   n_orig <- sum(dat$weights)
   
   fnc <- function(x,w) {
+    # .count <<- .count+1 # !!!!!
     w_long <- as.data.frame(
       matrix(rep(w,length(dat$a)), ncol=length(w), byrow=T)
     )
+    
     return(
       (1/n_orig) * sum(
         dat$weights * as.integer(dat$a<=x) *

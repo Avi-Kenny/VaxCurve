@@ -18,7 +18,7 @@
   L <- list(
     n=1000, alpha_3=-2, dir="decr",
     sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5),
-    distr_A="Unif(0.3,0.7)", edge="none", surv_true="Cox PH", # N(0.5,0.01)
+    distr_A="Unif(0,1)", edge="expit 0.2", surv_true="Cox PH", # N(0.5,0.01)
     sampling="two-phase (72%)", estimator=list(est="Grenander",params=params)
   )
   

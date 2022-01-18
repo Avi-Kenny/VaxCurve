@@ -135,31 +135,21 @@ if (cfg$which_sim=="testing") {
       "p_val" = test_results$p_val,
       "beta_n" = test_results$beta_n,
       "sd_n" = test_results$sd_n,
-      "psi1psi2" = test_results$psi1psi2, # !!!!!
+      "var_n" = test_results$var_n,
+      "sum12_est" = test_results$sum12_est, # !!!!!
+      "sum12_var_est" = test_results$sum12_var_est, # !!!!!
       "Psi_1_est" = test_results$Psi_1_est, # !!!!!
       "Psi_2_est" = test_results$Psi_2_est, # !!!!!
-      "Psi_1_sd" = test_results$Psi_1_sd, # !!!!!
-      "Psi_2_sd" = test_results$Psi_2_sd # !!!!!
-      # "Gamma_n_5" = test_results$Gamma_n_5, # !!!!!
-      # "Gamma_true_5" = attr(dat_orig, "Theta_true")[26], # !!!!!
-      # "theta_true_5" = attr(dat_orig, "theta_true")[26], # !!!!!
-      # "Gamma_var_n" = test_results$Gamma_var_n, # !!!!!
-      # "lambda_2" = test_results$lambda_2, # !!!!!
-      # "lambda_3" = test_results$lambda_3, # !!!!!
-      # "g_n" = test_results$g_n, # !!!!!
-      # "S_n" = test_results$S_n, # !!!!!
-      # "Sc_n" = test_results$Sc_n, # !!!!!
-      # "omega_n1" = test_results$omega_n1, # !!!!!
-      # "omega_n0" = test_results$omega_n0, # !!!!!
-      # "gcomp_n" = test_results$gcomp_n, # !!!!!
-      # "eta_n" = test_results$eta_n, # !!!!!
-      # "xi_n" = test_results$xi_n, # !!!!!
-      # "infl_fn_1" = test_results$infl_fn_1, # !!!!!
-      # "infl_fn_Gamma" = test_results$infl_fn_Gamma, # !!!!!
-      # "infl_fn_2" = test_results$infl_fn_2, # !!!!!
-      # "partial_est" = test_results$partial_est, # !!!!!
-      # "partial_var" = test_results$partial_var, # !!!!!
-      # "Phi_n_5" = test_results$Phi_n_5 # !!!!!
+      "p_val_Psi_1" = test_results$p_val_Psi_1, # !!!!!
+      "p_val_Psi_2" = test_results$p_val_Psi_2, # !!!!!
+      "p_val_sum12" = test_results$p_val_sum12, # !!!!!
+      "p_val_sum12b" = test_results$p_val_sum12b, # !!!!!
+      "p_val_alt" = test_results$p_val_alt, # !!!!!
+      "reject_Psi_1" = test_results$reject_Psi_1, # !!!!!
+      "reject_Psi_2" = test_results$reject_Psi_2, # !!!!!
+      "reject_sum12" = test_results$reject_sum12, # !!!!!
+      "reject_sum12b" = test_results$reject_sum12b, # !!!!!
+      "reject_alt" = test_results$reject_alt # !!!!!
     ))
     
   }

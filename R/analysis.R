@@ -14,7 +14,7 @@
   cfg2 <- list(
     analysis = "Moderna", # Janssen Moderna
     run_dqa = F,
-    run_debug = list(gren_var=F, objs=F),
+    run_debug = list(gren_var=T, objs=T),
     run_graphs = T
   )
   
@@ -29,6 +29,7 @@
                     "Anti RBD IgG (BAU/ml) (=s)",
                     "Phagocytic Score (=s)",
                     "Pseudovirus-nAb ID50 (IU50/ml) (=s)")
+    cfg2$title <- c("999","999","999","999")
     cfg2$day <- c(29)
     cfg2$t_e <- c(66)
     cfg2$dataset <- c(
@@ -64,6 +65,7 @@
     cfg2$map <- data.frame(
       marker = c(1,2,3,4),
       x_lab = c(1,2,3,4),
+      title = c(1,2,3,4),
       day = c(1,1,1,1),
       t_e = c(1,1,1,1),
       dataset = c(1,1,2,3),
@@ -92,15 +94,24 @@
     cfg2$marker <- c("Day29bindSpike", "Day57bindSpike", "Day29bindRBD",
                      "Day57bindRBD", "Day29pseudoneutid50",
                      "Day57pseudoneutid50", "Day29pseudoneutid80",
-                     "Day57pseudoneutid80")
+                     "Day57pseudoneutid80", "Day29liveneutmn50",
+                     "Day57liveneutmn50")
     cfg2$x_lab <- c("Anti Spike IgG (BAU/ml) (=s)",
                     "Anti RBD IgG (BAU/ml) (=s)",
                     "Pseudovirus-nAb ID50 (IU50/ml) (=s)",
-                    "Pseudovirus-nAb ID80 (IU80/ml) (=s)")
+                    "Pseudovirus-nAb ID80 (IU80/ml) (=s)",
+                    "Live Virus-mnAb ID50 (IU50/ml) (=s)")
+    cfg2$title <- c("Binding Antibody to Spike",
+                    "Binding Antibody to RBD",
+                    "PsV Neutralization 50% Titer",
+                    "PsV Neutralization 80% Titer",
+                    "Live Virus Micro Neut 50% Titer")
     cfg2$day <- c(29,57)
     cfg2$t_e <- c(126,100)
+    # cfg2$dataset <- c(paste0("P3001ModernaCOVEimmunemarkerdata_correlates_proc",
+    #                          "essed_v1.0_Oct28_2021.csv"))
     cfg2$dataset <- c(paste0("P3001ModernaCOVEimmunemarkerdata_correlates_proc",
-                             "essed_v1.0_Oct28_2021.csv"))
+                             "essed_v1.1_lvmn_added_Jan14_2022.csv"))
     cfg2$edge_corr <- c("none", "min")
     cfg2$v <- list(
       id = c("Ptid"),
@@ -123,35 +134,35 @@
       edge_corr=NA, omega_n_type="estimated", cf_folds=1, n_bins=0,
       marg=NA, lod_shift="none"
     )
-    C <- list(appx=list(t_e=1,w_tol=25,a=0.001)) # !!!!! a=0.001, w_tol=75
+    C <- list(appx=list(t_e=1,w_tol=25,a=0.01)) # !!!!! a=0.001, w_tol=75
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
-      marker = c(1,2,3,4,5,6,7,8),
-      x_lab = c(1,1,2,2,3,3,4,4),
-      day = c(1,2,1,2,1,2,1,2),
-      t_e = c(1,2,1,2,1,2,1,2),
-      dataset = c(1,1,1,1,1,1,1,1),
-      # edge_corr = c(1,1,1,1,1,1,2,1),
-      edge_corr = c(1,1,1,1,2,1,2,1),
-      v_id = c(1,1,1,1,1,1,1,1),
-      v_time = c(1,2,1,2,1,2,1,2),
-      v_event = c(1,2,1,2,1,2,1,2),
-      v_wt = c(1,2,1,2,1,2,1,2),
-      v_ph1 = c(1,2,1,2,1,2,1,2),
-      v_ph2 = c(1,2,1,2,1,2,1,2),
-      v_covariates = c(1,1,1,1,1,1,1,1)
+      marker = c(1,2,3,4,5,6,7,8,9,10),
+      x_lab = c(1,1,2,2,3,3,4,4,5,5),
+      title = c(1,1,2,2,3,3,4,4,5,5),
+      day = c(1,2,1,2,1,2,1,2,1,2),
+      t_e = c(1,2,1,2,1,2,1,2,1,2),
+      dataset = c(1,1,1,1,1,1,1,1,1,1),
+      edge_corr = c(1,1,1,1,2,1,2,1,2,1),
+      v_id = c(1,1,1,1,1,1,1,1,1,1),
+      v_time = c(1,2,1,2,1,2,1,2,1,2),
+      v_event = c(1,2,1,2,1,2,1,2,1,2),
+      v_wt = c(1,2,1,2,1,2,1,2,1,2),
+      v_ph1 = c(1,2,1,2,1,2,1,2,1,2),
+      v_ph2 = c(1,2,1,2,1,2,1,2,1,2),
+      v_covariates = c(1,1,1,1,1,1,1,1,1,1)
     )
     
     # Secondary map for variations within a graph; map_row corresponds to which
     #     row of cfg2$map to use
     cfg2$map2 <- data.frame(
-      tid = c(1:8),
-      map_row = c(1:8),
-      S_n_type = rep("Super Learner",8),
-      marg = c("Gamma","Gamma","Gamma","Gamma","Theta","Gamma","Theta","Gamma"),
-      # marg = c(rep("Gamma",6),"Theta","Gamma"),
-      trim = rep(F,8) # c(T,F)
+      tid = c(1:10),
+      map_row = c(1:10),
+      S_n_type = rep("Super Learner",10),
+      marg = c("Gamma","Gamma","Gamma","Gamma","Theta",
+               "Gamma","Theta","Gamma","Theta","Gamma"),
+      trim = rep(F,10)
     )
     
   } else if (cfg2$analysis=="HVTN 705") {
@@ -162,7 +173,7 @@
   
   # Set config based on local vs. cluster
   if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
-    cfg2$tid <- 1
+    cfg2$tid <- 9
     cfg2$dataset <- paste0(cfg2$folder_cluster,cfg2$dataset)
   } else {
     cfg2$tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
@@ -171,7 +182,7 @@
   
   # Set config based on cfg2$map and cfg2$map2
   i <- cfg2$map2[cfg2$tid,"map_row"]
-  for (x in c("marker", "x_lab", "day", "dataset", "t_e")) {
+  for (x in c("marker", "x_lab", "title", "day", "dataset", "t_e")) {
     cfg2[[x]] <- cfg2[[x]][cfg2$map[i,x]]
   }
   for (x in c("id", "time", "event", "wt", "ph1", "ph2", "covariates")) {
@@ -183,7 +194,7 @@
   cfg2$params$marg <- cfg2$map2[cfg2$tid,"marg"]
   cfg2$params$trim <- cfg2$map2[cfg2$tid,"trim"] # !!!!!
   C$t_e <- cfg2$t_e
-  if (i %in% c(5,7)) { cfg2$qnt_lo <- 0 } # !!!!! hack
+  if ((i %in% c(5,7,9)) && cfg2$analysis=="Moderna") { cfg2$qnt_lo <- 0 } # !!!!! hack
   
 }
 
@@ -376,6 +387,14 @@ if (cfg2$run_dqa) {
       indicies_to_keep <- c(1:length(dat_orig$a))[-(which(dat_orig$a<q02))]
       dat_orig <- ss(dat_orig, indicies_to_keep)
     }
+  }
+  
+  # !!!!! temporary
+  mrks <- c("Day29pseudoneutid50", "Day29pseudoneutid50", "Day29liveneutmn50")
+  if (cfg2$marker %in% mrks && cfg2$analysis=="Moderna") {
+    q98 <- quantile(dat_orig$a, na.rm=T, probs=0.98)[[1]]
+    indicies_to_keep <- c(1:length(dat_orig$a))[-(which(dat_orig$a>q98))]
+    dat_orig <- ss(dat_orig, indicies_to_keep)
   }
   
   # Archive original marker and lod*1/2 value (for plot)
@@ -586,7 +605,8 @@ if (cfg2$run_graphs) {
       scale_color_manual(values=c("darkgrey","darkblue")) +
       scale_fill_manual(values=c("darkgrey","darkblue")) +
       theme(legend.position="bottom") +
-      labs(x=cfg2$x_lab, y=y_lab, color=NULL, fill=NULL) +
+      labs(title=paste0(cfg2$title,": Day ",cfg2$day),
+           x=cfg2$x_lab, y=y_lab, color=NULL, fill=NULL) +
       geom_line()
     
     # Save plot

@@ -9,16 +9,16 @@
 # GitHub packages: tedwestling/ctsCausal, tedwestling/CFsurvival, 
 #                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
-  main_task = "analysis.R", # run update analysis.R
+  main_task = "run", # run update analysis.R
   which_sim = "estimation", # "estimation" "edge" "testing" "infl_fn_1 (temp)"
   level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
   # keep = c(1:3,7:9,16:18,22:24),
   num_sim = 500,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
-           "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm"),
+           "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm", "tidyr"),
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
-                     "data.table", "latex2exp", "tidyr"),
+                     "data.table", "latex2exp"),
   parallel = "none",
   stop_at_error = FALSE,
   appx = list(t_e=10, w_tol=25, a=0.01) # !!!!! t_e=1, a=0.001
@@ -117,11 +117,10 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
         "Slope (one-step Gamma_os_n)" = list(
           type = "test_2",
           params = list(
-            var = "asymptotic",
+            var = c("asymptotic", "boot", "mixed boot"),
             cf_folds = c(1, 10),
             S_n_type = c("Cox PH", "Random Forest"),
             g_n_type = c("parametric", "binning"),
-            est_known_nuis = c(TRUE, FALSE),
             omega_n_type = c("estimated", "true")
           )
         )
@@ -145,13 +144,21 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       #   params = list(marg="Theta", edge_corr="min")
       # ),
       # "Qbins (9)" = list(est="Qbins", params=list(n_bins=9)),
-      "Grenander (Theta)" = list(
+      # "Grenander (Theta)" = list(
+      #   est = "Grenander",
+      #   params = list(marg="Theta", S_n_type="Cox PH")
+      # ),
+      # "Grenander (Gamma)" = list(
+      #   est = "Grenander",
+      #   params = list(marg="Gamma", S_n_type="Cox PH")
+      # )
+      "Grenander (Theta, edge_corr='min')" = list(
         est = "Grenander",
-        params = list(marg="Theta", S_n_type="Cox PH")
+        params = list(marg="Theta", S_n_type="Cox PH", edge_corr="min")
       ),
-      "Grenander (Gamma)" = list(
+      "Grenander (Theta, edge_corr='split')" = list(
         est = "Grenander",
-        params = list(marg="Gamma", S_n_type="Cox PH")
+        params = list(marg="Theta", S_n_type="Cox PH", edge_corr="split")
       )
     )
   )
@@ -167,19 +174,13 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     surv_true = "Cox PH",
     sampling = "two-phase (6%)",
     estimator = list(
-      "Grenander (true nuisances)" = list(
+      "Grenander (Theta)" = list(
         est = "Grenander",
-        params = list(S_n_type="true", g_n_type="true",
-                      ci_type="regular", cf_folds=1, edge_corr="none",
-                      ecdf_type="true", deriv_type="m-spline",
-                      gamma_type="kernel", omega_n_type="estimated", marg="Theta")
+        params = list(marg="Theta", S_n_type="Cox PH")
       ),
-      "Grenander (est nuisances)" = list(
+      "Grenander (Gamma)" = list(
         est = "Grenander",
-        params = list(S_n_type="Cox PH", g_n_type="binning",
-                      ci_type="regular", cf_folds=1, edge_corr="none",
-                      ecdf_type="linear (mid)", deriv_type="m-spline",
-                      gamma_type="kernel", omega_n_type="estimated", marg="Theta")
+        params = list(marg="Gamma", S_n_type="Cox PH")
       )
     )
   )
@@ -197,25 +198,13 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     surv_true = "Cox PH",
     sampling = c("two-phase (72%)"),
     # sampling = c("iid", "two-phase (72%)", "two-phase (70% random)"),
-    temp_which = "Psi_1+Psi_2",
-    # temp_which = c("Psi_1","Psi_2","Psi_1+Psi_2"), # Gamma, beta_n
     test = list(
       "Slope (two-tailed)" = list(
         type = "test_2",
-        alt_type = "two-tailed",
+        alt_type = "two-tailed", # decr
         test_stat_only = FALSE,
-        params = list(var="asymptotic", ecdf_type="step", # "step" "linear (mid)"
-                      g_n_type="true", S_n_type="true", cf_folds=1, # Cox PH
-                      est_known_nuis=FALSE, omega_n_type="true", marg="Theta")
+        params = list(g_n_type="true", S_n_type="true", omega_n_type="true")
       )
-      # "Slope (decr)" = list(
-      #   type = "test_2",
-      #   alt_type = "decr",
-      #   test_stat_only = FALSE,
-      #   params = list(var="asymptotic", ecdf_type="step", # "step" "linear (mid)"
-      #                 g_n_type="binning", S_n_type="Cox PH", cf_folds=1,
-      #                 est_known_nuis=FALSE, omega_n_type="estimated")
-      # )
     )
   )
   

@@ -54,7 +54,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   if (estimator=="Grenander") {
     
     # LOD shift
-    lod12 <- min(dat_orig$a,na.rm=T)
+    a_min <- min(dat_orig$a,na.rm=T)
+    lod12 <- a_min
     if (params$lod_shift=="3/4") {
       lod34 <- log10(1.5*(10^lod12))
       dat_orig$a[dat_orig$a==lod12] <- lod34
@@ -62,6 +63,27 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       lod <- log10(2*(10^lod12))
       dat_orig$a[dat_orig$a==lod12] <- lod
     }
+    
+    # # If edge_corr==split, construct new data objects
+    # if (params$edge_corr=="split") {
+    #   
+    #   # Pull out records for which A=min(A)
+    #   indices_edge <- which(dat_orig$a==a_min)
+    #   indices_other <- c(1:length(dat_orig$a))[-indices_edge]
+    #   # dat_full <- dat_orig
+    #   dat_edge <- ss(dat_orig, indices_edge)
+    #   dat_orig <- ss(dat_orig, indices_other)
+    #   
+    #   # Set A=0 for edge
+    #   dat_edge$a <- rep(0,length(dat_edge$a))
+    #   
+    #   # Re-standardize weights
+    #   dat_edge$weights <- dat_edge$weights *
+    #     (length(dat_edge$a)/sum(dat_edge$weights))
+    #   dat_orig$weights <- dat_orig$weights *
+    #     (length(dat_orig$a)/sum(dat_orig$weights))
+    #   
+    # }
     
     # Rescale A to lie in [0,1]
     a_lims <- c(min(dat_orig$a,na.rm=T),max(dat_orig$a,na.rm=T))
@@ -80,12 +102,20 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
         n_unique <- length(unique(round(dat_orig$w[,i],rnd)))
       }
       dat_orig$w[,i] <- round(dat_orig$w[,i],rnd)
+      if (params$edge_corr=="split") {
+        dat_edge$w[,i] <- round(dat_edge$w[,i],rnd)
+      }
+    }
+    
+    # Obtain minimum value (excluding edge point mass)
+    if (params$edge_corr=="min") {
+      a_min2 <- min(dat_orig$a[dat_orig$a!=0],na.rm=T)
     }
     
     # Rescale points and remove points outside the range of A
     points_orig <- points
+    na_head <- sum(points<a_min)
     points <- round((points+a_shift)*a_scale, -log10(C$appx$a))
-    na_head <- sum(points<0)
     na_tail <- sum(points>1)
     if (na_head>0) {
       points <- points[-c(1:na_head)]
@@ -94,11 +124,11 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       points <- points[-c((length(points)-na_tail+1):length(points))]
     }
     
-    if (params$edge_corr=="spread") {
-      # !!!!! If needed, fix this to do two-sided spread
-      noise <- runif(length(dat_orig$a))*0.05
-      dat_orig$a <- ifelse(dat_orig$a==0, noise, dat_orig$a)
-    }
+    # if (params$edge_corr=="spread") {
+    #   # !!!!! If needed, fix this to do two-sided spread
+    #   noise <- runif(length(dat_orig$a))*0.05
+    #   dat_orig$a <- ifelse(dat_orig$a==0, noise, dat_orig$a)
+    # }
     
     # Setup
     dat <- ss(dat_orig, which(dat_orig$delta==1))
@@ -106,6 +136,11 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     # Construct regular Gamma_0 estimator
     if (params$cf_folds==1) {
+      
+      # !!!!! Alternative transformation
+      dat2 <- ss(dat, which(dat$a!=0))
+      G_n <- construct_Phi_n(dat2, type=params$ecdf_type)
+      G_n_inv <- construct_Phi_n(dat2, which="inverse", type=params$ecdf_type)
       
       # Construct component functions
       Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
@@ -198,17 +233,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       }
     }
     
-    # # !!!!!
-    # gcm2 <- approxfun(x=gcm$x.knots, y=gcm$y.knots, ties="ordered")
-    # plot_data <- data.frame(
-    #   x = rep(grid,3),
-    #   y = c(Psi_n(grid), gcm2(grid), dGCM(grid)),
-    #   which = rep(c("Psi_n (-1*Theta_os_n)","gcm","dGCM (-1*theta_n)"), each=101)
-    # )
-    # ggplot(plot_data, aes(x=x, y=y, color=which)) +
-    #   geom_line() +
-    #   theme(legend.position="bottom")
-    
     # Recompute functions on full dataset
     if (params$cf_folds>1) {
       # !!!!! Update to incorporate params$marg=="Theta"
@@ -248,30 +272,28 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     } else if (params$edge_corr=="min") {
       
       theta_n <- Vectorize(function(x) {
-        if (dir=="incr") {
-          if(x==0) {
-            theta_os_n_est
-          } else {
-            max(theta_os_n_est, theta_n_Gr(x))
-          }
+        # if(x==0) {
+        if(x==0 || x<a_min2) {
+          theta_os_n_est
         } else {
-          if(x==0) {
-            theta_os_n_est
+          if (dir=="incr") {
+            max(theta_os_n_est, theta_n_Gr(x))
           } else {
             min(theta_os_n_est, theta_n_Gr(x))
           }
         }
       })
       
-      gren_ests <- theta_n_Gr(points)
+      # gren_ests <- theta_n_Gr(points)
       gren_points <- sapply(c(1:length(points)), function(i) {
         if (dir=="incr") {
-          as.numeric(gren_ests[i]>theta_os_n_est)
+          # as.numeric(gren_ests[i]>theta_os_n_est)
+          as.numeric(theta_n(points[i])>theta_os_n_est)
         } else {
-          as.numeric(gren_ests[i]<theta_os_n_est)
+          # as.numeric(gren_ests[i]<theta_os_n_est)
+          as.numeric(theta_n(points[i])<theta_os_n_est)
         }
       })
-      gren_points[1] <- 0
       
     }
     
@@ -323,8 +345,10 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       } else if (params$edge_corr %in% c("weighted","min")) {
         ci_lo2 <- ests - 1.96*sqrt(sigma2_os_n_est/n_orig)
         ci_hi2 <- ests + 1.96*sqrt(sigma2_os_n_est/n_orig)
-        ci_lo <- (1-gren_points)*pmin(ci_lo,ci_lo2) + gren_points*ci_lo
-        ci_hi <- (1-gren_points)*pmax(ci_hi,ci_hi2) + gren_points*ci_hi
+        # ci_lo <- (1-gren_points)*pmin(ci_lo,ci_lo2) + gren_points*ci_lo
+        # ci_hi <- (1-gren_points)*pmax(ci_hi,ci_hi2) + gren_points*ci_hi
+        ci_lo <- (1-gren_points)*ci_lo2 + replace_na(gren_points*ci_lo, 0)
+        ci_hi <- (1-gren_points)*ci_hi2 + replace_na(gren_points*ci_hi, 0)
       }
       
     }

@@ -9,7 +9,7 @@
 # GitHub packages: tedwestling/ctsCausal, tedwestling/CFsurvival, 
 #                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
-  main_task = "run", # run update analysis.R
+  main_task = "analysis.R", # run update analysis.R
   which_sim = "estimation", # "estimation" "edge" "testing" "infl_fn_1 (temp)"
   level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
   # keep = c(1:3,7:9,16:18,22:24),
@@ -134,8 +134,8 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     alpha_3 = -2,
     dir = "decr",
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_A = c("Unif(0,1)", "Unif(0.3,0.7)"), # "N(0.5,0.01)", "N(0.5,0.04)"
-    edge = "none", # c("none", "expit 0.2")
+    distr_A = c("N(0.5,0.01)"), # "Unif(0.3,0.7)" "N(0.5,0.01)", "N(0.5,0.04)"
+    edge = c("expit 0.2"), # c("none", "expit 0.2")
     surv_true = c("Cox PH"), # "complex"
     sampling = "two-phase (72%)",
     estimator = list(
@@ -148,18 +148,18 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       #   est = "Grenander",
       #   params = list(marg="Theta", S_n_type="Cox PH")
       # ),
-      # "Grenander (Gamma)" = list(
-      #   est = "Grenander",
-      #   params = list(marg="Gamma", S_n_type="Cox PH")
-      # )
-      "Grenander (Theta, edge_corr='min')" = list(
+      "Grenander (Gamma_star, edge_corr='none')" = list(
         est = "Grenander",
-        params = list(marg="Theta", S_n_type="Cox PH", edge_corr="min")
+        params = list(marg="Gamma_star", S_n_type="Cox PH")
       ),
-      "Grenander (Theta, edge_corr='split')" = list(
+      "Grenander (Gamma_star, edge_corr='min')" = list(
         est = "Grenander",
-        params = list(marg="Theta", S_n_type="Cox PH", edge_corr="split")
+        params = list(marg="Gamma_star", S_n_type="Cox PH", edge_corr="min")
       )
+      # "Grenander (Theta, edge_corr='min')" = list(
+      #   est = "Grenander",
+      #   params = list(marg="Theta", S_n_type="Cox PH", edge_corr="min")
+      # )
     )
   )
   
@@ -259,6 +259,8 @@ if (cfg$main_task=="run") {
         "beta_n_var_hat", "create_val_list", "construct_Gamma_cf_k",
         "construct_Gamma_cf", "construct_pi_n", "theta_os_n", "sigma2_os_n",
         "ss", "construct_Theta_os_n", "construct_etastar_n",
+        "construct_g_n_star", "construct_alpha_star_n", "construct_eta_ss_n",
+        "construct_Gamma_os_n_star",
         
         "est_curve", "generate_data",
         "lambda", "one_simulation", "test_2"
@@ -721,7 +723,7 @@ if (FALSE) {
   
   # Filter data
   d <- sim$results
-  d %<>% filter(level_id==4)
+  d %<>% filter(level_id==8)
   
   # Set up vector containers
   theta_true <- c()

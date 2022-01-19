@@ -1858,3 +1858,103 @@ sigma2_os_n <- function(dat, pi_n, S_n, omega_n, theta_os_n_est, val=0) {
   )
   
 }
+
+
+
+#' Construct density ratio estimator g*_n
+#' 
+#' @param f_aIw_n Conditional density estimator returned by construct_f_aIw_n
+#' @param f_a_n Marginal density estimator returned by construct_f_a_n
+#' @return Density ratio estimator function
+construct_g_n_star <- function(f_aIw_n, f_a_n, z_n) {
+  
+  function(a,w) {
+    if (a==0) {
+      0 # !!!!! Test to see if this is needed
+    } else {
+      z_n * (f_aIw_n(a,w) / f_a_n(a))
+    }
+  }
+  
+}
+
+
+
+#' Construct nuisance estimator alpha*_n
+#' 
+#' @param dat !!!!!
+#' @param gcomp !!!!!
+#' @param z_n !!!!!
+#' @param vals !!!!!
+#' @return Nuisance estimator function
+construct_alpha_star_n <- function(dat, gcomp_n, z_n, vals=NA) {
+  
+  n_orig <- sum(dat$weights)
+  piece_1 <- dat$weights * as.integer(dat$a!=0) * gcomp_n(dat$a)
+  
+  fnc <- function(x) {
+    (1/(n_orig*z_n)) * sum(as.integer(dat$a<=x)*piece_1)
+  }
+  
+  return(construct_superfunc(fnc, aux=NA, vec=T, vals=vals))
+  
+}
+
+
+
+#' Construct nuisance estimator eta_ss_n
+#' 
+#' @param dat !!!!!
+#' @param S_n !!!!!
+#' @param z_n !!!!!
+#' @param vals !!!!!
+#' @return Nuisance estimator function
+construct_eta_ss_n <- function(dat, S_n, z_n, vals=NA) {
+  
+  n_orig <- sum(dat$weights)
+  piece_1 <- dat$weights * as.integer(dat$a!=0)
+  
+  fnc <- function(x,w) {
+    w_long <- as.data.frame(
+      matrix(rep(w,length(dat$a)), ncol=length(w), byrow=T)
+    )
+    (1/(n_orig*z_n)) * sum(
+      piece_1 * as.integer(dat$a<=x) * (1-S_n(rep(C$t_e,length(dat$a)),w_long,dat$a))
+    )
+  }
+  
+  return(construct_superfunc(fnc, aux=NA, vec=c(1,2), vals=vals))
+  
+}
+
+
+
+#' Construct Gamma_os_n_star primitive one-step estimator
+#' 
+#' @param x !!!!!
+construct_Gamma_os_n_star <- function(dat, omega_n, g_n_star, eta_ss_n, z_n, gcomp_n, alpha_star_n, vals=NA) {
+  
+  weights_i <- dat$weights
+  n_orig <- sum(weights_i)
+  a_i <- dat$a
+  w_i <- dat$w
+  piece_1 <- omega_n(dat$w,dat$a,dat$y_star,dat$delta_star) /
+    g_n_star(dat$a,dat$w)
+  piece_2 <- as.integer(a_i!=0) / z_n
+  piece_3 <- gcomp_n(a_i)
+  
+  # Remove large intermediate objects
+  objs <- c("dat", "omega_n", "g_n_star", "gcomp_n")
+  for (obj in objs) { rm(obj) }
+  
+  fnc <- function(x) {
+    (1/n_orig) * sum(weights_i * (
+      as.integer(a_i<=x)*piece_1 +
+        eta_ss_n(rep(x,nrow(w_i)),w_i) +
+        piece_2*(as.integer(a_i<=x)*piece_3-alpha_star_n(x))
+    ))
+  }
+  
+  return(construct_superfunc(fnc, aux=NA, vec=T, vals=vals))
+  
+}

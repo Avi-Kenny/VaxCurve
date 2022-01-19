@@ -14,7 +14,7 @@
   cfg2 <- list(
     analysis = "Moderna", # Janssen Moderna
     run_dqa = F,
-    run_debug = list(gren_var=T, objs=T),
+    run_debug = list(gren_var=F, objs=T),
     run_graphs = T
   )
   
@@ -59,7 +59,7 @@
       edge_corr=NA, omega_n_type="estimated", cf_folds=1, n_bins=0,
       marg=NA, lod_shift="3/4"
     )
-    C <- list(appx=list(t_e=1,w_tol=25,a=0.01)) # !!!!! a=0.001, w_tol=75
+    C <- list(appx=list(t_e=1,w_tol=25,a=0.01)) # !!!!! a=0.001
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
@@ -134,7 +134,7 @@
       edge_corr=NA, omega_n_type="estimated", cf_folds=1, n_bins=0,
       marg=NA, lod_shift="none"
     )
-    C <- list(appx=list(t_e=1,w_tol=25,a=0.01)) # !!!!! a=0.001, w_tol=75
+    C <- list(appx=list(t_e=1,w_tol=25,a=0.001)) # !!!!! a=0.001
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
@@ -160,8 +160,9 @@
       tid = c(1:10),
       map_row = c(1:10),
       S_n_type = rep("Super Learner",10),
-      marg = c("Gamma","Gamma","Gamma","Gamma","Theta",
-               "Gamma","Theta","Gamma","Theta","Gamma"),
+      marg = rep("Gamma_star", 10),
+      # marg = c("Gamma","Gamma","Gamma","Gamma","Theta",
+      #          "Gamma","Theta","Gamma","Theta","Gamma"),
       trim = rep(F,10)
     )
     
@@ -381,21 +382,21 @@ if (cfg2$run_dqa) {
 
 {
   
-  if (cfg2$params$trim) {
-    q02 <- quantile(dat_orig$a, na.rm=T, probs=0.02)[[1]]
-    if (length(which(dat_orig$a<q02))>0) {
-      indicies_to_keep <- c(1:length(dat_orig$a))[-(which(dat_orig$a<q02))]
-      dat_orig <- ss(dat_orig, indicies_to_keep)
-    }
-  }
+  # if (cfg2$params$trim) {
+  #   q02 <- quantile(dat_orig$a, na.rm=T, probs=0.02)[[1]]
+  #   if (length(which(dat_orig$a<q02))>0) {
+  #     indicies_to_keep <- c(1:length(dat_orig$a))[-(which(dat_orig$a<q02))]
+  #     dat_orig <- ss(dat_orig, indicies_to_keep)
+  #   }
+  # }
   
-  # !!!!! temporary
-  mrks <- c("Day29pseudoneutid50", "Day29pseudoneutid50", "Day29liveneutmn50")
-  if (cfg2$marker %in% mrks && cfg2$analysis=="Moderna") {
-    q98 <- quantile(dat_orig$a, na.rm=T, probs=0.98)[[1]]
-    indicies_to_keep <- c(1:length(dat_orig$a))[-(which(dat_orig$a>q98))]
-    dat_orig <- ss(dat_orig, indicies_to_keep)
-  }
+  # # !!!!! temporary
+  # mrks <- c("Day29pseudoneutid50", "Day29pseudoneutid50", "Day29liveneutmn50")
+  # if (cfg2$marker %in% mrks && cfg2$analysis=="Moderna") {
+  #   q98 <- quantile(dat_orig$a, na.rm=T, probs=0.98)[[1]]
+  #   indicies_to_keep <- c(1:length(dat_orig$a))[-(which(dat_orig$a>q98))]
+  #   dat_orig <- ss(dat_orig, indicies_to_keep)
+  # }
   
   # Archive original marker and lod*1/2 value (for plot)
   a_orig <- dat_orig$a[!is.na(dat_orig$a)]

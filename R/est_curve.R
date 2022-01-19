@@ -137,16 +137,26 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     # Construct regular Gamma_0 estimator
     if (params$cf_folds==1) {
       
-      # !!!!! Alternative transformation
+      # !!!!! New G_n
       dat2 <- ss(dat, which(dat$a!=0))
       G_n <- construct_Phi_n(dat2, type=params$ecdf_type)
       G_n_inv <- construct_Phi_n(dat2, which="inverse", type=params$ecdf_type)
+      n_orig <- length(dat_orig$delta)
+      z_n <- (1/n_orig) * sum(dat$weights * as.integer(dat$a!=0))
+      # !!!!!
       
       # Construct component functions
       Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
       Phi_n_inv <- construct_Phi_n(dat, which="inverse", type=params$ecdf_type)
       S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
       Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
+      
+      # !!!!! New G_n
+      gcomp_n <- construct_gcomp_n(dat_orig, vals=vlist$A_grid, S_n)
+      alpha_star_n <- construct_alpha_star_n(dat, gcomp_n, z_n, vals=NA)
+      eta_ss_n <- construct_eta_ss_n(dat, S_n, z_n, vals=NA)
+      # !!!!!
+      
       f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid,
                                    type=params$g_n_type, k=15)
       f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
@@ -159,6 +169,11 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       } else if (params$marg=="Gamma") {
         g_n <- construct_g_n(f_aIw_n, f_a_n)
         Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n)
+      } else if (params$marg=="Gamma_star") {
+        g_n_star <- construct_g_n_star(f_aIw_n, f_a_n, z_n)
+        Gamma_os_n_star <- construct_Gamma_os_n_star(dat, omega_n, g_n_star,
+                                                     eta_ss_n, z_n, gcomp_n,
+                                                     alpha_star_n, vals=NA)
       } else {
         stop("`params$marg` must equal either 'Theta' or 'Gamma'")
       }
@@ -205,6 +220,16 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       } else {
         Psi_n <- Vectorize(function(x) { -1 * Theta_os_n(x) })
       }
+    } else if (params$marg=="Gamma_star") {
+      if (dir=="incr") {
+        Psi_n <- Vectorize(function(x) {
+          Gamma_os_n_star(round(G_n_inv(x), -log10(C$appx$a)))
+        })
+      } else {
+        Psi_n <- Vectorize(function(x) {
+          -1 * Gamma_os_n_star(round(G_n_inv(x), -log10(C$appx$a)))
+        })
+      }
     }
     
     # Compute GCM and extract its derivative
@@ -230,6 +255,13 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
         theta_n_Gr <- Vectorize(function(x) { min(max(dGCM(x),0),1) })
       } else {
         theta_n_Gr <- Vectorize(function(x) { min(max(-1*dGCM(x),0),1) })
+      }
+    } else if (params$marg=="Gamma_star") {
+      if (dir=="incr") {
+        # !!!!! COnsolidate this by renaming G_n to Phi_n and G_n_inv to Phi_n_inv ?????
+        theta_n_Gr <- Vectorize(function(x) { min(max(dGCM(G_n(x)),0),1) })
+      } else {
+        theta_n_Gr <- Vectorize(function(x) { min(max(-1 * dGCM(G_n(x)),0),1) })
       }
     }
     
@@ -272,7 +304,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     } else if (params$edge_corr=="min") {
       
       theta_n <- Vectorize(function(x) {
-        # if(x==0) {
         if(x==0 || x<a_min2) {
           theta_os_n_est
         } else {
@@ -284,13 +315,10 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
         }
       })
       
-      # gren_ests <- theta_n_Gr(points)
       gren_points <- sapply(c(1:length(points)), function(i) {
         if (dir=="incr") {
-          # as.numeric(gren_ests[i]>theta_os_n_est)
           as.numeric(theta_n(points[i])>theta_os_n_est)
         } else {
-          # as.numeric(gren_ests[i]<theta_os_n_est)
           as.numeric(theta_n(points[i])<theta_os_n_est)
         }
       })

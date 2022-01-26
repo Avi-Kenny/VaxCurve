@@ -1,4 +1,108 @@
 
+# Debugging gamma_n CV selection of bandwidth
+if (F) {
+  
+  # Create pseudo-outcome dataframe
+  delta_prob <- mean(dat_orig$delta)
+  I_star <- dat$delta_star*as.integer(dat$y_star<=C$t_e)
+  po <- ((dat$weights*omega_n(dat$w,dat$a,dat$y_star,dat$delta_star)) /
+           f_aIw_n(dat$a,dat$w))^2
+  df <- data.frame(a=dat$a, po=po, I_star=I_star)
+  df %<>% filter(is.finite(po))
+  
+  # Select bandwidth via cross-validation
+  {
+    # CV prep
+    n_folds <- 5
+    folds <- sample(cut(c(1:nrow(df)), breaks=n_folds, labels=FALSE))
+    # bws <- seq(2*C$appx$a, 0.3, length.out=30)
+    bws <- seq(0.02,0.4,0.02)
+    # bws <- seq(2*0.001, 0.3, length.out=30)
+    
+    # Conduct CV
+    best <- list(bw=999, sum_sse=999)
+    for (bw in bws) {
+      sum_sse <- 0
+      for (i in c(1:n_folds)) {
+        df_train <- df[-which(folds==i),]
+        df_test <- df[which(folds==i),]
+        ks <- ksmooth(x=df_train$a, y=df_train$po, kernel="normal", bandwidth=bw)
+        reg <- Vectorize(function(a) {
+          index <- which.min(abs(a-ks$x))
+          return(ks$y[index])
+        })
+        sum_sse <- sum_sse + sum((reg(df_test$a)-df_test$po)^2, na.rm=T)
+      }
+      if (sum_sse<best$sum_sse || best$sum_sse==999) {
+        best$bw <- bw
+        best$sum_sse <- sum_sse
+      }
+      
+    }
+    
+  }
+  
+  # Construct optimal function from true data
+  ks <- ksmooth(x=df_train$a, y=df_train$po, kernel="normal",
+                bandwidth=best$bw)
+  reg <- Vectorize(function(a) {
+    index <- which.min(abs(a-ks$x))
+    return(ks$y[index])
+  })
+  
+  # Generate plots 1-3
+  plot_gamma1 <- ggplot(df, aes(x=a, y=po)) +
+    geom_point(alpha=0.3) +
+    ylim(c(0,10)) +
+    geom_line(data=data.frame(
+      a = seq(0,1,0.01),
+      po = reg(seq(0,1,0.01))
+    ),
+    color="forestgreen") +
+    labs(x=paste0("a (bw=",round(best$bw,4),")"))
+  ggsave(
+    filename = paste0("Moderna plots/debug_gamma_",
+                      Sys.getenv("SLURM_ARRAY_TASK_ID"),"_ylim(10).pdf"),
+    plot=plot_gamma1, device="pdf", width=6, height=4
+  )
+  plot_gamma2 <- plot_gamma1 + ylim(c(0,1))
+  ggsave(
+    filename = paste0("Moderna plots/debug_gamma_",
+                      Sys.getenv("SLURM_ARRAY_TASK_ID"),"_ylim(1).pdf"),
+    plot=plot_gamma2, device="pdf", width=6, height=4
+  )
+  plot_gamma3 <- plot_gamma1 + ylim(c(0,0.1))
+  ggsave(
+    filename = paste0("Moderna plots/debug_gamma_",
+                      Sys.getenv("SLURM_ARRAY_TASK_ID"),"_ylim(0.1).pdf"),
+    plot=plot_gamma3, device="pdf", width=6, height=4
+  )
+  plot_gamma4 <- plot_gamma1 + ylim(c(0,0.01))
+  ggsave(
+    filename = paste0("Moderna plots/debug_gamma_",
+                      Sys.getenv("SLURM_ARRAY_TASK_ID"),"_ylim(0.01).pdf"),
+    plot=plot_gamma4, device="pdf", width=6, height=4
+  )
+  
+  # Generate plot 5
+  mult_factor <- Vectorize(function(a) {
+    delta_prob*(f_a_delta1_n(a)/f_a_n(a))
+  })
+  plot_gamma5 <- ggplot(data.frame(
+    x = seq(0,1,0.01),
+    y = mult_factor(seq(0,1,0.01))
+  ), aes(x=x, y=y)) +
+    geom_line()
+  ggsave(
+    filename = paste0("Moderna plots/debug_gamma2_",
+                      Sys.getenv("SLURM_ARRAY_TASK_ID"),".pdf"),
+    plot=plot_gamma5, device="pdf", width=6, height=4
+  )
+  
+}
+
+
+
 # Old infl_fn_1
 if (F) {
   

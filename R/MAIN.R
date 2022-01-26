@@ -10,10 +10,10 @@
 #                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
   main_task = "analysis.R", # run update analysis.R
-  which_sim = "estimation", # "estimation" "edge" "testing" "infl_fn_1 (temp)"
-  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
+  which_sim = "testing", # "estimation" "edge" "testing" "infl_fn_1 (temp)"
+  level_set_which = "level_set_testing_1", # level_set_estimation_1 level_set_testing_1
   # keep = c(1:3,7:9,16:18,22:24),
-  num_sim = 500,
+  num_sim = 1000,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm", "tidyr"),
@@ -187,24 +187,35 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Testing: compare all methods
   level_set_testing_1 <- list(
-    n = 1000,
+    n = c(100,200,400,800), # 1000
     # n = c(1000,2000),
     alpha_3 = 0,
     # alpha_3 = c(0,-0.25,-0.5),
     dir = "decr",
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
     distr_A = "Unif(0,1)",
+    # distr_A = c("Unif(0,1)", "N(0.5,0.01)"),
     edge = "none",
     surv_true = "Cox PH",
-    sampling = c("two-phase (72%)"),
+    sampling = c("iid"),
+    # sampling = c("iid", "cycle", "two-phase (50%)"), # "two-phase (50% random)"
     # sampling = c("iid", "two-phase (72%)", "two-phase (70% random)"),
     test = list(
-      "Slope (two-tailed)" = list(
+      "Slope (two-tailed, asy)" = list(
         type = "test_2",
         alt_type = "two-tailed", # decr
         test_stat_only = FALSE,
+        # params = list(g_n_type="binning", S_n_type="Cox PH", omega_n_type="estimated")
         params = list(g_n_type="true", S_n_type="true", omega_n_type="true")
       )
+      # "Slope (two-tailed, boot)" = list(
+      #   type = "test_2",
+      #   alt_type = "two-tailed", # decr
+      #   test_stat_only = FALSE,
+      #   # params = list(g_n_type="binning", S_n_type="Cox PH", omega_n_type="estimated")
+      #   params = list(g_n_type="true", S_n_type="true", omega_n_type="true",
+      #                 var="boot", boot_reps=100)
+      # )
     )
   )
   

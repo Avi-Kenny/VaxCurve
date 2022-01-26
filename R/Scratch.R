@@ -1,4 +1,221 @@
 
+# Debugging influence functions
+if (F) {
+  
+  # Construct dataframe
+  df <- subset(sim$results, select=c(
+    n, sampling, if1_mean, if2_mean, r_1n, r_2n, Psi_1_est, Psi_2_est
+  ))
+  
+  # Scatterplots (Psi_1)
+  ggplot(df, aes(x=Psi_1_est, y=if1_mean)) + geom_point(alpha=0.3) +
+    facet_grid(rows=dplyr::vars(sampling), cols=dplyr::vars(n)) +
+    xlim(c(-2e-3,2e-3)) + ylim(c(-2e-3,2e-3))
+  ggplot(df, aes(x=Psi_1_est, y=r_1n)) + geom_point(alpha=0.3) +
+    facet_grid(rows=dplyr::vars(sampling), cols=dplyr::vars(n)) +
+    xlim(c(-2e-3,2e-3)) + ylim(c(-2e-3,2e-3))
+  ggplot(df, aes(x=if1_mean, y=r_1n)) + geom_point(alpha=0.3) +
+    facet_grid(rows=dplyr::vars(sampling), cols=dplyr::vars(n)) +
+    xlim(c(-2e-3,2e-3)) + ylim(c(-2e-3,2e-3))
+  
+  # Scatterplots (Psi_2)
+  ggplot(df, aes(x=Psi_2_est, y=if2_mean)) + geom_point(alpha=0.3) +
+    facet_grid(rows=dplyr::vars(sampling), cols=dplyr::vars(n)) +
+    xlim(c(-2e-3,2e-3)) + ylim(c(-2e-3,2e-3))
+  ggplot(df, aes(x=Psi_2_est, y=r_2n)) + geom_point(alpha=0.3) +
+    facet_grid(rows=dplyr::vars(sampling), cols=dplyr::vars(n)) +
+    xlim(c(-2e-3,2e-3)) + ylim(c(-2e-3,2e-3))
+  ggplot(df, aes(x=if2_mean, y=r_2n)) + geom_point(alpha=0.3) +
+    facet_grid(rows=dplyr::vars(sampling), cols=dplyr::vars(n)) +
+    xlim(c(-2e-3,2e-3)) + ylim(c(-2e-3,2e-3))
+  
+  # Scatterplots (both)
+  ggplot(df, aes(x=Psi_1_est, y=Psi_2_est)) + geom_point(alpha=0.3) +
+    facet_grid(rows=dplyr::vars(sampling), cols=dplyr::vars(n)) +
+    xlim(c(-2e-3,2e-3)) + ylim(c(-2e-3,2e-3))
+  
+  # Remainder plots
+  ggplot(df, aes(x=n, y=sqrt(n)*r_1n)) + geom_point(alpha=0.3)
+  ggplot(df, aes(x=n, y=sqrt(n)*r_2n)) + geom_point(alpha=0.3)
+  
+  # Toy example: sample variance
+  var_ests <- c()
+  if_means <- c()
+  r_ns <- c()
+  for (n in c(100,200,400,800)) {
+    for (i in c(1:100)) {
+      x <- rnorm(n)
+      m <- mean(x)
+      var_est <- mean((x-m)^2) - 1
+      if_mean <- mean(
+        # (x-0)^2 - 1
+        (x-m)^2 - (var_est+1)
+      )
+      r_n <- var_est - if_mean
+      var_ests <- c(var_ests, var_est)
+      if_means <- c(if_means, if_mean)
+      r_ns <- c(r_ns, r_n)
+    }
+  }
+  ns <- rep(c(100,200,400,800), each=100)
+  df2 <- data.frame(var_est=var_ests, if_mean=if_means,
+                    r_n=r_ns, n=ns)
+  
+  # Toy example: scatterplots
+  ggplot(df2, aes(x=var_est, y=if_mean)) + geom_point(alpha=0.3) +
+    facet_grid(cols=dplyr::vars(n)) + ylim(c(-1e-4,1e-4))
+  ggplot(df2, aes(x=var_est, y=r_n)) + geom_point(alpha=0.3) +
+    facet_grid(cols=dplyr::vars(n))
+  ggplot(df2, aes(x=if_mean, y=r_n)) + geom_point(alpha=0.3) +
+    facet_grid(cols=dplyr::vars(n))
+  ggplot(df2, aes(x=n, y=sqrt(n)*r_n)) + geom_point(alpha=0.3)
+  
+}
+
+# Plotting VE
+if (F) {
+  
+  x <- seq(0,1,0.1)
+  ve <- (function(x) {
+    0.8 + 0.15*x
+  })(x)
+  ve_to_risk <- Vectorize(function(ve) {
+    risk_p <- 0.065 # Moderna
+    # risk_p <- 0.048 # Janssen
+    risk_p*(1-ve)
+  })
+  risk <- ve_to_risk(ve)
+  
+  ggplot(data.frame(x=x,y=ve), aes(x=x,y=y)) +
+    geom_line() +
+    ylim(c(0,1)) +
+    labs(y="VE")
+  ggplot(data.frame(x=x,y=(1-ve)), aes(x=x,y=y)) +
+    geom_line() +
+    ylim(c(0,1)) +
+    labs(y="1-VE")
+  ggplot(data.frame(x=x,y=(1-ve)), aes(x=x,y=y)) +
+    geom_line() +
+    scale_y_continuous(trans='log10') +
+    # ylim(c(0,1)) +
+    labs(y="1-VE (log scale))")
+  ggplot(data.frame(x=x,y=risk), aes(x=x,y=y)) +
+    geom_line() +
+    ylim(c(0,0.1)) +
+    labs(y="Risk")
+  
+}
+
+# Debugging eta_n runtime
+if (F) {
+  
+  params = list(g_n_type="true", S_n_type="true", omega_n_type="true")
+  C <- list(
+    points=seq(0,1,0.02), alpha_1=0.5, alpha_2=0.7, t_e=200,
+    appx=list(t_e=10, w_tol=25, a=0.01)
+  )
+  L <- list(
+    n=200, alpha_3=-2, dir="decr", sampling="two-phase (72%)",
+    sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5),
+    distr_A="Unif(0,1)", edge="expit 0.2", surv_true="Cox PH"
+  )
+  dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+                            L$sc_params, L$sampling, L$dir)
+  
+  # Setup
+  .default_params <- list(
+    var="asymptotic", ecdf_type="step", g_n_type="binning",
+    S_n_type="Super Learner", omega_n_type="estimated", cf_folds=1
+  )
+  for (i in c(1:length(.default_params))) {
+    if (is.null(params[[names(.default_params)[i]]])) {
+      params[[names(.default_params)[i]]] <- .default_params[[i]]
+    }
+  }
+  a_lims <- c(min(dat_orig$a,na.rm=T),max(dat_orig$a,na.rm=T))
+  a_shift <- -1 * a_lims[1]
+  a_scale <- 1/(a_lims[2]-a_lims[1])
+  dat_orig$a <- (dat_orig$a+a_shift)*a_scale
+  dat_orig$a <- round(dat_orig$a, -log10(C$appx$a))
+  for (i in c(1:length(dat_orig$w))) {
+    rnd <- 8
+    tol <- C$appx$w_tol
+    n_unique <- tol + 1
+    while(n_unique>tol) {
+      rnd <- rnd - 1
+      n_unique <- length(unique(round(dat_orig$w[,i],rnd)))
+    }
+    dat_orig$w[,i] <- round(dat_orig$w[,i],rnd)
+  }
+  n_orig <- length(dat_orig$delta)
+  dat <- ss(dat_orig, which(dat_orig$delta==1))
+  weights <- dat$weights
+  vlist <- create_val_list(dat, C$appx)
+  S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
+  Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
+  
+  # !!!!! New constructor: omega_n
+  construct_omega_n <- function(vals=NA, S_n, Sc_n, type="estimated") {
+    H_n <- function(t,w,a) { -1 * log(S_n(t,w,a)) }
+    fnc <- function(w,a,y_star,delta_star) {
+      k <- round(min(y_star,C$t_e))
+      if (k==0) { integral <- 0 } else {
+        i <- c(1:k)
+        w_long <- as.data.frame(matrix(rep(w,length(i)), ncol=length(w), byrow=T))
+        a_long <- rep(a,length(i))
+        integral <- 0.5 * sum(
+          ( H_n(i,w_long,a_long) - H_n(i-1,w_long,a_long) ) * (
+            ( S_n(i,w_long,a_long) * Sc_n(i,w_long,a_long) )^-1 +
+              ( S_n(i-1,w_long,a_long) * Sc_n(i-1,w_long,a_long))^-1
+          )
+        )
+      }
+
+      return(S_n(C$t_e,w,a) * (
+        (delta_star*as.integer(y_star<=C$t_e))/(S_n(k,w,a)*Sc_n(k,w,a))-integral
+      ))
+    }
+    return(construct_superfunc(fnc, aux=NA, vec=c(2,1,1,1), vals=vals))
+  }
+
+  # !!!!! New constructor: eta_n
+  construct_eta_n <- function(dat, vals=NA, S_n) {
+    n_orig <- sum(dat$weights)
+    fnc <- function(x,w) {
+      w_long <- as.data.frame(matrix(rep(w,length(dat$a)), ncol=length(w), byrow=T))
+      return(
+        (1/n_orig) * sum(
+          dat$weights * as.integer(dat$a<=x)*(1-S_n(rep(C$t_e,length(dat$a)),w_long,dat$a))
+        )
+      )
+    }
+    return(construct_superfunc(fnc, aux=NA, vec=c(1,2), vals=vals))
+  }
+  
+  # !!!!! New constructor calls
+  eta_n <- construct_eta_n(dat, vlist$AW_grid, S_n)
+  omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n,
+                               type=params$omega_n_type)
+  
+  time_omega_n <- system.time({
+    for (x in seq(0,1,0.01)) {
+      for (w1 in seq(0,1,0.1)) {
+        z <- omega_n(c(w1,0),x,10,0) # C$t_e
+      }
+    }
+  })
+  time_eta_n <- system.time({
+    for (x in seq(0,1,0.01)) {
+      for (w1 in seq(0,1,0.1)) {
+        z <- eta_n(x,c(w1,0))
+      }
+    }
+  })
+  print(time_omega_n)
+  print(time_eta_n)
+  
+}
+
 # Cross-validation wrapper
 if (F) {
   

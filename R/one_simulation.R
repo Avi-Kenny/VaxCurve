@@ -52,6 +52,74 @@ if (cfg$which_sim=="estimation") {
 
 
 
+##############################.
+##### Hypothesis testing #####
+##############################.
+
+if (cfg$which_sim=="testing") {
+  
+  #' Run a single simulation (testing)
+  #'
+  #' @return A list that gives the result of the hypothesis test
+  
+  one_simulation <- function() {
+    
+    # Generate dataset
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+                              L$sc_params, L$sampling, L$dir)
+    # dat_orig <- generate_data(400, 0, "Unif(0,1)", "none", "Cox PH",
+    #                           list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5),
+    #                           "cycle", "decr")
+    
+    msg <- "Direction of monotonicity does not align with test type"
+    if (L$dir=="incr" && L$test$alt_type=="decr") { stop(msg) }
+    if (L$dir=="decr" && L$test$alt_type=="incr") { stop(msg) }
+    
+    # Perform hypothesis test
+    test_results <- use_method(L$test$type, list(
+      dat_orig = dat_orig,
+      alt_type = L$test$alt_type,
+      params = L$test$params,
+      test_stat_only = L$test$test_stat_only
+    ))
+    
+    # Return results
+    return (list(
+      "reject" = test_results$reject,
+      "p_val" = test_results$p_val,
+      "beta_n" = test_results$beta_n,
+      "sd_n" = test_results$sd_n,
+      "var_n" = test_results$var_n,
+      "if1_mean" = test_results$if1_mean, # !!!!!
+      "if2_mean" = test_results$if2_mean, # !!!!!
+      "r_1n" = test_results$r_1n, # !!!!!
+      "r_2n" = test_results$r_2n, # !!!!!
+      # "Psi_1_var_est" = test_results$Psi_1_var_est, # !!!!!
+      # "sum12_est" = test_results$sum12_est, # !!!!!
+      # "sum12_var_est" = test_results$sum12_var_est, # !!!!!
+      "Psi_1_est" = test_results$Psi_1_est, # !!!!!
+      "Psi_2_est" = test_results$Psi_2_est, # !!!!!
+      "Psi_1_var_est" = test_results$Psi_1_var_est, # !!!!!
+      "Psi_2_var_est" = test_results$Psi_2_var_est, # !!!!!
+      "Psi_12_covar" = test_results$Psi_12_covar, # !!!!!
+      "p_val_Psi_1" = test_results$p_val_Psi_1, # !!!!!
+      "p_val_Psi_2" = test_results$p_val_Psi_2 # !!!!!
+      # "p_val_sum12" = test_results$p_val_sum12, # !!!!!
+      # "p_val_sum12b" = test_results$p_val_sum12b, # !!!!!
+      # "p_val_alt" = test_results$p_val_alt, # !!!!!
+      # "reject_Psi_1" = test_results$reject_Psi_1, # !!!!!
+      # "reject_Psi_2" = test_results$reject_Psi_2, # !!!!!
+      # "reject_sum12" = test_results$reject_sum12, # !!!!!
+      # "reject_sum12b" = test_results$reject_sum12b, # !!!!!
+      # "reject_alt" = test_results$reject_alt # !!!!!
+    ))
+    
+  }
+  
+}
+
+
+
 ########################################.
 ##### Estimation (edge value only) #####
 ########################################.
@@ -61,7 +129,7 @@ if (cfg$which_sim=="edge") {
   #' Run a single simulation (estimation; only the portions related to the edge)
   #'
   #' @return A list with edge estimates
-
+  
   one_simulation <- function() {
     
     # !!!!! Update function calls (htab-->superfunc)
@@ -101,66 +169,9 @@ if (cfg$which_sim=="edge") {
 
 
 
-##############################.
-##### Hypothesis testing #####
-##############################.
-
-if (cfg$which_sim=="testing") {
-  
-  #' Run a single simulation (testing)
-  #'
-  #' @return A list that gives the result of the hypothesis test
-  
-  one_simulation <- function() {
-    
-    # Generate dataset
-    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
-                              L$sc_params, L$sampling, L$dir)
-    
-    msg <- "Direction of monotonicity does not align with test type"
-    if (L$dir=="incr" && L$test$alt_type=="decr") { stop(msg) }
-    if (L$dir=="decr" && L$test$alt_type=="incr") { stop(msg) }
-    
-    # Perform hypothesis test
-    test_results <- use_method(L$test$type, list(
-      dat_orig = dat_orig,
-      alt_type = L$test$alt_type,
-      params = L$test$params,
-      test_stat_only = L$test$test_stat_only
-    ))
-    
-    # Return results
-    return (list(
-      "reject" = test_results$reject,
-      "p_val" = test_results$p_val,
-      "beta_n" = test_results$beta_n,
-      "sd_n" = test_results$sd_n,
-      "var_n" = test_results$var_n,
-      "sum12_est" = test_results$sum12_est, # !!!!!
-      "sum12_var_est" = test_results$sum12_var_est, # !!!!!
-      "Psi_1_est" = test_results$Psi_1_est, # !!!!!
-      "Psi_2_est" = test_results$Psi_2_est, # !!!!!
-      "p_val_Psi_1" = test_results$p_val_Psi_1, # !!!!!
-      "p_val_Psi_2" = test_results$p_val_Psi_2, # !!!!!
-      "p_val_sum12" = test_results$p_val_sum12, # !!!!!
-      "p_val_sum12b" = test_results$p_val_sum12b, # !!!!!
-      "p_val_alt" = test_results$p_val_alt, # !!!!!
-      "reject_Psi_1" = test_results$reject_Psi_1, # !!!!!
-      "reject_Psi_2" = test_results$reject_Psi_2, # !!!!!
-      "reject_sum12" = test_results$reject_sum12, # !!!!!
-      "reject_sum12b" = test_results$reject_sum12b, # !!!!!
-      "reject_alt" = test_results$reject_alt # !!!!!
-    ))
-    
-  }
-  
-}
-
-
-
-##############################.
-##### Hypothesis testing #####
-##############################.
+#####################################.
+##### Hypothesis testing (temp) #####
+#####################################.
 
 if (cfg$which_sim=="infl_fn_1 (temp)") {
   

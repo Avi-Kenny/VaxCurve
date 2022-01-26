@@ -59,39 +59,22 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     if (params$lod_shift=="3/4") {
       lod34 <- log10(1.5*(10^lod12))
       dat_orig$a[dat_orig$a==lod12] <- lod34
+      a_min <- lod34
     } else if (params$lod_shift=="1") {
       lod <- log10(2*(10^lod12))
       dat_orig$a[dat_orig$a==lod12] <- lod
+      a_min <- lod
     }
     
-    # # If edge_corr==split, construct new data objects
-    # if (params$edge_corr=="split") {
-    #   
-    #   # Pull out records for which A=min(A)
-    #   indices_edge <- which(dat_orig$a==a_min)
-    #   indices_other <- c(1:length(dat_orig$a))[-indices_edge]
-    #   # dat_full <- dat_orig
-    #   dat_edge <- ss(dat_orig, indices_edge)
-    #   dat_orig <- ss(dat_orig, indices_other)
-    #   
-    #   # Set A=0 for edge
-    #   dat_edge$a <- rep(0,length(dat_edge$a))
-    #   
-    #   # Re-standardize weights
-    #   dat_edge$weights <- dat_edge$weights *
-    #     (length(dat_edge$a)/sum(dat_edge$weights))
-    #   dat_orig$weights <- dat_orig$weights *
-    #     (length(dat_orig$a)/sum(dat_orig$weights))
-    #   
-    # }
-    
     # Rescale A to lie in [0,1]
+    # !!!!! Functionize and refactor w/ test_2.R
     a_lims <- c(min(dat_orig$a,na.rm=T),max(dat_orig$a,na.rm=T))
     a_shift <- -1 * a_lims[1]
     a_scale <- 1/(a_lims[2]-a_lims[1])
     dat_orig$a <- (dat_orig$a+a_shift)*a_scale
     
     # Round values
+    # !!!!! Functionize and refactor w/ test_2.R
     dat_orig$a <- round(dat_orig$a, -log10(C$appx$a))
     for (i in c(1:length(dat_orig$w))) {
       rnd <- 8
@@ -102,9 +85,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
         n_unique <- length(unique(round(dat_orig$w[,i],rnd)))
       }
       dat_orig$w[,i] <- round(dat_orig$w[,i],rnd)
-      if (params$edge_corr=="split") {
-        dat_edge$w[,i] <- round(dat_edge$w[,i],rnd)
-      }
     }
     
     # Obtain minimum value (excluding edge point mass)
@@ -123,12 +103,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     if (na_tail>0) {
       points <- points[-c((length(points)-na_tail+1):length(points))]
     }
-    
-    # if (params$edge_corr=="spread") {
-    #   # !!!!! If needed, fix this to do two-sided spread
-    #   noise <- runif(length(dat_orig$a))*0.05
-    #   dat_orig$a <- ifelse(dat_orig$a==0, noise, dat_orig$a)
-    # }
     
     # Setup
     dat <- ss(dat_orig, which(dat_orig$delta==1))
@@ -175,7 +149,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
                                                      eta_ss_n, z_n, gcomp_n,
                                                      alpha_star_n, vals=NA)
       } else {
-        stop("`params$marg` must equal either 'Theta' or 'Gamma'")
+        stop("`params$marg` must be one of c('Theta', 'Gamma', 'Gamma_star'")
       }
       
       # Construct one-step edge estimator
@@ -267,7 +241,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     # Recompute functions on full dataset
     if (params$cf_folds>1) {
-      # !!!!! Update to incorporate params$marg=="Theta"
+      # !!!!! Update to incorporate params$marg %in% c("Theta", "Gamma_star")
       S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
       Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
       f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid,

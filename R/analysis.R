@@ -29,11 +29,14 @@
                     "Anti RBD IgG (BAU/ml) (=s)",
                     "Phagocytic Score (=s)",
                     "Pseudovirus-nAb ID50 (IU50/ml) (=s)")
-    cfg2$title <- c("999","999","999","999")
+    cfg2$title <- c("Binding Antibody to Spike",
+                    "Binding Antibody to RBD",
+                    "Phagocytic Score",
+                    "PsV Neutralization 50% Titer")
     cfg2$day <- c(29)
     cfg2$t_e <- c(66)
     cfg2$dataset <- c(
-      "janssen_pooled_real_data_processed_with_riskscore.csv",
+      "janssen_pooled_realbAb_data_processed_with_riskscore.csv",
       "janssen_pooled_realADCP_data_processed_with_riskscore.csv",
       "janssen_pooled_realPsV_data_processed_with_riskscore.csv"
     )
@@ -57,9 +60,9 @@
       S_n_type=NA, g_n_type="binning", ecdf_type="linear (mid)",
       deriv_type="m-spline", gamma_type="kernel", ci_type="regular",
       edge_corr=NA, omega_n_type="estimated", cf_folds=1, n_bins=0,
-      marg=NA, lod_shift="3/4"
+      marg=NA, lod_shift="none" # 3/4
     )
-    C <- list(appx=list(t_e=1,w_tol=25,a=0.01)) # !!!!! a=0.001
+    C <- list(appx=list(t_e=1,w_tol=25,a=0.001)) # !!!!! a=0.001
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
@@ -85,8 +88,8 @@
       tid = c(1:4),
       map_row = c(1:4),
       S_n_type = rep("Super Learner",4),
-      marg = rep("Theta",4), # c("Theta", "Gamma")
-      trim = rep(F,4) # c(T,F)
+      marg = rep("Gamma_star",4),
+      trim = rep(F,4)
     )
     
   } else if (cfg2$analysis=="Moderna") {
@@ -161,8 +164,6 @@
       map_row = c(1:10),
       S_n_type = rep("Super Learner",10),
       marg = rep("Gamma_star", 10),
-      # marg = c("Gamma","Gamma","Gamma","Gamma","Theta",
-      #          "Gamma","Theta","Gamma","Theta","Gamma"),
       trim = rep(F,10)
     )
     
@@ -174,7 +175,7 @@
   
   # Set config based on local vs. cluster
   if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
-    cfg2$tid <- 9
+    cfg2$tid <- 1
     cfg2$dataset <- paste0(cfg2$folder_cluster,cfg2$dataset)
   } else {
     cfg2$tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
@@ -619,17 +620,6 @@ if (cfg2$run_graphs) {
   }
   
 }
-
-
-
-# Component function check: conditional survival function
-# !!!!! Update
-
-# Component function check: conditional distribution
-# !!!!! Update
-
-# Component function check: marginal distribution
-# !!!!! Update
 
 
 

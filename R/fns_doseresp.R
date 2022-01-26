@@ -201,17 +201,32 @@ construct_superfunc <- function(fnc, aux=NA, vec=TRUE, vals=NA, rnd=NA) {
 #'     calculated separately
 Pi <- function(sampling, delta_star, y_star, w) {
   
+  # # !!!!!
+  # m <- 10^6
+  # w <- list(w1 = sample(seq(0,1,0.1), size=m, replace=T),
+  #           w2 = rbinom(m, size=1, prob=0.5))
+  
   if (sampling=="iid") {
     return(rep(1, length(y_star)))
   } else if (sampling=="two-phase (70% random)") {
     return(rep(0.7, length(y_star)))
+  } else if (sampling=="two-phase (50% random)") {
+    return(rep(0.5, length(y_star)))
+  } else if (sampling=="two-phase (25% random)") {
+    return(rep(0.25, length(y_star)))
   } else if (sampling=="two-phase (6% random)") {
     return(rep(0.06, length(y_star)))
+  } else if (sampling=="cycle") {
+    return(rep(c(0.8,0.6,0.4,0.2), length.out=length(y_star)))
   } else {
     if (sampling=="two-phase (6%)") {
       pi_w <- function(w) { expit(w$w1+w$w2-3.85) }
     } else if (sampling=="two-phase (72%)") {
       pi_w <- function(w) { expit(w$w1+w$w2-0.1) }
+    } else if (sampling=="two-phase (50%)") {
+      pi_w <- function(w) { expit(w$w1+w$w2-1) }
+    } else if (sampling=="two-phase (25%)") {
+      pi_w <- function(w) { expit(w$w1+w$w2-2.2) }
     }
     ev <- as.integer(delta_star==1 & y_star<=200)
     return(ev + (1-ev)*pi_w(w))
@@ -382,8 +397,12 @@ construct_S_n <- function(dat, vals, type, csf=F, return_model=F) {
       r[[length(w)+1]] <- which(abs(a-newX[["a"]])<1e-8)
       row <- Reduce(intersect, r)
       col <- which.min(abs(t-pred$time.interest))
-      if (length(row)!=1) { stop("Error in construct_S_n (B)") }
-      if (length(col)!=1) { stop("Error in construct_S_n (C)") }
+      if (length(row)!=1) {
+        stop(paste0("Error in construct_S_n (B); ", "t=",t,",w=",w,",a=",a,""))
+      }
+      if (length(col)!=1) {
+        stop(paste0("Error in construct_S_n (C); ", "t=",t,",w=",w,",a=",a,""))
+      }
       return(pred$survival[row,col])
     }
     
@@ -431,8 +450,12 @@ construct_S_n <- function(dat, vals, type, csf=F, return_model=F) {
       }
       row <- Reduce(intersect, r)
       col <- which.min(abs(t-new.times))
-      if (length(row)!=1) { stop("Error in construct_S_n (B)") }
-      if (length(col)!=1) { stop("Error in construct_S_n (C)") }
+      if (length(row)!=1) {
+        stop(paste0("Error in construct_S_n (B); ", "t=",t,",w=",w,",a=",a,""))
+      }
+      if (length(col)!=1) {
+        stop(paste0("Error in construct_S_n (C); ", "t=",t,",w=",w,",a=",a,""))
+      }
       return(srv_pred[row,col])
     }
     
@@ -855,11 +878,7 @@ construct_gamma_n <- function(dat_orig, dat, vals=NA, type, omega_n, f_aIw_n,
                f_aIw_n(dat$a,dat$w))^2
   
   # Create dataframe for regression
-  df <- data.frame(
-    a=dat$a,
-    po=po,
-    I_star=I_star
-  )
+  df <- data.frame(a=dat$a, po=po, I_star=I_star)
   
   # Remove outliers to prevent errors (revisit this)
   df %<>% filter(is.finite(po))
@@ -871,12 +890,12 @@ construct_gamma_n <- function(dat_orig, dat, vals=NA, type, omega_n, f_aIw_n,
   # Run regression
   if (type=="cubic") {
     
-    model <- lm(po~a+I(a^2)+I(a^3), data=df)
-    coeff <- as.numeric(model$coefficients)
-    
-    reg <- function(a) {
-      coeff[1] + coeff[2]*a + coeff[3]*(a^2) + coeff[4]*(a^3)
-    }
+    # model <- lm(po~a+I(a^2)+I(a^3), data=df)
+    # coeff <- as.numeric(model$coefficients)
+    # 
+    # reg <- function(a) {
+    #   coeff[1] + coeff[2]*a + coeff[3]*(a^2) + coeff[4]*(a^3)
+    # }
 
   } else if (type=="kernel") {
     
@@ -885,7 +904,8 @@ construct_gamma_n <- function(dat_orig, dat, vals=NA, type, omega_n, f_aIw_n,
       # CV prep
       n_folds <- 5
       folds <- sample(cut(c(1:nrow(df)), breaks=n_folds, labels=FALSE))
-      bws <- seq(2*C$appx$a, 0.3, length.out=30)
+      # bws <- seq(2*C$appx$a, 0.3, length.out=30)
+      bws <- seq(0.02,0.4,0.02)
       
       # Conduct CV
       best <- list(bw=999, sum_sse=999)
@@ -1208,11 +1228,11 @@ construct_eta_n <- function(dat, vals=NA, S_n) {
   n_orig <- sum(dat$weights)
   
   fnc <- function(x,w) {
-    # .count <<- .count+1 # !!!!!
+    
     w_long <- as.data.frame(
       matrix(rep(w,length(dat$a)), ncol=length(w), byrow=T)
     )
-    
+
     return(
       (1/n_orig) * sum(
         dat$weights * as.integer(dat$a<=x) *
@@ -1238,13 +1258,6 @@ construct_etastar_n <- function(S_n, vals=NA) {
   
   fnc <- function(x,w) {
     x <- round(x,-log10(C$appx$a))
-    # if (x<=0.2) {
-    #   integral <- 0
-    # } else {
-    #   integral <- sum(sapply(seq(0.2,x,C$appx$a), function(a) {
-    #     C$appx$a * S_n(C$t_e, w, round(a,-log10(C$appx$a)))
-    #   }))
-    # }
     if (x==0) {
       integral <- 0
     } else {
@@ -1304,7 +1317,6 @@ construct_Theta_os_n <- function(dat, vals=NA, omega_n, f_aIw_n, etastar_n) {
   
   fnc <- function(x) {
     (1/n_orig) * sum(weights_i * (
-      # as.integer(a_i<=x&0.2<=x) * piece_1 + etastar_n(rep(x,nrow(w_i)),w_i)
       as.integer(a_i<=x) * piece_1 + etastar_n(rep(x,nrow(w_i)),w_i)
     ))
   }
@@ -1449,7 +1461,7 @@ construct_infl_fn_1 <- function(dat, Gamma_os_n, Phi_n, lambda_2,
   a_j <- dat$a
   
   rho_n <- function(a,x) {
-    (1/n_orig)*sum(
+    (1/n_orig) * sum(
       weights_j * (Phi_n(a))^x * Gamma_os_n(round(a,-log10(C$appx$a)))
     )
   }
@@ -1866,14 +1878,12 @@ sigma2_os_n <- function(dat, pi_n, S_n, omega_n, theta_os_n_est, val=0) {
 #' @param f_aIw_n Conditional density estimator returned by construct_f_aIw_n
 #' @param f_a_n Marginal density estimator returned by construct_f_a_n
 #' @return Density ratio estimator function
+#' @notes The indicator functions are for computational conveniene; the actual
+#'     function is technically undefined there
 construct_g_n_star <- function(f_aIw_n, f_a_n, z_n) {
   
   function(a,w) {
-    if (a==0) {
-      0 # !!!!! Test to see if this is needed
-    } else {
-      z_n * (f_aIw_n(a,w) / f_a_n(a))
-    }
+    as.integer(a==0) + as.integer(a!=0) * (z_n*(f_aIw_n(a,w)/f_a_n(a)))
   }
   
 }
@@ -1940,7 +1950,7 @@ construct_Gamma_os_n_star <- function(dat, omega_n, g_n_star, eta_ss_n, z_n, gco
   w_i <- dat$w
   piece_1 <- omega_n(dat$w,dat$a,dat$y_star,dat$delta_star) /
     g_n_star(dat$a,dat$w)
-  piece_2 <- as.integer(a_i!=0) / z_n
+  piece_2 <- as.integer(a_i!=0)
   piece_3 <- gcomp_n(a_i)
   
   # Remove large intermediate objects
@@ -1949,9 +1959,9 @@ construct_Gamma_os_n_star <- function(dat, omega_n, g_n_star, eta_ss_n, z_n, gco
   
   fnc <- function(x) {
     (1/n_orig) * sum(weights_i * (
-      as.integer(a_i<=x)*piece_1 +
+      piece_2*as.integer(a_i<=x)*piece_1 +
         eta_ss_n(rep(x,nrow(w_i)),w_i) +
-        piece_2*(as.integer(a_i<=x)*piece_3-alpha_star_n(x))
+        (piece_2/z_n)*(as.integer(a_i<=x)*piece_3-alpha_star_n(x))
     ))
   }
   

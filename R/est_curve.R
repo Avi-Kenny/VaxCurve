@@ -148,6 +148,14 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
         Gamma_os_n_star <- construct_Gamma_os_n_star(dat, omega_n, g_n_star,
                                                      eta_ss_n, z_n, gcomp_n,
                                                      alpha_star_n, vals=NA)
+      } else if (params$marg=="Gamma_star2") {
+        g_n_star <- construct_g_n_star(f_aIw_n, f_a_n, z_n)
+        q_n <- construct_q_n(dat, dat_orig, type="Super Learner", omega_n,
+                             g_n_star, z_n, gcomp_n, alpha_star_n, vals=NA)
+        Gamma_os_n_star <- construct_Gamma_os_n_star2(dat, dat_orig, omega_n,
+                                                       g_n_star, eta_ss_n, z_n,
+                                                       q_n, gcomp_n,
+                                                       alpha_star_n, vals=NA)
       } else {
         stop("`params$marg` must be one of c('Theta', 'Gamma', 'Gamma_star'")
       }
@@ -194,7 +202,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       } else {
         Psi_n <- Vectorize(function(x) { -1 * Theta_os_n(x) })
       }
-    } else if (params$marg=="Gamma_star") {
+    # } else if (params$marg=="Gamma_star") {
+    } else if (params$marg %in% c("Gamma_star", "Gamma_star2")) {
       if (dir=="incr") {
         Psi_n <- Vectorize(function(x) {
           Gamma_os_n_star(round(G_n_inv(x), -log10(C$appx$a)))
@@ -230,7 +239,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       } else {
         theta_n_Gr <- Vectorize(function(x) { min(max(-1*dGCM(x),0),1) })
       }
-    } else if (params$marg=="Gamma_star") {
+    # } else if (params$marg=="Gamma_star") {
+    } else if (params$marg %in% c("Gamma_star", "Gamma_star2")) {
       if (dir=="incr") {
         # !!!!! COnsolidate this by renaming G_n to Phi_n and G_n_inv to Phi_n_inv ?????
         theta_n_Gr <- Vectorize(function(x) { min(max(dGCM(G_n(x)),0),1) })

@@ -1,4 +1,42 @@
 
+# Super Learner for estimating regressions
+if (F) {
+  
+  # Generate data
+  n <- 100
+  w1 <- sample(seq(0,1,0.1), size=n, replace=T)
+  w2 <- rbinom(n, size=1, prob=0.5)
+  y <- 1 + 2*w1 + 3*w2 + rnorm(n)
+  df <- data.frame(w1=w1,w2=w2,y=y)
+  newX <- data.frame(w1=c(0.1,0.3,0.8), w2=c(1,0,1))
+  
+  # Construct true regression function
+  reg_true <- function(w1,w2) { 1 + 2*w1 + 3*w2 }
+  
+  # True regression values
+  apply(X=newX, MARGIN=1, FUN = function(r) { reg_true(r[["w1"]], r[["w2"]]) })
+  
+  # Fit superleaner model
+  model_sl <- SuperLearner(
+    Y = df$y,
+    X = subset(df, select=-y),
+    newX = newX,
+    family = "gaussian",
+    SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.randomForest"),
+    verbose = FALSE
+  )
+  as.numeric(model_sl$SL.predict)
+  
+  # Fit a linear regression
+  model <- lm(y~w1+w2, data=df)
+  reg_lin <- Vectorize(function(w1,w2) {
+    cf <- as.numeric(coef(model))
+    return( cf[1] + cf[2]*w1 + cf[3]*w2 )
+  })
+  apply(X=newX, MARGIN=1, FUN = function(r) { reg_lin(r[["w1"]], r[["w2"]]) })
+  
+}
+
 # Debugging influence functions
 if (F) {
   

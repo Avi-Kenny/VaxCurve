@@ -11,12 +11,12 @@
   params <- list(
     S_n_type="Cox PH", g_n_type="binning", ci_type="regular", cf_folds=1,
     edge_corr="none", ecdf_type="linear (mid)", deriv_type="m-spline",
-    gamma_type="kernel", omega_n_type="estimated", marg="Gamma"
+    gamma_type="kernel", omega_n_type="estimated", marg="Gamma_star"
   )
   C <- list(points=seq(0,1,0.02), alpha_1=0.5, alpha_2=0.7, t_e=200,
             appx=list(t_e=10, w_tol=25, a=0.01))
   L <- list(
-    n=1000, alpha_3=-2, dir="decr",
+    n=500, alpha_3=-2, dir="decr",
     sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5),
     distr_A="Unif(0,1)", edge="none", surv_true="Cox PH",
     sampling="two-phase (72%)", estimator=list(est="Grenander",params=params)

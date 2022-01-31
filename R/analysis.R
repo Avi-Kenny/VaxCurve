@@ -14,8 +14,9 @@
   cfg2 <- list(
     analysis = "Moderna", # Janssen Moderna
     run_dqa = F,
-    run_debug = list(gren_var=F, objs=T),
-    run_graphs = T
+    run_debug = list(gren_var=F, objs=F),
+    run_graphs = T,
+    save_plot_data = T
   )
   
   # Set up analysis-specific configuration variables. Each row in the cfg2$map
@@ -62,7 +63,7 @@
       edge_corr=NA, omega_n_type="estimated", cf_folds=1, n_bins=0,
       marg=NA, lod_shift="none" # 3/4
     )
-    C <- list(appx=list(t_e=1,w_tol=25,a=0.001)) # !!!!! a=0.001
+    C <- list(appx=list(t_e=1,w_tol=25,a=0.001))
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
@@ -137,7 +138,7 @@
       edge_corr=NA, omega_n_type="estimated", cf_folds=1, n_bins=0,
       marg=NA, lod_shift="none"
     )
-    C <- list(appx=list(t_e=1,w_tol=25,a=0.001)) # !!!!! a=0.001
+    C <- list(appx=list(t_e=1,w_tol=25,a=0.001))
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
@@ -592,6 +593,13 @@ if (cfg2$run_graphs) {
       ci_lo = c(ci_lo[1],ci_lo,rep(cfg2$ve_overall[2],2)),
       ci_hi = c(ci_hi[1],ci_hi,rep(cfg2$ve_overall[3],2))
     )
+    if (cfg2$save_plot_data) {
+      saveRDS(
+        list(plot_data=plot_data, a_orig=a_orig, n_bins=n_bins, xlim=xlim,
+             cfg2=cfg2, y_lab=y_lab),
+        paste0(cfg2$analysis," plots/plot_data_",cfg2$tid,".rds")
+      )
+    }
     
     plot <- ggplot(plot_data, aes(x=x, y=y, color=curve)) +
       geom_ribbon(aes(ymin=ci_lo,ymax=ci_hi,fill=curve), alpha=0.1,
@@ -616,6 +624,51 @@ if (cfg2$run_graphs) {
       filename = paste0(cfg2$analysis," plots/plot_",cfg2$tid,".pdf"),
       plot=plot, device="pdf", width=6, height=4
     )
+    
+    # Alternate plots (for David)
+    if (F) {
+      
+      for (i in c(1:10)) {
+        
+        plot_data_ <- readRDS(paste0("Moderna plots/plot_data_",i,".rds"))
+        attach(plot_data_)
+        
+        ind_lo <- min(which(!is.na(plot_data$y))) - 3
+        if (ind_lo<0) { ind_lo <- 1 }
+        ind_hi <- max(head(which(!is.na(plot_data$y)),-2)) + 3
+        new_xlims <- c(plot_data$x[ind_lo], plot_data$x[ind_hi])
+        
+        plot <- ggplot(plot_data, aes(x=x, y=y, color=curve)) +
+          geom_ribbon(aes(ymin=ci_lo,ymax=ci_hi,fill=curve), alpha=0.1,
+                      linetype="dotted") +
+          geom_histogram(
+            mapping=aes(x=x,y=0.526+0.45*((0.6*..count..)/max(..count..))),
+            data=data.frame(x=a_orig), bins=n_bins, fill="forestgreen",
+            alpha=0.3, inherit.aes=F) +
+          coord_cartesian(xlim=new_xlims, ylim=c(0.55,1)) +
+          scale_y_continuous(labels=label_percent(accuracy=1), limits=c(0,1),
+                             breaks=seq(-1,1,0.1), minor_breaks=NULL) +
+          theme(panel.grid.major=element_line(colour="white", size=0.3),
+                panel.grid.minor=element_line(colour="white", size=0.3)) +
+          scale_x_continuous(label=math_format(10^.x),limits=xlim) +
+          scale_color_manual(values=c("darkgrey","darkblue")) +
+          scale_fill_manual(values=c("darkgrey","darkblue")) +
+          theme(legend.position="bottom") +
+          labs(title=paste0(cfg2$title,": Day ",cfg2$day),
+               x=cfg2$x_lab, y=y_lab, color=NULL, fill=NULL) +
+          geom_line()
+        
+        # Save plot
+        ggsave(
+          filename = paste0(cfg2$analysis," plots/plot_zoomed_",i,".pdf"),
+          plot=plot, device="pdf", width=6, height=4
+        )
+        
+        detach(plot_data_)
+        
+      }
+      
+    }
     
   }
   

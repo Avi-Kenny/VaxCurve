@@ -398,10 +398,12 @@ construct_S_n <- function(dat, vals, type, csf=F, return_model=F) {
       row <- Reduce(intersect, r)
       col <- which.min(abs(t-pred$time.interest))
       if (length(row)!=1) {
-        stop(paste0("Error in construct_S_n (B); ", "t=",t,",w=",w,",a=",a,""))
+        stop(paste0("Error in construct_S_n (B); ", "t=",t,",w=(",
+                    paste(w,collapse=","),"),a=",a,""))
       }
       if (length(col)!=1) {
-        stop(paste0("Error in construct_S_n (C); ", "t=",t,",w=",w,",a=",a,""))
+        stop(paste0("Error in construct_S_n (C); ", "t=",t,",w=(",
+                    paste(w,collapse=","),"),a=",a,""))
       }
       return(pred$survival[row,col])
     }
@@ -451,10 +453,12 @@ construct_S_n <- function(dat, vals, type, csf=F, return_model=F) {
       row <- Reduce(intersect, r)
       col <- which.min(abs(t-new.times))
       if (length(row)!=1) {
-        stop(paste0("Error in construct_S_n (B); ", "t=",t,",w=",w,",a=",a,""))
+        stop(paste0("Error in construct_S_n (B); ", "t=",t,",w=(",
+                    paste(w,collapse=","),"),a=",a,""))
       }
       if (length(col)!=1) {
-        stop(paste0("Error in construct_S_n (C); ", "t=",t,",w=",w,",a=",a,""))
+        stop(paste0("Error in construct_S_n (C); ", "t=",t,",w=(",
+                    paste(w,collapse=","),"),a=",a,""))
       }
       return(srv_pred[row,col])
     }
@@ -914,7 +918,8 @@ construct_gamma_n <- function(dat_orig, dat, vals=NA, type, omega_n, f_aIw_n,
         for (i in c(1:n_folds)) {
           df_train <- df[-which(folds==i),]
           df_test <- df[which(folds==i),]
-          ks <- ksmooth(x=df_train$a, y=df_train$po, kernel="normal", bandwidth=bw)
+          ks <- ksmooth(x=df_train$a, y=df_train$po,
+                        kernel="normal", bandwidth=bw)
           reg <- Vectorize(function(a) {
             index <- which.min(abs(a-ks$x))
             return(ks$y[index])
@@ -1000,6 +1005,115 @@ construct_gamma_n <- function(dat_orig, dat, vals=NA, type, omega_n, f_aIw_n,
   
   # round_args <- -log10(C$appx$a))
   return(construct_superfunc(fnc, aux=NA, vec=T, vals=vals))
+  
+}
+
+
+
+#' Construct q_n nuisance estimator function
+#' 
+#' @param x !!!!!
+#' @return q_n nuisance estimator function
+construct_q_n <- function(dat, dat_orig, type="Super Learner", omega_n, g_n_star, z_n,
+                          gcomp_n, alpha_star_n, vals=NA) {
+  
+  # Create grid of x-values and container for regression predictions
+  x_grid <- seq(0.1,1,0.1) # Try 0.01, 0.02, or 0.05 !!!!!
+  preds <- list()
+  
+  # Set up objects
+  a <- dat$a
+  w <- dat$w
+  y_star <- round(dat$y_star,1)
+  delta_star <- dat$delta_star
+  X <- cbind(w, y_star=y_star, delta_star=delta_star)
+  newX <- distinct(cbind(
+    dat_orig$w,
+    y_star = round(dat_orig$y_star,1),
+    delta_star = dat_orig$delta_star
+  ))
+  
+  for (i in c(1:length(x_grid))) {
+    
+    # Create pseudo-outcomes
+    x <- x_grid[i]
+    q_star <- (
+      (as.integer(a!=0 & a<=x)*omega_n(w,a,y_star,delta_star))/g_n_star(a,w)
+    ) + (
+      (as.integer(a!=0)/z_n) * (as.integer(a<=x)*gcomp_n(a) - alpha_star_n(x))
+    )
+    
+    # Fit SuperLearner regression
+    model_sl <- SuperLearner(
+      Y = q_star,
+      X = X,
+      newX = newX,
+      family = "gaussian",
+      SL.library = c("SL.xgboost"), # c("SL.gam", "SL.ranger", "SL.xgboost")
+      verbose = FALSE
+    )
+    preds[[i]] <- as.numeric(model_sl$SL.predict)
+    rm(model_sl)
+    
+  }
+  
+  # Construct function
+  newX$index <- c(1:nrow(newX))
+  fnc <- function(w, y_star, delta_star, x) {
+    
+    if (x==0) { return(0) } else {
+      
+      # Choose which regression to use based on `x`
+      pred <- preds[[which.min(abs(x-x_grid))]]
+      
+      # Dynamically filter to select index
+      # !!!!! Test if this works for factors
+      # !!!!! Modify construct_S_n to follow this paradigm instead
+      cond <- paste0("round(y_star,1)==",round(y_star,1),
+                     " & delta_star==",delta_star,"")
+      for (i in c(1:length(w))) {
+        cond <- paste0(cond," & w",i,"==",w[i])
+      }
+      index <- (dplyr::filter(newX, eval(parse(text=cond))))$index
+      if (length(index)!=1) {
+        stop(paste0("Error in construct_q_n; ", "w=(", paste(w,collapse=","),
+                    "), y_star=",y_star,", delta_star=",delta_star,", x=",x))
+      }
+      
+      # Return prediction
+      return(pred[index])
+    }
+    
+  }
+  
+  # Remove large intermediate objects
+  objs <- c("dat", "omega_n", "g_n_star", "gcomp_n", "alpha_star_n")
+  for (obj in objs) { rm(obj) }
+  
+  # !!!!! Plot regression predictions
+  if (F) {
+    
+    # Omit `newX = newX` to test
+    
+    # Generate predictions
+    sfnc <- construct_superfunc(fnc, aux=NA, vec=c(2,1,1,0), vals=NA)
+    pred_y <- sfnc(dat$w, dat$y_star, dat$delta_star, x)
+    
+    # Plot pseudo-outcomes against predictions
+    plot_data <- data.frame(x=q_star, y=pred_y, w1=dat$w$w1, w2=dat$w$w2,
+                            y_star=y_star, delta_star=delta_star)
+    ggplot(plot_data, aes(x=x, y=y, color=factor(delta_star))) +
+      geom_point() +
+      lims(x=c(-1.6,1.6), y=c(-1.6,1.6)) +
+      labs(title="SL.xgboost") +
+      geom_abline(slope=1, intercept=0, color="grey")
+    
+    # Calculate MSE
+    mean((pred_y-q_star)^2)
+    
+  }
+  
+  return(construct_superfunc(fnc, aux=NA, vec=c(2,1,1,0), vals=vals))
   
 }
 
@@ -1392,9 +1506,9 @@ construct_Gamma_os_n <- function(dat, vals=NA, omega_n, S_n, g_n,
       (1 - S_n(rep(C$t_e, length(a_i_long)),w_j_long,a_i_long))
     
     # Remove large intermediate objects
-    objs <- c("dat", "delta_star_i_long", "delta_star_j_long", "i_long", "j_long",
-              "omega_n", "S_n", "w_i_long", "w_j_long", "weights_i_long",
-              "weights_j_long")
+    objs <- c("dat", "delta_star_i_long", "delta_star_j_long", "i_long",
+              "j_long", "omega_n", "S_n", "w_i_long", "w_j_long",
+              "weights_i_long", "weights_j_long")
     for (obj in objs) { rm(obj) }
     
     fnc <- function(a) {
@@ -1523,6 +1637,36 @@ construct_infl_fn_Gamma <- function(omega_n, g_n, gcomp_n, eta_n,
 #' 
 #' @param x x
 #' @return x
+construct_infl_fn_Gamma2 <- function(omega_n, g_n_star, gcomp_n, z_n,
+                                     alpha_star_n, q_n, eta_ss_n,
+                                     Gamma_os_n_star) {
+  
+  fnc <- function(x,w,y_star,delta_star,a,wt) {
+    if (wt==0) {
+      piece_1 <- 0
+      piece_2 <- 0
+      piece_3 <- 0
+    } else {
+      piece_1 <- as.integer(a!=0 & a<=x)
+      piece_2 <- omega_n(w,a,y_star,delta_star)/g_n_star(a,w) + gcomp_n(a)/z_n
+      piece_3 <- as.integer(a!=0)*alpha_star_n(x)
+    }
+    wt * (piece_1*piece_2-piece_3/z_n) +
+      (1-wt) * q_n(w,y_star,delta_star,x) +
+      eta_ss_n(x,w) -
+      Gamma_os_n_star(round(x,-log10(C$appx$a)))
+  }
+  
+  return(construct_superfunc(fnc, vec=c(1,2,1,1,1,1)))
+  
+}
+
+
+
+#' !!!!! document
+#' 
+#' @param x x
+#' @return x
 construct_infl_fn_2 <- function(dat, Phi_n, infl_fn_Gamma, lambda_2, lambda_3) {
   
   n_orig <- sum(dat$weights)
@@ -1570,16 +1714,15 @@ beta_n_var_hat <- function(dat, infl_fn_1, infl_fn_2) {
 
 #' Construct lists of values to pre-compute functions on
 #' 
-#' @param dat Subsample of dataset returned by ss() for which delta==1;
-#'     !!!!! can also be dat_orig (needed for W), but formalize this later
+#' @param dat_orig Dataset returned by generate_data()
 #' @param appx Approximation spec used for grids (stored in C$appx); !!!!!
 #' @param factor_A If true, factor_A is used instead of seq(0,1,appx$a) for the
 #'     S_n component only
 #' @return A list of lists
-create_val_list <- function(dat, appx=NA, factor_A=NA) {
+create_val_list <- function(dat_orig, appx=NA, factor_A=NA) {
   
-  names(dat$w) <- paste0("w", c(1:length(dat$w)))
-  W_reduced <- distinct(dat$w)
+  names(dat_orig$w) <- paste0("w", c(1:length(dat_orig$w)))
+  W_reduced <- distinct(dat_orig$w)
   W_reduced <- cbind("w_index"=c(1:nrow(W_reduced)), W_reduced)
   if (is.na(factor_A[1])) {
     a <- seq(0,1,appx$a)
@@ -1929,7 +2072,8 @@ construct_eta_ss_n <- function(dat, S_n, z_n, vals=NA) {
       matrix(rep(w,length(dat$a)), ncol=length(w), byrow=T)
     )
     (1/(n_orig*z_n)) * sum(
-      piece_1 * as.integer(dat$a<=x) * (1-S_n(rep(C$t_e,length(dat$a)),w_long,dat$a))
+      piece_1 * as.integer(dat$a<=x) *
+        (1-S_n(rep(C$t_e,length(dat$a)),w_long,dat$a))
     )
   }
   
@@ -1940,10 +2084,11 @@ construct_eta_ss_n <- function(dat, S_n, z_n, vals=NA) {
 
 
 #' Construct Gamma_os_n_star primitive one-step estimator
-#' 
+#'
 #' @param x !!!!!
-construct_Gamma_os_n_star <- function(dat, omega_n, g_n_star, eta_ss_n, z_n, gcomp_n, alpha_star_n, vals=NA) {
-  
+construct_Gamma_os_n_star <- function(dat, omega_n, g_n_star, eta_ss_n, z_n,
+                                      gcomp_n, alpha_star_n, vals=NA) {
+
   weights_i <- dat$weights
   n_orig <- sum(weights_i)
   a_i <- dat$a
@@ -1952,17 +2097,50 @@ construct_Gamma_os_n_star <- function(dat, omega_n, g_n_star, eta_ss_n, z_n, gco
     g_n_star(dat$a,dat$w)
   piece_2 <- as.integer(a_i!=0)
   piece_3 <- gcomp_n(a_i)
-  
+
   # Remove large intermediate objects
   objs <- c("dat", "omega_n", "g_n_star", "gcomp_n")
   for (obj in objs) { rm(obj) }
-  
+
   fnc <- function(x) {
     (1/n_orig) * sum(weights_i * (
       piece_2*as.integer(a_i<=x)*piece_1 +
         eta_ss_n(rep(x,nrow(w_i)),w_i) +
         (piece_2/z_n)*(as.integer(a_i<=x)*piece_3-alpha_star_n(x))
     ))
+  }
+
+  return(construct_superfunc(fnc, aux=NA, vec=T, vals=vals))
+
+}
+
+
+
+#' Construct Gamma_os_n_star primitive one-step estimator (based on EIF)
+#' 
+#' @param x !!!!!
+construct_Gamma_os_n_star2 <- function(dat, dat_orig, omega_n, g_n_star,
+                                       eta_ss_n, z_n, q_n, gcomp_n,
+                                       alpha_star_n, vals=NA) {
+  
+  n_orig <- sum(dat$weights)
+  piece_1 <- as.integer(dat$a!=0)
+  piece_2 <- (omega_n(dat$w,dat$a,dat$y_star,dat$delta_star) /
+    g_n_star(dat$a,dat$w)) + (gcomp_n(dat$a)/z_n)
+  piece_3 <- (1-dat_orig$weights)
+  
+  # Remove large intermediate objects
+  objs <- c("omega_n", "g_n_star", "gcomp_n")
+  for (obj in objs) { rm(obj) }
+
+  fnc <- function(x) {
+    (1/n_orig) * sum(dat$weights * (
+      piece_1*as.integer(dat$a<=x)*piece_2 - (piece_1*alpha_star_n(x))/z_n
+    )) +
+    (1/n_orig) * sum(
+      piece_3 * q_n(dat_orig$w,dat_orig$y_star,dat_orig$delta_star,x) +
+      eta_ss_n(rep(x,nrow(dat_orig$w)),dat_orig$w)
+    )
   }
   
   return(construct_superfunc(fnc, aux=NA, vec=T, vals=vals))

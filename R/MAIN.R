@@ -9,9 +9,9 @@
 # GitHub packages: tedwestling/ctsCausal, tedwestling/CFsurvival, 
 #                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
-  main_task = "analysis.R", # run update analysis.R
-  which_sim = "testing", # "estimation" "edge" "testing" "infl_fn_1 (temp)"
-  level_set_which = "level_set_testing_1", # level_set_estimation_1 level_set_testing_1
+  main_task = "run", # run update analysis.R
+  which_sim = "estimation", # "estimation" "edge" "testing" "infl_fn_1 (temp)"
+  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
   # keep = c(1:3,7:9,16:18,22:24),
   num_sim = 1000,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
@@ -57,9 +57,7 @@ if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
 # Load packages (if running locally)
 if (load_pkgs_local) {
   for (pkg in c(cfg$pkgs,cfg$pkgs_nocluster)) {
-    suppressMessages({
-      do.call("library", list(pkg))
-    })
+    suppressMessages({ do.call("library", list(pkg)) })
   }
 }
 
@@ -135,7 +133,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     dir = "decr",
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
     distr_A = c("N(0.5,0.01)"), # "Unif(0.3,0.7)" "N(0.5,0.01)", "N(0.5,0.04)"
-    edge = c("expit 0.2"), # c("none", "expit 0.2")
+    edge = c("none"), # c("none", "expit 0.2")
     surv_true = c("Cox PH"), # "complex"
     sampling = "two-phase (72%)",
     estimator = list(
@@ -148,14 +146,18 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       #   est = "Grenander",
       #   params = list(marg="Theta", S_n_type="Cox PH")
       # ),
-      "Grenander (Gamma_star, edge_corr='none')" = list(
+      "Grenander (Gamma_star)" = list(
         est = "Grenander",
         params = list(marg="Gamma_star", S_n_type="Cox PH")
       ),
-      "Grenander (Gamma_star, edge_corr='min')" = list(
+      "Grenander (Gamma_star2)" = list(
         est = "Grenander",
-        params = list(marg="Gamma_star", S_n_type="Cox PH", edge_corr="min")
+        params = list(marg="Gamma_star2", S_n_type="Cox PH")
       )
+      # "Grenander (Gamma_star, edge_corr='min')" = list(
+      #   est = "Grenander",
+      #   params = list(marg="Gamma_star", S_n_type="Cox PH", edge_corr="min")
+      # )
       # "Grenander (Theta, edge_corr='min')" = list(
       #   est = "Grenander",
       #   params = list(marg="Theta", S_n_type="Cox PH", edge_corr="min")
@@ -187,7 +189,8 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Testing: compare all methods
   level_set_testing_1 <- list(
-    n = c(100,200,400,800), # 1000
+    n = 400, # 1000
+    # n = c(100,200,400,800), # 1000
     # n = c(1000,2000),
     alpha_3 = 0,
     # alpha_3 = c(0,-0.25,-0.5),
@@ -197,8 +200,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     # distr_A = c("Unif(0,1)", "N(0.5,0.01)"),
     edge = "none",
     surv_true = "Cox PH",
-    sampling = c("iid"),
-    # sampling = c("iid", "cycle", "two-phase (50%)"), # "two-phase (50% random)"
+    sampling = c("iid", "cycle", "two-phase (50%)"), # "two-phase (50% random)"
     # sampling = c("iid", "two-phase (72%)", "two-phase (70% random)"),
     test = list(
       "Slope (two-tailed, asy)" = list(
@@ -471,7 +473,7 @@ if (FALSE) {
     geom_hline(aes(yintercept=0.95), linetype="longdash", color="grey") +
     geom_line() +
     facet_grid(rows=dplyr::vars(surv_true), cols=dplyr::vars(distr_A)) +
-    ylim(0,0.003) +
+    ylim(0,0.01) +
     # scale_color_manual(values=m_colors) +
     theme(legend.position="bottom") +
     labs(title="MSE", x="A", y=NULL, color="Estimator")

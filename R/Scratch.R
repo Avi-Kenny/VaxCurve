@@ -1,4 +1,23 @@
 
+# Approximating Gamma_0
+if (F) {
+  
+  Theta_true <- attr(dat_orig,"Theta_true")
+  Gamma_0 <- Vectorize(function(x) {
+    Theta_true[which.min(abs(x-seq(0,1,0.02)))[1]]
+  })
+  
+  Gamma_appx <- function(x) { sqrt(x)/3 }
+  
+  grid <- seq(0,1,0.02)
+  ggplot(data.frame(
+    x = rep(grid,2),
+    y = c(Gamma_0(grid), Gamma_appx(grid)),
+    which = rep(c("Gamma_0","Gamma_appx"), each=51)
+  ), aes(x=x, y=y, color=which)) + geom_line()  
+  
+}
+
 # Super Learner for estimating regressions
 if (F) {
   
@@ -150,7 +169,7 @@ if (F) {
   params = list(g_n_type="true", S_n_type="true", omega_n_type="true")
   C <- list(
     points=seq(0,1,0.02), alpha_1=0.5, alpha_2=0.7, t_e=200,
-    appx=list(t_e=10, w_tol=25, a=0.01)
+    appx=list(t_e=10, w_tol=25, y_star=1, a=0.01)
   )
   L <- list(
     n=200, alpha_3=-2, dir="decr", sampling="two-phase (72%)",
@@ -623,7 +642,7 @@ if (F) {
   # Setup
   
   C <- list(points=seq(0,1,0.02), alpha_1=0.5, alpha_2=0.7, t_e=200,
-            appx=list(t_e=10,w1=0.1,a=0.01))
+            appx=list(t_e=10,w1=0.1,y_star=1,a=0.01))
   
   # Approximate Gamma_0
   Gamma_0 <- function(x) { sqrt(x)/3 }

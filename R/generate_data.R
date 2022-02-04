@@ -109,7 +109,7 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
   } else {
     delta <- rbinom(n, size=1, prob=Pi(sampling,delta_star,y_star,w))
     dat_orig <- list(id=c(1:n), w=w, a=ifelse(delta==1,a,NA), delta=delta,
-                           y_star=y_star, delta_star=delta_star)
+                     y_star=y_star, delta_star=delta_star)
   }
   
   # Set up function to calculate true regression values over C$points

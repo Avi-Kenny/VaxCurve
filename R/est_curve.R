@@ -41,9 +41,9 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   # Set default params
   .default_params <- list(
     S_n_type="Super Learner", g_n_type="binning", deriv_type="m-spline",
-    ecdf_type="linear (mid)", gamma_type="kernel", omega_n_type="estimated",
-    boot_reps=1000, ci_type="trunc", cf_folds=1, m=5, edge_corr="none",
-    marg="Theta", lod_shift="none"
+    ecdf_type="linear (mid)", gamma_type="Super Learner", gamma_which="new",
+    omega_n_type="estimated", boot_reps=1000, ci_type="trunc", cf_folds=1, m=5,
+    edge_corr="none", marg="Theta", lod_shift="none"
   )
   for (i in c(1:length(.default_params))) {
     if (is.null(params[[names(.default_params)[i]]])) {
@@ -76,6 +76,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     # Round values
     # !!!!! Functionize and refactor w/ test_2.R
     dat_orig$a <- round(dat_orig$a, -log10(C$appx$a))
+    dat_orig$y_star <- round(dat_orig$y_star, -log10(C$appx$y_star))
     for (i in c(1:length(dat_orig$w))) {
       rnd <- 8
       tol <- C$appx$w_tol
@@ -134,6 +135,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid,
                                    type=params$g_n_type, k=15)
       f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
+      g_n <- construct_g_n(f_aIw_n, f_a_n)
       omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n,
                                    type=params$omega_n_type)
       if (params$marg=="Theta") {
@@ -141,7 +143,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
         Theta_os_n <- construct_Theta_os_n(dat, vlist$A_grid, omega_n,
                                            f_aIw_n, etastar_n)
       } else if (params$marg=="Gamma") {
-        g_n <- construct_g_n(f_aIw_n, f_a_n)
         Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n)
       } else if (params$marg=="Gamma_star") {
         g_n_star <- construct_g_n_star(f_aIw_n, f_a_n, z_n)
@@ -150,8 +151,9 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
                                                      alpha_star_n, vals=NA)
       } else if (params$marg=="Gamma_star2") {
         g_n_star <- construct_g_n_star(f_aIw_n, f_a_n, z_n)
-        q_n <- construct_q_n(dat, dat_orig, type="Super Learner", omega_n,
-                             g_n_star, z_n, gcomp_n, alpha_star_n, vals=NA)
+        q_n <- construct_q_n(which="q_n", type="Super Learner", dat, dat_orig,
+                             omega_n=omega_n, g_n_star=g_n_star, z_n=z_n,
+                             gcomp_n=gcomp_n, alpha_star_n=alpha_star_n)
         Gamma_os_n_star <- construct_Gamma_os_n_star2(dat, dat_orig, omega_n,
                                                        g_n_star, eta_ss_n, z_n,
                                                        q_n, gcomp_n,
@@ -266,9 +268,14 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
                                         type=params$g_n_type, k=15, delta1=TRUE)
     f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid,
                                     f_aIw_delta1_n)
-    gamma_n <- construct_gamma_n(dat_orig, dat, vlist$A_grid,
-                                 type=params$gamma_type, omega_n, f_aIw_n,
-                                 f_a_n, f_a_delta1_n)
+    gamma_n <- construct_gamma_n(dat_orig, dat, type=params$gamma_type,
+                                 which=params$gamma_which, vals=vlist$A_grid,
+                                 omega_n=omega_n, f_aIw_n=f_aIw_n, f_a_n=f_a_n,
+                                 f_a_delta1_n=f_a_delta1_n)
+    if (params$gamma_which=="new") {
+      pi_star_n <- construct_pi_star_n(dat_orig, vals=NA, type="Super Learner",
+                                       f_aIw_n, f_aIw_delta1_n)
+    }
     
     # Edge correction
     if (params$edge_corr %in% c("none", "spread")) {
@@ -315,7 +322,12 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     # Construct variance scale factor
     deriv_theta_n <- construct_deriv_theta_n(theta_n, type=params$deriv_type,
                                              dir=dir)
-    tau_n <- construct_tau_n(deriv_theta_n, gamma_n, f_a_n)
+    if (params$gamma_which=="old") {
+      tau_n <- construct_tau_n(which="old", deriv_theta_n, gamma_n, f_a_n)
+    } else if (params$gamma_which=="new") {
+      tau_n <- construct_tau_n(which="new", deriv_theta_n, gamma_n, f_a_n,
+                               pi_star_n, g_n, dat_orig)
+    }
     
     # Generate confidence limits
     if (params$ci_type=="none") {

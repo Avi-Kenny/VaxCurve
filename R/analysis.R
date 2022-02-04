@@ -12,7 +12,7 @@
   # Note: NA param values are set below based on the task ID
   # !!!!! In the correlates repo, if t_e=0, it is inferred from the data
   cfg2 <- list(
-    analysis = "Moderna", # Janssen Moderna
+    analysis = "Janssen", # Janssen Moderna
     run_dqa = F,
     run_debug = list(gren_var=F, objs=F),
     run_graphs = T,
@@ -59,11 +59,11 @@
                                   "linded_Phase_Data/adata/")
     cfg2$params = list(
       S_n_type=NA, g_n_type="binning", ecdf_type="linear (mid)",
-      deriv_type="m-spline", gamma_type="kernel", ci_type="regular",
+      deriv_type="m-spline", gamma_type="kernel", ci_type="regular", # !!!!! gamma_type="Super Learner"
       edge_corr=NA, omega_n_type="estimated", cf_folds=1, n_bins=0,
       marg=NA, lod_shift="none" # 3/4
     )
-    C <- list(appx=list(t_e=1,w_tol=25,a=0.001))
+    C <- list(appx=list(t_e=1,w_tol=25,y_star=1,a=0.01)) # !!!!! a=0.001
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
@@ -134,11 +134,11 @@
                                   "linded_Phase_Data/adata/")
     cfg2$params = list(
       S_n_type=NA, g_n_type="binning", ecdf_type="linear (mid)",
-      deriv_type="m-spline", gamma_type="kernel", ci_type="regular",
+      deriv_type="m-spline", gamma_type="kernel", ci_type="regular", # !!!!! gamma_type="Super Learner"
       edge_corr=NA, omega_n_type="estimated", cf_folds=1, n_bins=0,
       marg=NA, lod_shift="none"
     )
-    C <- list(appx=list(t_e=1,w_tol=25,a=0.001))
+    C <- list(appx=list(t_e=1,w_tol=25,y_star=1,a=0.01)) # !!!!! a=0.001
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(

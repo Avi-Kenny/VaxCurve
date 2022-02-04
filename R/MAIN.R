@@ -10,18 +10,19 @@
 #                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
   main_task = "run", # run update analysis.R
-  which_sim = "estimation", # "estimation" "edge" "testing" "infl_fn_1 (temp)"
+  which_sim = "estimation", # "estimation" "edge" "testing" "infl_fn_G (temp)"
   level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
   # keep = c(1:3,7:9,16:18,22:24),
   num_sim = 1000,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
-           "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm", "tidyr"),
+           "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm", "tidyr",
+           "ranger", "xgboost"),
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
                      "data.table", "latex2exp"),
   parallel = "none",
   stop_at_error = FALSE,
-  appx = list(t_e=10, w_tol=25, a=0.01) # !!!!! t_e=1, a=0.001
+  appx = list(t_e=10, w_tol=25, y_star=1, a=0.01) # !!!!! t_e=1, a=0.001
 )
 
 # Set cluster config
@@ -146,13 +147,25 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       #   est = "Grenander",
       #   params = list(marg="Theta", S_n_type="Cox PH")
       # ),
-      "Grenander (Gamma_star)" = list(
+      # "Grenander (Gamma_star)" = list(
+      #   est = "Grenander",
+      #   params = list(marg="Gamma_star", S_n_type="Cox PH")
+      # ),
+      "Grenander (Gamma_star; old)" = list(
         est = "Grenander",
-        params = list(marg="Gamma_star", S_n_type="Cox PH")
+        params = list(marg="Gamma_star", S_n_type="Cox PH", gamma_which="old")
       ),
-      "Grenander (Gamma_star2)" = list(
+      "Grenander (Gamma_star; new)" = list(
         est = "Grenander",
-        params = list(marg="Gamma_star2", S_n_type="Cox PH")
+        params = list(marg="Gamma_star", S_n_type="Cox PH", gamma_which="new")
+      ),
+      "Grenander (Gamma_star2; old)" = list(
+        est = "Grenander",
+        params = list(marg="Gamma_star2", S_n_type="Cox PH", gamma_which="old")
+      ),
+      "Grenander (Gamma_star2; new)" = list(
+        est = "Grenander",
+        params = list(marg="Gamma_star2", S_n_type="Cox PH", gamma_which="new")
       )
       # "Grenander (Gamma_star, edge_corr='min')" = list(
       #   est = "Grenander",
@@ -189,26 +202,28 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Testing: compare all methods
   level_set_testing_1 <- list(
-    n = 400, # 1000
+    n = 1000,
     # n = c(100,200,400,800), # 1000
     # n = c(1000,2000),
     alpha_3 = 0,
     # alpha_3 = c(0,-0.25,-0.5),
     dir = "decr",
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_A = "Unif(0,1)",
-    # distr_A = c("Unif(0,1)", "N(0.5,0.01)"),
+    # distr_A = "Unif(0,1)",
+    distr_A = c("Unif(0,1)", "N(0.5,0.04)", "N(0.5,0.01)"),
     edge = "none",
     surv_true = "Cox PH",
-    sampling = c("iid", "cycle", "two-phase (50%)"), # "two-phase (50% random)"
-    # sampling = c("iid", "two-phase (72%)", "two-phase (70% random)"),
+    sampling = c("iid", "two-phase (50%)"),
+    # sampling = c("iid", "w1", "w2", "two-phase (50%)", "two-phase (50% random)"),
+    # sampling = c("w1", "w2", "two-phase (50%)"),
+    # sampling = c("iid", "cycle", "two-phase (72%)", "two-phase (70% random)"),
     test = list(
-      "Slope (two-tailed, asy)" = list(
+      "Slope (two-tailed, MC)" = list(
         type = "test_2",
         alt_type = "two-tailed", # decr
         test_stat_only = FALSE,
-        # params = list(g_n_type="binning", S_n_type="Cox PH", omega_n_type="estimated")
-        params = list(g_n_type="true", S_n_type="true", omega_n_type="true")
+        # params = list(g_n_type="binning", S_n_type="true", omega_n_type="true")
+        params = list(g_n_type="binning", S_n_type="Cox PH", omega_n_type="estimated")
       )
       # "Slope (two-tailed, boot)" = list(
       #   type = "test_2",
@@ -273,7 +288,9 @@ if (cfg$main_task=="run") {
         "construct_Gamma_cf", "construct_pi_n", "theta_os_n", "sigma2_os_n",
         "ss", "construct_Theta_os_n", "construct_etastar_n",
         "construct_g_n_star", "construct_alpha_star_n", "construct_eta_ss_n",
-        "construct_Gamma_os_n_star",
+        "construct_Gamma_os_n_star", "construct_q_n",
+        "construct_infl_fn_Gamma2", "construct_Theta_os_n2",
+        "construct_infl_fn_Theta", "construct_pi_star_n",
         
         "est_curve", "generate_data",
         "lambda", "one_simulation", "test_2"

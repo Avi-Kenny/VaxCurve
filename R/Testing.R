@@ -11,15 +11,17 @@
   params <- list(
     S_n_type="Cox PH", g_n_type="binning", ci_type="regular", cf_folds=1,
     edge_corr="none", ecdf_type="linear (mid)", deriv_type="m-spline",
-    gamma_type="kernel", omega_n_type="estimated", marg="Gamma_star"
+    gamma_type="kernel", gamma_which="new", omega_n_type="estimated",
+    marg="Gamma_star"
   )
   C <- list(points=seq(0,1,0.02), alpha_1=0.5, alpha_2=0.7, t_e=200,
-            appx=list(t_e=10, w_tol=25, a=0.01))
+            appx=list(t_e=10, w_tol=25, y_star=1, a=0.01))
   L <- list(
     n=500, alpha_3=-2, dir="decr",
     sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5),
+    # sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5), # Uncomment this for (almost) no censoring
     distr_A="Unif(0,1)", edge="none", surv_true="Cox PH",
-    sampling="two-phase (72%)", estimator=list(est="Grenander",params=params)
+    sampling="two-phase (50%)", estimator=list(est="Grenander",params=params)
   )
   
   # 3. Generate dataset
@@ -289,9 +291,11 @@
                                         type=params$g_n_type, k=15, delta1=TRUE)
     f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid,
                                     f_aIw_delta1_n)
-    gamma_n <- construct_gamma_n(dat_orig, dat, vlist$A_grid,
-                                 type=params$gamma_type, omega_n, f_aIw_n,
-                                 f_a_n, f_a_delta1_n)
+    gamma_n <- construct_gamma_n(dat_orig, dat, type=params$gamma_type,
+                                 vals=vlist$A_grid, omega_n=omega_n,
+                                 f_aIw_n=f_aIw_n, f_a_n=f_a_n,
+                                 f_a_delta1_n=f_a_delta1_n)
+    
     theta_n <- theta_n_Gr
     deriv_theta_n <- construct_deriv_theta_n(theta_n, type=params$deriv_type,
                                              L$dir="decr")
@@ -427,10 +431,15 @@
   f_aIw_delta1_n <- construct_f_aIw_n(dat, vlist$AW_grid,
                                       type=params$g_n_type, delta1=TRUE, k=15)
   f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_delta1_n)
-  gamma_n <- construct_gamma_n(dat_orig, dat, vlist$A_grid, type="kernel",
-                               omega_n, f_aIw_n, f_a_n, f_a_delta1_n)
-  gamma_n2 <- construct_gamma_n(dat_orig, dat, vlist$A_grid, type="kernel2",
-                               omega_n, f_aIw_n, f_a_n, f_a_delta1_n)
+  gamma_n <- construct_gamma_n(dat_orig, dat, type="kernel",
+                               vals=vlist$A_grid, omega_n=omega_n,
+                               f_aIw_n=f_aIw_n, f_a_n=f_a_n,
+                               f_a_delta1_n=f_a_delta1_n)
+  gamma_n2 <- construct_gamma_n(dat_orig, dat, type="kernel2",
+                               vals=vlist$A_grid, omega_n=omega_n,
+                               f_aIw_n=f_aIw_n, f_a_n=f_a_n,
+                               f_a_delta1_n=f_a_delta1_n)
+  
   
   # Plot true curves against estimated curve
   grid <- seq(0,1,0.05)

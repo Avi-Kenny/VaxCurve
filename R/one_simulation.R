@@ -67,9 +67,6 @@ if (cfg$which_sim=="testing") {
     # Generate dataset
     dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
                               L$sc_params, L$sampling, L$dir)
-    # dat_orig <- generate_data(400, 0, "Unif(0,1)", "none", "Cox PH",
-    #                           list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5),
-    #                           "cycle", "decr")
     
     msg <- "Direction of monotonicity does not align with test type"
     if (L$dir=="incr" && L$test$alt_type=="decr") { stop(msg) }
@@ -89,26 +86,29 @@ if (cfg$which_sim=="testing") {
       "p_val" = test_results$p_val,
       "beta_n" = test_results$beta_n,
       "sd_n" = test_results$sd_n,
-      "var_n" = test_results$var_n,
-      "if1_mean" = test_results$if1_mean, # !!!!!
-      "if2_mean" = test_results$if2_mean, # !!!!!
-      "r_1n" = test_results$r_1n, # !!!!!
-      "r_2n" = test_results$r_2n, # !!!!!
+      "var_n" = test_results$var_n
+      # "if1_mean" = test_results$if1_mean, # !!!!!
+      # "if2_mean" = test_results$if2_mean, # !!!!!
+      # "r_1n" = test_results$r_1n, # !!!!!
+      # "r_2n" = test_results$r_2n, # !!!!!
       # "Psi_1_var_est" = test_results$Psi_1_var_est, # !!!!!
       # "sum12_est" = test_results$sum12_est, # !!!!!
       # "sum12_var_est" = test_results$sum12_var_est, # !!!!!
-      "Psi_1_est" = test_results$Psi_1_est, # !!!!!
-      "Psi_2_est" = test_results$Psi_2_est, # !!!!!
-      "Psi_1_var_est" = test_results$Psi_1_var_est, # !!!!!
-      "Psi_2_var_est" = test_results$Psi_2_var_est, # !!!!!
-      "Psi_12_covar" = test_results$Psi_12_covar, # !!!!!
-      "p_val_Psi_1" = test_results$p_val_Psi_1, # !!!!!
-      "p_val_Psi_2" = test_results$p_val_Psi_2 # !!!!!
+      # "Psi_1_est" = test_results$Psi_1_est, # !!!!!
+      # "Psi_2_est" = test_results$Psi_2_est, # !!!!!
+      # "Psi_G_est" = test_results$Psi_G_est, # !!!!!
+      # "Psi_1_var_est" = test_results$Psi_1_var_est, # !!!!!
+      # "Psi_2_var_est" = test_results$Psi_2_var_est, # !!!!!
+      # "Psi_12_covar" = test_results$Psi_12_covar, # !!!!!
+      # "p_val_Psi_1" = test_results$p_val_Psi_1, # !!!!!
+      # "p_val_Psi_2" = test_results$p_val_Psi_2, # !!!!!
+      # "p_val_Psi_G" = test_results$p_val_Psi_G, # !!!!!
       # "p_val_sum12" = test_results$p_val_sum12, # !!!!!
       # "p_val_sum12b" = test_results$p_val_sum12b, # !!!!!
       # "p_val_alt" = test_results$p_val_alt, # !!!!!
       # "reject_Psi_1" = test_results$reject_Psi_1, # !!!!!
       # "reject_Psi_2" = test_results$reject_Psi_2, # !!!!!
+      # "reject_Psi_G" = test_results$reject_Psi_G # !!!!!
       # "reject_sum12" = test_results$reject_sum12, # !!!!!
       # "reject_sum12b" = test_results$reject_sum12b, # !!!!!
       # "reject_alt" = test_results$reject_alt # !!!!!
@@ -173,97 +173,118 @@ if (cfg$which_sim=="edge") {
 ##### Hypothesis testing (temp) #####
 #####################################.
 
-if (cfg$which_sim=="infl_fn_1 (temp)") {
+if (cfg$which_sim=="infl_fn_G (temp)") {
   
   one_simulation <- function() {
     
-    # Generate dataset
+    params <- L$test$params # list(g_n_type="true", S_n_type="true", omega_n_type="true")
+    
+    # dat_orig <- generate_data(400, 0, "Unif(0,1)", "none", "Cox PH",
+    #                           list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5),
+    #                           "two-phase (50% random)", "decr")
     dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
                               L$sc_params, L$sampling, L$dir)
+    
+    # Prep
+    {
+      .default_params <- list(
+        var="asymptotic", ecdf_type="step", g_n_type="binning", boot_reps=200,
+        S_n_type="Super Learner", omega_n_type="estimated", cf_folds=1
+      )
+      for (i in c(1:length(.default_params))) {
+        if (is.null(params[[names(.default_params)[i]]])) {
+          params[[names(.default_params)[i]]] <- .default_params[[i]]
+        }
+      }
+      
+      a_lims <- c(min(dat_orig$a,na.rm=T),max(dat_orig$a,na.rm=T))
+      a_shift <- -1 * a_lims[1]
+      a_scale <- 1/(a_lims[2]-a_lims[1])
+      dat_orig$a <- (dat_orig$a+a_shift)*a_scale
+      
+      dat_orig$a <- round(dat_orig$a, -log10(C$appx$a))
+      for (i in c(1:length(dat_orig$w))) {
+        rnd <- 8
+        tol <- C$appx$w_tol
+        n_unique <- tol + 1
+        while(n_unique>tol) {
+          rnd <- rnd - 1
+          n_unique <- length(unique(round(dat_orig$w[,i],rnd)))
+        }
+        dat_orig$w[,i] <- round(dat_orig$w[,i],rnd)
+      }
+      
+    }
     
     # Prep
     n_orig <- length(dat_orig$delta)
     dat <- ss(dat_orig, which(dat_orig$delta==1))
     weights <- dat$weights
     
+    # Construct dataframes of values to pre-compute functions on
+    vlist <- create_val_list(dat, C$appx)
+    
     # Construct component functions
-    Phi_n <- construct_Phi_n(dat, type=L$test$params$ecdf_type)
+    Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
+    lambda_2 <- lambda(dat,2,Phi_n)
+    lambda_3 <- lambda(dat,3,Phi_n)
+    f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=params$g_n_type, k=15)
+    f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
+    g_n <- construct_g_n(f_aIw_n, f_a_n)
+    S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
+    Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
+    omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n,
+                                 type=params$omega_n_type)
+    n_orig <- length(dat_orig$delta)
+    z_n <- (1/n_orig) * sum(dat$weights * as.integer(dat$a!=0))
+    g_n_star <- construct_g_n_star(f_aIw_n, f_a_n, z_n)
+    eta_ss_n <- construct_eta_ss_n(dat, S_n, z_n, vals=NA)
+    gcomp_n <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n)
+    alpha_star_n <- construct_alpha_star_n(dat, gcomp_n, z_n, vals=NA)
+    q_n <- construct_q_n(which="q_n", type="GAM", dat, dat_orig,
+                         omega_n=omega_n, g_n_star=g_n_star, z_n=z_n,
+                         gcomp_n=gcomp_n, alpha_star_n=alpha_star_n)
+    Gamma_os_n <- construct_Gamma_os_n_star2(dat, dat_orig, omega_n,
+                                             g_n_star, eta_ss_n, z_n, q_n,
+                                             gcomp_n, alpha_star_n, vals=NA)
+    infl_fn_Gamma <- construct_infl_fn_Gamma2(omega_n, g_n_star, gcomp_n, z_n,
+                                              alpha_star_n, q_n, eta_ss_n,
+                                              Gamma_os_n_star=Gamma_os_n)
     
-    # Gamma_0 true function
-    Gamma_0 <- Vectorize(function(a) {
-      Theta_true <- attr(dat_orig,"Theta_true")
-      grid <- seq(0,1,0.02)
-      index <- which.min(abs(a-seq(0,1,0.02)))
-      return(Theta_true[index])
+    # Compute variance estimate and test statistic
+    Theta_true <- attr(dat_orig,"Theta_true")
+    Gamma_0 <- Vectorize(function(x) { # This only works for Unif(0,1)
+      Theta_true[which.min(abs(x-seq(0,1,0.02)))[1]]
     })
+    xx <- 0.7
+    Psi_G_est <- Gamma_os_n(xx)
+    Psi_G_var_est <- (1/n_orig^2) * sum((
+      infl_fn_Gamma(rep(xx, n_orig), dat_orig$w, dat_orig$y_star,
+                    dat_orig$delta_star, dat_orig$a, dat_orig$weights)
+    )^2)
+    test_stat_Psi_G <- (Psi_G_est-Gamma_0(xx))^2/Psi_G_var_est
+    p_val_Psi_G <- pchisq(test_stat_Psi_G, df=1, lower.tail=FALSE)
     
-    # Psi_4
-    if (F) {
-      Psi_4_n <- (1/n_orig) * sum( weights * ( Phi_n(dat$a) * Gamma_0(dat$a) ))
-      construct_infl_fn_4 <- function(dat, Gamma_0, Phi_n) {
-        n_orig <- sum(dat$weights)
-        weights_j <- dat$weights
-        a_j <- dat$a
-        fnc <- function(a_i) {
-          piece_1 <- (1/n_orig) * sum(
-            weights_j * (as.integer(a_i<=a_j)-2*Phi_n(a_j)) * Gamma_0(a_j)
-          )
-          piece_2 <- Phi_n(a_i) * Gamma_0(a_i)
-          return(piece_1+piece_2)
-        }
-        return(construct_superfunc(fnc, aux=NA, vec=c(1), vals=NA))
-      }
-      infl_fn_Psi_4 <- construct_infl_fn_4(dat, Gamma_0, Phi_n)
-      Psi_4_var <- (1/n_orig^2) * sum((weights*infl_fn_Psi_4(dat$a))^2)
-    }
-    
-    # Psi_5
-    if (F) {
-      Psi_5_n <- (1/n_orig) * sum(weights*Phi_n(dat$a))
-      construct_infl_fn_5 <- function(dat, Phi_n) {
-        n_orig <- sum(dat$weights)
-        weights_j <- dat$weights
-        a_j <- dat$a
-        fnc <- function(a_i) {
-          piece_1 <- (1/n_orig) * sum(
-            weights_j * (as.integer(a_i<=a_j)-2*Phi_n(a_j))
-          )
-          piece_2 <- Phi_n(a_i)
-          return(piece_1+piece_2)
-        }
-        return(construct_superfunc(fnc, aux=NA, vec=c(1), vals=NA))
-      }
-      infl_fn_Psi_5 <- construct_infl_fn_5(dat, Phi_n)
-      Psi_5_var <- (1/n_orig^2) * sum((weights*infl_fn_Psi_5(dat$a))^2)
-    }
-    
-    # infl_fn_1
-    if (T) {
-      lambda_2 <- 1/3 # lambda(dat,2,Phi_n)
-      lambda_3 <- 1/4 # lambda(dat,3,Phi_n)
-      Phi_0 <- function(x) { x }
-      Psi_1_n <- (1/n_orig) * sum( weights * (
-        # (lambda_2*(Phi_n(dat$a))^2 - lambda_3*Phi_n(dat$a)) * Gamma_0(dat$a)
-        (lambda_2*(Phi_0(dat$a))^2 - lambda_3*Phi_0(dat$a)) * Gamma_0(dat$a)
-      ))
-      # infl_fn_1 <- construct_infl_fn_1(dat, Gamma_0, Phi_n, lambda_2, lambda_3)
-      infl_fn_1 <- construct_infl_fn_1(dat, Gamma_0, Phi_0, lambda_2, lambda_3)
-      Psi_1_var <- (1/n_orig^2) * sum((weights*infl_fn_1(dat$a))^2)
-    }
+    # Estimates from old influence function
+    eta_n <- construct_eta_n(dat, vlist$AW_grid, S_n)
+    infl_fn_Gamma_old <- construct_infl_fn_Gamma(omega_n, g_n, gcomp_n,
+                                             eta_n, Gamma_os_n)
+    Psi_G_var_est2 <- (1/n_orig^2) * sum((
+      dat$weights * infl_fn_Gamma_old(rep(xx,length(dat$a)), dat$w, dat$y_star,
+                                      dat$delta_star, dat$a)
+    )^2)
+    test_stat_Psi_G2 <- (Psi_G_est-Gamma_0(xx))^2/Psi_G_var_est2
+    p_val_Psi_G2 <- pchisq(test_stat_Psi_G2, df=1, lower.tail=FALSE)
     
     # Return results
     return (list(
-      # "partial_est" = partial_est,
-      # "partial_sd" = sqrt(partial_var),
-      # "rho_5" = rho_n(0.5),
-      # "lambda_2" = lambda_2,
-      # "lambda_3" = lambda_3,
-      "Psi_1_n" = Psi_1_n,
-      "Psi_1_sd" = sqrt(Psi_1_var)
-      # "Psi_4_n" = Psi_4_n,
-      # "Psi_4_sd" = sqrt(Psi_4_var),
-      # "Psi_5_n" = Psi_5_n,
-      # "Psi_5_sd" = sqrt(Psi_5_var)
+      Psi_G_est = Psi_G_est-Gamma_0(xx),
+      Psi_G_var_est = Psi_G_var_est,
+      p_val_Psi_G = p_val_Psi_G,
+      reject_Psi_G = as.integer(p_val_Psi_G<0.05),
+      Psi_G_var_est2 = Psi_G_var_est2,
+      p_val_Psi_G2 = p_val_Psi_G2,
+      reject_Psi_G2 = as.integer(p_val_Psi_G2<0.05)
     ))
     
   }

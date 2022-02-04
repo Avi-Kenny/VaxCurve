@@ -1,4 +1,49 @@
 
+# kernel2 gamma_n estimator
+if (F) {
+  
+  df_0 <- filter(df, I_star==0)
+  df_1 <- filter(df, I_star==1)
+  
+  ks_0 <- ksmooth(
+    x = df_0$a,
+    y = df_0$po,
+    kernel = "normal",
+    bandwidth = 0.2, # !!!!! Select via CV
+    x.points = vals$a
+  )
+  
+  ks_1 <- ksmooth(
+    x = df_1$a,
+    y = df_1$po,
+    kernel = "normal",
+    bandwidth = 0.2, # !!!!! Select via CV
+    x.points = vals$a
+  )
+  
+  reg_0 <- function(a) {
+    index <- which.min(abs(a-ks_0$x))
+    return(ks_0$y[index])
+  }
+  
+  reg_1 <- function(a) {
+    index <- which.min(abs(a-ks_1$x))
+    return(ks_1$y[index])
+  }
+  
+  # Run logistic regression
+  model <- glm(I_star~a, data=df, family="binomial")
+  coeff <- as.numeric(model$coefficients)
+  
+  prob_1 <- function(a) { expit(coeff[1]+coeff[2]*a) }
+  prob_0 <- function(a) { 1 - prob_1(a) }
+  
+  reg <- function(a) {
+    reg_0(a)*prob_0(a) + reg_1(a)*prob_1(a)
+  }
+  
+}
+
 # Debugging gamma_n CV selection of bandwidth
 if (F) {
   

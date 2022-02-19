@@ -220,8 +220,8 @@ Pi <- function(sampling, delta_star, y_star, w) {
     } else if (sampling=="two-phase (72%)") {
       probs <- ev + (1-ev)*expit(w$w1+w$w2-0.1)
     } else if (sampling=="two-phase (50%)") {
-      probs <- expit(w$w1+w$w2-1)
-      # probs <- ev + (1-ev)*expit(w$w1+w$w2-1)
+      probs <- ev + (1-ev)*expit(w$w1+w$w2-1)
+      # probs <- expit(w$w1+w$w2-1)
     } else if (sampling=="two-phase (25%)") {
       probs <- ev + (1-ev)*expit(w$w1+w$w2-2.2)
     } else if (sampling=="w1") {
@@ -507,8 +507,6 @@ construct_S_n <- function(dat, vals, type, csf=F, return_model=F) {
     
   }  
   
-  # round_args <- c(-log10(C$appx$t_e), -log10(C$appx$w1b), 0, -log10(C$appx$a))
-  
   sfnc <- construct_superfunc(fnc, aux=NA, vec=c(1,2,1), vals=vals)
   rm("vals", envir=environment(get("fnc",envir=environment(sfnc))))
   
@@ -550,11 +548,11 @@ construct_gcomp_n <- function(dat_orig, vals=NA, S_n) {
 #' @param dir Direction of monotonicity; one of c("incr", "decr")
 construct_deriv_theta_n <- function(theta_n, type, dir="incr") {
   
+  # Estimate entire function on grid
+  grid <- round(seq(0,1,0.01),2)
+  theta_ns <- theta_n(grid)
+  
   if (type=="linear") {
-    
-    # Estimate entire function on grid
-    grid <- seq(0,1,0.01)
-    theta_ns <- theta_n(grid)
     
     grid_width <- grid[2] - grid[1]
     points_x <- c(grid[1])
@@ -578,7 +576,7 @@ construct_deriv_theta_n <- function(theta_n, type, dir="incr") {
       if (a==0) {
         index <- 1
       } else {
-        index <- which(a<=points_x)[1]-1
+        index <- which(round(a,6)<=round(points_x,6))[1]-1
       }
       if (dir=="incr") {
         return(max(points_sl[index],0))
@@ -589,28 +587,20 @@ construct_deriv_theta_n <- function(theta_n, type, dir="incr") {
     
   } else if (type=="line") {
     
-    theta_n_left <- theta_n(0.1)
-    theta_n_right <- theta_n(0.9)
-    
-    fnc <- function(a) {
-      (theta_n_right-theta_n_left)/0.8
-    }
+    theta_n_left <- theta_n(0) # 0.1
+    theta_n_right <- theta_n(1) # 0.9
+    fnc <- function(a) { (theta_n_right-theta_n_left)/1 } # 0.8
     
   } else if (type=="spline") {
     
-    # Estimate entire function on grid
-    grid <- seq(0,1,0.01)
-    theta_ns <- theta_n(grid)
-    
     # Identify jump points of step function
-    # jump_points <- c(0)
-    jump_points <- c()
+    jump_points <- c(0)
     for (i in 2:length(grid)) {
       if (theta_ns[i]!=theta_ns[i-1]) {
         jump_points <- c(jump_points, mean(c(grid[i],grid[i-1])))
       }
     }
-    # jump_points <- c(jump_points,grid[length(grid)])
+    jump_points <- c(jump_points,grid[length(grid)])
     
     # Identify midpoints of jump points
     midpoints <- jump_points[1:(length(jump_points)-1)]+(diff(jump_points)/2)
@@ -647,19 +637,14 @@ construct_deriv_theta_n <- function(theta_n, type, dir="incr") {
     
   } else if (type=="m-spline") {
     
-    # Estimate entire function on grid
-    grid <- seq(0,1,0.01)
-    theta_ns <- theta_n(grid)
-    
     # Identify jump points of step function
-    jump_points <- c(0) # !!!!!
-    # jump_points <- c()
+    jump_points <- c(0)
     for (i in 2:length(grid)) {
       if (theta_ns[i]!=theta_ns[i-1]) {
         jump_points <- c(jump_points, mean(c(grid[i],grid[i-1])))
       }
     }
-    jump_points <- c(jump_points,grid[length(grid)]) # !!!!!
+    jump_points <- c(jump_points,grid[length(grid)])
     
     # Identify midpoints of jump points
     midpoints <- jump_points[1:(length(jump_points)-1)]+(diff(jump_points)/2)
@@ -683,7 +668,7 @@ construct_deriv_theta_n <- function(theta_n, type, dir="incr") {
     # Construct derivative function
     fnc <- function(a) {
       
-      width <- 0.2 # !!!!! changed from 0.1 to 0.2
+      width <- 0.2
       x1 <- a - width/2
       x2 <- a + width/2
       
@@ -921,7 +906,7 @@ construct_gamma_n <- function(dat_orig, dat, type="Super Learner", which="old",
     X <- cbind(dat$w, a=dat$a)
     W_reduced <- distinct(dat_orig$w)
     W_reduced <- cbind("w_index"=c(1:nrow(W_reduced)), W_reduced)
-    # a <- seq(0,1,appx$a)
+    # a <- round(seq(0,1,C$appx$a),-log10(C$appx$a))
     newX <- expand.grid(
       w_index = W_reduced$w_index,
       a = x_grid
@@ -935,8 +920,8 @@ construct_gamma_n <- function(dat_orig, dat, type="Super Learner", which="old",
     
     # Fit SuperLearner regression
     SL.library <- c("SL.mean", "SL.gam", "SL.ranger", "SL.earth", "SL.loess",
-                    "SL.nnet", "SL.ksvm", "SL.caret", "SL.polymars",
-                    "SL.rpartPrune", "SL.svm")
+                    "SL.nnet", "SL.ksvm", "SL.caret", "SL.rpartPrune",
+                    "SL.svm")
     
     model_sl <- SuperLearner(Y=df$po, X=X, newX=newX, family="gaussian",
                              SL.library=SL.library, verbose=F)
@@ -979,7 +964,6 @@ construct_gamma_n <- function(dat_orig, dat, type="Super Learner", which="old",
       # CV prep
       n_folds <- 5
       folds <- sample(cut(c(1:nrow(df)), breaks=n_folds, labels=FALSE))
-      # bws <- seq(2*C$appx$a, 0.3, length.out=30)
       bws <- seq(0.02,0.4,0.02)
       
       # Conduct CV
@@ -1040,9 +1024,7 @@ construct_gamma_n <- function(dat_orig, dat, type="Super Learner", which="old",
   }
   
   # Remove large intermediate objects
-  # !!!!! These are not being removed for some reason
-  objs <- c("dat_orig", "dat", "omega_n", "f_aIw_n")
-  for (obj in objs) { if (exists(obj)) { rm(obj) } }
+  rm(dat_orig,dat,omega_n,f_aIw_n)
   
   if (which=="old") {
     fnc <- function(a) {
@@ -1067,7 +1049,7 @@ construct_q_n <- function(which="q_n", type="Super Learner", dat, dat_orig,
                           alpha_star_n=NA, f_aIw_n=NA, vals=NA) {
   
   # Create grid of x-values and container for regression predictions
-  x_grid <- seq(0.1,1,0.1) # Try 0.01, 0.02, or 0.05 !!!!!
+  x_grid <- round(seq(0.1,1,0.1),1) # Try 0.01, 0.02, or 0.05 !!!!!
   preds <- list()
   
   # Set up objects
@@ -1085,7 +1067,7 @@ construct_q_n <- function(which="q_n", type="Super Learner", dat, dat_orig,
   # Set library
   if (type=="Super Learner") {
     SL.library <- c("SL.mean", "SL.gam", "SL.ranger", "SL.earth", "SL.nnet",
-                    "SL.polymars", "SL.svm")
+                    "SL.svm")
   } else if (type=="GAM") {
     SL.library <- c("SL.gam")
   }
@@ -1141,9 +1123,7 @@ construct_q_n <- function(which="q_n", type="Super Learner", dat, dat_orig,
   }
   
   # Remove large intermediate objects
-  objs <- c("dat", "dat_orig", "omega_n", "g_n_star", "gcomp_n",
-            "alpha_star_n", "f_aIw_n")
-  for (obj in objs) { if (exists(obj)) { rm(obj) } }
+  rm(dat,dat_orig,omega_n,g_n_star,gcomp_n,alpha_star_n,f_aIw_n)
   
   # !!!!! Plot regression predictions
   if (F) {
@@ -1284,8 +1264,7 @@ construct_f_aIw_n <- function(dat, vals=NA, type, k=0, delta1=FALSE) {
       prm <- opt$pars
       
       # Remove large intermediate objects
-      objs <- c("dat", "dens_s", "opt")
-      for (obj in objs) { rm(obj) }
+      rm(dat,dens_s,opt)
       
       fnc <- function(a, w) {
         
@@ -1484,8 +1463,7 @@ construct_Theta_os_n <- function(dat, vals=NA, omega_n, f_aIw_n, etastar_n) {
     f_aIw_n(dat$a,dat$w)
   
   # Remove large intermediate objects
-  objs <- c("dat", "omega_n", "f_aIw_n")
-  for (obj in objs) { rm(obj) }
+  rm(dat,omega_n,f_aIw_n)
   
   fnc <- function(x) {
     (1/n_orig) * sum(weights_i * (
@@ -1537,10 +1515,8 @@ construct_Gamma_os_n <- function(dat, vals=NA, omega_n, S_n, g_n,
       S_n(rep(C$t_e, length(a_i_long)),w_j_long,a_i_long)
     
     # Remove large intermediate objects
-    objs <- c("dat", "delta_star_i_long", "delta_star_j_long", "i_long",
-              "j_long", "omega_n", "S_n", "w_i_long", "w_j_long",
-              "weights_i_long", "weights_j_long")
-    for (obj in objs) { rm(obj) }
+    rm(dat,delta_star_i_long,delta_star_j_long,i_long,j_long,omega_n,S_n,
+       w_i_long,w_j_long,weights_i_long,weights_j_long)
     
     fnc <- function(a) {
       
@@ -1564,10 +1540,8 @@ construct_Gamma_os_n <- function(dat, vals=NA, omega_n, S_n, g_n,
       (1 - S_n(rep(C$t_e, length(a_i_long)),w_j_long,a_i_long))
     
     # Remove large intermediate objects
-    objs <- c("dat", "delta_star_i_long", "delta_star_j_long", "i_long",
-              "j_long", "omega_n", "S_n", "w_i_long", "w_j_long",
-              "weights_i_long", "weights_j_long")
-    for (obj in objs) { rm(obj) }
+    rm(dat,delta_star_i_long,delta_star_j_long,i_long,j_long,omega_n,S_n,
+       w_i_long,w_j_long,weights_i_long,weights_j_long)
     
     fnc <- function(a) {
       return((1/n_orig^2) * sum(piece * as.integer(a_i_long<=a)))
@@ -1811,22 +1785,21 @@ beta_n_var_hat <- function(dat, dat_orig, infl_fn_1, infl_fn_2) {
 #' Construct lists of values to pre-compute functions on
 #' 
 #' @param dat_orig Dataset returned by generate_data()
-#' @param appx Approximation spec used for grids (stored in C$appx); !!!!!
-#' @param factor_A If true, factor_A is used instead of seq(0,1,appx$a) for the
+#' @param factor_A If true, factor_A is used instead of seq(0,1,C$appx$a) for the
 #'     S_n component only
 #' @return A list of lists
-create_val_list <- function(dat_orig, appx=NA, factor_A=NA) {
+create_val_list <- function(dat_orig, factor_A=NA) {
   
   names(dat_orig$w) <- paste0("w", c(1:length(dat_orig$w)))
   W_reduced <- distinct(dat_orig$w)
   W_reduced <- cbind("w_index"=c(1:nrow(W_reduced)), W_reduced)
   if (is.na(factor_A[1])) {
-    a <- seq(0,1,appx$a)
+    a <- round(seq(0,1,C$appx$a),-log10(C$appx$a))
   } else {
     a <- factor_A
   }
   S_n_pre <- expand.grid(
-    t = seq(0,C$t_e,appx$t_e),
+    t = round(seq(0,C$t_e,C$appx$t_e),-log10(C$appx$t_e)),
     w_index = W_reduced$w_index,
     a = a
   )
@@ -1835,9 +1808,9 @@ create_val_list <- function(dat_orig, appx=NA, factor_A=NA) {
   return(list(
     A = NA, # list(a=dat$a),
     AW = NA, # data.frame(a=dat$a, w1=dat$w1, w2=dat$w2),
-    A_grid = NA, # list(a=seq(0,1,appx$a)),
-    W_grid = NA, # expand.grid(w1=seq(0,1,appx$w1), w2=c(0,1)),
-    AW_grid = NA, # expand.grid(a=seq(0,1,appx$a), w1=seq(0,1,appx$w1), w2=c(0,1)),
+    A_grid = NA, # list(a=round(seq(0,1,C$appx$a),-log10(C$appx$a)),
+    W_grid = NA,
+    AW_grid = NA,
     S_n = list(
       t = S_n_pre$t,
       w = subset(S_n_pre, select=-c(t,w_index,a)),
@@ -2067,7 +2040,7 @@ construct_pi_star_n <- function(dat_orig, vals=NA, type="Super Learner",
   # Set library
   if (type=="Super Learner") {
     SL.library <- c("SL.mean", "SL.gam", "SL.ranger", "SL.earth", "SL.nnet",
-                    "SL.polymars", "SL.svm", "SL.glmnet")
+                    "SL.svm", "SL.glmnet")
   } else if (type=="logistic") {
     SL.library <- c("SL.glm")
   }
@@ -2107,7 +2080,7 @@ construct_pi_star_n <- function(dat_orig, vals=NA, type="Super Learner",
   if (F) {
     d0 <- ss(dat_orig, which(dat_orig$w$w2==0))
     d1 <- ss(dat_orig, which(dat_orig$w$w2==0))
-    grid <- seq(0,1,0.1)
+    grid <- round(seq(0,1,0.1),1)
     preds0 <- sapply(grid, function(w1) { reg(c(w1,0)) })
     preds1 <- sapply(grid, function(w1) { reg(c(w1,1)) })
     ggplot(
@@ -2271,9 +2244,8 @@ construct_Gamma_os_n_star <- function(dat, omega_n, g_n_star, eta_ss_n, z_n,
   piece_3 <- gcomp_n(a_i)
 
   # Remove large intermediate objects
-  objs <- c("dat", "omega_n", "g_n_star", "gcomp_n")
-  for (obj in objs) { rm(obj) }
-
+  rm(dat,omega_n,g_n_star,gcomp_n)
+  
   fnc <- function(x) {
     (1/n_orig) * sum(weights_i * (
       piece_2*as.integer(a_i<=x)*piece_1 +
@@ -2302,9 +2274,8 @@ construct_Gamma_os_n_star2 <- function(dat, dat_orig, omega_n, g_n_star,
   piece_3 <- (1-dat_orig$weights)
   
   # Remove large intermediate objects
-  objs <- c("omega_n", "g_n_star", "gcomp_n")
-  for (obj in objs) { rm(obj) }
-
+  rm(omega_n,g_n_star,gcomp_n)
+  
   fnc <- function(x) {
     (1/n_orig) * sum(dat$weights * (
       piece_1*as.integer(dat$a<=x)*piece_2 - (piece_1*alpha_star_n(x))/z_n
@@ -2332,8 +2303,7 @@ construct_Theta_os_n2 <- function(dat, dat_orig, omega_n, f_aIw_n, q_star_n,
   piece_3 <- (1-dat_orig$weights)
   
   # Remove large intermediate objects
-  objs <- c("omega_n", "f_aIw_n")
-  for (obj in objs) { rm(obj) }
+  rm(omega_n,f_aIw_n)
   
   fnc <- function(x) {
     (1/n_orig) * sum(dat$weights * as.integer(dat$a<=x) * piece_2) +

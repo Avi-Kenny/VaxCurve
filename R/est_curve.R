@@ -40,10 +40,10 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   
   # Set default params
   .default_params <- list(
-    S_n_type="Super Learner", g_n_type="binning", deriv_type="m-spline",
+    S_n_type="Super Learner", g_n_type="binning", deriv_type="linear",
     ecdf_type="linear (mid)", gamma_type="Super Learner", gamma_which="new",
     omega_n_type="estimated", boot_reps=1000, ci_type="trunc", cf_folds=1, m=5,
-    edge_corr="none", marg="Theta", lod_shift="none"
+    edge_corr="none", marg="Theta", lod_shift="none", n_bins=5
   )
   for (i in c(1:length(.default_params))) {
     if (is.null(params[[names(.default_params)[i]]])) {
@@ -51,63 +51,63 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     }
   }
   
+  # LOD shift
+  a_min <- min(dat_orig$a,na.rm=T)
+  lod12 <- a_min
+  if (params$lod_shift=="3/4") {
+    lod34 <- log10(1.5*(10^lod12))
+    dat_orig$a[dat_orig$a==lod12] <- lod34
+    a_min <- lod34
+  } else if (params$lod_shift=="1") {
+    lod <- log10(2*(10^lod12))
+    dat_orig$a[dat_orig$a==lod12] <- lod
+    a_min <- lod
+  }
+  
+  # Rescale A to lie in [0,1]
+  # !!!!! Functionize and refactor w/ test_2.R
+  a_lims <- c(min(dat_orig$a,na.rm=T),max(dat_orig$a,na.rm=T))
+  a_shift <- -1 * a_lims[1]
+  a_scale <- 1/(a_lims[2]-a_lims[1])
+  dat_orig$a <- (dat_orig$a+a_shift)*a_scale
+  
+  # Round values
+  # !!!!! Functionize and refactor w/ test_2.R
+  dat_orig$a <- round(dat_orig$a, -log10(C$appx$a))
+  dat_orig$y_star <- round(dat_orig$y_star, -log10(C$appx$t_e))
+  for (i in c(1:length(dat_orig$w))) {
+    rnd <- 8
+    tol <- C$appx$w_tol
+    n_unique <- tol + 1
+    while(n_unique>tol) {
+      rnd <- rnd - 1
+      n_unique <- length(unique(round(dat_orig$w[,i],rnd)))
+    }
+    dat_orig$w[,i] <- round(dat_orig$w[,i],rnd)
+  }
+  
+  # Obtain minimum value (excluding edge point mass)
+  if (params$edge_corr=="min") {
+    a_min2 <- min(dat_orig$a[dat_orig$a!=0],na.rm=T)
+  }
+  
+  # Rescale points and remove points outside the range of A
+  points_orig <- points
+  na_head <- sum(points<a_min)
+  points <- round((points+a_shift)*a_scale, -log10(C$appx$a))
+  na_tail <- sum(points>1)
+  if (na_head>0) {
+    points <- points[-c(1:na_head)]
+  }
+  if (na_tail>0) {
+    points <- points[-c((length(points)-na_tail+1):length(points))]
+  }
+  
+  dat <- ss(dat_orig, which(dat_orig$delta==1))
+  
   if (estimator=="Grenander") {
     
-    # LOD shift
-    a_min <- min(dat_orig$a,na.rm=T)
-    lod12 <- a_min
-    if (params$lod_shift=="3/4") {
-      lod34 <- log10(1.5*(10^lod12))
-      dat_orig$a[dat_orig$a==lod12] <- lod34
-      a_min <- lod34
-    } else if (params$lod_shift=="1") {
-      lod <- log10(2*(10^lod12))
-      dat_orig$a[dat_orig$a==lod12] <- lod
-      a_min <- lod
-    }
-    
-    # Rescale A to lie in [0,1]
-    # !!!!! Functionize and refactor w/ test_2.R
-    a_lims <- c(min(dat_orig$a,na.rm=T),max(dat_orig$a,na.rm=T))
-    a_shift <- -1 * a_lims[1]
-    a_scale <- 1/(a_lims[2]-a_lims[1])
-    dat_orig$a <- (dat_orig$a+a_shift)*a_scale
-    
-    # Round values
-    # !!!!! Functionize and refactor w/ test_2.R
-    dat_orig$a <- round(dat_orig$a, -log10(C$appx$a))
-    dat_orig$y_star <- round(dat_orig$y_star, -log10(C$appx$y_star))
-    for (i in c(1:length(dat_orig$w))) {
-      rnd <- 8
-      tol <- C$appx$w_tol
-      n_unique <- tol + 1
-      while(n_unique>tol) {
-        rnd <- rnd - 1
-        n_unique <- length(unique(round(dat_orig$w[,i],rnd)))
-      }
-      dat_orig$w[,i] <- round(dat_orig$w[,i],rnd)
-    }
-    
-    # Obtain minimum value (excluding edge point mass)
-    if (params$edge_corr=="min") {
-      a_min2 <- min(dat_orig$a[dat_orig$a!=0],na.rm=T)
-    }
-    
-    # Rescale points and remove points outside the range of A
-    points_orig <- points
-    na_head <- sum(points<a_min)
-    points <- round((points+a_shift)*a_scale, -log10(C$appx$a))
-    na_tail <- sum(points>1)
-    if (na_head>0) {
-      points <- points[-c(1:na_head)]
-    }
-    if (na_tail>0) {
-      points <- points[-c((length(points)-na_tail+1):length(points))]
-    }
-    
-    # Setup
-    dat <- ss(dat_orig, which(dat_orig$delta==1))
-    vlist <- create_val_list(dat_orig, C$appx)
+    vlist <- create_val_list(dat_orig)
     
     # Construct regular Gamma_0 estimator
     if (params$cf_folds==1) {
@@ -125,7 +125,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       Phi_n_inv <- construct_Phi_n(dat, which="inverse", type=params$ecdf_type)
       S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
       Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
-      
+
       # !!!!! New G_n
       gcomp_n <- construct_gcomp_n(dat_orig, vals=vlist$A_grid, S_n)
       alpha_star_n <- construct_alpha_star_n(dat, gcomp_n, z_n, vals=NA)
@@ -159,7 +159,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
                                                        q_n, gcomp_n,
                                                        alpha_star_n, vals=NA)
       } else {
-        stop("`params$marg` must be one of c('Theta', 'Gamma', 'Gamma_star'")
+        stop(paste0("`params$marg` must be one of c('Theta', 'Gamma', 'Gamma_s",
+                    "tar', 'Gamma_star2'"))
       }
       
       # Construct one-step edge estimator
@@ -204,7 +205,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       } else {
         Psi_n <- Vectorize(function(x) { -1 * Theta_os_n(x) })
       }
-    # } else if (params$marg=="Gamma_star") {
     } else if (params$marg %in% c("Gamma_star", "Gamma_star2")) {
       if (dir=="incr") {
         Psi_n <- Vectorize(function(x) {
@@ -345,19 +345,21 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       # The Normal approximation would use qnorm(0.975, sd=0.52) instead
       qnt <- 1.00
       n_orig <- length(dat_orig$delta)
+      pct_a <- sum(dat$a==0)/length(dat$a)
+      n_ci <- round(n_orig*(1-pct_a))
       if (params$ci_type=="regular") {
-        ci_lo <- ests - (qnt*tau_ns)/(n_orig^(1/3))
-        ci_hi <- ests + (qnt*tau_ns)/(n_orig^(1/3))
+        ci_lo <- ests - (qnt*tau_ns)/(n_ci^(1/3))
+        ci_hi <- ests + (qnt*tau_ns)/(n_ci^(1/3))
       } else if (params$ci_type=="logit") {
         ci_lo <- expit(
-          logit(ests) - (qnt*tau_ns*deriv_logit(ests))/(n_orig^(1/3))
+          logit(ests) - (qnt*tau_ns*deriv_logit(ests))/(n_ci^(1/3))
         )
         ci_hi <- expit(
-          logit(ests) + (qnt*tau_ns*deriv_logit(ests))/(n_orig^(1/3))
+          logit(ests) + (qnt*tau_ns*deriv_logit(ests))/(n_ci^(1/3))
         )
       } else if (params$ci_type=="trunc") {
-        ci_lo <- ests - (qnt*tau_ns)/(n_orig^(1/3))
-        ci_hi <- ests + (qnt*tau_ns)/(n_orig^(1/3))
+        ci_lo <- ests - (qnt*tau_ns)/(n_ci^(1/3))
+        ci_hi <- ests + (qnt*tau_ns)/(n_ci^(1/3))
         ci_lo %<>% pmax(0) %>% pmin(1)
         ci_hi %<>% pmax(0) %>% pmin(1)
       }
@@ -366,11 +368,9 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       if (params$edge_corr=="point") {
         ci_lo[1] <- ests[1] - 1.96*sqrt(sigma2_os_n_est/n_orig)
         ci_hi[1] <- ests[1] + 1.96*sqrt(sigma2_os_n_est/n_orig)
-      } else if (params$edge_corr %in% c("weighted","min")) {
+      } else if (params$edge_corr %in% c("weighted", "min")) {
         ci_lo2 <- ests - 1.96*sqrt(sigma2_os_n_est/n_orig)
         ci_hi2 <- ests + 1.96*sqrt(sigma2_os_n_est/n_orig)
-        # ci_lo <- (1-gren_points)*pmin(ci_lo,ci_lo2) + gren_points*ci_lo
-        # ci_hi <- (1-gren_points)*pmax(ci_hi,ci_hi2) + gren_points*ci_hi
         ci_lo <- (1-gren_points)*ci_lo2 + replace_na(gren_points*ci_lo, 0)
         ci_hi <- (1-gren_points)*ci_hi2 + replace_na(gren_points*ci_hi, 0)
       }
@@ -379,7 +379,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     # # Add extra return data
     # res[["Phi_n"]] <- Phi_n
-    # res[["Gamma_os_n"]] <- Gamma_os_n
     
   }
   
@@ -387,13 +386,25 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     # !!!!! Handle case in which marginal distribution has mass
     # !!!!! Implement cross-fitted version
-    # !!!!! Implement isotonized version
-    # !!!!! Adapt for `points` as above; make sure NA calues can be handled
+    # !!!!! Adapt for `points` as above; make sure NA values can be handled
+    
+    # !!!!! transform/round X-values
     
     # Construct bin cutoffs
-    dat <- ss(dat_orig, which(dat_orig$delta==1))
-    Phi_n_inv <- construct_Phi_n(dat, which="inverse", type=params$ecdf_type)
-    cutoffs <- Phi_n_inv(seq(0,1,length.out=params$n_bins+1))
+    {
+      Phi_n_inv <- construct_Phi_n(dat, which="inverse", type="step")
+      cutoffs <- Phi_n_inv(seq(0,1,length.out=params$n_bins+1))
+      if (sum(cutoffs==0)>1) {
+        a_sub <- dat$a[dat$a!=0]
+        wt_sub <- dat$weights[dat$a!=0]
+        Phi_n_inv_sub <- construct_Phi_n(
+          dat = list(a=a_sub, weights=wt_sub),
+          which = "inverse",
+          type = params$ecdf_type
+        )
+        cutoffs <- c(0, Phi_n_inv_sub(seq(0,1,length.out=params$n_bins)))
+      }
+    }
     
     # Function to transform A values to categorical bins values
     transform_a <- function(a) {
@@ -401,8 +412,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     }
     
     # Create vlist
-    vlist <- create_val_list(dat_orig, C$appx,
-                             factor_A=unique(transform_a(dat$a)))
+    vlist <- create_val_list(dat_orig, factor_A=unique(transform_a(dat$a)))
     
     # Construct f_aIw_n BEFORE transforming A values
     f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid,
@@ -445,7 +455,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     # Setup
     dat <- ss(dat_orig, which(dat_orig$delta==1))
-    vlist <- create_val_list(dat_orig, C$appx)
+    vlist <- create_val_list(dat_orig)
     
     # Construct component functions
     S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)

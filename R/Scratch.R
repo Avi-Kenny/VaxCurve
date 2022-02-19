@@ -1,4 +1,130 @@
 
+if (F) {
+  
+  library(SimEngine)
+  sim <- new_sim()
+  sim %<>% add_creator("create_data", function(n) { rpois(n, lambda=5) })
+  sim %<>% add_method("estimator", function(dat, type) {
+    if (type=="M") { return(meen(dat)) }
+    if (type=="V") { return(var(dat)) }
+  })
+  sim %<>% set_levels(n=c(10,100), est=c("M", "V"))
+  sim %<>% set_config(num_sim=2)
+  sim %<>% set_script(function() {
+    dat <- create_data(L$n)
+    lambda_hat <- estimator(dat=dat, type=L$est)
+    return(list(lambda_hat=lambda_hat))
+  })
+  sim %<>% run()
+  sim$results %>% print()
+  
+}
+
+# Comparing isotonic regression PAVA CIs to mean CI
+if (T) {
+  
+  boot_reps <- 100
+  v_x <- c()
+  v_iso <- c()
+  v_grp <- c()
+  v_clr <- c()
+  for (i in c(1:boot_reps)) {
+    n <- 100
+    x <- runif(n)
+    y <- x + rnorm(n, sd=0.2)
+    # x <- 0.3 + 0.4*rbinom(n, size=1, prob=0.5) + 0.01*runif(n)
+    # y <- x + rnorm(n, sd=0.01)
+    df <- data.frame(x=x, y=y)
+    # df_boot <- df[sample(c(1:n), replace=T),]
+    df %<>% arrange(x)
+    iso <- pava(y=df$y)
+    v_x <- c(v_x, df$x, c(0,1))
+    v_iso <- c(v_iso, iso, rep(mean(df$y), 2))
+    v_grp <- c(v_grp, rep(i,n), rep(i+0.5,2))
+    v_clr <- c(v_clr, rep("Iso",n), rep("Mean",2))
+  }
+  
+  res <- data.frame(
+    x = v_x,
+    y = v_iso,
+    grp = v_grp,
+    clr = v_clr
+  )
+  
+  ggplot(data=res, aes(x=x, y=y, group=grp, color=clr)) +
+    geom_abline(slope=1, intercept=0, alpha=0.3) +
+    geom_abline(slope=0, intercept=0.5, alpha=0.3) +
+    geom_point(data=df, aes(group=NA, color=NA), alpha=0.5) +
+    geom_line(alpha=0.3) +
+    theme(legend.position="none") +
+    scale_color_manual(values=viridis::viridis(4)[2:3])
+  
+}
+
+# Qbins cutoffs
+if (F) {
+  
+  # Generate cutoffs
+  n_bins <- 4
+  n <- 1000
+  x <- runif(n)
+  pi <- rbinom(n, size=1, prob=0.4)
+  # pi <- rep(0,n)
+  a <- x * (1-pi)
+  wt <- rep(1,n)
+  dat <- list(a=a, weights=wt)
+  Phi_n_inv <- construct_Phi_n(dat, which="inverse", type="step")
+  cutoffs <- round(Phi_n_inv(seq(0,1,length.out=n_bins+1)),3)
+  
+  num_0 <- sum(cutoffs==0)
+  if (num_0==1) {
+    cutoffs2 <- cutoffs
+  } else {
+    a_sub <- a[a!=0]
+    wt_sub <- wt[a!=0]
+    dat_sub <- list(a=a_sub, weights=wt_sub)
+    Phi_n_inv_sub <- construct_Phi_n(dat_sub, which="inverse", type="step")
+    cutoffs2 <- c(0,round(Phi_n_inv_sub(seq(0,1,length.out=n_bins)),3))
+  }
+  cutoffs2
+  
+  # View percent in each bin
+  a_binned <- cut(a, breaks=cutoffs2, right=F, include.lowest=T)
+  xtabs(~a_binned)/length(a_binned)
+  
+}
+
+# Cox models
+if (F) {
+  
+  # Subset datasets
+  dat_J <- ss(dat_orig_J, which(dat_orig_J$delta==1))
+  dat_M <- ss(dat_orig_M, which(dat_orig_M$delta==1))
+  
+  # Right-censor data
+  t_e_J <- 66
+  indices_J <- which(dat_J$y_star>t_e_J)
+  dat_J$y_star[indices_J] <- t_e_J
+  dat_J$delta_star[indices_J] <- 0
+  t_e_M <- 126
+  indices_M <- which(dat_M$y_star>t_e_M)
+  dat_M$y_star[indices_M] <- t_e_M
+  dat_M$delta_star[indices_M] <- 0
+  
+  # Create analysis dataframes
+  df_J <- data.frame(time=dat_J$y_star, ev=dat_J$delta_star, a=dat_J$a,
+                     w1=dat_J$w$w1, w2=dat_J$w$w2, w3=dat_J$w$w3,
+                     wts1=dat_J$weights)
+  df_M <- data.frame(time=dat_M$y_star, ev=dat_M$delta_star, a=dat_M$a,
+                     w1=dat_M$w$w1, w2=dat_M$w$w2, w3=dat_M$w$w3,
+                     wts1=dat_M$weights)
+  
+  # Run Cox models
+  coxph(Surv(time,ev)~a+w1+w2+w3, data=df_J, weights=wts1) %>% summary()
+  coxph(Surv(time,ev)~a+w1+w2+w3, data=df_M, weights=wts1) %>% summary()
+  
+}
+
 # Approximating Gamma_0
 if (F) {
   
@@ -207,7 +333,7 @@ if (F) {
   n_orig <- length(dat_orig$delta)
   dat <- ss(dat_orig, which(dat_orig$delta==1))
   weights <- dat$weights
-  vlist <- create_val_list(dat, C$appx)
+  vlist <- create_val_list(dat_orig)
   S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
   Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
   
@@ -734,7 +860,7 @@ if (F) {
     n_orig <- length(dat_orig$delta)
     dat <- ss(dat_orig, which(dat_orig$delta==1))
     weights <- dat$weights
-    vlist <- create_val_list(dat, C$appx)
+    vlist <- create_val_list(dat_orig)
     
     Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
     lambda_2 <- lambda(dat,2,Phi_n)
@@ -810,7 +936,7 @@ if (F) {
     dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
                               L$sc_params, L$sampling, L$dir)
     dat <- ss(dat_orig, which(dat_orig$delta==1))
-    vlist <- create_val_list(dat, C$appx)
+    vlist <- create_val_list(dat_orig)
     vlist$AW_grid <- NA; vlist$omega <- NA; vlist$W_grid <- NA;
     Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n)
     Psi_n <- Vectorize(function(x) {
@@ -1149,7 +1275,7 @@ if (F) {
   n_orig <- nrow(dat_orig)
 
   # Construct dataframes of values to pre-compute functions on
-  vlist <- create_val_list(dat_orig, C$appx)
+  vlist <- create_val_list(dat_orig)
   
   # Construct component functions
   S_n <- construct_S_n(dat_orig, vlist$S_n, type="true")
@@ -1202,7 +1328,7 @@ if (F) {
     )
     
     n_orig <- nrow(dat_orig)
-    vlist <- create_val_list(dat_orig, C$appx)
+    vlist <- create_val_list(dat_orig)
     
     S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
     Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type,
@@ -1242,7 +1368,7 @@ if (F) {
     )
     
     n_orig <- nrow(dat_orig)
-    vlist <- create_val_list(dat_orig, C$appx)
+    vlist <- create_val_list(dat_orig)
     
     S_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type)
     Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type,

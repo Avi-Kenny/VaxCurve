@@ -136,7 +136,6 @@ if (cfg2$run_dqa) {
   C <- list(appx=cfg$appx, t_e=550)
 
   # !!!!! Reset appx for `t_e` and `a`
-  C$appx$t_e <- 10
   C$appx$a <- 0.01 # !!!!!
   
   # Set `a` value from `a_list`
@@ -167,7 +166,7 @@ if (cfg2$run_dqa) {
 
   # Set estimation tuning parameters
   params <- list(S_n_type=cfg2$S_n_type, g_n_type="binning",
-                 ecdf_type="linear (mid)", deriv_type="m-spline",
+                 ecdf_type="linear (mid)", deriv_type="linear",
                  gamma_type="kernel", ci_type="trunc")
   
 }
@@ -181,7 +180,7 @@ if (cfg2$run_dqa) {
 dat <- ss(dat_orig, which(dat_orig$delta==1))
 
 # Obtain estimates
-p_grid <- seq(0,1,0.01)
+p_grid <- round(seq(0,1,0.01),2)
 ests <- est_curve(
   dat_orig = dat_orig,
   estimator = "Grenander",

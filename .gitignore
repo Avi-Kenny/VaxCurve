@@ -40,10 +40,13 @@ SimENgine.out
 _Archive
 R/*.pdf
 Debugging sampling issue
-705 plots
+Janssen data
 Janssen plots
+Moderna data
 Moderna plots
-Snapshot - Janssen 2021-12-09.zip
-Snapshot - Janssen 2021-12-17.zip
-Snapshot - Janssen 2021-12-20.zip
+705 data
+705 plots
+AMP data
+AMP plots
+Analysis snapshots
 R/sim.rds

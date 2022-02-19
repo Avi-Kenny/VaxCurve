@@ -25,7 +25,7 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
   
   # Sample baseline covariates
   w <- data.frame(
-    w1 = sample(seq(0,1,0.1), size=n, replace=T),
+    w1 = sample(round(seq(0,1,0.1),1), size=n, replace=T),
     w2 = rbinom(n, size=1, prob=0.5)
   )
   
@@ -116,7 +116,7 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
   # These are Monte Carlo approximations
   {
     m <- 10^6 # 10^5
-    w1 <- sample(seq(0,1,0.1), size=m, replace=T) # runif(m)
+    w1 <- sample(round(seq(0,1,0.1),1), size=m, replace=T) # runif(m)
     w2 <- rbinom(m, size=1, prob=0.5)
     
     lin <- function(w1,w2,a) {

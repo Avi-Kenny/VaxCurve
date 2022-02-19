@@ -37,7 +37,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
   # Round values
   # !!!!! Functionize and refactor w/ est_curve.R
   dat_orig$a <- round(dat_orig$a, -log10(C$appx$a))
-  dat_orig$y_star <- round(dat_orig$y_star, -log10(C$appx$y_star))
+  dat_orig$y_star <- round(dat_orig$y_star, -log10(C$appx$t_e))
   for (i in c(1:length(dat_orig$w))) {
     rnd <- 8
     tol <- C$appx$w_tol
@@ -57,7 +57,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     weights <- dat$weights
     
     # Construct dataframes of values to pre-compute functions on
-    vlist <- create_val_list(dat, C$appx)
+    vlist <- create_val_list(dat_orig)
     
     # Construct component functions
     Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
@@ -234,7 +234,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     # Setup
     n_orig <- length(dat_orig$delta)
     dat <- ss(dat_orig, which(dat_orig$delta==1))
-    vlist <- create_val_list(dat, C$appx)
+    vlist <- create_val_list(dat_orig)
     
     # Construct component functions
     f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=params$g_n_type, k=10) # !!!!! k=15
@@ -251,7 +251,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
                                              etastar_n, Theta_os_n)
     
     # Construct pieces needed for hypothesis test
-    x_mc <- seq(0,1,C$appx$a) # round(runif(10^5),-log10(C$appx$a))
+    x_mc <- round(seq(0,1,C$appx$a),-log10(C$appx$a)) # round(runif(10^5),-log10(C$appx$a))
     m <- length(x_mc)
     lambda_2 <- mean((x_mc)^2) # ~1/3
     lambda_3 <- mean((x_mc)^3) # ~1/4
@@ -296,7 +296,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
         weights <- dat$weights
         
         # Construct dataframes of values to pre-compute functions on
-        vlist <- create_val_list(dat, C$appx)
+        vlist <- create_val_list(dat_orig)
         
         # Construct component functions
         Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)

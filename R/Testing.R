@@ -10,18 +10,21 @@
   # 2. Set global constants
   params <- list(
     S_n_type="Cox PH", g_n_type="binning", ci_type="regular", cf_folds=1,
-    edge_corr="none", ecdf_type="linear (mid)", deriv_type="m-spline",
+    edge_corr="none", ecdf_type="linear (mid)", deriv_type="linear",
     gamma_type="kernel", gamma_which="new", omega_n_type="estimated",
     marg="Gamma_star"
   )
-  C <- list(points=seq(0,1,0.02), alpha_1=0.5, alpha_2=0.7, t_e=200,
-            appx=list(t_e=10, w_tol=25, y_star=1, a=0.01))
+  C <- list(points=round(seq(0,1,0.02),2), alpha_1=0.5, alpha_2=0.7, t_e=200,
+            appx=list(t_e=10, w_tol=25, a=0.01))
   L <- list(
-    n=500, alpha_3=-2, dir="decr",
-    sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5),
-    # sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5), # Uncomment this for (almost) no censoring
-    distr_A="Unif(0,1)", edge="none", surv_true="Cox PH",
-    sampling="two-phase (50%)", estimator=list(est="Grenander",params=params)
+    # n=500, alpha_3=-2, dir="decr",
+    # sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5), # sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5), # Uncomment this for (almost) no censoring
+    # distr_A="Unif(0,1)", edge="expit 0.5", surv_true="Cox PH",
+    # sampling="two-phase (50%)", estimator=list(est="Grenander",params=params)
+    n=15000, alpha_3=-4, dir="decr",
+    sc_params=list(lmbd=3e-5, v=1.5, lmbd2=3e-5, v2=1.5), # sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5), # Uncomment this for (almost) no censoring
+    distr_A="N(0.5,0.04)", edge="none", surv_true="Cox PH",
+    sampling="two-phase (6%)", estimator=list(est="Grenander",params=params)
   )
   
   # 3. Generate dataset
@@ -137,10 +140,10 @@
   dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
                             L$sc_params, "iid", L$dir) # L$sampling
   dat <- ss(dat_orig, which(dat_orig$delta==1))
-  vlist <- create_val_list(dat, C$appx)
+  vlist <- create_val_list(dat_orig)
   Phi_n1 <- construct_Phi_n(dat, type="step")
   Phi_n2 <- ecdf(dat$a)
-  round(Phi_n1(seq(0,1,0.1))-Phi_n2(seq(0,1,0.1)),10) # !!!!!
+  round(Phi_n1(round(seq(0,1,0.1),1))-Phi_n2(round(seq(0,1,0.1),1)),10) # !!!!!
   
   # Curve 1: Phi_n
   Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
@@ -179,7 +182,7 @@
   #        color="Which")
   
   # !!!!!
-  grid <- seq(0,1,0.01)
+  grid <- round(seq(0,1,0.01),2)
   curves <- c("Phi","Phi_inv")
   len <- length(grid)
   n_curves <- length(curves)
@@ -214,7 +217,7 @@
     library(numDeriv)
     
     m <- 10^5
-    w1 <- sample(seq(0,1,0.1), size=m, replace=T)
+    w1 <- sample(round(seq(0,1,0.1),1), size=m, replace=T)
     w2 <- rbinom(m, size=1, prob=0.5)
     alpha_3 <- L$alpha_3
     lmbd <- L$sc_params$lmbd
@@ -253,14 +256,14 @@
   
   # Esimate deriv_theta_n n_samples times
   deriv_ests <- c()
-  grid <- seq(0,1,0.1)
+  grid <- round(seq(0,1,0.1),1)
   n_samples <- 3 # !!!!!
   for (i in 1:n_samples) {
     
     # Construct dat_orig and vlist
     dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
                               L$sc_params, L$sampling, L$dir)
-    vlist <- create_val_list(dat, C$appx)
+    vlist <- create_val_list(dat_orig)
     
     # Construct component functions
     Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
@@ -331,7 +334,7 @@
   # Note: this check only works for surv_true=="Cox PH"
   
   # Create vlist
-  vlist <- create_val_list(dat, C$appx)
+  vlist <- create_val_list(dat_orig)
   
   # True omega_0
   S_0 <- construct_S_n(dat, vlist$S_n, type="true")
@@ -442,7 +445,7 @@
   
   
   # Plot true curves against estimated curve
-  grid <- seq(0,1,0.05)
+  grid <- round(seq(0,1,0.05),2)
   df <- data.frame(
     x = rep(grid, 3),
     y = c(gamma_n(grid), gamma_n2(grid), gamma_0(grid)),
@@ -621,7 +624,7 @@
     weights <- dat$weights
     
     # Construct dataframes of values to pre-compute functions on
-    vlist <- create_val_list(dat, C$appx)
+    vlist <- create_val_list(dat_orig)
     
     # Construct component functions
     Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
@@ -722,7 +725,7 @@
   # S_n_RF <- construct_S_n(dat, vlist$S_n, type="Random Forest")
   
   # Plot true curve against estimated curve
-  times <- seq(0,200,10)
+  times <- round(seq(0,200,10))
   n <- length(times)
   w_a <- as.data.frame(cbind(w1=rep(0.2,n), w2=rep(1,n)))
   w_b <- as.data.frame(cbind(w1=rep(0.5,n), w2=rep(1,n)))
@@ -773,7 +776,7 @@
     sampling = L$sampling,
     dir = L$dir
   )
-  vlist <- create_val_list(dat, C$appx)
+  vlist <- create_val_list(dat_orig)
   
   # Sc_n_CoxPH <- construct_S_n(dat, vlist$S_n, type="Cox PH", csf=TRUE)
   # Sc_n_RF <- construct_S_n(dat, vlist$S_n, type="Random Forest", csf=TRUE)
@@ -826,7 +829,7 @@
     dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true, # !!!!!
                               L$sc_params, L$sampling, L$dir) # !!!!!
     dat <- ss(dat_orig, which(dat_orig$delta==1)) # !!!!!
-    vlist <- create_val_list(dat, C$appx) # !!!!!
+    vlist <- create_val_list(dat_orig) # !!!!!
     # !!!!! END !!!!!
     
     # dat_orig1 <- dat_orig
@@ -931,7 +934,7 @@
 {
   
   # Construct vlist
-  vlist <- create_val_list(dat, C$appx)
+  vlist <- create_val_list(dat_orig)
   
   # # !!!!!
   # R.utils::withTimeout({
@@ -946,7 +949,7 @@
   f_aIw_n_para <- f_aIw_0 # !!!!!
   
   # Generate plot data
-  grid <- seq(0,1,0.01)
+  grid <- round(seq(0,1,0.01),2)
   f_aIw_models <- c("Truth", "Parametric", "Semiparametric")
   n_models <- length(f_aIw_models)
   len <- length(grid)
@@ -988,7 +991,7 @@
   f_a_n <- construct_f_a_n(dat_orig, NA, f_aIw_n_semi)
   
   # Generate plot data
-  grid <- seq(0,1,0.01)
+  grid <- round(seq(0,1,0.01),2)
   f_a_models <- c("Truth", "Semiparametric")
   len <- length(grid)
   plot_data <- data.frame(
@@ -1040,7 +1043,7 @@
   )
   
   # Construct estimators
-  vlist <- create_val_list(dat, C$appx)
+  vlist <- create_val_list(dat_orig)
   pi_n_logistic <- construct_pi_n(dat, vlist$W_grid, type="logistic")
   pi_n_SL <- construct_pi_n(dat, vlist$W_grid, type="SL")
   
@@ -1055,7 +1058,7 @@
   pi_0_1 <- function(w1) { pi_0(w1,w2=1) }
   
   # Plot true curves against estimated curve
-  grid <- seq(0,1,0.01)
+  grid <- round(seq(0,1,0.01),2)
   curves <- c("W2=0","W2=1")
   estimators <- c("Logistic","SL","True")
   len <- length(grid)

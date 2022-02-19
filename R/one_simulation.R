@@ -143,7 +143,7 @@ if (cfg$which_sim=="edge") {
     dat <- ss(dat_orig, which(dat_orig$delta==1))
     
     # Construct dataframes of values to pre-compute functions on
-    vlist <- create_val_list(dat, C$appx)
+    vlist <- create_val_list(dat_orig)
     
     # Construct component functions
     S_n <- construct_S_n(dat, vlist$S_n, type=L$estimator$params$S_n_type)
@@ -222,7 +222,7 @@ if (cfg$which_sim=="infl_fn_G (temp)") {
     weights <- dat$weights
     
     # Construct dataframes of values to pre-compute functions on
-    vlist <- create_val_list(dat, C$appx)
+    vlist <- create_val_list(dat_orig)
     
     # Construct component functions
     Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)

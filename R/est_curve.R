@@ -43,7 +43,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     S_n_type="Super Learner", g_n_type="binning", deriv_type="linear",
     ecdf_type="linear (mid)", gamma_type="Super Learner", gamma_which="new",
     omega_n_type="estimated", boot_reps=1000, ci_type="trunc", cf_folds=1, m=5,
-    edge_corr="none", marg="Theta", lod_shift="none", n_bins=5
+    edge_corr="none", marg="Gamma_star2", lod_shift="none", n_bins=5
   )
   for (i in c(1:length(.default_params))) {
     if (is.null(params[[names(.default_params)[i]]])) {
@@ -93,7 +93,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   
   # Rescale points and remove points outside the range of A
   points_orig <- points
-  na_head <- sum(points<a_min)
+  na_head <- sum(points<round(a_min,-log10(C$appx$a)))
   points <- round((points+a_shift)*a_scale, -log10(C$appx$a))
   na_tail <- sum(points>1)
   if (na_head>0) {
@@ -105,6 +105,28 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   
   dat <- ss(dat_orig, which(dat_orig$delta==1))
   
+  # # !!!!!
+  # vals <- vlist$S_n
+  # newX <- cbind(vals$w, a=vals$a)[which(vals$t==0),]
+  # new.times <- unique(vals$t)
+  # methods <- c("survSL.coxph", "survSL.expreg", "survSL.km",
+  #              "survSL.loglogreg", "survSL.pchreg", "survSL.weibreg")
+  # srv <- survSuperLearner(
+  #   time = dat$y_star,
+  #   event = dat$delta_star,
+  #   X = cbind(dat$w, a=dat$a),
+  #   newX = newX,
+  #   new.times = new.times,
+  #   event.SL.library = methods,
+  #   cens.SL.library = methods,
+  #   obsWeights = dat$weights,
+  #   control = list(
+  #     initWeightAlg = methods[1],
+  #     max.SL.iter = 10,
+  #     initWeight = "event"
+  #   )
+  # )
+  
   if (estimator=="Grenander") {
     
     vlist <- create_val_list(dat_orig)
@@ -112,52 +134,61 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     # Construct regular Gamma_0 estimator
     if (params$cf_folds==1) {
       
-      # !!!!! New G_n
-      dat2 <- ss(dat, which(dat$a!=0))
-      G_n <- construct_Phi_n(dat2, type=params$ecdf_type)
-      G_n_inv <- construct_Phi_n(dat2, which="inverse", type=params$ecdf_type)
-      n_orig <- length(dat_orig$delta)
-      z_n <- (1/n_orig) * sum(dat$weights * as.integer(dat$a!=0))
-      # !!!!!
-      
-      # Construct component functions
-      Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
-      Phi_n_inv <- construct_Phi_n(dat, which="inverse", type=params$ecdf_type)
-      S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
-      Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
-
-      # !!!!! New G_n
-      gcomp_n <- construct_gcomp_n(dat_orig, vals=vlist$A_grid, S_n)
-      alpha_star_n <- construct_alpha_star_n(dat, gcomp_n, z_n, vals=NA)
-      eta_ss_n <- construct_eta_ss_n(dat, S_n, z_n, vals=NA)
-      # !!!!!
-      
-      f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid,
-                                   type=params$g_n_type, k=15)
-      f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
-      g_n <- construct_g_n(f_aIw_n, f_a_n)
+      print(paste("Check 0:", Sys.time()))
+      srvSL <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
+      S_n <- srvSL$srv
+      Sc_n <- srvSL$cens
+      print(paste("Check 1:", Sys.time()))
       omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n,
                                    type=params$omega_n_type)
+      print(paste("Check 2:", Sys.time()))
+      f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid,
+                                   type=params$g_n_type, k=15) # !!!!! k=0
+      f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
+      g_n <- construct_g_n(f_aIw_n, f_a_n)
+      print(paste("Check 3:", Sys.time()))
+      
+      if (params$marg %in% c("Gamma_star", "Gamma_star2")) {
+        dat2 <- ss(dat, which(dat$a!=0))
+        Phi_n <- construct_Phi_n(dat2, type=params$ecdf_type)
+        Phi_n_inv <- construct_Phi_n(dat2, which="inverse",
+                                     type=params$ecdf_type)
+        print(paste("Check 4:", Sys.time()))
+        n_orig <- length(dat_orig$delta)
+        z_n <- (1/n_orig) * sum(dat$weights * as.integer(dat$a!=0))
+        g_n_star <- construct_g_n_star(f_aIw_n, f_a_n, z_n)
+        print(paste("Check 5:", Sys.time()))
+        eta_ss_n <- construct_eta_ss_n(dat, S_n, z_n, vals=NA)
+        print(paste("Check 6:", Sys.time()))
+        gcomp_n <- construct_gcomp_n(dat_orig, vals=vlist$A_grid, S_n)
+        print(paste("Check 7:", Sys.time()))
+        alpha_star_n <- construct_alpha_star_n(dat, gcomp_n, z_n, vals=NA)
+        print(paste("Check 8:", Sys.time()))
+      }
+      
       if (params$marg=="Theta") {
         etastar_n <- construct_etastar_n(S_n)
         Theta_os_n <- construct_Theta_os_n(dat, vlist$A_grid, omega_n,
                                            f_aIw_n, etastar_n)
       } else if (params$marg=="Gamma") {
+        Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
+        Phi_n_inv <- construct_Phi_n(dat, which="inverse", type=params$ecdf_type)
         Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n)
       } else if (params$marg=="Gamma_star") {
-        g_n_star <- construct_g_n_star(f_aIw_n, f_a_n, z_n)
         Gamma_os_n_star <- construct_Gamma_os_n_star(dat, omega_n, g_n_star,
                                                      eta_ss_n, z_n, gcomp_n,
                                                      alpha_star_n, vals=NA)
       } else if (params$marg=="Gamma_star2") {
-        g_n_star <- construct_g_n_star(f_aIw_n, f_a_n, z_n)
+        print(paste("Check 9:", Sys.time()))
         q_n <- construct_q_n(which="q_n", type="Super Learner", dat, dat_orig,
                              omega_n=omega_n, g_n_star=g_n_star, z_n=z_n,
                              gcomp_n=gcomp_n, alpha_star_n=alpha_star_n)
+        print(paste("Check 10:", Sys.time()))
         Gamma_os_n_star <- construct_Gamma_os_n_star2(dat, dat_orig, omega_n,
                                                        g_n_star, eta_ss_n, z_n,
                                                        q_n, gcomp_n,
                                                        alpha_star_n, vals=NA)
+        print(paste("Check 11:", Sys.time()))
       } else {
         stop(paste0("`params$marg` must be one of c('Theta', 'Gamma', 'Gamma_s",
                     "tar', 'Gamma_star2'"))
@@ -175,21 +206,27 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     # Construct cross-fitted Gamma_0 estimator
     if (params$cf_folds>1) {
       
-      Gamma_os_n <- construct_Gamma_cf(dat_orig, params, vlist)
-      
-      # Recompute functions on full dataset
-      Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
-      Phi_n_inv <- construct_Phi_n(dat, which="inverse", type=params$ecdf_type)
-      
-      # Construct cross-fitted one-step edge estimator
-      if (params$edge_corr!="none") {
-        # !!!!! TO DO
-      }
+      # Gamma_os_n <- construct_Gamma_cf(dat_orig, params, vlist)
+      # 
+      # # Recompute functions on full dataset
+      # Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
+      # Phi_n_inv <- construct_Phi_n(dat, which="inverse", type=params$ecdf_type)
+      # 
+      # # Construct cross-fitted one-step edge estimator
+      # if (params$edge_corr!="none") {
+      #   # !!!!! TO DO
+      # }
       
     }
     
     # Construct Psi_n
-    if (params$marg=="Gamma") {
+    if (params$marg=="Theta") {
+      if (dir=="incr") {
+        Psi_n <- Theta_os_n
+      } else {
+        Psi_n <- Vectorize(function(x) { -1 * Theta_os_n(x) })
+      }
+    } else if (params$marg=="Gamma") {
       if (dir=="incr") {
         Psi_n <- Vectorize(function(x) {
           Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
@@ -199,25 +236,20 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
           -1 * Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
         })
       }
-    } else if (params$marg=="Theta") {
-      if (dir=="incr") {
-        Psi_n <- Theta_os_n
-      } else {
-        Psi_n <- Vectorize(function(x) { -1 * Theta_os_n(x) })
-      }
     } else if (params$marg %in% c("Gamma_star", "Gamma_star2")) {
       if (dir=="incr") {
         Psi_n <- Vectorize(function(x) {
-          Gamma_os_n_star(round(G_n_inv(x), -log10(C$appx$a)))
+          Gamma_os_n_star(round(Phi_n_inv(x), -log10(C$appx$a)))
         })
       } else {
         Psi_n <- Vectorize(function(x) {
-          -1 * Gamma_os_n_star(round(G_n_inv(x), -log10(C$appx$a)))
+          -1 * Gamma_os_n_star(round(Phi_n_inv(x), -log10(C$appx$a)))
         })
       }
     }
     
     # Compute GCM and extract its derivative
+    print(paste("Check 12:", Sys.time()))
     grid <- round(seq(0,1,C$appx$a),-log10(C$appx$a))
     gcm <- gcmlcm(x=grid, y=Psi_n(grid), type="gcm")
     dGCM <- approxfun(
@@ -227,54 +259,64 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       rule = 2,
       f = 0
     )
+    print(paste("Check 13:", Sys.time()))
     
     # Construct Grenander-based theta_n
-    if (params$marg=="Gamma") {
+    if (params$marg=="Theta") {
       if (dir=="incr") {
-        theta_n_Gr <- Vectorize(function(x) { min(max(dGCM(Phi_n(x)),0),1) })
+        theta_n_Gr <- Vectorize(function(x) {
+          # min(max(dGCM(x),0),1)
+          dGCM(x)
+        })
       } else {
-        theta_n_Gr <- Vectorize(function(x) { min(max(-1 * dGCM(Phi_n(x)),0),1) })
+        theta_n_Gr <- Vectorize(function(x) {
+          # min(max(-1*dGCM(x),0),1)
+          -1*dGCM(x)
+        })
       }
-    } else if (params$marg=="Theta") {
+    } else if (params$marg %in% c("Gamma", "Gamma_star", "Gamma_star2")) {
       if (dir=="incr") {
-        theta_n_Gr <- Vectorize(function(x) { min(max(dGCM(x),0),1) })
+        theta_n_Gr <- Vectorize(function(x) {
+          # min(max(dGCM(Phi_n(x)),0),1)
+          dGCM(Phi_n(x))
+        })
       } else {
-        theta_n_Gr <- Vectorize(function(x) { min(max(-1*dGCM(x),0),1) })
-      }
-    # } else if (params$marg=="Gamma_star") {
-    } else if (params$marg %in% c("Gamma_star", "Gamma_star2")) {
-      if (dir=="incr") {
-        # !!!!! COnsolidate this by renaming G_n to Phi_n and G_n_inv to Phi_n_inv ?????
-        theta_n_Gr <- Vectorize(function(x) { min(max(dGCM(G_n(x)),0),1) })
-      } else {
-        theta_n_Gr <- Vectorize(function(x) { min(max(-1 * dGCM(G_n(x)),0),1) })
+        theta_n_Gr <- Vectorize(function(x) {
+          # min(max(-1 * dGCM(Phi_n(x)),0),1)
+          -1 * dGCM(Phi_n(x))
+        })
       }
     }
     
     # Recompute functions on full dataset
     if (params$cf_folds>1) {
-      # !!!!! Update to incorporate params$marg %in% c("Theta", "Gamma_star")
-      S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
-      Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
-      f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid,
-                                   type=params$g_n_type, k=15)
-      f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
-      omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n,
-                                   type=params$omega_n_type)
+      # # !!!!! Update to incorporate params$marg %in% c("Theta", "Gamma_star")
+      # srvSL <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
+      # S_n <- srvSL$srv
+      # Sc_n <- srvSL$cens
+      # f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid,
+      #                              type=params$g_n_type, k=15)
+      # f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
+      # omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n,
+      #                              type=params$omega_n_type)
     }
     
-    # Compute new functions
+    # Compute variance component functions
+    print(paste("Check 14:", Sys.time()))
     f_aIw_delta1_n <- construct_f_aIw_n(dat, vlist$AW_grid,
-                                        type=params$g_n_type, k=15, delta1=TRUE)
+                                        type=params$g_n_type, k=15, delta1=TRUE) # !!!!! k=0
     f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid,
                                     f_aIw_delta1_n)
+    print(paste("Check 15:", Sys.time()))
     gamma_n <- construct_gamma_n(dat_orig, dat, type=params$gamma_type,
                                  which=params$gamma_which, vals=vlist$A_grid,
                                  omega_n=omega_n, f_aIw_n=f_aIw_n, f_a_n=f_a_n,
                                  f_a_delta1_n=f_a_delta1_n)
+    print(paste("Check 16:", Sys.time()))
     if (params$gamma_which=="new") {
       pi_star_n <- construct_pi_star_n(dat_orig, vals=NA, type="Super Learner",
                                        f_aIw_n, f_aIw_delta1_n)
+      print(paste("Check 17:", Sys.time()))
     }
     
     # Edge correction
@@ -317,16 +359,20 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     }
     
     # Generate estimates for each point
+    print(paste("Check 18:", Sys.time()))
     ests <- theta_n(points)
+    print(paste("Check 19:", Sys.time()))
     
     # Construct variance scale factor
     deriv_theta_n <- construct_deriv_theta_n(theta_n, type=params$deriv_type,
                                              dir=dir)
+    print(paste("Check 20:", Sys.time()))
     if (params$gamma_which=="old") {
       tau_n <- construct_tau_n(which="old", deriv_theta_n, gamma_n, f_a_n)
     } else if (params$gamma_which=="new") {
       tau_n <- construct_tau_n(which="new", deriv_theta_n, gamma_n, f_a_n,
                                pi_star_n, g_n, dat_orig)
+      print(paste("Check 21:", Sys.time()))
     }
     
     # Generate confidence limits
@@ -339,6 +385,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       
       # Generate variance scale factor for each point
       tau_ns <- tau_n(points)
+      print(paste("Check 22:", Sys.time()))
       
       # Construct CIs
       # The 0.975 quantile of the Chernoff distribution occurs at roughly 1.00
@@ -384,11 +431,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   
   if (estimator=="Qbins") {
     
-    # !!!!! Handle case in which marginal distribution has mass
     # !!!!! Implement cross-fitted version
     # !!!!! Adapt for `points` as above; make sure NA values can be handled
-    
-    # !!!!! transform/round X-values
     
     # Construct bin cutoffs
     {
@@ -407,9 +451,10 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     }
     
     # Function to transform A values to categorical bins values
-    transform_a <- function(a) {
+    # !!!!! Wrapped this in Vectorize()
+    transform_a <- Vectorize(function(a) {
       cut(a, breaks=cutoffs, right=F, include.lowest=T)
-    }
+    })
     
     # Create vlist
     vlist <- create_val_list(dat_orig, factor_A=unique(transform_a(dat$a)))
@@ -423,8 +468,9 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     # !!!!! Check to see if these need to be modified to handle factor A (including different S_n types)
     # Note: S_n and Sc_n will not work with type="true"
-    S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
-    Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
+    srvSL <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
+    S_n <- srvSL$srv
+    Sc_n <- srvSL$cens
     omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n,
                                  type=params$omega_n_type)
     pi_n <- construct_pi_n(dat, vlist$W_grid, type="generalized",
@@ -458,13 +504,13 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     vlist <- create_val_list(dat_orig)
     
     # Construct component functions
-    S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
+    S_n <- (construct_S_n(dat, vlist$S_n, type=params$S_n_type))$srv
     gcomp_n <- construct_gcomp_n(dat_orig, vals=vlist$A_grid, S_n)
     
     # Compute estimates and dummy CIs
     ests <- gcomp_n(points)
-    ci_lo <- rep(0, length(ests))
-    ci_hi <- rep(0, length(ests))
+    ci_lo <- rep(0, length(ests)) # !!!!! Replace this with new analytic estimator
+    ci_hi <- rep(0, length(ests)) # !!!!! Replace this with new analytic estimator
     
     # Add extra return data
     # res[["ex_S_n"]] <- S_n(C$t_e, w=c(0.5,1), a=0.5)
@@ -479,7 +525,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     ci_hi = c(rep(NA,na_head), ci_hi, rep(NA,na_tail))
   )
   if ("gcomp" %in% return_extra) {
-    S_n2 <- construct_S_n(dat, vlist$S_n, type="Cox PH")
+    S_n2 <- (construct_S_n(dat, vlist$S_n, type="Cox PH"))$srv
     res$gcomp <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n=S_n2)
   }
   fns_extra <- c("f_a_n", "gamma_n", "deriv_theta_n", "Phi_n_inv", "Theta_os_n",

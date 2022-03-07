@@ -11,11 +11,11 @@
 # GitHub packages: tedwestling/ctsCausal, tedwestling/CFsurvival, 
 #                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
-  main_task = "analysis.R", # run update analysis.R
-  which_sim = "estimation", # "estimation" "edge" "testing" "infl_fn_G (temp)"
-  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1
+  main_task = "run", # run update analysis.R
+  which_sim = "Cox", # "estimation" "edge" "testing" "Cox"
+  level_set_which = "level_set_Cox_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
   # keep = c(1:3,7:9,16:18,22:24),
-  num_sim = 1000,
+  num_sim = 700,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm", "tidyr",
@@ -24,7 +24,7 @@ cfg <- list(
                      "data.table", "latex2exp"),
   parallel = "none",
   stop_at_error = FALSE,
-  appx = list(t_e=10, w_tol=25, a=0.001) # !!!!! t_e=1, a=0.001
+  appx = list(t_e=1, w_tol=25, a=0.01) # !!!!! a=0.001
 )
 
 # Set cluster config
@@ -71,6 +71,7 @@ if (load_pkgs_local) {
   source("generate_data.R", local=TRUE)
   source("est_curve.R", local=TRUE)
   source("test_2.R", local=TRUE)
+  source("MarginalizedCox.R", local=TRUE)
   source("fns_doseresp.R", local=TRUE)
 }
 
@@ -88,7 +89,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       n = 5000,
       alpha_3 = c(0,-2,-4),
       dir = "decr",
-      sc_params = list("sc_params"=list(lmbd=9e-7, v=1.5, lmbd2=1e-5, v2=1.5)),
+      sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
       distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
       edge = c("none", "expit", "complex"),
       surv_true = c("Cox PH", "complex"),
@@ -131,20 +132,41 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Estimation: ideal params
   level_set_estimation_1 <- list(
-    n = 1000, # 1000
+    n = 1000,
     alpha_3 = -2,
-    dir = c("incr", "decr"),
+    dir = c("decr"), # "incr"
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"), # "Unif(0.3,0.7)" "N(0.5,0.01)", "N(0.5,0.04)"
+    distr_A = "Unif(0,1)",
+    # distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
     edge = c("none"), # c("none", "expit 0.2")
     surv_true = c("Cox PH"), # "complex"
-    sampling = c("two-phase (72%)"), # "iid", "two-phase (72%)"
+    # sampling = c("two-phase (72%)"),
+    sampling = c("iid", "two-phase (72%)"),
     estimator = list(
-      "Qbins (5)" = list(est="Qbins", params=list(n_bins=8, S_n_type="Cox PH")),
-      "Grenander" = list(
+      # "Qbins (true)" = list(
+      #   est = "Qbins",
+      #   params = list(n_bins=8, S_n_type="Cox PH")
+      # ),
+      "Grenander (Cox/true)" = list(
         est = "Grenander",
-        params = list(marg="Gamma_star2", S_n_type="Cox PH")
+        params = list(marg="Gamma_star2", S_n_type="Cox PH",
+                      g_n_type="true")
       )
+      # "Grenander (Cox/binning)" = list(
+      #   est = "Grenander",
+      #   params = list(marg="Gamma_star2", S_n_type="Cox PH",
+      #                 g_n_type="binning")
+      # ),
+      # "Grenander (SL/true)" = list(
+      #   est = "Grenander",
+      #   params = list(marg="Gamma_star2", S_n_type="Super Learner",
+      #                 g_n_type="true")
+      # ),
+      # "Grenander (SL/binning)" = list(
+      #   est = "Grenander",
+      #   params = list(marg="Gamma_star2", S_n_type="Super Learner",
+      #                 g_n_type="binning")
+      # )
     )
   )
   
@@ -202,6 +224,19 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     )
   )
   
+  # Estimation: ideal params
+  level_set_Cox_1 <- list(
+    n = 500,
+    alpha_3 = -2,
+    dir = "decr",
+    sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
+    distr_A = c("Unif(0,1)"),
+    # distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
+    edge = "none",
+    sampling = c("iid") # "two-phase (72%)"
+    # tau_mult = c(2,4,6)
+  )
+  
   level_set <- eval(as.name(cfg$level_set_which))
   
 }
@@ -257,6 +292,8 @@ if (cfg$main_task=="run") {
         "construct_Gamma_os_n_star", "construct_q_n",
         "construct_infl_fn_Gamma2", "construct_Theta_os_n2",
         "construct_infl_fn_Theta", "construct_pi_star_n",
+        
+        "int_appx", "int_step", "cox_var",
         
         "est_curve", "generate_data",
         "lambda", "one_simulation", "test_2"
@@ -719,7 +756,7 @@ if (FALSE) {
   
   # Filter data
   d <- sim$results
-  d %<>% filter(level_id==3)
+  d %<>% filter(level_id==1)
   
   # Set up vector containers
   theta_true <- c()
@@ -763,7 +800,7 @@ if (FALSE) {
       color = "orange",
       linetype = "dashed"
     ) +
-    ylim(c(0,0.02)) + # 0.02
+    ylim(c(0,0.8)) + # 0.02
     theme(legend.position="none")
   
 }

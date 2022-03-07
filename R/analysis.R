@@ -8,7 +8,7 @@
 
 {
   # Choose analysis
-  which_analysis <- "AMP" # Janssen Moderna AMP
+  which_analysis <- "Moderna" # Janssen Moderna AMP
   
   # # TEMP: AMP analysis
   # ..tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
@@ -36,9 +36,10 @@
   # !!!!! In the correlates repo, if t_e=0, it is inferred from the data
   cfg2 <- list(
     analysis = which_analysis,
+    run_analysis = F,
     run_dqa = F,
     run_debug = list(gren_var=F, objs=F),
-    run_hyptest = F
+    run_hyptest = T
   )
   
   # Set up analysis-specific configuration variables. Each row in the cfg2$map
@@ -222,9 +223,7 @@
     cfg2$endpoint <- "HIV-1 infection"
     cfg2$amp_protocol <- c("HVTN 703", "HVTN 704", "Pooled")
     cfg2$amp_tx <- c("C3", "T1", "T2", "T1+T2")
-    # cfg2$day <- 0
     cfg2$t_e <- c(595,595) # c(601,609)
-    # cfg2$t_e <- c(496,595,585,595,595,563,560,563,595,595,585,595) # !!!!!
     cfg2$dataset <- "amp_survival_all.csv"
     cfg2$txct <- F
     cfg2$cr2_trial <- F
@@ -295,7 +294,7 @@
   
   # Set config based on local vs. cluster
   if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
-    cfg2$tid <- 2
+    cfg2$tid <- 1
     cfg2$dataset <- paste0(cfg2$folder_cluster,cfg2$dataset)
   } else {
     cfg2$tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
@@ -487,7 +486,7 @@
 ##### Import Cox model estimates #####
 ######################################.
 
-if (any(unlist(c(cfg2$plot_cve,cfg2$plot_risk))=="Cox")) {
+if (cfg2$run_analysis && any(unlist(c(cfg2$plot_cve,cfg2$plot_risk))=="Cox")) {
   
   path1 <- paste0(cfg2$folder_local, "/output/", cfg2$cr2_trial, "/",
                   cfg2$cr2_COR, "/marginalized.risk.Rdata")
@@ -537,7 +536,7 @@ if (any(unlist(c(cfg2$plot_cve,cfg2$plot_risk))=="Cox")) {
 ##### Calculate Kaplan-Meier risk estimates #####
 #################################################.
 
-if (cfg2$plot_risk$overall=="KM") {
+if (cfg2$run_analysis && cfg2$plot_risk$overall=="KM") {
   
   srv_ov <- survfit(Surv(dat_orig$y_star,dat_orig$delta_star)~1)
   risk_ov <- 1 - srv_ov$surv[which.min(abs(srv_ov$time-C$t_e))]
@@ -731,7 +730,8 @@ if (cfg2$run_dqa) {
 ##### Data analysis (Grenander) #####
 #####################################.
 
-if (any(unlist(c(cfg2$plot_cve$est,cfg2$plot_risk$est))=="Grenander")) {
+if (cfg2$run_analysis &&
+    any(unlist(c(cfg2$plot_cve$est,cfg2$plot_risk$est))=="Grenander")) {
   
   # Obtain estimates
   return_extra <- c("Phi_n_inv", "deriv_theta_n", "f_a_n", "gamma_n", "Psi_n",
@@ -783,7 +783,8 @@ if (any(unlist(c(cfg2$plot_cve$est,cfg2$plot_risk$est))=="Grenander")) {
 ##### Data analysis (Qbins) #####
 #################################.
 
-if (any(unlist(c(cfg2$plot_cve$est,cfg2$plot_risk$est))=="Qbins")) {
+if (cfg2$run_analysis &&
+    any(unlist(c(cfg2$plot_cve$est,cfg2$plot_risk$est))=="Qbins")) {
   
   # Obtain estimates
   return_extra <- c("Phi_n_inv", "deriv_theta_n", "f_a_n", "gamma_n", "Psi_n",
@@ -820,7 +821,8 @@ if (cfg2$run_hyptest) {
   res <- test_2(
     dat_orig = dat_orig,
     alt_type = "two-tailed", # decr
-    params = list()
+    params = list(),
+    return_extras = T # !!!!!
   )
   res_df <- data.frame(reject=res$reject, p_val=res$p_val, beta_n=res$beta_n,
                        sd_n=res$sd_n, var_n=res$var_n)
@@ -829,6 +831,10 @@ if (cfg2$run_hyptest) {
     file = paste0(cfg2$analysis," plots/hyptest_",cfg2$tid,".csv"),
     sep = ",",
     row.names = FALSE
+  )
+  saveRDS(
+    res$Theta_os_n,
+    paste0(cfg2$analysis," plots/Theta_os_n_",cfg2$tid,".rds")
   )
   
 }

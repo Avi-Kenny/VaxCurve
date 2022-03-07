@@ -44,9 +44,6 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
     stop("distr_A incorrectly specified")
   }
   
-  # # Round A values to speed computation
-  # a <- round(a, -log10(C$appx$a))
-  
   # Adjust A for point mass at the edge
   if (edge=="expit 0.2") {
     edge_probs <- expit(w$w1+w$w2-2.5)
@@ -116,7 +113,7 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
   # These are Monte Carlo approximations
   {
     m <- 10^6 # 10^5
-    w1 <- sample(round(seq(0,1,0.1),1), size=m, replace=T) # runif(m)
+    w1 <- sample(round(seq(0,1,0.1),1), size=m, replace=T)
     w2 <- rbinom(m, size=1, prob=0.5)
     
     lin <- function(w1,w2,a) {
@@ -145,7 +142,8 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
       return(1 - mean(S_0(C$t_e,w1,w2,a)))
     })
     
-    a <- round(runif(m), -log10(C$appx$a))
+    # a <- round(runif(m), -log10(C$appx$a))
+    a <- runif(m)
     Theta_true_f <- Vectorize(function(x) {
       return(mean( as.integer(a<=x) * (1-S_0(C$t_e,w1,w2,a)) ))
     })

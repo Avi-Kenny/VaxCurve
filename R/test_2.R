@@ -14,7 +14,7 @@
 #'     do not estimate its variance
 #' @return Binary; is null rejected (1) or not (0)
 test_2 <- function(dat_orig, alt_type="two-tailed", params,
-                   test_stat_only=FALSE) {
+                   test_stat_only=F, return_extras=F) {
   
   # Set default params
   .default_params <- list(
@@ -66,8 +66,9 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=params$g_n_type, k=15)
     f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
     g_n <- construct_g_n(f_aIw_n, f_a_n)
-    S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
-    Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
+    srvSL <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
+    S_n <- srvSL$srv
+    Sc_n <- srvSL$cens
     omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n,
                                  type=params$omega_n_type)
     
@@ -238,8 +239,9 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     
     # Construct component functions
     f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=params$g_n_type, k=10) # !!!!! k=15
-    S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
-    Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
+    srvSL <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
+    S_n <- srvSL$srv
+    Sc_n <- srvSL$cens
     omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n,
                                  type=params$omega_n_type)
     etastar_n <- construct_etastar_n(S_n)
@@ -305,8 +307,9 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
         f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=params$g_n_type, k=15)
         f_a_n <- construct_f_a_n(dat_orig_b, vlist$A_grid, f_aIw_n)
         g_n <- construct_g_n(f_aIw_n, f_a_n)
-        S_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
-        Sc_n <- construct_S_n(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
+        srvSL <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
+        S_n <- srvSL$srv
+        Sc_n <- srvSL$cens
         omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n,
                                      type=params$omega_n_type)
         Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n)
@@ -390,8 +393,9 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     #   weights_0 <- wts(dat_0) # !!!!!
     #   
     #   G_0 <- construct_Phi_n(dat_0, type=params$ecdf_type)
-    #   S_0 <- construct_S_n(dat_0, type=params$S_n_type)
-    #   Sc_0 <- construct_S_n(dat_0, type=params$S_n_type, csf=TRUE)
+    #   srvSL <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
+    #   S_0 <- srvSL$srv
+    #   Sc_0 <- srvSL$cens
     #   omega_0 <- construct_omega_n(S_0, Sc_0)
     #   f_aIw_n <- construct_f_aIw_n(dat_0, type=params$g_n_type, k=15)
     #   f_a_n <- construct_f_a_n(dat_0_orig, f_aIw_n=f_aIw_n)
@@ -484,37 +488,48 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     
   }
   
-  return(list(
+  res <- list(
     reject = as.integer(p_val<0.05),
     p_val = p_val,
     beta_n = beta_n,
     sd_n = sd_n,
     var_n = var_n
-    # if1_mean = if1_mean, # !!!!!
-    # if2_mean = if2_mean, # !!!!!
-    # r_1n = Psi_1_est - if1_mean, # !!!!!
-    # r_2n = Psi_2_est - if2_mean, # !!!!!
-    # Psi_1_var_est = Psi_1_var_est,
-    # sum12_est = Psi_1_est+Psi_2_est, # !!!!!
-    # sum12_var_est = sum12_var_est, # !!!!!
-    # Psi_1_est = Psi_1_est, # !!!!!
-    # Psi_2_est = Psi_2_est, # !!!!!
-    # Psi_G_est = Psi_G_est-Gamma_0(xx), # !!!!!
-    # Psi_1_var_est = Psi_1_var_est, # !!!!!
-    # Psi_2_var_est = Psi_2_var_est, # !!!!!
-    # Psi_12_covar = Psi_12_covar, # !!!!!
-    # p_val_Psi_1 = p_val_Psi_1, # !!!!!
-    # p_val_Psi_2 = p_val_Psi_2, # !!!!!
-    # p_val_Psi_G = p_val_Psi_G, # !!!!!
-    # p_val_sum12 = p_val_sum12, # !!!!!
-    # p_val_sum12b = p_val_sum12b, # !!!!!
-    # p_val_alt = p_val_alt, # !!!!!
-    # reject_Psi_1 = as.integer(p_val_Psi_1<0.05), # !!!!!
-    # reject_Psi_2 = as.integer(p_val_Psi_2<0.05), # !!!!!
-    # reject_Psi_G = as.integer(p_val_Psi_G<0.05) # !!!!!
-    # reject_sum12 = as.integer(p_val_sum12<0.05), # !!!!!
-    # reject_sum12b = as.integer(p_val_sum12b<0.05), # !!!!!
-    # reject_alt = as.integer(p_val_alt<0.05) # !!!!!
-  ))
+  )
+  
+  # Return debugging components (var="Monte Carlo")
+  if (return_extras) {
+    res$Theta_os_n <- Theta_os_n
+  }
+  
+  # Return debugging components (var="asymptotic")
+  if (F) {
+    # res$if1_mean <- if1_mean
+    # res$if2_mean <- if2_mean
+    # res$r_1n <- Psi_1_est - if1_mean
+    # res$r_2n <- Psi_2_est - if2_mean
+    # res$Psi_1_var_est <- Psi_1_var_est
+    # res$sum12_est <- Psi_1_est+Psi_2_est
+    # res$sum12_var_est <- sum12_var_est
+    # res$Psi_1_est <- Psi_1_est
+    # res$Psi_2_est <- Psi_2_est
+    # res$Psi_G_est <- Psi_G_est-Gamma_0(xx)
+    # res$Psi_1_var_est <- Psi_1_var_est
+    # res$Psi_2_var_est <- Psi_2_var_est
+    # res$Psi_12_covar <- Psi_12_covar
+    # res$p_val_Psi_1 <- p_val_Psi_1
+    # res$p_val_Psi_2 <- p_val_Psi_2
+    # res$p_val_Psi_G <- p_val_Psi_G
+    # res$p_val_sum12 <- p_val_sum12
+    # res$p_val_sum12b <- p_val_sum12b
+    # res$p_val_alt <- p_val_alt
+    # res$reject_Psi_1 <- as.integer(p_val_Psi_1<0.05)
+    # res$reject_Psi_2 <- as.integer(p_val_Psi_2<0.05)
+    # res$reject_Psi_G <- as.integer(p_val_Psi_G<0.05)
+    # res$reject_sum12 <- as.integer(p_val_sum12<0.05)
+    # res$reject_sum12b <- as.integer(p_val_sum12b<0.05)
+    # res$reject_alt <- as.integer(p_val_alt<0.05)
+  }
+  
+  return(res)
   
 }

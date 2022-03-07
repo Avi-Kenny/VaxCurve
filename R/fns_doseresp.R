@@ -362,58 +362,12 @@ construct_Phi_n <- function (dat, which="ecdf", type="step") {
 #' @param vals List of values to pre-compute function on; passed to
 #'     construct_superfunc(); REQUIRED FOR SUPERLEARNER
 #' @param type One of c("true", "Cox PH", "Random Forest", "Super Learner")
-#' @param csf Logical; if TRUE, estimate the conditional survival
-#'     function of the censoring distribution instead
 #' @param return_model Logical; if TRUE, return the model object instead of the
 #'     function
 #' @return Conditional density estimator function
-construct_S_n <- function(dat, vals, type, csf=F, return_model=F) {
-  
-  if (csf) { dat$delta_star <- round(1-dat$delta_star) }
-  
-  if (type %in% c("Cox PH", "Random Forest")) {
-    fml <- "Surv(y_star,delta_star)~a"
-    for (i in 1:length(dat$w)) {
-      fml <- paste0(fml, "+w",i)
-    }
-    fml <- formula(fml)
-    df <- cbind("y_star"=dat$y_star, "delta_star"=dat$delta_star, "a"=dat$a,
-                dat$w, "weights"=dat$weights)
-  }
-  
-  if (type=="Random Forest") {
-    
-    model <- rfsrc(fml, data=df, ntree=500, mtry=2, nodesize=100,
-                   splitrule="logrank", nsplit=0, case.wt=df$weights,
-                   samptype="swor")
-    if (return_model) { return(model) }
-    
-    newX <- cbind(vals$w, a=vals$a)[which(vals$t==0),]
-    pred <- predict(model, newdata=newX)
-    
-    fnc <- function(t, w, a) {
-      r <- list()
-      for (i in 1:length(w)) {
-        r[[i]] <- which(abs(w[i]-newX[[paste0("w",i)]])<1e-8)
-      }
-      r[[length(w)+1]] <- which(abs(a-newX[["a"]])<1e-8)
-      row <- Reduce(intersect, r)
-      col <- which.min(abs(t-pred$time.interest))
-      if (length(row)!=1) {
-        stop(paste0("Error in construct_S_n (B); ", "t=",t,",w=(",
-                    paste(w,collapse=","),"),a=",a,""))
-      }
-      if (length(col)!=1) {
-        stop(paste0("Error in construct_S_n (C); ", "t=",t,",w=(",
-                    paste(w,collapse=","),"),a=",a,""))
-      }
-      return(pred$survival[row,col])
-    }
-    
-  }
+construct_S_n <- function(dat, vals, type, return_model=F) {
   
   if (type %in% c("Cox PH", "Super Learner")) {
-    
     if (type=="Cox PH") {
       methods <- c("survSL.coxph")
     } else if (type=="Super Learner") {
@@ -424,15 +378,14 @@ construct_S_n <- function(dat, vals, type, csf=F, return_model=F) {
     
     newX <- cbind(vals$w, a=vals$a)[which(vals$t==0),]
     new.times <- unique(vals$t)
-    
     srv <- survSuperLearner(
       time = dat$y_star,
       event = dat$delta_star,
       X = cbind(dat$w, a=dat$a),
       newX = newX,
       new.times = new.times,
-      event.SL.library = c(methods),
-      cens.SL.library = c(methods),
+      event.SL.library = methods,
+      cens.SL.library = methods,
       obsWeights = dat$weights,
       control = list(
         initWeightAlg = methods[1],
@@ -440,9 +393,11 @@ construct_S_n <- function(dat, vals, type, csf=F, return_model=F) {
       )
     )
     srv_pred <- srv$event.SL.predict
+    cens_pred <- srv$cens.SL.predict
     rm(srv)
     
-    fnc <- function(t, w, a) {
+    # !!!!! Later consolidate these via a wrapper/constructor function
+    fnc_srv <- function(t, w, a) {
       r <- list()
       for (i in 1:length(w)) {
         r[[i]] <- which(abs(w[i]-newX[[paste0("w",i)]])<1e-8)
@@ -465,6 +420,29 @@ construct_S_n <- function(dat, vals, type, csf=F, return_model=F) {
       return(srv_pred[row,col])
     }
     
+    fnc_cens <- function(t, w, a) {
+      r <- list()
+      for (i in 1:length(w)) {
+        r[[i]] <- which(abs(w[i]-newX[[paste0("w",i)]])<1e-8)
+      }
+      if (class(newX[["a"]][1])=="factor") {
+        r[[length(w)+1]] <- which(a==newX[["a"]])
+      } else {
+        r[[length(w)+1]] <- which(abs(a-newX[["a"]])<1e-8)
+      }
+      row <- Reduce(intersect, r)
+      col <- which.min(abs(t-new.times))
+      if (length(row)!=1) {
+        stop(paste0("Error in construct_S_n (B); ", "t=",t,",w=(",
+                    paste(w,collapse=","),"),a=",a,""))
+      }
+      if (length(col)!=1) {
+        stop(paste0("Error in construct_S_n (C); ", "t=",t,",w=(",
+                    paste(w,collapse=","),"),a=",a,""))
+      }
+      return(cens_pred[row,col])
+    }
+    
   }
   
   if (type=="true") {
@@ -475,42 +453,42 @@ construct_S_n <- function(dat, vals, type, csf=F, return_model=F) {
     v <- L$sc_params$v
     lmbd2 <- L$sc_params$lmbd2
     v2 <- L$sc_params$v2
-    if (csf) {
-      fnc <- function(t, w, a) {
-        if (L$surv_true=="Cox PH") {
-          lin <- C$alpha_1*w[1] + C$alpha_2*w[2] - 1
-        } else if (L$surv_true=="complex") {
-          lin <- C$alpha_1*pmax(0,2-8*abs(w[1]-0.5)) - 0.35
+    
+    fnc_srv <- function(t, w, a) {
+      if (L$surv_true=="Cox PH") {
+        if (L$dir=="decr") {
+          lin <- C$alpha_1*w[1] + C$alpha_2*w[2] + alpha_3*a - 1.7
+        } else {
+          lin <- C$alpha_1*w[1] + C$alpha_2*w[2] + alpha_3*(1-a) - 1.7
         }
-        return(exp(-1*lmbd2*(t^v2)*exp(lin)))
-      }
-    } else {
-      fnc <- function(t, w, a) {
-        if (L$surv_true=="Cox PH") {
-          if (L$dir=="decr") {
-            lin <- C$alpha_1*w[1] + C$alpha_2*w[2] + alpha_3*a - 1.7
-          } else {
-            lin <- C$alpha_1*w[1] + C$alpha_2*w[2] + alpha_3*(1-a) - 1.7
-          }
-        } else if (L$surv_true=="complex") {
-          if (L$dir=="decr") {
-            lin <- C$alpha_1*pmax(0,2-8*abs(w[1]-0.5)) +
-              2.5*alpha_3*w[2]*a + 0.7*alpha_3*(1-w[2])*a - 1.3
-          } else {
-            lin <- C$alpha_1*pmax(0,2-8*abs(w[1]-0.5)) +
-              2.5*alpha_3*w[2]*(1-a) + 0.7*alpha_3*(1-w[2])*(1-a) - 1.3
-          }
+      } else if (L$surv_true=="complex") {
+        if (L$dir=="decr") {
+          lin <- C$alpha_1*pmax(0,2-8*abs(w[1]-0.5)) +
+            2.5*alpha_3*w[2]*a + 0.7*alpha_3*(1-w[2])*a - 1.3
+        } else {
+          lin <- C$alpha_1*pmax(0,2-8*abs(w[1]-0.5)) +
+            2.5*alpha_3*w[2]*(1-a) + 0.7*alpha_3*(1-w[2])*(1-a) - 1.3
         }
-        return(exp(-1*lmbd*(t^v)*exp(lin)))
       }
+      return(exp(-1*lmbd*(t^v)*exp(lin)))
+    }
+    
+    fnc_cens <- function(t, w, a) {
+      if (L$surv_true=="Cox PH") {
+        lin <- C$alpha_1*w[1] + C$alpha_2*w[2] - 1
+      } else if (L$surv_true=="complex") {
+        lin <- C$alpha_1*pmax(0,2-8*abs(w[1]-0.5)) - 0.35
+      }
+      return(exp(-1*lmbd2*(t^v2)*exp(lin)))
     }
     
   }  
   
-  sfnc <- construct_superfunc(fnc, aux=NA, vec=c(1,2,1), vals=vals)
-  rm("vals", envir=environment(get("fnc",envir=environment(sfnc))))
+  sfnc_srv <- construct_superfunc(fnc_srv, aux=NA, vec=c(1,2,1), vals=vals)
+  sfnc_cens <- construct_superfunc(fnc_cens, aux=NA, vec=c(1,2,1), vals=vals)
+  rm("vals", envir=environment(get("fnc_srv",envir=environment(sfnc_srv))))
   
-  return(sfnc)
+  return(list(srv=sfnc_srv, cens=sfnc_cens))
   
 }
 
@@ -1180,6 +1158,10 @@ construct_f_aIw_n <- function(dat, vals=NA, type, k=0, delta1=FALSE) {
     
     if (L$distr_A=="Unif(0,1)") {
       fnc <- function(a, w) { 1 }
+    } else if (L$distr_A=="Unif(0.3,0.7)") {
+      fnc <- function(a, w) {
+        2.5 * as.integer(a>=0.3 & a<=0.7)
+      }
     } else if (L$distr_A=="N(0.5,0.01)") {
       fnc <- function(a, w) {
         dnorm(a, mean=0.5, sd=0.1)
@@ -1360,7 +1342,6 @@ construct_g_n <- function(f_aIw_n, f_a_n) {
   
   function(a,w) {
     f_aIw_n(a,w) / f_a_n(a)
-    # 1
   }
   
 }
@@ -1893,8 +1874,9 @@ construct_Gamma_cf <- function(dat_orig, params, vlist) {
     Phi_n <- construct_Phi_n(dat_train, type=params$ecdf_type)
     Phi_n_inv <- construct_Phi_n(dat_train, which="inverse",
                                  type=params$ecdf_type)
-    S_n <- construct_S_n(dat_train, vlist$S_n, type=params$S_n_type)
-    Sc_n <- construct_S_n(dat_train, vlist$S_n, type=params$S_n_type, csf=TRUE)
+    srvSL <- construct_S_n(dat_train, vlist$S_n, type=params$S_n_type)
+    S_n <- srvSL$srv
+    Sc_n <- srvSL$cens
     gcomp_n <- construct_gcomp_n(dat_orig_train, vlist$A_grid, S_n)
     eta_n <- construct_eta_n(dat_train, vlist$AW_grid, S_n)
     f_aIw_n <- construct_f_aIw_n(dat_train, vlist$AW_grid, type=params$g_n_type,

@@ -142,7 +142,6 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
       return(1 - mean(S_0(C$t_e,w1,w2,a)))
     })
     
-    # a <- round(runif(m), -log10(C$appx$a))
     a <- runif(m)
     Theta_true_f <- Vectorize(function(x) {
       return(mean( as.integer(a<=x) * (1-S_0(C$t_e,w1,w2,a)) ))

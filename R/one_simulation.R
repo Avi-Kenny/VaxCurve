@@ -181,11 +181,11 @@ if (cfg$which_sim=="Cox") {
   
   one_simulation <- function() {
     
-    # Fix a covariate vector
-    z_0 = c(0.3,1,0.5)
+    # Fix a covariate vector and time of interest
+    z_0 <- c(0.3,1,0.5) # c(W1,W2,A)
     
     # Generate dataset
-    # dat_orig <- generate_data(100, -2, "Unif(0,1)", "none", surv_true="Cox PH", list(lmbd=1e-3,v=1.5,lmbd2=5e-5,v2=1.5), "iid", "decr")
+    # dat_orig <- generate_data(n=100, -2, "Unif(0,1)", "none", surv_true="Cox PH", list(lmbd=1e-3,v=1.5,lmbd2=5e-5,v2=1.5), "iid", "decr")
     dat_orig <- generate_data(
       L$n, L$alpha_3, L$distr_A, L$edge, surv_true="Cox PH",
       L$sc_params, L$sampling, L$dir
@@ -200,97 +200,54 @@ if (cfg$which_sim=="Cox") {
     cfs <- model$coefficients
     
     # Calculate the cumulative hazard via predict()
-    newdata <- data.frame(y_star=100, delta_star=1, w1=z_0[1],
+    newdata <- data.frame(y_star=C$t_e, delta_star=1, w1=z_0[1],
                           w2=z_0[2], a=z_0[3])
     pred <- predict(model, newdata=newdata, type="expected", se.fit=T)
-    
-    # !!!!!
-    # predict(model, newdata=newdata, type="terms", se.fit=T)
-    # predict(model, newdata=newdata, type="lp", se.fit=T)
-    # sum(z_0*cfs)
-    # sqrt(t(z_0) %*% res$I_tilde_inv %*% z_0)
-    # predict(model, newdata=newdata, type="risk", se.fit=T) # exp(lp)
     
     # Calculate certain true values
     H_0_true <- function(t) {
       L$sc_params$lmbd*exp(-1.7) * t^L$sc_params$v # !!!!!
     }
     true_lp <- sum(c(C$alpha_1,C$alpha_2,L$alpha_3)*z_0)
-    true_exp <- exp(true_lp)
-    true_cmhz <- true_exp * H_0_true(100)
     
     # Calculate Fisher information and variance estimate
-    res <- cox_var(
-      dat = dat,
-      theta_hat = as.numeric(cfs),
-      bh = basehaz(model, centered=FALSE),
-      z_0 = z_0,
-      t = 100
-    )
-    res # !!!!!
-    I_tilde_inv <- res$I_tilde_inv
-    var_est <- res$var_est
-    sigma2n <- res$sigma2n
-    
-    # # !!!!!
-    # sf <- survfit(model, newdata=newdata, stype=2, ctype=1)
-    # index <- max(which((sf$time<100)==T))
-    # sf$cumhaz[index]
-    # sf$std.err[index]
-    # sf2 <- survfit2(model, newdata=newdata, stype=2, ctype=1)
-    # index <- max(which((sf2$time<100)==T))
-    # sf2$cumhaz[index]
-    # sf2$std.err[index]
-    
-    # !!!!! These should be equal
-    # pred$se.fit        # !!!!!
-    # sqrt(res$var_est)  # !!!!!
-    # sqrt(res$var_est2)  # !!!!!
+    res <- cox_var(dat=dat, theta_n=as.numeric(cfs), z_0=z_0, t=C$t_e)
     
     # Calculate the Breslow estimator
     bh <- basehaz(model, centered=FALSE)
-    index <- max(which((bh$time<100)==T))
+    index <- max(which((bh$time<C$t_e)==T))
     est_bshz <- bh$hazard[index]
     
-    # Calculate linear predictor (lp), exp(lp), and cuml hazard
-    est_lp <- sum(cfs*z_0)
-    est_exp <- exp(est_lp)
-    est_cmhz <- est_exp * est_bshz
+    # Calculate marginalized survival for A=0.5
+    est_marg <- (1/L$n) * sum(sapply(c(1:L$n), function(i) {
+      exp(-1*exp(sum(cfs*c(dat$w$w1[i],dat$w$w2[i],0.5)))*est_bshz)
+    }))
     
-    # Calculate SE of lp and exp(lp)
-    se_lp_MC <- as.numeric(sqrt(t(z_0)%*%(I_tilde_inv/L$n)%*%z_0))
-    se_exp_MC <- est_exp*se_lp_MC
-    
-    # # Calculate SE of est_exp*est_bshz
-    # se_cmhz_delta <- sqrt( est_bshz^2 * se_exp_MC^2 + est_exp^2 * sigma2n )
+    # S_0 <- function(t, w1, w2, a) {
+    #   exp( -1 * sc_params$lmbd * (t^sc_params$v) * exp(lin(w1,w2,a)) )
+    # }
+    # theta_true_f <- Vectorize(function(a) {
+    #   return(1 - mean(S_0(C$t_e,w1,w2,a)))
+    # })
     
     # Return results
     return(list(
-      true_lp = true_lp,
-      true_exp = true_exp,
-      true_bshz = H_0_true(100),
-      true_cmhz = true_cmhz,
-      
-      est_lp = est_lp,
-      est_exp = est_exp,
+      true_bshz = H_0_true(C$t_e),
+      true_cmhz = exp(true_lp) * H_0_true(C$t_e),
+      true_surv = exp(-1*exp(true_lp)*H_0_true(C$t_e)),
+      true_marg = 1-attr(dat_orig, "theta_true")[26], # Corresponds to A=0.5
       est_bshz = est_bshz,
-      est_cmhz = est_cmhz, # Should equal pred$fit
-      
-      se_lp_MC = se_lp_MC,
-      se_exp_MC = se_exp_MC,
-      se_bshz_MC = sqrt(sigma2n),
-      se_cmhz_MC = sqrt(var_est),
-      
-      se_cmhz_Cox = pred$se.fit,
-      est_w1_Cox = as.numeric(cfs[1]),
-      est_w2_Cox = as.numeric(cfs[2]),
-      est_a_Cox = as.numeric(cfs[3]),
-      se_w1_Cox = as.numeric(sqrt(diag(vcov(model)))[1]),
-      se_w2_Cox = as.numeric(sqrt(diag(vcov(model)))[2]),
-      se_a_Cox = as.numeric(sqrt(diag(vcov(model)))[3]),
-      se_w1_MC = as.numeric(sqrt(diag(I_tilde_inv)/L$n)[1]),
-      se_w2_MC = as.numeric(sqrt(diag(I_tilde_inv)/L$n)[2]),
-      se_a_MC = as.numeric(sqrt(diag(I_tilde_inv)/L$n)[3])
+      est_cmhz = exp(sum(cfs*z_0))*est_bshz, # Should equal pred$fit
+      est_surv = exp(-1*exp(sum(cfs*z_0))*est_bshz),
+      est_marg = est_marg,
+      se_bshz_MC = sqrt(res$var_bshz_est), # Should roughly equal pred$se.fit
+      se_cmhz_MC = sqrt(res$var_cmhz_est),
+      se_surv_MC = sqrt(res$var_surv_est),
+      se_marg_MC = 999
+      # se_bshz_Cox = pred$se.fit,
+      # est_w1_Cox = as.numeric(cfs[1]),
+      # se_w1_Cox = as.numeric(sqrt(diag(vcov(model)))[1]),
+      # se_w1_MC = as.numeric(sqrt(diag(res$I_tilde_inv)/L$n)[1])
     ))
     
   }

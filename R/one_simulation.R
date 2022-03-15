@@ -186,9 +186,10 @@ if (cfg$which_sim=="Cox") {
     
     # Generate dataset
     # dat_orig <- generate_data(n=100, -2, "Unif(0,1)", "none", surv_true="Cox PH", list(lmbd=1e-3,v=1.5,lmbd2=5e-5,v2=1.5), "iid", "decr")
+    dat_orig <- generate_data(n=100, -2, "Unif(0,1)", "none", surv_true="Cox PH", list(lmbd=1e-3,v=1.5,lmbd2=5e-5,v2=1.5), "two-phase (50%)", "decr")
     dat_orig <- generate_data(
       L$n, L$alpha_3, L$distr_A, L$edge, surv_true="Cox PH",
-      L$sc_params, L$sampling, L$dir
+      L$sc_params, L$sampling, L$dir, L$wts_type
     )
     dat <- ss(dat_orig, which(dat_orig$delta==1))
     
@@ -211,7 +212,49 @@ if (cfg$which_sim=="Cox") {
     true_lp <- sum(c(C$alpha_1,C$alpha_2,L$alpha_3)*z_0)
     
     # Calculate Fisher information and variance estimate
-    res <- cox_var(dat=dat, theta_n=as.numeric(cfs), z_0=z_0, t=C$t_e)
+    res <- cox_var(dat=dat, dat_orig=dat_orig, theta_n=as.numeric(cfs),
+                   z_0=z_0, t=C$t_e, return_extras=T)
+    # res # !!!!!
+    
+    # Debugging
+    if (F) {
+      
+      res$S_0n(50)
+      res$S_0n(150)
+      res$S_1n(50)
+      res$S_1n(150)
+      res$S_2n(50)
+      res$S_2n(150)
+      res$l_tilde(z_i=c(1,1,1),delta_i=1,t_i=50)
+      res$l_tilde(z_i=c(1,1,1),delta_i=0,t_i=50)
+      res$l_tilde(z_i=c(0,1,1),delta_i=1,t_i=50)
+      res$l_tilde(z_i=c(0,1,1),delta_i=0,t_i=50)
+      res$omega_n(z_i=c(1,1,1),delta_i=1,t_i=50,z_0)
+      res$omega_n(z_i=c(1,1,1),delta_i=0,t_i=50,z_0)
+      res$omega_n(z_i=c(0,1,1),delta_i=1,t_i=50,z_0)
+      res$omega_n(z_i=c(0,1,1),delta_i=0,t_i=50,z_0)
+      res$Lambda_n(50)
+      res$Lambda_n(150)
+      
+      # !!!!!
+      S_0nv1 <- memoise(function(x) {
+        (1/N) * as.numeric(as.integer(T_>=x)%*%exp(lin))
+      })
+      S_0nv2 <- memoise(function(x) {
+        (1/N) * sum(as.integer(T_>=x)*exp(lin))
+      })
+      S_0nv3 <- function(x) {
+        (1/N) * as.numeric(as.integer(T_>=x)%*%exp(lin))
+      }
+      S_0nv4 <- function(x) {
+        (1/N) * sum(as.integer(T_>=x)*exp(lin))
+      }
+      microbenchmark(S_0nv1(30), times=100L) # 63.6
+      microbenchmark(S_0nv2(30), times=100L) # 66.5
+      microbenchmark(S_0nv3(30), times=100L) #  9.1
+      microbenchmark(S_0nv4(30), times=100L) #  9.0
+      
+    }
     
     # Calculate the Breslow estimator
     bh <- basehaz(model, centered=FALSE)
@@ -219,31 +262,30 @@ if (cfg$which_sim=="Cox") {
     est_bshz <- bh$hazard[index]
     
     # Calculate marginalized survival for A=0.5
-    est_marg <- (1/L$n) * sum(sapply(c(1:L$n), function(i) {
-      exp(-1*exp(sum(cfs*c(dat$w$w1[i],dat$w$w2[i],0.5)))*est_bshz)
+    # n <- length(dat$weights)
+    N <- sum(dat$weights)
+    # est_marg <- (1/N) * sum(sapply(c(1:n), function(i) {
+    #   dat$weights[i] *
+    #     exp(-1*exp(sum(cfs*c(dat$w$w1[i],dat$w$w2[i],0.5)))*est_bshz)
+    # }))
+    est_marg <- (1/N) * sum(sapply(c(1:N), function(i) {
+      exp(-1*exp(sum(cfs*c(dat_orig$w$w1[i],dat_orig$w$w2[i],0.5)))*est_bshz)
     }))
-    
-    # S_0 <- function(t, w1, w2, a) {
-    #   exp( -1 * sc_params$lmbd * (t^sc_params$v) * exp(lin(w1,w2,a)) )
-    # }
-    # theta_true_f <- Vectorize(function(a) {
-    #   return(1 - mean(S_0(C$t_e,w1,w2,a)))
-    # })
     
     # Return results
     return(list(
-      true_bshz = H_0_true(C$t_e),
-      true_cmhz = exp(true_lp) * H_0_true(C$t_e),
-      true_surv = exp(-1*exp(true_lp)*H_0_true(C$t_e)),
       true_marg = 1-attr(dat_orig, "theta_true")[26], # Corresponds to A=0.5
-      est_bshz = est_bshz,
-      est_cmhz = exp(sum(cfs*z_0))*est_bshz, # Should equal pred$fit
-      est_surv = exp(-1*exp(sum(cfs*z_0))*est_bshz),
       est_marg = est_marg,
-      se_bshz_MC = sqrt(res$var_bshz_est), # Should roughly equal pred$se.fit
-      se_cmhz_MC = sqrt(res$var_cmhz_est),
-      se_surv_MC = sqrt(res$var_surv_est),
-      se_marg_MC = 999
+      se_marg_MC = sqrt(res$var_marg_est)
+      # true_bshz = H_0_true(C$t_e),
+      # true_cmhz = exp(true_lp) * H_0_true(C$t_e),
+      # true_surv = exp(-1*exp(true_lp)*H_0_true(C$t_e)),
+      # est_bshz = est_bshz,
+      # est_cmhz = exp(sum(cfs*z_0))*est_bshz, # Should equal pred$fit
+      # est_surv = exp(-1*exp(sum(cfs*z_0))*est_bshz),
+      # se_bshz_MC = sqrt(res$var_bshz_est), # Should roughly equal pred$se.fit
+      # se_cmhz_MC = sqrt(res$var_cmhz_est),
+      # se_surv_MC = sqrt(res$var_surv_est),
       # se_bshz_Cox = pred$se.fit,
       # est_w1_Cox = as.numeric(cfs[1]),
       # se_w1_Cox = as.numeric(sqrt(diag(vcov(model)))[1]),

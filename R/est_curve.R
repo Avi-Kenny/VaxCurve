@@ -93,7 +93,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   
   # Rescale points and remove points outside the range of A
   points_orig <- points
-  na_head <- sum(points<round(a_min,-log10(C$appx$a)))
+  na_head <- sum(round(points,-log10(C$appx$a))<round(a_min,-log10(C$appx$a)))
   points <- round((points+a_shift)*a_scale, -log10(C$appx$a))
   na_tail <- sum(points>1)
   if (na_head>0) {
@@ -105,27 +105,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   
   dat <- ss(dat_orig, which(dat_orig$delta==1))
   
-  # # !!!!!
-  # vals <- vlist$S_n
-  # newX <- cbind(vals$w, a=vals$a)[which(vals$t==0),]
-  # new.times <- unique(vals$t)
-  # methods <- c("survSL.coxph", "survSL.expreg", "survSL.km",
-  #              "survSL.loglogreg", "survSL.pchreg", "survSL.weibreg")
-  # srv <- survSuperLearner(
-  #   time = dat$y_star,
-  #   event = dat$delta_star,
-  #   X = cbind(dat$w, a=dat$a),
-  #   newX = newX,
-  #   new.times = new.times,
-  #   event.SL.library = methods,
-  #   cens.SL.library = methods,
-  #   obsWeights = dat$weights,
-  #   control = list(
-  #     initWeightAlg = methods[1],
-  #     max.SL.iter = 10,
-  #     initWeight = "event"
-  #   )
-  # )
+  Phi_n_inv_notrans <- construct_Phi_n(dat, which="inverse",
+                                       type=params$ecdf_type)
   
   if (estimator=="Grenander") {
     
@@ -147,6 +128,17 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
       g_n <- construct_g_n(f_aIw_n, f_a_n)
       print(paste("Check 3:", Sys.time()))
+      
+      # !!!!! DEBUGGING
+      if (F) {
+        S_n <- construct_S_n2(dat, vlist$S_n, type=params$S_n_type)
+        Sc_n <- construct_S_n2(dat, vlist$S_n, type=params$S_n_type, csf=TRUE)
+        omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n,
+                                     type=params$omega_n_type)
+        pi_n <- construct_pi_n(dat, vlist$W_grid, type="logistic")
+        theta_os_n_est <- theta_os_n(dat, pi_n, S_n, omega_n)
+        theta_os_n_est
+      }
       
       if (params$marg %in% c("Gamma_star", "Gamma_star2")) {
         dat2 <- ss(dat, which(dat$a!=0))
@@ -172,7 +164,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
                                            f_aIw_n, etastar_n)
       } else if (params$marg=="Gamma") {
         Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
-        Phi_n_inv <- construct_Phi_n(dat, which="inverse", type=params$ecdf_type)
+        Phi_n_inv <- construct_Phi_n(dat, which="inverse",
+                                     type=params$ecdf_type)
         Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n)
       } else if (params$marg=="Gamma_star") {
         Gamma_os_n_star <- construct_Gamma_os_n_star(dat, omega_n, g_n_star,
@@ -496,8 +489,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   
   if (estimator=="gcomp") {
     
-    # For debugging purposes related to bias
-    # !!!!! This does not give confidence intervals
+    # !!!!! This does not (yet) give confidence intervals
     
     # Setup
     dat <- ss(dat_orig, which(dat_orig$delta==1))
@@ -530,7 +522,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   }
   fns_extra <- c("f_a_n", "gamma_n", "deriv_theta_n", "Phi_n_inv", "Theta_os_n",
                  "Psi_n", "omega_n", "f_aIw_n", "etastar_n", "S_n", "gcm",
-                 "dGCM")
+                 "dGCM", "Phi_n_inv_notrans")
   for (fn in fns_extra) {
     if (fn %in% return_extra) { res[[fn]] <- eval(as.name(fn)) }
   }

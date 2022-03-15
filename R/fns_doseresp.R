@@ -221,7 +221,6 @@ Pi <- function(sampling, delta_star, y_star, w) {
       probs <- ev + (1-ev)*expit(w$w1+w$w2-0.1)
     } else if (sampling=="two-phase (50%)") {
       probs <- ev + (1-ev)*expit(w$w1+w$w2-1)
-      # probs <- expit(w$w1+w$w2-1)
     } else if (sampling=="two-phase (25%)") {
       probs <- ev + (1-ev)*expit(w$w1+w$w2-2.2)
     } else if (sampling=="w1") {
@@ -242,16 +241,32 @@ Pi <- function(sampling, delta_star, y_star, w) {
 #' 
 #' @param dat_orig Dataset returned by generate_data()
 #' @param scale One of c("none", "stabilized")
+#' @param type One of c("true", "estimated")
 #' @return A sum-to-one vector of weights
 #' @notes
 #'   - Only used for simulation; for the real analysis, the weights are
 #'     calculated separately
-wts <- function(dat_orig, scale="stabilized") {
+wts <- function(dat_orig, scale="stabilized", type="true") {
   
   sampling <- attr(dat_orig,"sampling")
+  Pi_0 <- Pi(sampling, dat_orig$delta_star, dat_orig$y_star, dat_orig$w)
   
-  weights <- dat_orig$delta /
-    Pi(sampling, dat_orig$delta_star, dat_orig$y_star, dat_orig$w)
+  if (type=="true") {
+    
+    weights <- dat_orig$delta / Pi_0
+    
+  } else if (type=="estimated") {
+    
+    strata1 <- as.numeric(factor(Pi_0))
+    Pi_n_vals <- c()
+    for (i in c(1:max(strata1))) {
+      Pi_n_vals[i] <- sum(as.integer(strata1==i)*dat_orig$delta) /
+        sum(as.integer(strata1==i))
+      Pi_n_vals <- ifelse(Pi_n_vals==0, min(Pi_n_vals[Pi_n_vals!=0]), Pi_n_vals) # Hack to avoid NA values in small sample sizes
+    }
+    weights <- dat_orig$delta / Pi_n_vals[strata1]
+    
+  }
   
   if (scale=="stabilized") {
     s <- sum(weights) / length(dat_orig$delta)
@@ -1814,12 +1829,12 @@ construct_Gamma_cf_k <- function(dat_train, dat_test, vals=NA, omega_n, g_n,
   # !!!!! Needs to be updated
   
   n_test <- length(dat_test$a)
-  dat_test$weights <- wts(dat_test) # !!!!! Weights need to be re-stabilized here
+  dat_test$weights <- wts(dat_test) # !!!!! Weights need to be re-calculated and/or re-stabilized here
   d1 <- ss(dat_test, which(dat_test$delta==1))
   weights_1 <- d1$weights
   
   n_train <- length(dat_train$a)
-  dat_train$weights <- wts(dat_train) # !!!!! Weights need to be re-stabilized here
+  dat_train$weights <- wts(dat_train) # !!!!! Weights need to be re-calculated and/or re-stabilized here
   d2 <- ss(dat_train, which(dat_train$delta==1))
   weights_2 <- d2$weights
   
@@ -2296,5 +2311,145 @@ construct_Theta_os_n2 <- function(dat, dat_orig, omega_n, f_aIw_n, q_star_n,
   }
   
   return(construct_superfunc(fnc, aux=NA, vec=T, vals=vals))
+  
+}
+
+
+
+# !!!!! DEBUGGING
+construct_S_n2 <- function(dat, vals, type, csf=F, return_model=F) {
+  
+  if (csf) { dat$delta_star <- round(1-dat$delta_star) }
+  
+  if (type %in% c("Cox PH", "Random Forest")) {
+    fml <- "Surv(y_star,delta_star)~a"
+    for (i in 1:length(dat$w)) {
+      fml <- paste0(fml, "+w",i)
+    }
+    fml <- formula(fml)
+    df <- cbind("y_star"=dat$y_star, "delta_star"=dat$delta_star, "a"=dat$a,
+                dat$w, "weights"=dat$weights)
+  }
+  
+  if (type=="Random Forest") {
+    
+    model <- rfsrc(fml, data=df, ntree=500, mtry=2, nodesize=100,
+                   splitrule="logrank", nsplit=0, case.wt=df$weights,
+                   samptype="swor")
+    if (return_model) { return(model) }
+    
+    newX <- cbind(vals$w, a=vals$a)[which(vals$t==0),]
+    pred <- predict(model, newdata=newX)
+    
+    fnc <- function(t, w, a) {
+      r <- list()
+      for (i in 1:length(w)) {
+        r[[i]] <- which(abs(w[i]-newX[[paste0("w",i)]])<1e-8)
+      }
+      r[[length(w)+1]] <- which(abs(a-newX[["a"]])<1e-8)
+      row <- Reduce(intersect, r)
+      col <- which.min(abs(t-pred$time.interest))
+      if (length(row)!=1) { stop("Error in construct_S_n (B)") }
+      if (length(col)!=1) { stop("Error in construct_S_n (C)") }
+      return(pred$survival[row,col])
+    }
+    
+  }
+  
+  if (type %in% c("Cox PH", "Super Learner")) {
+    
+    if (type=="Cox PH") {
+      methods <- c("survSL.coxph")
+    } else if (type=="Super Learner") {
+      # Excluding "survSL.rfsrc" for now. survSL.pchSL gives errors.
+      methods <- c("survSL.coxph", "survSL.expreg", "survSL.km",
+                   "survSL.loglogreg", "survSL.pchreg", "survSL.weibreg")
+    }
+    
+    newX <- cbind(vals$w, a=vals$a)[which(vals$t==0),]
+    new.times <- unique(vals$t)
+    
+    srv <- survSuperLearner(
+      time = dat$y_star,
+      event = dat$delta_star,
+      X = cbind(dat$w, a=dat$a),
+      newX = newX,
+      new.times = new.times,
+      event.SL.library = c(methods),
+      cens.SL.library = c(methods),
+      obsWeights = dat$weights,
+      control = list(
+        initWeightAlg = methods[1],
+        max.SL.iter = 10
+      )
+    )
+    srv_pred <- srv$event.SL.predict
+    rm(srv)
+    
+    fnc <- function(t, w, a) {
+      r <- list()
+      for (i in 1:length(w)) {
+        r[[i]] <- which(abs(w[i]-newX[[paste0("w",i)]])<1e-8)
+      }
+      if (class(newX[["a"]][1])=="factor") {
+        r[[length(w)+1]] <- which(a==newX[["a"]])
+      } else {
+        r[[length(w)+1]] <- which(abs(a-newX[["a"]])<1e-8)
+      }
+      row <- Reduce(intersect, r)
+      col <- which.min(abs(t-new.times))
+      if (length(row)!=1) { stop("Error in construct_S_n (B)") }
+      if (length(col)!=1) { stop("Error in construct_S_n (C)") }
+      return(srv_pred[row,col])
+    }
+    
+  }
+  
+  if (type=="true") {
+    
+    surv_true <- L$surv_true
+    alpha_3 <- L$alpha_3
+    lmbd <- L$sc_params$lmbd
+    v <- L$sc_params$v
+    lmbd2 <- L$sc_params$lmbd2
+    v2 <- L$sc_params$v2
+    if (csf) {
+      fnc <- function(t, w, a) {
+        if (L$surv_true=="Cox PH") {
+          lin <- C$alpha_1*w[1] + C$alpha_2*w[2] - 1
+        } else if (L$surv_true=="complex") {
+          lin <- C$alpha_1*pmax(0,2-8*abs(w[1]-0.5)) - 0.35
+        }
+        return(exp(-1*lmbd2*(t^v2)*exp(lin)))
+      }
+    } else {
+      fnc <- function(t, w, a) {
+        if (L$surv_true=="Cox PH") {
+          if (L$dir=="decr") {
+            lin <- C$alpha_1*w[1] + C$alpha_2*w[2] + alpha_3*a - 1.7
+          } else {
+            lin <- C$alpha_1*w[1] + C$alpha_2*w[2] + alpha_3*(1-a) - 1.7
+          }
+        } else if (L$surv_true=="complex") {
+          if (L$dir=="decr") {
+            lin <- C$alpha_1*pmax(0,2-8*abs(w[1]-0.5)) +
+              2.5*alpha_3*w[2]*a + 0.7*alpha_3*(1-w[2])*a - 1.3
+          } else {
+            lin <- C$alpha_1*pmax(0,2-8*abs(w[1]-0.5)) +
+              2.5*alpha_3*w[2]*(1-a) + 0.7*alpha_3*(1-w[2])*(1-a) - 1.3
+          }
+        }
+        return(exp(-1*lmbd*(t^v)*exp(lin)))
+      }
+    }
+    
+  }  
+  
+  # round_args <- c(-log10(C$appx$t_e), -log10(C$appx$w1b), 0, -log10(C$appx$a))
+  
+  sfnc <- construct_superfunc(fnc, aux=NA, vec=c(1,2,1), vals=vals)
+  rm("vals", envir=environment(get("fnc",envir=environment(sfnc))))
+  
+  return(sfnc)
   
 }

@@ -19,9 +19,10 @@
 #'     "two-phase (6%)", "two-phase (72%)", "two-phase (70% random)", two-phase
 #'     (6% random))
 #' @param dir Direction of monotonicity; one of c("incr", "decr")
+#' @param wts_type One of c("true", "estimated")
 #' @return A dataframe representing the study population
 generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
-                          sampling, dir) {
+                          sampling, dir, wts_type="true") {
   
   # Sample baseline covariates
   w <- data.frame(
@@ -112,7 +113,7 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
   # Set up function to calculate true regression values over C$points
   # These are Monte Carlo approximations
   {
-    m <- 10^6 # 10^5
+    m <- 10^5 # 10^6
     w1 <- sample(round(seq(0,1,0.1),1), size=m, replace=T)
     w2 <- rbinom(m, size=1, prob=0.5)
     
@@ -142,11 +143,12 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
       return(1 - mean(S_0(C$t_e,w1,w2,a)))
     })
     
-    a <- runif(m)
-    Theta_true_f <- Vectorize(function(x) {
-      return(mean( as.integer(a<=x) * (1-S_0(C$t_e,w1,w2,a)) ))
-    })
-    attr(dat_orig, "Theta_true") <- Theta_true_f(C$points)
+    # Note: uncomment this to return true Theta_true
+    # a <- runif(m)
+    # Theta_true_f <- Vectorize(function(x) {
+    #   return(mean( as.integer(a<=x) * (1-S_0(C$t_e,w1,w2,a)) ))
+    # })
+    # attr(dat_orig, "Theta_true") <- Theta_true_f(C$points)
     
   }
   
@@ -155,7 +157,7 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
   attr(dat_orig, "sampling") <- sampling
   
   # Add (stabilized) inverse weights
-  dat_orig$weights <- wts(dat_orig)
+  dat_orig$weights <- wts(dat_orig, type=wts_type)
   
   return(dat_orig)
   

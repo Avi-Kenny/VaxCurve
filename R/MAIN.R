@@ -11,11 +11,11 @@
 # GitHub packages: tedwestling/ctsCausal, tedwestling/CFsurvival, 
 #                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
-  main_task = "analysis.R", # run update analysis.R
+  main_task = "run", # run update analysis.R
   which_sim = "Cox", # "estimation" "edge" "testing" "Cox"
   level_set_which = "level_set_Cox_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
   # keep = c(1:3,7:9,16:18,22:24),
-  num_sim = 1000,
+  num_sim = 700,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm", "tidyr",
@@ -132,7 +132,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Estimation: ideal params
   level_set_estimation_1 <- list(
-    n = 1000,
+    n = 500, # 1000
     alpha_3 = -2,
     dir = c("decr"), # "incr"
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
@@ -140,18 +140,20 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     # distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
     edge = c("none"), # c("none", "expit 0.2")
     surv_true = c("Cox PH"), # "complex"
-    # sampling = c("two-phase (72%)"),
-    sampling = c("iid", "two-phase (72%)"),
+    sampling = c("two-phase (72%)"),
+    # sampling = c("iid", "two-phase (72%)"),
     estimator = list(
       # "Qbins (true)" = list(
       #   est = "Qbins",
       #   params = list(n_bins=8, S_n_type="Cox PH")
       # ),
-      "Grenander (Cox/true)" = list(
-        est = "Grenander",
-        params = list(marg="Gamma_star2", S_n_type="Cox PH",
-                      g_n_type="true")
-      )
+      # "Grenander (Cox/true)" = list(
+      #   est = "Grenander",
+      #   params = list(marg="Gamma_star2", S_n_type="Cox PH",
+      #                 g_n_type="true")
+      # )
+      "Cox gcomp" = list(est="Cox gcomp")
+      
       # "Grenander (Cox/binning)" = list(
       #   est = "Grenander",
       #   params = list(marg="Gamma_star2", S_n_type="Cox PH",
@@ -226,15 +228,16 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Estimation: ideal params
   level_set_Cox_1 <- list(
-    n = 600,
+    n = 500,
     alpha_3 = -2,
     dir = "decr",
-    wts_type = c("true", "estimated"),
+    wts_type = "true",
+    # wts_type = c("true", "estimated"),
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
     distr_A = c("Unif(0,1)"),
     # distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
     edge = "none",
-    sampling = c("two-phase (25%)", "two-phase (72%)")
+    sampling = "iid"
     # sampling = c("iid", "two-phase (72%)", "two-phase (50%)", "two-phase (25%)")
   )
   
@@ -292,7 +295,7 @@ if (cfg$main_task=="run") {
       )
       sim <- do.call(set_levels, c(list(sim), level_set))
       if (!is.null(cfg$keep)) { sim %<>% set_levels(.keep=cfg$keep) }
-
+      
       # Add functions to simulation object
       sim %<>% add_creator(generate_data)
       methods <- c(
@@ -322,7 +325,7 @@ if (cfg$main_task=="run") {
       
       # Add constants
       sim %<>% add_constants(
-        points = round(seq(0,1,0.02),2),
+        points = round(seq(0,1,0.02),2), # round(seq(0,1,0.2),2),
         alpha_1 = 0.5,
         alpha_2 = 0.7,
         t_e = 200,

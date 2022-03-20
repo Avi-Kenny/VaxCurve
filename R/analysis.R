@@ -47,8 +47,8 @@
   #     analysis.
   if (cfg2$analysis=="Janssen") {
     
-    cfg2$plot_cve <- list(overall="Cox", est=c("Grenander","Cox")) # "Qbins",
-    cfg2$plot_risk <- list(overall="Cox", est=c("Grenander","Cox")) # "Qbins",
+    cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox")) # "Qbins", "Cox gcomp"
+    cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Cox")) # "Qbins", "Cox gcomp"
     cfg2$marker <- c("Day29bindSpike", "Day29bindRBD", "Day29pseudoneutid50",
                      "Day29ADCP")
     cfg2$lab_title <- c("Binding Antibody to Spike: Day 29",
@@ -79,7 +79,14 @@
       ph2 = c("ph2.D29start1"),
       covariates = c("~. + risk_score + as.factor(Region)")
     )
-    cfg2$qnt <- c(0,0.95)
+    cfg2$qnt <- list(
+      "Risk, nonparametric" = c(0,0.95),
+      "CVE, nonparametric" = c(0,0.95),
+      "Risk, Qbins" = c(0,0.95),
+      "CVE, Qbins" = c(0,0.95),
+      "Risk, Cox model" = c(0,0.975),
+      "CVE, Cox model" = c(0,0.975)
+    )
     cfg2$zoom_x <- NA
     cfg2$zoom_y <- NA
     cfg2$folder_local <- "Janssen data/"
@@ -164,7 +171,14 @@
       ph2 = c("ph2.D29", "ph2.D57"),
       covariates = c("~. + MinorityInd + HighRiskInd + risk_score")
     )
-    cfg2$qnt <- c(0.05,0.95)
+    cfg2$qnt <- list(
+      "Risk, nonparametric" = c(0.05,0.95),
+      "CVE, nonparametric" = c(0.05,0.95),
+      "Risk, Qbins" = c(0.05,0.95),
+      "CVE, Qbins" = c(0.05,0.95),
+      "Risk, Cox model" = c(0.025,0.975),
+      "CVE, Cox model" = c(0.025,0.975)
+    )
     cfg2$zoom_x <- "zoomed"
     cfg2$zoom_y <- "zoomed"
     cfg2$folder_local <- "Moderna data/"
@@ -234,7 +248,14 @@
       covariates = c("~. + age + standardized_risk_score",
                      "~. + as.factor(protocol) + age + standardized_risk_score")
     )
-    cfg2$qnt <- c(0.1,0.9)
+    cfg2$qnt <- list(
+      "Risk, nonparametric" = c(0.1,0.9),
+      "CVE, nonparametric" = c(0.1,0.9),
+      "Risk, Qbins" = c(0.1,0.9),
+      "CVE, Qbins" = c(0.1,0.9),
+      "Risk, Cox model" = c(0.025,0.975),
+      "CVE, Cox model" = c(0.025,0.975)
+    )
     cfg2$zoom_x <- "zoomed"
     cfg2$zoom_y <- "zoomed"
     cfg2$folder_local <- "AMP data/"
@@ -283,7 +304,7 @@
   
   # Set config based on local vs. cluster
   if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
-    cfg2$tid <- 3
+    cfg2$tid <- 1
     cfg2$dataset <- paste0(cfg2$folder_cluster,cfg2$dataset)
   } else {
     cfg2$tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
@@ -308,7 +329,9 @@
   cfg2$params$S_n_type <- cfg2$map2[cfg2$tid,"S_n_type"]
   cfg2$params$marg <- cfg2$map2[cfg2$tid,"marg"]
   C$t_e <- cfg2$t_e
-  if ((i %in% c(5,7,9)) && cfg2$analysis=="Moderna") { cfg2$qnt[1] <- 0 } # !!!!! temp hack
+  if ((i %in% c(5,7,9)) && cfg2$analysis=="Moderna") {
+    cfg2$qnt <- lapply(cfg2$qnt, function(x) { c(0,x[2]) }) # !!!!! temp hack
+  }
   
 }
 
@@ -727,22 +750,6 @@ if (cfg2$run_dqa) {
       ci_hi_cve <- cve(ci_lo_risk) %>% pmax(0) %>% pmin(1)
     }
     
-    # !!!!! Moved this functionality to trim_plot_data
-    # # Truncate at quantiles and at histogram edges
-    # p_grid <- round(seq(0,1,0.01),2)
-    # which1 <- p_grid>=ests$Phi_n_inv_notrans(cfg2$qnt[1]) &
-    #   p_grid<=ests$Phi_n_inv_notrans(cfg2$qnt[2])
-    # ests_risk <- ifelse(which1, ests_risk, NA)
-    # ci_lo_risk <- ifelse(which1, ci_lo_risk, NA)
-    # ci_hi_risk <- ifelse(which1, ci_hi_risk, NA)
-    # if (run_cve) {
-    #   ests_cve <- ifelse(which1, ests_cve, NA)
-    #   ci_lo_cve <- ifelse(which1, ci_lo_cve, NA)
-    #   ci_hi_cve <- ifelse(which1, ci_hi_cve, NA)
-    # }
-    
-    if (is.na(lab_risk)) { lab_risk <- "Risk, nonparametric" }
-    if (is.na(lab_cve)) { lab_cve <- "CVE, nonparametric" }
     plot_data_risk <- data.frame(
       x = a_grid,
       y = ests_risk,
@@ -803,7 +810,9 @@ if (cfg2$run_analysis &&
   saveRDS(ests, paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds")) # !!!!!
   
   run_cve <- as.logical("Grenander" %in% cfg2$plot_cve$est)
-  ests2 <- process_ests(ests, a_grid, run_cve=run_cve, tag="Gren")
+  ests2 <- process_ests(ests, a_grid, run_cve=run_cve,
+                        lab_risk="Risk, nonparametric",
+                        lab_cve="CVE, nonparametric", tag="Gren")
   plot_data_risk <- rbind(plot_data_risk, ests2$risk)
   if (run_cve) { plot_data_cve <- rbind(plot_data_cve, ests2$cve) }
   
@@ -819,9 +828,14 @@ if (cfg2$run_analysis &&
     any(unlist(c(cfg2$plot_cve$est,cfg2$plot_risk$est))=="Qbins")) {
   
   # Obtain estimates
-  return_extra <- c("Phi_n_inv", "deriv_theta_n", "f_a_n", "gamma_n", "Psi_n",
-                    "omega_n", "f_aIw_n", "S_n", "gcm", "dGCM",
-                    "Phi_n_inv_notrans")
+  return_extra <- c("Phi_n_inv_notrans")
+  if (cfg2$run_debug$objs) {
+    return_extra <- c(return_extra, "Phi_n_inv", "Psi_n", "omega_n", "f_aIw_n",
+                      "S_n", "gcm", "dGCM", "etastar_n")
+  }
+  if (cfg2$run_debug$gren_var) {
+    return_extra <- c(return_extra, "deriv_theta_n", "f_a_n", "gamma_n")
+  }
   if (cfg2$params$marg=="Theta") { return_extra <- c(return_extra,"etastar_n") }
   a_orig <- dat_orig$a[!is.na(dat_orig$a)]
   a_grid <- seq(from=min(a_orig), to=max(a_orig), length.out=101)
@@ -836,10 +850,47 @@ if (cfg2$run_analysis &&
   
   saveRDS(ests, paste0(cfg2$analysis," plots/ests_q_",cfg2$tid,".rds")) # !!!!!
   
-  cve <- as.logical("Qbins" %in% cfg2$plot_cve$est)
-  ests2 <- process_ests(ests, a_grid, cve=cve, tag="Qbins")
-  plot_data_risk <- rbind(plot_data_risk, ests2$plot_data_risk)
-  if (cve) { plot_data_cve <- rbind(plot_data_cve, ests2$plot_data_cve) }
+  run_cve <- as.logical("Qbins" %in% cfg2$plot_cve$est)
+  ests2 <- process_ests(ests, a_grid, run_cve=run_cve,
+                        lab_risk="Risk, Qbins", lab_cve="CVE, Qbins",
+                        tag="Qbins")
+  plot_data_risk <- rbind(plot_data_risk, ests2$risk)
+  if (run_cve) { plot_data_cve <- rbind(plot_data_cve, ests2$cve) }
+  
+}
+
+
+
+#####################################.
+##### Data analysis (Cox gcomp) #####
+#####################################.
+
+if (cfg2$run_analysis &&
+    any(unlist(c(cfg2$plot_cve$est,cfg2$plot_risk$est))=="Cox gcomp")) {
+  
+  # Obtain estimates
+  return_extra <- c("Phi_n_inv_notrans")
+  a_orig <- dat_orig$a[!is.na(dat_orig$a)]
+  # a_grid <- seq(from=min(a_orig), to=max(a_orig), length.out=101)
+  a_grid <- seq(from=min(a_orig), to=max(a_orig), length.out=5) # !!!!!
+  ests <- est_curve(
+    dat_orig = dat_orig,
+    estimator = "Cox gcomp",
+    params = cfg2$params,
+    points = a_grid,
+    dir = "decr",
+    return_extra = return_extra
+  )
+  
+  saveRDS(ests, paste0(cfg2$analysis," plots/ests_c_",cfg2$tid,".rds")) # !!!!!
+  
+  run_cve <- as.logical("Cox gcomp" %in% cfg2$plot_cve$est)
+  ests2 <- process_ests(ests, a_grid, run_cve=run_cve,
+                        lab_risk="Risk, Cox (analytic)",
+                        lab_cve="CVE, Cox (analytic)", tag="Cox gcomp")
+  
+  plot_data_risk <- rbind(plot_data_risk, ests2$risk)
+  if (run_cve) { plot_data_cve <- rbind(plot_data_cve, ests2$cve) }
   
 }
 
@@ -918,12 +969,14 @@ if (cfg2$run_hyptest) {
     
     # Change curve labels to factors and set color scale
     # goldenrod3, darkseagreen3, darkslategray3, darkorange3, darkgoldenrod3, cyan3
-    curves <- c("Placebo overall", "Vaccine overall", "Overall VE", "Risk, Cox model",
-                "CVE, Cox model", "Risk, Qbins", "CVE, Qbins",
-                "Risk, nonparametric", "CVE, nonparametric", "Control",
+    curves <- c("Placebo overall", "Vaccine overall", "Overall VE",
+                "Risk, Cox model", "CVE, Cox model", "Risk, Qbins",
+                "CVE, Qbins", "Risk, nonparametric", "CVE, nonparametric",
+                "Risk, Cox (analytic)", "CVE, Cox (analytic)", "Control",
                 "VRC01 10mg/kg", "VRC01 30mg/kg", "VRC01 Pooled")
     curve_colors <- c("darkgrey", "darkgrey", "darkgrey", "darkorchid3",
-                      "darkorchid3", "firebrick3", "firebrick3", "deepskyblue3",
+                      "darkorchid3", "firebrick3", "firebrick3",
+                      "deepskyblue3", "deepskyblue3", "deepskyblue3",
                       "deepskyblue3", "deepskyblue3", "darkorchid3",
                       "firebrick3", "darkolivegreen3")
     names(curve_colors) <- curves
@@ -1025,6 +1078,13 @@ if (cfg2$run_hyptest) {
     if (log10_x_axis) {
       xlim <- c(min(dat_orig$a, na.rm=T), max(dat_orig$a, na.rm=T))
       x_axis <- draw.x.axis.cor(xlim, NA)
+      
+      # !!!!! Temp Janssen
+      if (cfg2$analysis=="Janssen" && cfg2$marker=="Day29pseudoneutid50") {
+        x_axis$ticks[4] <- log10(2.7426)
+        x_axis$labels[[4]] <- "LLOQ"
+      }
+      
       plot <- plot + scale_x_continuous(
         labels = do.call(expression,x_axis$labels),
         breaks = x_axis$ticks
@@ -1054,13 +1114,23 @@ if (cfg2$run_hyptest) {
 
 if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
   
+  # Create cutoff values corresponding to cfg2$qnt
+  cutoffs <- lapply(cfg2$qnt, function(qnt) {
+    as.numeric(quantile(dat_orig$a, na.rm=T, probs=qnt))
+  })
+  
   # Trim estimates at specified quantiles
   trim_plot_data <- function(plot_data) {
-    cutoffs <- as.numeric(quantile(dat_orig$a, na.rm=T, probs=cfg2$qnt))
-    which_curves <- c("CVE, Cox model", "CVE, nonparametric", "Risk, Cox model",
-                      "Risk, nonparametric")
-    rows_1 <- which(plot_data$curve %in% which_curves)
-    rows_2 <- which(plot_data$x <= cutoffs[1] | plot_data$x >= cutoffs[2])
+    
+    which_curves <- names(cfg2$qnt)
+    cut_lo <- sapply(plot_data$curve, function(curve) {
+      ifelse(curve %in% which_curves, cutoffs[[curve]][1], NA)
+    }, USE.NAMES=F)
+    cut_hi <- sapply(plot_data$curve, function(curve) {
+      ifelse(curve %in% which_curves, cutoffs[[curve]][2], NA)
+    }, USE.NAMES=F)
+    rows_1 <- which(plot_data$curve %in% which_curves) # !!!!! Might not be needed anymore
+    rows_2 <- which(plot_data$x <= cut_lo | plot_data$x >= cut_hi)
     rows <- intersect(rows_1, rows_2)
     plot_data[rows, c("y", "ci_lo", "ci_hi")] <- NA
     return(plot_data)

@@ -487,7 +487,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
   }
   
-  if (estimator=="gcomp") {
+  if (estimator=="Cox gcomp") {
     
     # !!!!! This does not (yet) give confidence intervals
     
@@ -495,17 +495,24 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     dat <- ss(dat_orig, which(dat_orig$delta==1))
     vlist <- create_val_list(dat_orig)
     
-    # Construct component functions
-    S_n <- (construct_S_n(dat, vlist$S_n, type=params$S_n_type))$srv
-    gcomp_n <- construct_gcomp_n(dat_orig, vals=vlist$A_grid, S_n)
+    # Fit Cox model and compute variance
+    res <- cox_var(dat=dat, dat_orig=dat_orig, t=C$t_e, points=points)
     
-    # Compute estimates and dummy CIs
-    ests <- gcomp_n(points)
-    ci_lo <- rep(0, length(ests)) # !!!!! Replace this with new analytic estimator
-    ci_hi <- rep(0, length(ests)) # !!!!! Replace this with new analytic estimator
+    # Construct estimate
+    bh <- basehaz(res$model, centered=FALSE)
+    index <- max(which((bh$time<C$t_e)==T))
+    est_bshz <- bh$hazard[index]
+    N <- sum(dat$weights)
+    ests <- sapply(points, function(a) {
+      1 - (1/N) * sum(sapply(c(1:N), function(i) {
+        exp(-1*exp(sum(res$theta_n*c(as.numeric(dat_orig$w[i,]),a)))*est_bshz)
+      }))
+    })
     
-    # Add extra return data
-    # res[["ex_S_n"]] <- S_n(C$t_e, w=c(0.5,1), a=0.5)
+    # Compute CIs
+    ses <- sqrt(res$var_marg_ests)
+    ci_lo <- (ests - 1.96*ses) %>% pmax(0) %>% pmin(1)
+    ci_hi <- (ests + 1.96*ses) %>% pmax(0) %>% pmin(1)
     
   }
   

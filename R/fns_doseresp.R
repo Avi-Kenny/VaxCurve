@@ -2316,140 +2316,282 @@ construct_Theta_os_n2 <- function(dat, dat_orig, omega_n, f_aIw_n, q_star_n,
 
 
 
-# !!!!! DEBUGGING
-construct_S_n2 <- function(dat, vals, type, csf=F, return_model=F) {
+
+
+# Estimate the variance of the Cox model based marginalized survival estimator
+#' 
+#' @param dat_orig Dataset returned by generate_data()
+#' @param dat Subsample of dataset returned by ss() for which delta==1
+#' @param t The end time of interest
+#' @param points The A-values of interest
+#' @param z_0 For debugging
+#' @param return_extras For debugging
+#' @param calc_bshz For debugging
+#' @param calc_surv For debugging
+#' @return A list containing the estimated information matrix and the variance
+#'     estimates corresponding to `points`
+cox_var <- function(dat, dat_orig, t, points, z_0=NA, return_extras=F,
+                    calc_bshz=F, calc_surv=F) {
   
-  if (csf) { dat$delta_star <- round(1-dat$delta_star) }
+  # Fit a Cox model
+  # Note: scaling the weights affects the SEs but not the estimates; thus, this
+  #       is only needed for debugging
+  model <- coxph(
+    formula = formula(paste0("Surv(y_star,delta_star)~",
+                             paste(names(dat$w),collapse="+"),"+a")),
+    data = cbind(y_star=dat$y_star, delta_star=dat$delta_star,
+                 dat$w, a=dat$a),
+    weights = dat$weights * (length(dat$weights)/sum(dat$weights))
+  )
+  theta_n <- as.numeric(model$coefficients)
   
-  if (type %in% c("Cox PH", "Random Forest")) {
-    fml <- "Surv(y_star,delta_star)~a"
-    for (i in 1:length(dat$w)) {
-      fml <- paste0(fml, "+w",i)
-    }
-    fml <- formula(fml)
-    df <- cbind("y_star"=dat$y_star, "delta_star"=dat$delta_star, "a"=dat$a,
-                dat$w, "weights"=dat$weights)
-  }
+  # Alias random variables
+  WT <- dat$weights
+  N <- round(sum(WT))
+  n <- length(WT)
+  Z_ <- t(as.matrix(cbind(dat$w,a=dat$a)))
+  T_ <- dat$y_star
+  D_ <- dat$delta_star
+  lin <- as.numeric(t(theta_n)%*%Z_)
+  d <- dim(Z_)[1]
   
-  if (type=="Random Forest") {
-    
-    model <- rfsrc(fml, data=df, ntree=500, mtry=2, nodesize=100,
-                   splitrule="logrank", nsplit=0, case.wt=df$weights,
-                   samptype="swor")
-    if (return_model) { return(model) }
-    
-    newX <- cbind(vals$w, a=vals$a)[which(vals$t==0),]
-    pred <- predict(model, newdata=newX)
-    
-    fnc <- function(t, w, a) {
-      r <- list()
-      for (i in 1:length(w)) {
-        r[[i]] <- which(abs(w[i]-newX[[paste0("w",i)]])<1e-8)
+  # Intermediate functions
+  {
+    S_2n <- memoise(function(x) {
+      res <- matrix(NA, nrow=d, ncol=d)
+      for (i in c(1:d)) {
+        for (j in c(1:d)) {
+          if (!is.na(res[j,i])) {
+            res[i,j] <- res[j,i]
+          } else {
+            res[i,j] <- (1/N)*sum(WT*as.integer(T_>=x)*Z_[i,]*Z_[j,]*exp(lin))
+          }
+        }
       }
-      r[[length(w)+1]] <- which(abs(a-newX[["a"]])<1e-8)
-      row <- Reduce(intersect, r)
-      col <- which.min(abs(t-pred$time.interest))
-      if (length(row)!=1) { stop("Error in construct_S_n (B)") }
-      if (length(col)!=1) { stop("Error in construct_S_n (C)") }
-      return(pred$survival[row,col])
+      return(res)
+    })
+    
+    S_0n <- function(x) {
+      (1/N) * sum(WT*as.integer(T_>=x)*exp(lin))
+    }
+    # S_0n <- memoise(function(x) {
+    #   (1/N) * sum(WT*as.integer(T_>=x)*exp(lin))
+    # })
+    
+    S_1n <- memoise(function(x) {
+      (1/N)*as.numeric(Z_ %*% (WT*as.integer(T_>=x)*exp(lin)))
+    })
+    
+    m_n <- function(x) {
+      S_1n(x) / S_0n(x)
+    }
+    
+    h <- function(x) {
+      (S_2n(x)/S_0n(x)) - m_n(x) %*% t(m_n(x))
     }
     
   }
   
-  if (type %in% c("Cox PH", "Super Learner")) {
+  # Create set of event times
+  i_ev <- which(D_==1)
+  t_ev <- T_[which(D_==1)]
+  
+  # Create estimated information matrix (for an individual)
+  I_tilde <- Reduce("+", lapply(i_ev, function(i) {
+    WT[i] * h(T_[i])
+  }))
+  I_tilde <- (1/N)*I_tilde
+  I_tilde_inv <- solve(I_tilde)
+  
+  # Create score function
+  l_star <- function(z_i,delta_i,t_i) {
+    delta_i*(z_i-m_n(t_i)) - (1/N)*Reduce("+", lapply(i_ev, function(j) {
+      (WT[j]*exp(sum(z_i*theta_n))*as.integer(T_[j]<=t_i)*(z_i-m_n(T_[j]))) /
+        S_0n(T_[j])
+    }))
+  }
+  l_tilde <- memoise(function(z_i,delta_i,t_i) {
+    I_tilde_inv %*% l_star(z_i,delta_i,t_i)
+  })
+  
+  # !!!!!
+  browser()
+  I_tilde2 <- (1/N)*Reduce("+", lapply(i_ev, function(i) {
+    WT[i]*l_star(Z_[,i],D_[i],T_[i]) %*% t(WT[i]*l_star(Z_[,i],D_[i],T_[i]))
+  }))
+  
+  # Create omega influence function
+  omega_n <- (function() {
     
-    if (type=="Cox PH") {
-      methods <- c("survSL.coxph")
-    } else if (type=="Super Learner") {
-      # Excluding "survSL.rfsrc" for now. survSL.pchSL gives errors.
-      methods <- c("survSL.coxph", "survSL.expreg", "survSL.km",
-                   "survSL.loglogreg", "survSL.pchreg", "survSL.weibreg")
-    }
+    piece_3b <- (1/N) * sum(sapply(i_ev, function(j) {
+      (WT[j]*as.integer(T_[j]<=t)) / S_0n(T_[j])
+    }))
+    piece_3c <- (1/N) * Reduce("+", lapply(i_ev, function(j) {
+      (WT[j]*as.integer(T_[j]<=t)*m_n(T_[j])) / S_0n(T_[j])
+    }))
     
-    newX <- cbind(vals$w, a=vals$a)[which(vals$t==0),]
-    new.times <- unique(vals$t)
-    
-    srv <- survSuperLearner(
-      time = dat$y_star,
-      event = dat$delta_star,
-      X = cbind(dat$w, a=dat$a),
-      newX = newX,
-      new.times = new.times,
-      event.SL.library = c(methods),
-      cens.SL.library = c(methods),
-      obsWeights = dat$weights,
-      control = list(
-        initWeightAlg = methods[1],
-        max.SL.iter = 10
+    return(memoise(function(z_i,delta_i,t_i,z) {
+      piece_1 <- (delta_i*as.integer(t_i<=t)) / S_0n(t_i)
+      piece_2 <- (1/N) * exp(sum(z_i*theta_n)) * sum(
+        sapply(i_ev, function(j) {
+          (WT[j]*as.integer(T_[j]<=min(t,t_i))) / ((S_0n(T_[j]))^2)
+        })
       )
-    )
-    srv_pred <- srv$event.SL.predict
-    rm(srv)
+      piece_3a <- t(z*piece_3b-piece_3c)
+      piece_3 <- as.numeric(piece_3a %*% l_tilde(z_i,delta_i,t_i))
+      piece_4 <- exp(sum(z*theta_n))
+      return(piece_4*(piece_1-piece_2+piece_3))
+    }))
     
-    fnc <- function(t, w, a) {
-      r <- list()
-      for (i in 1:length(w)) {
-        r[[i]] <- which(abs(w[i]-newX[[paste0("w",i)]])<1e-8)
-      }
-      if (class(newX[["a"]][1])=="factor") {
-        r[[length(w)+1]] <- which(a==newX[["a"]])
-      } else {
-        r[[length(w)+1]] <- which(abs(a-newX[["a"]])<1e-8)
-      }
-      row <- Reduce(intersect, r)
-      col <- which.min(abs(t-new.times))
-      if (length(row)!=1) { stop("Error in construct_S_n (B)") }
-      if (length(col)!=1) { stop("Error in construct_S_n (C)") }
-      return(srv_pred[row,col])
-    }
+  })()
+  
+  # Calculate Breslow estimator
+  Lambda_n <- Vectorize(memoise(function(x) {
+    (1/N) * sum(sapply(i_ev, function(i) {
+      (WT[i] * as.integer(T_[i]<=x)) / S_0n(T_[i])
+    }))
+  }))
+  
+  # Influence function of marginalized survival
+  S_n <- memoise(function(w,a) {
+    exp(-exp(sum(c(w,a)*theta_n))*Lambda_n(t))
+  })
+  infl_fn_marg <- memoise(function(w_i,a_i,delta_i,t_i,wt_i,a) {
+    piece_1 <- S_n(w_i,a)
+    piece_2 <- (1/N) * sum(sapply(c(1:N), function(j) {
+      w_j <- as.numeric(dat_orig$w[j,])
+      S_n(w_j,a) * (
+        wt_i * ifelse(wt_i==0, 0, omega_n(c(w_i,a_i),delta_i,t_i,c(w_j,a))) - 1
+      )
+    }))
+    return(piece_1+piece_2)
+  })
+  
+  # Variance estimate of marginalized survival
+  var_marg_ests <- sapply(points, function(a) {
+    (1/N^2) * sum(sapply(c(1:N), function(i) {
+      (infl_fn_marg(
+        w_i = as.numeric(dat_orig$w[i,]),
+        a_i = replace_na(dat_orig$a[i],0),
+        delta_i = dat_orig$delta_star[i],
+        t_i = dat_orig$y_star[i],
+        wt_i = dat_orig$weight[i],
+        a = a
+      ))^2
+    }))
+  })
+  
+  # Construct results object
+  res <- list(
+    I_tilde_inv = I_tilde_inv,
+    var_marg_ests = var_marg_ests,
+    model = model,
+    theta_n = theta_n
+  )
+  
+  # Debugging
+  if (T) {
+    
+    # Variance estimate of marginalized survival
+    browser()
+    var_est_betas <- (1/N^2) * as.numeric(Reduce("+", lapply(i_ev, function(i) {
+      (WT[i] * l_tilde(Z_[,i],D_[i],T_[i]))^2
+    })))
+    res$se_w1_MC <- sqrt(var_est_betas[1])
+    res$se_w2_MC <- sqrt(var_est_betas[2])
+  }
+  
+  if (return_extras) {
+    
+    res$S_0n <- S_0n
+    res$S_1n <- S_1n
+    res$S_2n <- S_2n
+    res$I_tilde <- I_tilde
+    res$l_tilde <- l_tilde
+    res$omega_n <- omega_n
+    res$Lambda_n <- Lambda_n
     
   }
   
-  if (type=="true") {
+  # !!!!! Needs updating (points and generalize W, at least)
+  if (calc_bshz) {
     
-    surv_true <- L$surv_true
-    alpha_3 <- L$alpha_3
-    lmbd <- L$sc_params$lmbd
-    v <- L$sc_params$v
-    lmbd2 <- L$sc_params$lmbd2
-    v2 <- L$sc_params$v2
-    if (csf) {
-      fnc <- function(t, w, a) {
-        if (L$surv_true=="Cox PH") {
-          lin <- C$alpha_1*w[1] + C$alpha_2*w[2] - 1
-        } else if (L$surv_true=="complex") {
-          lin <- C$alpha_1*pmax(0,2-8*abs(w[1]-0.5)) - 0.35
-        }
-        return(exp(-1*lmbd2*(t^v2)*exp(lin)))
-      }
-    } else {
-      fnc <- function(t, w, a) {
-        if (L$surv_true=="Cox PH") {
-          if (L$dir=="decr") {
-            lin <- C$alpha_1*w[1] + C$alpha_2*w[2] + alpha_3*a - 1.7
-          } else {
-            lin <- C$alpha_1*w[1] + C$alpha_2*w[2] + alpha_3*(1-a) - 1.7
-          }
-        } else if (L$surv_true=="complex") {
-          if (L$dir=="decr") {
-            lin <- C$alpha_1*pmax(0,2-8*abs(w[1]-0.5)) +
-              2.5*alpha_3*w[2]*a + 0.7*alpha_3*(1-w[2])*a - 1.3
-          } else {
-            lin <- C$alpha_1*pmax(0,2-8*abs(w[1]-0.5)) +
-              2.5*alpha_3*w[2]*(1-a) + 0.7*alpha_3*(1-w[2])*(1-a) - 1.3
-          }
-        }
-        return(exp(-1*lmbd*(t^v)*exp(lin)))
-      }
+    # Calculate component estimator Q_n
+    # !!!!! Adapt to two-phase sampling
+    Q_n <- memoise(function(z_i,delta_i,t_i) {
+      piece_1 <- (delta_i*as.integer(t_i<=t)) / S_0n(t_i)
+      piece_2 <- exp(sum(z_i*theta_n))
+      piece_3 <- (1/N) * sum(sapply(t_ev, function(t_j) {
+        as.integer(t_j<=min(t,t_i)) / (S_0n(t_j))^2
+      }))
+      return(piece_1-piece_2*piece_3)
+    })
+    
+    # Influence function of Breslow estiamtor
+    # !!!!! Adapt to two-phase sampling
+    infl_fn_2 <- function(z_i,delta_i,t_i) {
+      pc_1 <- Q_n(z_i,delta_i,t_i)
+      pc_2 <- (1/N) * Reduce("+", lapply(c(1:N), function(j) {
+        Z_[,j] * (D_[j]-exp(sum(Z_[,j]*theta_n))*Lambda_n(T_[j])) *
+          Q_n(Z_[,j],D_[j],T_[j])
+      }))
+      pc_3 <- l_tilde(z_i,delta_i,t_i)
+      return(pc_1-sum(pc_2*pc_3))
     }
     
-  }  
+    # Variance estimate of Breslow estimator using influence function
+    # !!!!! Adapt to two-phase sampling
+    var_bshz_est <- (1/N^2) * sum(sapply(c(1:N), function(i) {
+      (infl_fn_2(Z_[,i],D_[i],T_[i]))^2
+    }))
+    
+    res$var_bshz_est <- var_bshz_est
+    
+  }
   
-  # round_args <- c(-log10(C$appx$t_e), -log10(C$appx$w1b), 0, -log10(C$appx$a))
+  # !!!!! Needs updating (points and generalize W, at least)
+  if (calc_surv) {
+    
+    # Variance of cumulative hazard estimator
+    # !!!!! Adapt to two-phase sampling
+    var_cmhz_est <- (1/N^2) * sum(sapply(c(1:N), function(i) {
+      (omega_n(Z_[,i],D_[i],T_[i],z_0))^2
+    }))
+    
+    # Influence function of cumulative hazard estiamtor
+    # !!!!! Adapt to two-phase sampling
+    infl_fn_3 <- (function() {
+      pc_1 <- exp(sum(theta_n*z_0))
+      pc_3 <- z_0 * Lambda_n(t)
+      return(function(z_i,delta_i,t_i) {
+        pc_2 <- Q_n(z_i,delta_i,t_i)
+        pc_4 <- (1/N) * Reduce("+", lapply(c(1:N), function(j) {
+          Z_[,j] * (D_[j]-exp(sum(Z_[,j]*theta_n))*Lambda_n(T_[j])) *
+            Q_n(Z_[,j],D_[j],T_[j])
+        }))
+        pc_5 <- l_tilde(z_i,delta_i,t_i)
+        return(pc_1*(pc_2+sum((pc_3-pc_4)*pc_5)))
+      })
+    })()
+    
+    # Variance estimate (cumulative hazard) using influence function
+    # !!!!! Adapt to two-phase sampling
+    var_cmhz_est2 <- (1/N^2) * sum(sapply(c(1:N), function(i) {
+      (infl_fn_3(Z_[,i],D_[i],T_[i]))^2
+    }))
+    
+    # Variance estimate (survival) using influence function
+    # !!!!! Adapt to two-phase sampling
+    surv_est <- exp(-exp(sum(z_0*theta_n))*Lambda_n(t))
+    var_surv_est <- (1/N^2) * sum(sapply(c(1:N), function(i) {
+      (surv_est*infl_fn_3(Z_[,i],D_[i],T_[i]))^2
+    }))
+    
+    res$var_cmhz_est <- var_cmhz_est # !!!!! var_cmhz_est or var_cmhz_est2 ?????
+    res$var_surv_est <- var_surv_est
+    
+  }
   
-  sfnc <- construct_superfunc(fnc, aux=NA, vec=c(1,2,1), vals=vals)
-  rm("vals", envir=environment(get("fnc",envir=environment(sfnc))))
-  
-  return(sfnc)
+  return(res)
   
 }

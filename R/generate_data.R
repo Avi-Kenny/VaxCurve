@@ -157,7 +157,12 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
   attr(dat_orig, "sampling") <- sampling
   
   # Add (stabilized) inverse weights
-  dat_orig$weights <- wts(dat_orig, type=wts_type)
+  wts_str <- wts(dat_orig, type=wts_type, return_strata=T)
+  dat_orig$weights <- wts_str$weights
+  dat_orig$strata <- wts_str$strata
+  
+  # # !!!!!
+  # dat_orig$weights_true <- wts(dat_orig, type="true", return_strata=T)$weights
   
   return(dat_orig)
   

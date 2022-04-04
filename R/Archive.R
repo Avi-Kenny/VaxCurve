@@ -1,4 +1,87 @@
 
+# Testing that the two epectations are equal
+if (F) {
+  
+  df_res <- data.frame(
+    "n" = integer(),
+    "rep" = integer(),
+    "E1a" = double(),
+    "E2a" = double(),
+    "E1b" = double(),
+    "E2b" = double(),
+    "E1c" = double(),
+    "E2c" = double()
+  )
+  for (nnn in c(1280)) { # c(40,80,160,320)
+    for (i in c(1:20)) {
+      
+      dat_orig <- generate_data(n=nnn, -2, "Unif(0,1)", "none", surv_true="Cox PH", list(lmbd=1e-3,v=1.5,lmbd2=5e-5,v2=1.5), "iid", "decr")
+      dat <- ss(dat_orig, which(dat_orig$delta==1))
+      
+      model <- coxph(
+        formula = formula(paste0("Surv(y_star,delta_star)~",
+                                 paste(names(dat$w),collapse="+"),"+a")),
+        data = cbind(y_star=dat$y_star, delta_star=dat$delta_star,
+                     dat$w, a=dat$a),
+        weights = dat$weights * (length(dat$weights)/sum(dat$weights))
+      )
+      theta_n <- as.numeric(model$coefficients)
+      WT <- dat$weights
+      ST <- dat$strata
+      t <- C$t_e
+      N <- round(sum(WT))
+      n <- length(WT)
+      Z_ <- t(as.matrix(cbind(dat$w,a=dat$a)))
+      T_ <- dat$y_star
+      Ds_ <- dat$delta_star
+      lin <- as.numeric(t(theta_n)%*%Z_)
+      S_0n <- function(x) {
+        (1/N) * sum(WT*as.integer(T_>=x)*exp(lin))
+      }
+      d <- dim(Z_)[1]
+      i_ev <- which(Ds_==1)
+      t_ev <- T_[which(Ds_==1)]
+      Lambda_n <- Vectorize(memoise(function(x) {
+        (1/N) * sum(sapply(i_ev, function(i) {
+          (WT[i] * as.integer(T_[i]<=x)) / S_0n(T_[i])
+        }))
+      }))
+      Q_n <- memoise(function(z_i,ds_i,t_i) {
+        piece_1 <- (ds_i*as.integer(t_i<=t)) / S_0n(t_i)
+        piece_2 <- exp(sum(z_i*theta_n))
+        piece_3 <- (1/N) * sum(sapply(i_ev, function(j) {
+          WT[j] * as.integer(T_[j]<=min(t,t_i)) / (S_0n(T_[j]))^2
+        }))
+        return(piece_1-piece_2*piece_3)
+      })
+      E1 <- (1/N^2) * Reduce("+", lapply(c(1:n), function(i) {
+        WT[i] * Z_[,i] * exp(sum(Z_[,i]*theta_n)) *
+          sum(sapply(t_ev, function(t_j) {
+            as.integer(t_j<=min(t,T_[i])) / (S_0n(t_j))^2
+          }))
+      }))
+      E2 <- (1/N) * Reduce("+", lapply(c(1:n), function(j) {
+        WT[j] * Z_[,j] * (Ds_[j]-exp(sum(Z_[,j]*theta_n))*Lambda_n(T_[j])) *
+          Q_n(Z_[,j],Ds_[j],T_[j])
+      }))
+      
+      df_res[nrow(df_res)+1,] <- c(nnn,i,E1[1],E2[1],E1[2],E2[2],E1[3],E2[3])
+      
+      print(paste0("Done with n=", nnn, ", rep=", i))
+      print(Sys.time())
+      
+    }
+  }
+  df_plot <- pivot_longer(df_res, cols=c(E1a,E2a,E1b,E2b,E1c,E2c))
+  ggplot(
+    filter(df_plot, name %in% c("E1a","E2a")),
+    aes(x=n, y=value, color=name)
+  ) + geom_jitter(width=1, height=0, alpha=0.5)
+  
+  # ggplot(df_res, aes(x=n, y=diff1, color=n)) + geom_point()
+  
+}
+
 # kernel2 gamma_n estimator
 if (F) {
   

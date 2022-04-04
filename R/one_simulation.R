@@ -201,8 +201,12 @@ if (cfg$which_sim=="Cox") {
     
     # Calculate Fisher information and variance estimate
     a <- 0.5
+    # res <- cox_var(dat=dat, dat_orig=dat_orig, t=C$t_e, points=a,
+    #                return_extras=T)
+    system.time({
     res <- cox_var(dat=dat, dat_orig=dat_orig, t=C$t_e, points=a,
-                   return_extras=T)
+                   return_extras=T, calc_bshz=T)
+    })
     
     # Calculate marginalized survival for A=0.5
     bh <- basehaz(res$model, centered=FALSE)
@@ -231,31 +235,44 @@ if (cfg$which_sim=="Cox") {
       # # Calculate the cumulative hazard via predict()
       # newdata <- data.frame(y_star=C$t_e, delta_star=1, w1=z_0[1],
       #                       w2=z_0[2], a=z_0[3])
-      # pred <- predict(model, newdata=newdata, type="expected", se.fit=T)
-      # 
-      # # Calculate certain true values
-      # H_0_true <- function(t) {
-      #   L$sc_params$lmbd*exp(-1.7) * t^L$sc_params$v # !!!!!
-      # }
+      # pred <- predict(res$model, newdata=newdata, type="expected", se.fit=T)
+      
+      # Calculate certain true values
+      H_0_true <- function(t) {
+        L$sc_params$lmbd*exp(-1.7) * t^L$sc_params$v # !!!!!
+      }
       # true_lp <- sum(c(C$alpha_1,C$alpha_2,L$alpha_3)*z_0)
       
       # Add additional results
-      # sim_res$true_bshz = H_0_true(C$t_e)
-      # sim_res$true_cmhz = exp(true_lp) * H_0_true(C$t_e)
+      # sim_res$true_cmhz = exp(true_lp) * H_0_true(C$t_e) # Should roughly equal pred$se.fit
       # sim_res$true_surv = exp(-1*exp(true_lp)*H_0_true(C$t_e))
-      # sim_res$est_bshz = est_bshz
       # sim_res$est_cmhz = exp(sum(res$theta_n*z_0))*est_bshz # Should equal pred$fit
       # sim_res$est_surv = exp(-1*exp(sum(res$theta_n*z_0))*est_bshz)
-      # sim_res$se_bshz_MC = sqrt(res$var_bshz_est) # Should roughly equal pred$se.fit
       # sim_res$se_cmhz_MC = sqrt(res$var_cmhz_est)
       # sim_res$se_surv_MC = sqrt(res$var_surv_est)
       # sim_res$se_bshz_Cox = pred$se.fit
-      sim_res$true_w1 = C$alpha_1
-      sim_res$est_w1 = as.numeric(res$theta_n[1])
-      sim_res$se_w1_MC = res$se_w1_MC
-      sim_res$true_w2 = C$alpha_2
-      sim_res$est_w2 = as.numeric(res$theta_n[2])
-      sim_res$se_w2_MC = res$se_w2_MC
+      sim_res$true_w1 <- C$alpha_1
+      sim_res$est_w1 <- as.numeric(res$theta_n[1])
+      sim_res$se_w1_MC <- res$se_w1_MC
+      sim_res$true_w2 <- C$alpha_2
+      sim_res$est_w2 <- as.numeric(res$theta_n[2])
+      sim_res$se_w2_MC <- res$se_w2_MC
+      sim_res$true_a <- L$alpha_3
+      sim_res$est_a <- as.numeric(res$theta_n[3])
+      sim_res$se_a_MC <- res$se_a_MC
+      
+      # These account for the weights
+      sim_res$se_w1_MCw <- res$se_w1_MCw
+      sim_res$se_w2_MCw <- res$se_w2_MCw
+      sim_res$se_a_MCw <- res$se_a_MCw
+      
+      # Debugging the Breslow estimator
+      sim_res$true_bshz <- H_0_true(C$t_e)
+      sim_res$est_bshz <- res$est_bshz
+      sim_res$se_bshz_MC = sqrt(res$var_bshz_est)
+      sim_res$se_bshz_MC2 = sqrt(res$var_bshz_est2) # New derivation
+      sim_res$se_bshz_MC3 = sqrt(res$var_bshz_est3) # Accounting for estimated weights
+      
       # sim_res$se_w1_Cox = as.numeric(sqrt(diag(vcov(res$model)))[1])
       # sim_res$se_w1_alt = as.numeric(sqrt(diag(res$I_tilde_inv)/L$n)[1])
       

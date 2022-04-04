@@ -15,7 +15,7 @@ cfg <- list(
   which_sim = "Cox", # "estimation" "edge" "testing" "Cox"
   level_set_which = "level_set_Cox_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
   # keep = c(1:3,7:9,16:18,22:24),
-  num_sim = 700,
+  num_sim = 2000,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm", "tidyr",
@@ -228,16 +228,16 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Estimation: ideal params
   level_set_Cox_1 <- list(
-    n = 500,
+    n = 600,
     alpha_3 = -2,
     dir = "decr",
-    wts_type = "true",
-    # wts_type = c("true", "estimated"),
+    # wts_type = "true",
+    wts_type = c("true", "estimated"),
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
     distr_A = c("Unif(0,1)"),
     # distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
     edge = "none",
-    sampling = "iid"
+    sampling = "two-phase (50%)"
     # sampling = c("iid", "two-phase (72%)", "two-phase (50%)", "two-phase (25%)")
   )
   

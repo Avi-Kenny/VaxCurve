@@ -8,18 +8,18 @@
 # To run multiple sims/analyses concurrently, ONLY change Slurm commands
 
 # Set global config
-# GitHub packages: tedwestling/ctsCausal, tedwestling/CFsurvival, 
+# GitHub packages: tedwestling/ctsCausal, tedwestling/CFsurvival,
 #                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
-  main_task = "run", # run update analysis.R
-  which_sim = "Cox", # "estimation" "edge" "testing" "Cox"
-  level_set_which = "level_set_Cox_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
+  main_task = "analysis.R", # run update analysis.R
+  which_sim = "estimation", # "estimation" "edge" "testing" "Cox"
+  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
   # keep = c(1:3,7:9,16:18,22:24),
-  num_sim = 2000,
+  num_sim = 500,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm", "tidyr",
-           "ranger", "xgboost"),
+           "ranger", "xgboost", "survey", "pbapply", "compiler", "simest"),
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
                      "data.table", "latex2exp"),
   parallel = "none",
@@ -132,33 +132,36 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Estimation: ideal params
   level_set_estimation_1 <- list(
-    n = 500, # 1000
+    n = 1000, # 500-1000
     alpha_3 = -2,
     dir = c("decr"), # "incr"
-    sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_A = "Unif(0,1)",
+    # sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
+    sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-4, v2=1.5)), # !!!!! exp
+    distr_A = c("N(0.5,0.04)"),
     # distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
     edge = c("none"), # c("none", "expit 0.2")
-    surv_true = c("Cox PH"), # "complex"
-    sampling = c("two-phase (72%)"),
+    surv_true = c("exp"), # "complex" "exp"
+    # surv_true = c("Cox PH"), # "complex" "exp"
+    sampling = c("iid"),
     # sampling = c("iid", "two-phase (72%)"),
     estimator = list(
       # "Qbins (true)" = list(
       #   est = "Qbins",
       #   params = list(n_bins=8, S_n_type="Cox PH")
       # ),
-      # "Grenander (Cox/true)" = list(
-      #   est = "Grenander",
-      #   params = list(marg="Gamma_star2", S_n_type="Cox PH",
-      #                 g_n_type="true")
-      # )
-      "Cox gcomp" = list(est="Cox gcomp")
-      
-      # "Grenander (Cox/binning)" = list(
-      #   est = "Grenander",
-      #   params = list(marg="Gamma_star2", S_n_type="Cox PH",
-      #                 g_n_type="binning")
-      # ),
+      # "Cox gcomp" = list(est="Cox gcomp")
+      "Grenander (GCM)" = list(
+        est = "Grenander",
+        params = list(marg="Gamma_star", S_n_type="Cox PH", # !!!!! Gamma_star2
+                      convex_type="GCM", ecdf_type="linear (mid)", # !!!!! "step"
+                      g_n_type="binning") # !!!!! ci_type="none"
+      ),
+      "Grenander (LS)" = list(
+        est = "Grenander",
+        params = list(marg="Gamma_star", S_n_type="Cox PH", # !!!!! Gamma_star2
+                      convex_type="LS", ecdf_type="linear (mid)", # !!!!! "step"
+                      g_n_type="binning") # !!!!! ci_type="none"
+      )
       # "Grenander (SL/true)" = list(
       #   est = "Grenander",
       #   params = list(marg="Gamma_star2", S_n_type="Super Learner",
@@ -228,10 +231,10 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Estimation: ideal params
   level_set_Cox_1 <- list(
-    n = 600,
+    n = 500,
     alpha_3 = -2,
     dir = "decr",
-    # wts_type = "true",
+    # wts_type = "estimated",
     wts_type = c("true", "estimated"),
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
     distr_A = c("Unif(0,1)"),
@@ -281,6 +284,15 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
 
 if (cfg$main_task=="run") {
   
+  # Set global constants
+  C <- list(
+    points = round(seq(0,1,0.02),2),
+    alpha_1 = 0.5,
+    alpha_2 = 0.7,
+    t_e = 200,
+    appx = cfg$appx
+  )
+  
   run_on_cluster(
     
     first = {
@@ -295,42 +307,6 @@ if (cfg$main_task=="run") {
       )
       sim <- do.call(set_levels, c(list(sim), level_set))
       if (!is.null(cfg$keep)) { sim %<>% set_levels(.keep=cfg$keep) }
-      
-      # Add functions to simulation object
-      sim %<>% add_creator(generate_data)
-      methods <- c(
-        "logit", "expit", "deriv_logit", "deriv_expit", "construct_superfunc",
-        "Pi", "wts", "construct_S_n", "construct_gcomp_n",
-        "construct_deriv_theta_n", "construct_tau_n", "construct_gamma_n",
-        "construct_f_aIw_n", "construct_f_a_n", "construct_g_n",
-        "construct_omega_n", "construct_eta_n", "construct_Gamma_os_n",
-        "construct_Phi_n", "construct_rho_n", "construct_xi_n",
-        "construct_infl_fn_1", "construct_infl_fn_Gamma", "construct_infl_fn_2",
-        "beta_n_var_hat", "create_val_list", "construct_Gamma_cf_k",
-        "construct_Gamma_cf", "construct_pi_n", "theta_os_n", "sigma2_os_n",
-        "ss", "construct_Theta_os_n", "construct_etastar_n",
-        "construct_g_n_star", "construct_alpha_star_n", "construct_eta_ss_n",
-        "construct_Gamma_os_n_star", "construct_q_n",
-        "construct_infl_fn_Gamma2", "construct_Theta_os_n2",
-        "construct_infl_fn_Theta", "construct_pi_star_n",
-        
-        "cox_var",
-        
-        "est_curve", "generate_data",
-        "lambda", "one_simulation", "test_2"
-      )
-      for (method in methods) {
-        sim %<>% add_method(method, eval(as.name(method)))
-      }
-      
-      # Add constants
-      sim %<>% add_constants(
-        points = round(seq(0,1,0.02),2), # round(seq(0,1,0.2),2),
-        alpha_1 = 0.5,
-        alpha_2 = 0.7,
-        t_e = 200,
-        appx = cfg$appx
-      )
       
       # Simulation script
       sim %<>% set_script(one_simulation)
@@ -389,6 +365,7 @@ if (FALSE) {
   
   # Summarize results
   summ_bias <- list()
+  summ_biasG <- list() # !!!!!
   summ_mse <- list()
   summ_cov <- list()
   for (i in c(1:51)) {
@@ -398,6 +375,11 @@ if (FALSE) {
       estimate = paste0("est_",m),
       truth = paste0("theta_",m)
     )
+    summ_biasG[[i]] <- list(        # !!!!!
+      name = paste0("biasG_",m),    # !!!!!
+      estimate = paste0("estG_",m), # !!!!!
+      truth = paste0("Gamma_",m)    # !!!!!
+    )                               # !!!!!
     summ_mse[[i]] <- list(
       name = paste0("mse_",m),
       estimate = paste0("est_",m),
@@ -411,7 +393,8 @@ if (FALSE) {
       na.rm = TRUE
     )
   }
-  summ <- summarize(sim, bias_pct=summ_bias, mse=summ_mse, coverage=summ_cov)
+  # summ <- summarize(sim, bias_pct=summ_bias, mse=summ_mse, coverage=summ_cov)
+  summ <- summarize(sim, bias_pct=c(summ_bias,summ_biasG), mse=summ_mse, coverage=summ_cov) # !!!!!
   
   summ %<>% rename("Estimator"=estimator)
   
@@ -465,8 +448,9 @@ if (FALSE) {
     distr_A = rep(c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"),2)
   )
   
-  # Bias plots
+  # Bias plot
   # Export: 10" x 6"
+  # Note: change "bias" to "biasG" for Gamma bias
   ggplot(
     filter(p_data, stat=="bias"),
     # aes(x=point, y=value)
@@ -478,7 +462,7 @@ if (FALSE) {
                linetype="dashed") +
     geom_line() +
     facet_grid(rows=dplyr::vars(dir), cols=dplyr::vars(distr_A)) + # surv_true
-    scale_y_continuous(labels=percent, limits=c(-0.2,0.2)) +
+    scale_y_continuous(labels=percent, limits=c(-0.5,0.5)) +
     # scale_y_continuous(labels=percent) +
     # scale_color_manual(values=m_colors) +
     theme(legend.position="bottom") +
@@ -514,7 +498,7 @@ if (FALSE) {
     geom_hline(aes(yintercept=0.95), linetype="longdash", color="grey") +
     geom_line() +
     facet_grid(rows=dplyr::vars(dir), cols=dplyr::vars(distr_A)) + # surv_true
-    ylim(0,0.02) +
+    ylim(0,0.01) +
     # scale_color_manual(values=m_colors) +
     theme(legend.position="bottom") +
     labs(title="MSE", x="A", y=NULL, color="Estimator")

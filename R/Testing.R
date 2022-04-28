@@ -12,7 +12,7 @@
     S_n_type="Cox PH", g_n_type="binning", ci_type="regular", cf_folds=1,
     edge_corr="none", ecdf_type="linear (mid)", deriv_type="linear",
     gamma_type="kernel", gamma_which="new", omega_n_type="estimated",
-    marg="Gamma_star"
+    marg="Gamma_star2"
   )
   C <- list(points=round(seq(0,1,0.02),2), alpha_1=0.5, alpha_2=0.7, t_e=200,
             appx=list(t_e=10, w_tol=25, a=0.01))
@@ -29,7 +29,7 @@
   
   # 3. Generate dataset
   dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
-                            L$sc_params, L$sampling, L$dir)
+                            L$sc_params, L$sampling, L$dir) # wts_type="estimated"
   
 }
 
@@ -53,18 +53,6 @@
   
   n_reps <- 10
   for (i in 1:n_reps) {
-    
-    # # !!!!!
-    # dat_orig <- sim$creators$generate_data(
-    #   n = 5000,
-    #   alpha_3 = 3,
-    #   distr_A = "N(0.5,0.01)",
-    #   edge = "none",
-    #   surv_true = "Cox PH",
-    #   sc_params = sim$levels$sc_params$sc_params,
-    #   sampling = "two-phase (72%)",
-    #   dir = "decr"
-    # )
     
     # Generate dataset
     dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,

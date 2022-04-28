@@ -1,4 +1,371 @@
 
+# Checking Gamma_os_n_star vs Gamma_os_n_star2
+if (F) {
+  
+  # Check 1
+  unique_rows <- function(df) { df[!duplicated(df), ] }
+  weights_i <- dat$weights
+  weights_f <- dat_orig$weights
+  n_orig <- round(sum(weights_i))
+  (1/n_orig) * sum((1-weights_f))
+  
+  # Check 2
+  w_f <- dat_orig$w
+  y_star_f <- dat_orig$y_star
+  delta_star_f <- dat_orig$delta_star
+  (1/n_orig) * sum((1-weights_f)*q_n(w_f, y_star_f, delta_star_f, 0.7))
+  (1/n_orig) * sum(sapply(c(1:n_orig), function(i) {
+    (1-weights_f[i])*q_n(as.numeric(w_f[i,]), y_star_f[i], delta_star_f[i], 0.7)
+  }))
+  
+  # Check 3
+  (1/n_orig) * sum((1-weights_f)*eta_ss_n(0.7,w_f))
+  (1/n_orig) * sum(sapply(c(1:n_orig), function(i) {
+    (1-weights_f[i])*eta_ss_n(0.7,as.numeric(w_f[i,]))
+  }))
+  
+  # Check 4
+  str_f <- dat_orig$strata
+  (1/n_orig) * sum((1-weights_f)*str_f)
+  (1/n_orig) * sum((1-weights_f)*(str_f^2))
+  
+  # Check 5
+  # dat_orig2 <- dat_orig # estimated weights
+  # dat_orig1 <- dat_orig # true weights
+  df_test <- cbind(dat_orig$w,
+                   delta = dat_orig$delta,
+                   delta_star = dat_orig$delta_star,
+                   y_star = dat_orig$y_star,
+                   weights = dat_orig$weights,
+                   strata = dat_orig$strata)
+  head(df_test)
+  df_unique <- unique_rows(df_test)
+  df_unique %>% arrange(w1,w2,delta_star)
+  
+}
+
+# Convex least squares
+if (F) {
+  
+  n <- 100
+  x <- runif(n)
+  # y <- x^2 + rnorm(n, sd=0.1)
+  y <- x + rnorm(n, sd=0.1)
+  fit <- cvx.lse.reg(t=x, z=y)
+  pred_x <- seq(0,1,0.01)
+  pred_y <- predict(fit, newdata=pred_x)
+  ggplot(data.frame(x=x,y=y), aes(x=x, y=y)) +
+    geom_point(alpha=0.5) +
+    geom_line(data=data.frame(x=pred_x,y=pred_y), color="red")
+  
+}
+
+# Comparing plots
+if (F) {
+  
+  C <- list(points=round(seq(0,1,0.02),2), alpha_1=0.5, alpha_2=0.7, t_e=200,
+            appx=list(t_e=10, w_tol=25, a=0.01))
+  L <- list(
+    n=500, alpha_3=-2, dir="decr",
+    sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-4, v2=1.5),
+    distr_A="N(0.5,0.04)", edge="none", surv_true="exp",
+    sampling="iid", estimator=list(est="Grenander",params=params)
+  )
+  dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+                            L$sc_params, L$sampling, L$dir)
+  
+  
+  dat_orig$a <- round(dat_orig$a, -log10(C$appx$a))
+  na_head <- sum(round(points,-log10(C$appx$a))<round(a_min,-log10(C$appx$a)))
+  points <- round((points+a_shift)*a_scale, -log10(C$appx$a))
+  na_tail <- sum(points>1)
+  if (na_head>0) {
+    points <- points[-c(1:na_head)]
+  }
+  if (na_tail>0) {
+    points <- points[-c((length(points)-na_tail+1):length(points))]
+  }
+  
+  dat <- ss(dat_orig, which(dat_orig$delta==1))
+  vlist <- create_val_list(dat_orig)
+  Phi_n1 <- construct_Phi_n(dat, type="linear (mid)")
+  Phi_n2 <- construct_Phi_n(dat, type="step")
+  Phi_n3 <- function(x) { ptruncnorm(x, a=0, b=1, mean=0.5, sd=0.2) }
+  
+  m <- 10^5
+  a <- rtruncnorm(m, a=0, b=1, mean=0.5, sd=0.2)
+  Gamma_os_n_star <- Vectorize(function(x) {
+    mean( as.integer(a<=x) * (1-exp(-1*L$sc_params$lmbd*C$t_e)) )
+  })
+  
+  grid <- sort(unique(dat$a))
+  x_vals1 <- Phi_n1(grid)
+  x_vals2 <- Phi_n2(grid)
+  x_vals3 <- Phi_n3(grid)
+  inds1 <- !base::duplicated(x_vals1)
+  inds2 <- !base::duplicated(x_vals2)
+  inds3 <- !base::duplicated(x_vals3)
+  x_vals1 <- x_vals1[inds1]
+  x_vals2 <- x_vals2[inds2]
+  x_vals3 <- x_vals3[inds3]
+  y_vals1 <- -1 * Gamma_os_n_star(grid[inds1])
+  y_vals2 <- -1 * Gamma_os_n_star(grid[inds2])
+  y_vals3 <- -1 * Gamma_os_n_star(grid[inds3])
+  gcm1 <- gcmlcm(x=x_vals1, y=y_vals1, type="gcm")
+  gcm2 <- gcmlcm(x=x_vals2, y=y_vals2, type="gcm")
+  gcm3 <- gcmlcm(x=x_vals3, y=y_vals3, type="gcm")
+  
+  GCM_f1 <- approxfun(x=gcm1$x.knots, y=gcm1$y.knots, method="linear", rule=1)
+  GCM_f2 <- approxfun(x=gcm2$x.knots, y=gcm2$y.knots, method="linear", rule=1)
+  GCM_f3 <- approxfun(x=gcm3$x.knots, y=gcm3$y.knots, method="linear", rule=1)
+  
+  dGCM1 <- approxfun(x=gcm1$x.knots[-length(gcm1$x.knots)],
+                     y=gcm1$slope.knots, method="constant",rule=2,f=0)
+  dGCM2 <- approxfun(x=gcm2$x.knots[-length(gcm2$x.knots)],
+                     y=gcm2$slope.knots, method="constant",rule=2,f=0)
+  dGCM3 <- approxfun(x=gcm3$x.knots[-length(gcm3$x.knots)],
+                     y=gcm3$slope.knots, method="constant",rule=2,f=0)
+  theta_n_Gr1 <- Vectorize(function(x) { -1 * dGCM1(Phi_n1(x)) })
+  theta_n_Gr2 <- Vectorize(function(x) { -1 * dGCM2(Phi_n2(x)) })
+  theta_n_Gr3 <- Vectorize(function(x) { -1 * dGCM3(Phi_n3(x)) })
+  df_A <- data.frame(
+    x = c(x_vals1,x_vals2,x_vals3),
+    y = c(y_vals1,y_vals2,y_vals3),
+    y2 = c(GCM_f1(x_vals1), GCM_f2(x_vals2), GCM_f3(x_vals3)),
+    which = factor(c(rep("Phi_n (lin mid)",length(x_vals1)),
+                     rep("Phi_n (step)",length(x_vals2)),
+                     rep("Phi_0",length(x_vals3))))
+  )
+  grid2 <- round(seq(0,1,0.02),2)
+  df_B <- data.frame(
+    x = rep(grid2, 3),
+    y = c(theta_n_Gr1(grid2), theta_n_Gr2(grid2), theta_n_Gr3(grid2)),
+    which = factor(c(rep("Phi_n (lin mid)",51), rep("Phi_n (step)",51),
+                     rep("Phi_0",51)))
+  )
+  ggplot(df_A, aes(x=x,y=y,color=which)) + geom_point(alpha=0.4) + 
+    geom_line(aes(y=y2)) +
+    facet_wrap(~which,ncol=3) +
+    labs(title="x=Phi(A), y=Gamma_0(A)")
+  ggplot(df_B, aes(x=x,y=y,color=which)) + geom_line() + 
+    facet_wrap(~which,ncol=3) +
+    geom_hline(yintercept=0.1813, color="grey") +
+    labs(title="theta_n estimates")
+  
+}
+
+# Testing spline models
+if (F) {
+  
+  # Existing model
+  {
+    # Fit Cox model
+    fml <- "Surv(y_star,delta_star)~a"
+    for (i in 1:length(dat$w)) {
+      fml <- paste0(fml, "+w",i)
+    }
+    fml <- formula(fml)
+    df <- cbind("y_star"=dat$y_star, "delta_star"=dat$delta_star, "a"=dat$a,
+                dat$w, "weights"=dat$weights)
+    model <- coxph(fml, data=df, weights=dat$weights)
+    beta_n <- coefficients(model)
+    
+    # Get Breslow estimator
+    bh <- basehaz(model, centered=FALSE)
+    index <- max(which((bh$time<C$t_e)==T))
+    est_bshz <- bh$hazard[index]
+    
+    # Construct conditional survival function
+    S_n <- function(w,a) {
+      exp(-1*est_bshz*exp(sum(as.numeric(beta_n)*c(a,w))))
+    }
+    
+    # Construct marginalized survival function
+    r_M <- Vectorize(function(a) {
+      1 - mean(sapply(c(1:length(dat_orig$a)), function(i) {
+        S_n(as.numeric(dat_orig$w[i,]),a)
+      }))
+    })
+  }
+  
+  # Square model
+  {
+    # Fit Cox model
+    fml <- "Surv(y_star,delta_star)~a+a2"
+    for (i in 1:length(dat$w)) {
+      fml <- paste0(fml, "+w",i)
+    }
+    fml <- formula(fml)
+    df <- cbind("y_star"=dat$y_star, "delta_star"=dat$delta_star, "a"=dat$a,
+                "a2"=(dat$a)^2,
+                dat$w, "weights"=dat$weights)
+    model2 <- coxph(fml, data=df, weights=dat$weights)
+    beta_n2 <- coefficients(model2)
+    
+    # Get Breslow estimator
+    bh2 <- basehaz(model2, centered=FALSE)
+    index2 <- max(which((bh2$time<C$t_e)==T))
+    est_bshz2 <- bh2$hazard[index2]
+    
+    # Construct conditional survival function
+    S_n2 <- function(w,a) {
+      exp(-1*est_bshz2*exp(sum(as.numeric(beta_n2)*c(a,a^2,w))))
+    }
+    
+    # Construct marginalized survival function
+    r_M2 <- Vectorize(function(a) {
+      1 - mean(sapply(c(1:length(dat_orig$a)), function(i) {
+        S_n2(as.numeric(dat_orig$w[i,]),a)
+      }))
+    })
+  }
+  
+  # Cube model
+  {
+    # Fit Cox model
+    fml <- "Surv(y_star,delta_star)~a+a2+a3"
+    for (i in 1:length(dat$w)) {
+      fml <- paste0(fml, "+w",i)
+    }
+    fml <- formula(fml)
+    df <- cbind("y_star"=dat$y_star, "delta_star"=dat$delta_star, "a"=dat$a,
+                "a2"=(dat$a)^2, "a3"=(dat$a)^3,
+                dat$w, "weights"=dat$weights)
+    model3 <- coxph(fml, data=df, weights=dat$weights)
+    beta_n3 <- coefficients(model3)
+    
+    # Get Breslow estimator
+    bh3 <- basehaz(model3, centered=FALSE)
+    index3 <- max(which((bh3$time<C$t_e)==T))
+    est_bshz3 <- bh3$hazard[index3]
+    
+    # Construct conditional survival function
+    S_n3 <- function(w,a) {
+      exp(-1*est_bshz3*exp(sum(as.numeric(beta_n3)*c(a,a^2,a^3,w))))
+    }
+    
+    # Construct marginalized survival function
+    r_M3 <- Vectorize(function(a) {
+      1 - mean(sapply(c(1:length(dat_orig$a)), function(i) {
+        S_n3(as.numeric(dat_orig$w[i,]),a)
+      }))
+    })
+  }
+  
+  # NCS model
+  {
+    
+    # Generate spline basis (up to 6 degrees of freedom)
+    degf <- 4
+    qnt <- as.numeric(quantile(dat$a, seq(0,1,1/degf)))
+    qnt <- unique(qnt)
+    spl <- list(
+      K = qnt[-c(1,length(qnt))],
+      B = c(qnt[1],qnt[length(qnt)]),
+      L = length(qnt)-1
+    )
+    ns_basis <- ns(dat$a, knots=spl$K, Boundary.knots=spl$B)
+    
+    # Fit Cox model
+    fml <- "Surv(y_star,delta_star)~b1"
+    for (i in 2:spl$L) { fml <- paste0(fml, "+b",i) }
+    for (i in 1:length(dat$w)) { fml <- paste0(fml, "+w",i) }
+    fml <- formula(fml)
+    df <- cbind("y_star"=dat$y_star, "delta_star"=dat$delta_star,
+                dat$w, "weights"=dat$weights)
+    for (i in 1:spl$L) { df[paste0("b",i)] <- ns_basis[,i] }
+    model4 <- coxph(fml, data=df, weights=dat$weights)
+    beta_n4 <- coefficients(model4)
+    
+    # Get Breslow estimator
+    bh4 <- basehaz(model4, centered=FALSE)
+    index4 <- max(which((bh4$time<C$t_e)==T))
+    est_bshz4 <- bh4$hazard[index4]
+    
+    # Construct conditional survival function
+    S_n4 <- function(w,a) {
+      lin <- c(as.numeric(ns(a, knots=spl$K, Boundary.knots=spl$B)),w)
+      exp(-1*est_bshz4*exp(sum(as.numeric(beta_n4)*lin)))
+    }
+    
+    # Construct marginalized survival function
+    r_M4 <- Vectorize(function(a) {
+      1 - mean(sapply(c(1:length(dat_orig$a)), function(i) {
+        S_n4(as.numeric(dat_orig$w[i,]),a)
+      }))
+    })
+  }
+  
+  # Plot results
+  grid <- seq(log10(100), log10(3000), length.out=10)
+  df_plot <- data.frame(
+    x = rep(grid,4),
+    y = c(r_M(grid), r_M2(grid), r_M3(grid), r_M4(grid)),
+    which = c(rep("linear",10), rep("square",10),
+              rep("cube",10), rep("NCS",10))
+  )
+  ggplot(df_plot, aes(x=x, y=y, color=which)) +
+    geom_line() +
+    xlim(c(log10(100),log10(30000))) +
+    ylim(c(0,0.08))
+  
+}
+
+# Kaplan-Meier estimates
+if (F) {
+  
+  dat <- ss(dat_orig, which(dat_orig$delta==1))
+  
+  dat1 <- ss(dat, which(dat$a==2))
+  dat2 <- ss(dat, which(dat$a>2 & dat$a<=log10(140)))
+  dat3 <- ss(dat, which(dat$a>log10(140)))
+  # cve <- function(r_v) { 1-r_v/0.06 }
+  
+  # srv_ov <- survfit(Surv(dat_orig$y_star,dat_orig$delta_star)~1)
+  # risk_ov <- 1 - srv_ov$surv[which.min(abs(srv_ov$time-C$t_e))]
+  # # print(paste0("Risk: ",round(risk_ov,3),", CVE: ",round(cve(risk_ov),3)))
+  # print(paste0("Risk: ",round(risk_ov,3),", CVE: ",round(cve(risk_ov),3)))
+  
+  srv_ov <- survfit(Surv(dat1$y_star,dat1$delta_star)~1, weights=dat1$weights)
+  risk_ov <- 1 - srv_ov$surv[which.min(abs(srv_ov$time-C$t_e))]
+  # print(paste0("Risk: ",round(risk_ov,3),", CVE: ",round(cve(risk_ov),3)))
+  print(paste0("Risk: ",round(risk_ov,3)))
+  
+  srv_ov <- survfit(Surv(dat2$y_star,dat2$delta_star)~1, weights=dat2$weights)
+  risk_ov <- 1 - srv_ov$surv[which.min(abs(srv_ov$time-C$t_e))]
+  # print(paste0("Risk: ",round(risk_ov,3),", CVE: ",round(cve(risk_ov),3)))
+  print(paste0("Risk: ",round(risk_ov,3)))
+  
+  srv_ov <- survfit(Surv(dat3$y_star,dat3$delta_star)~1, weights=dat3$weights)
+  risk_ov <- 1 - srv_ov$surv[which.min(abs(srv_ov$time-C$t_e))]
+  # print(paste0("Risk: ",round(risk_ov,3),", CVE: ",round(cve(risk_ov),3)))
+  print(paste0("Risk: ",round(risk_ov,3)))
+  
+}
+
+# Testing whether calculation of Gamma_true is correct
+if (F) {
+  
+  C <- list(points=round(seq(0,1,0.02),2), alpha_1=0.5, alpha_2=0.7, t_e=200,
+            appx=list(t_e=10, w_tol=25, a=0.01))
+  L <- list(
+    n=500, alpha_3=-2, dir="decr",
+    sc_params=list(lmbd=1e-3, v=1.5, lmbd2=4e-5, v2=1.5),
+    # distr_A="Unif(0,1)", edge="none", surv_true="exp",
+    distr_A="N(0.5,0.01)", edge="none", surv_true="exp",
+    sampling="iid", estimator=list(est="Grenander",params=params)
+  )
+  dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+                            L$sc_params, L$sampling, L$dir)
+  attr(dat_orig, "Gamma_true")
+  sapply(seq(0,1,0.02), function(x) {
+    # F_0 <- function(x) { x }
+    F_0 <- function(x) { pnorm(x, mean=0.5, sd=0.1) }
+    (1-exp(-1*1e-3*C$t_e)) * F_0(x)
+  })
+  
+}
+
 # Debugging standard errors
 if (F) {
   

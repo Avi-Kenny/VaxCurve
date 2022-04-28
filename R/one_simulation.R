@@ -24,26 +24,30 @@ if (cfg$which_sim=="estimation") {
       dir = L$dir
       # return_extra = "Theta_os_n"
     )
-    
+
     # Return results
     theta_true <- attr(dat_orig, "theta_true")
-    # Theta_true <- attr(dat_orig, "Theta_true") # !!!!!
+    Gamma_true <- attr(dat_orig, "Gamma_true") # !!!!!
     res_list <- list()
     for (i in 1:length(C$points)) {
       m <- format(C$points[i], nsmall=1)
-      # res_list[paste0("Theta_",m)] <- Theta_true[i] # !!!!!
+      res_list[paste0("Gamma_",m)] <- Gamma_true[i] # !!!!!
       res_list[paste0("theta_",m)] <- theta_true[i]
       res_list[paste0("est_",m)] <- ests$est[i]
-      # res_list[paste0("esT_",m)] <- ests$Theta_os_n(C$points[i]) # !!!!!
+      res_list[paste0("estG_",m)] <- ests$ests_Gamma[i] # !!!!!
       res_list[paste0("ci_lo_",m)] <- ests$ci_lo[i]
       res_list[paste0("ci_hi_",m)] <- ests$ci_hi[i]
     }
-    
+    # res_list$g_n_star <- ests$g_n_star # !!!!!
+    # res_list$eta_ss_n3 <- ests$eta_ss_n3 # !!!!!
+    # res_list$eta_ss_n5 <- ests$eta_ss_n5 # !!!!!
+    # res_list$alpha_star_n3 <- ests$alpha_star_n3 # !!!!!
+    # res_list$alpha_star_n5 <- ests$alpha_star_n5 # !!!!!
+    # res_list$gcomp_n <- ests$gcomp_n # !!!!!
+
     # # Return extra results
-    # res_list[[".complex"]] <- list(
-    #   Theta_os_n = ests$Theta_os_n
-    # )
-    
+    # res_list[[".complex"]] <- list(Theta_os_n = ests$Theta_os_n)
+
     return(res_list)
     
   }
@@ -188,8 +192,7 @@ if (cfg$which_sim=="Cox") {
     
     # Debugging
     if (F) {
-      dat_orig <- generate_data(n=100, -2, "Unif(0,1)", "none", surv_true="Cox PH", list(lmbd=1e-3,v=1.5,lmbd2=5e-5,v2=1.5), "iid", "decr")
-      dat_orig <- generate_data(n=100, -2, "Unif(0,1)", "none", surv_true="Cox PH", list(lmbd=1e-3,v=1.5,lmbd2=5e-5,v2=1.5), "two-phase (50%)", "decr")
+      dat_orig <- generate_data(n=1000, -2, "Unif(0,1)", "none", surv_true="Cox PH", list(lmbd=1e-3,v=1.5,lmbd2=5e-5,v2=1.5), "two-phase (50%)", "decr", "estimated")
     }
     
     # Generate dataset
@@ -197,84 +200,80 @@ if (cfg$which_sim=="Cox") {
       L$n, L$alpha_3, L$distr_A, L$edge, surv_true="Cox PH",
       L$sc_params, L$sampling, L$dir, L$wts_type
     )
+    
+    # Round data values and construct dat
+    dat_orig$a <- round(dat_orig$a,2)
+    dat_orig$weights <- round(dat_orig$weights,3)
+    dat_orig$y_star <- round(dat_orig$y_star,0)
     dat <- ss(dat_orig, which(dat_orig$delta==1))
     
-    # Calculate Fisher information and variance estimate
+    # Calculate variance estimates
     a <- 0.5
-    # res <- cox_var(dat=dat, dat_orig=dat_orig, t=C$t_e, points=a,
-    #                return_extras=T)
-    system.time({
-    res <- cox_var(dat=dat, dat_orig=dat_orig, t=C$t_e, points=a,
-                   return_extras=T, calc_bshz=T)
-    })
+    res_cox <- cox_var(dat_orig=dat_orig, dat=dat, t=C$t_e, points=a,
+                       se_beta=T, se_bshz=T, se_surv=T, se_marg=T)
     
-    # Calculate marginalized survival for A=0.5
-    bh <- basehaz(res$model, centered=FALSE)
-    index <- max(which((bh$time<C$t_e)==T))
-    est_bshz <- bh$hazard[index]
-    N <- sum(dat$weights)
-    est_marg <- (1/N) * sum(sapply(c(1:N), function(i) {
-      exp(-1*exp(sum(res$theta_n*c(as.numeric(dat_orig$w[i,]),a)))*est_bshz)
-    }))
+    res_cox <- cox_var(dat_orig=dat_orig, dat=dat, t=C$t_e, points=0.5, se_marg=T, verbose=T)
+    res_cox <- cox_var(dat_orig=dat_orig, dat=dat, t=C$t_e, points=c(0.2,0.5,0.8), se_marg=T, verbose=T)
+    res_cox <- cox_var(dat_orig=dat_orig, dat=dat, t=C$t_e, points=seq(0.1,0.9,0.1), se_marg=T, verbose=T)
+    
+    # Calculate certain true values
+    z_0 <- c(0.3,1,0.5) # !!!!! Needs to be consistent with the value in cox_var()
+    H_0_true <- function(t) {
+      L$sc_params$lmbd*exp(-1.7) * t^L$sc_params$v # !!!!!
+    }
+    true_lp <- sum(c(C$alpha_1,C$alpha_2,L$alpha_3)*z_0)
+    true_surv <- exp(-1*exp(true_lp)*H_0_true(C$t_e))
+    true_marg <- 1-attr(dat_orig, "theta_true")[26] # Corresponds to A=0.5
     
     # Construct simulation results object
+    # This needs to line up with res_cox based on the se_* flags
     sim_res <- list(
-      true_marg = 1-attr(dat_orig, "theta_true")[26], # Corresponds to A=0.5
-      est_marg = est_marg,
-      se_marg_MC = sqrt(res$var_marg_est)
+      true_w1 = C$alpha_1,
+      est_w1 = res_cox$beta_n[1],
+      se_w1 = sqrt(res_cox$var_est_beta[1]),
+      true_w2 = C$alpha_2,
+      est_w2 = res_cox$beta_n[2],
+      se_w2 = sqrt(res_cox$var_est_beta[2]),
+      true_a = L$alpha_3,
+      est_a = res_cox$beta_n[3],
+      se_a = sqrt(res_cox$var_est_beta[3]),
+      true_bshz = H_0_true(C$t_e),
+      est_bshz = res_cox$est_bshz,
+      se_est_bshz = sqrt(res_cox$var_est_bshz),
+      true_surv = true_surv,
+      est_surv = res_cox$est_surv,
+      se_est_surv = sqrt(res_cox$var_est_surv),
+      true_marg = true_marg,
+      est_marg = res_cox$est_marg,
+      se_est_marg = sqrt(res_cox$var_est_marg)
     )
     
     # Debugging
-    if (T) {
+    if (F) {
       
-      # # !!!!! Incomplete; need to rerun cox_var() with z_0, etc.
-      # 
       # # Fix a covariate vector and time of interest
       # z_0 <- c(0.3,1,0.5) # c(W1,W2,A)
       # 
       # # Calculate the cumulative hazard via predict()
       # newdata <- data.frame(y_star=C$t_e, delta_star=1, w1=z_0[1],
       #                       w2=z_0[2], a=z_0[3])
-      # pred <- predict(res$model, newdata=newdata, type="expected", se.fit=T)
+      # pred <- predict(res_cox$model, newdata=newdata, type="expected", se.fit=T)
       
-      # Calculate certain true values
-      H_0_true <- function(t) {
-        L$sc_params$lmbd*exp(-1.7) * t^L$sc_params$v # !!!!!
-      }
-      # true_lp <- sum(c(C$alpha_1,C$alpha_2,L$alpha_3)*z_0)
       
       # Add additional results
       # sim_res$true_cmhz = exp(true_lp) * H_0_true(C$t_e) # Should roughly equal pred$se.fit
-      # sim_res$true_surv = exp(-1*exp(true_lp)*H_0_true(C$t_e))
-      # sim_res$est_cmhz = exp(sum(res$theta_n*z_0))*est_bshz # Should equal pred$fit
-      # sim_res$est_surv = exp(-1*exp(sum(res$theta_n*z_0))*est_bshz)
-      # sim_res$se_cmhz_MC = sqrt(res$var_cmhz_est)
-      # sim_res$se_surv_MC = sqrt(res$var_surv_est)
+      # sim_res$est_cmhz = exp(sum(res_cox$beta_n*z_0))*est_bshz # Should equal pred$fit
+      # sim_res$est_surv = exp(-1*exp(sum(res_cox$beta_n*z_0))*est_bshz)
+      # sim_res$se_cmhz_MC = sqrt(res_cox$var_cmhz_est)
+      # sim_res$se_surv_MC = sqrt(res_cox$var_surv_est)
       # sim_res$se_bshz_Cox = pred$se.fit
-      sim_res$true_w1 <- C$alpha_1
-      sim_res$est_w1 <- as.numeric(res$theta_n[1])
-      sim_res$se_w1_MC <- res$se_w1_MC
-      sim_res$true_w2 <- C$alpha_2
-      sim_res$est_w2 <- as.numeric(res$theta_n[2])
-      sim_res$se_w2_MC <- res$se_w2_MC
-      sim_res$true_a <- L$alpha_3
-      sim_res$est_a <- as.numeric(res$theta_n[3])
-      sim_res$se_a_MC <- res$se_a_MC
-      
-      # These account for the weights
-      sim_res$se_w1_MCw <- res$se_w1_MCw
-      sim_res$se_w2_MCw <- res$se_w2_MCw
-      sim_res$se_a_MCw <- res$se_a_MCw
       
       # Debugging the Breslow estimator
-      sim_res$true_bshz <- H_0_true(C$t_e)
-      sim_res$est_bshz <- res$est_bshz
-      sim_res$se_bshz_MC = sqrt(res$var_bshz_est)
-      sim_res$se_bshz_MC2 = sqrt(res$var_bshz_est2) # New derivation
-      sim_res$se_bshz_MC3 = sqrt(res$var_bshz_est3) # Accounting for estimated weights
+      # sim_res$se_bshz_MC = sqrt(res_cox$var_bshz_est)
+      # sim_res$se_bshz_MC2 = sqrt(res_cox$var_bshz_est2) # New derivation
       
-      # sim_res$se_w1_Cox = as.numeric(sqrt(diag(vcov(res$model)))[1])
-      # sim_res$se_w1_alt = as.numeric(sqrt(diag(res$I_tilde_inv)/L$n)[1])
+      # sim_res$se_w1_Cox = as.numeric(sqrt(diag(vcov(res_cox$model)))[1])
+      # sim_res$se_w1_alt = as.numeric(sqrt(diag(res_cox$I_tilde_inv)/L$n)[1])
       
     }
     

@@ -1,4 +1,60 @@
 
+# Old code from est_curve
+if (F) {
+  
+  # LOD shift
+  a_min <- min(dat_orig$a,na.rm=T)
+  lod12 <- a_min
+  if (params$lod_shift=="3/4") {
+    lod34 <- log10(1.5*(10^lod12))
+    dat_orig$a[dat_orig$a==lod12] <- lod34
+    a_min <- lod34
+  } else if (params$lod_shift=="1") {
+    lod <- log10(2*(10^lod12))
+    dat_orig$a[dat_orig$a==lod12] <- lod
+    a_min <- lod
+  }
+  
+  # Phi_n_inv_notrans
+  Phi_n_inv_notrans <- construct_Phi_n(dat, which="inverse",
+                                       type=params$ecdf_type)
+  
+}
+
+# Construct Psi_n
+if (F) {
+  
+  # Phased this out for alternate method based on CIR paper
+  if (params$marg=="Theta") {
+    if (dir=="incr") {
+      Psi_n <- Theta_os_n
+    } else {
+      Psi_n <- Vectorize(function(x) { -1 * Theta_os_n(x) })
+    }
+  } else if (params$marg=="Gamma") {
+    if (dir=="incr") {
+      Psi_n <- Vectorize(function(x) {
+        Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
+      })
+    } else {
+      Psi_n <- Vectorize(function(x) {
+        -1 * Gamma_os_n(round(Phi_n_inv(x), -log10(C$appx$a)))
+      })
+    }
+  } else if (params$marg %in% c("Gamma_star", "Gamma_star2")) {
+    if (dir=="incr") {
+      Psi_n <- Vectorize(function(x) {
+        Gamma_os_n_star(round(Phi_n_inv(x), -log10(C$appx$a)))
+      })
+    } else {
+      Psi_n <- Vectorize(function(x) {
+        -1 * Gamma_os_n_star(round(Phi_n_inv(x), -log10(C$appx$a)))
+      })
+    }
+  }
+  
+}
+
 # Testing that the two epectations are equal
 if (F) {
   

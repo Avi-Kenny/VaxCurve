@@ -12,9 +12,7 @@ logit <- function(x) {
 #' 
 #' @param x Numeric input
 #' @return Numeric output
-expit <- function(x) {
-  1 / (1+exp(-x))
-}
+expit <- function(x) { 1 / (1+exp(-x)) }
 
 
 
@@ -22,9 +20,7 @@ expit <- function(x) {
 #' 
 #' @param x Numeric input
 #' @return Numeric output
-deriv_expit <- function(x) {
-  exp(x) / ((1+exp(x))^2)
-}
+deriv_expit <- function(x) { exp(x) / ((1+exp(x))^2) }
 
 
 
@@ -32,9 +28,7 @@ deriv_expit <- function(x) {
 #' 
 #' @param x Numeric input
 #' @return Numeric output
-deriv_logit <- function(x) {
-  1 / (x-x^2)
-}
+deriv_logit <- function(x) { 1 / (x-x^2) }
 
 
 
@@ -214,7 +208,7 @@ Pi <- function(sampling, delta_star, y_star, w) {
   } else if (sampling=="cycle") {
     probs <- rep(c(0.8,0.6,0.4,0.2), length.out=length(y_star))
   } else {
-    ev <- as.integer(delta_star==1 & y_star<=200)
+    ev <- as.integer(delta_star==1 & y_star<=C$t_e)
     if (sampling=="two-phase (6%)") {
       probs <- ev + (1-ev)*expit(w$w1+w$w2-3.85)
     } else if (sampling=="two-phase (72%)") {
@@ -252,7 +246,7 @@ wts <- function(dat_orig, scale="stabilized", type="true", return_strata=F) {
   
   sampling <- attr(dat_orig,"sampling")
   Pi_0 <- Pi(sampling, dat_orig$delta_star, dat_orig$y_star, dat_orig$w)
-  strata1 <- as.numeric(factor(Pi_0))
+  strata1 <- as.integer(factor(Pi_0))
   
   if (type=="true") {
     
@@ -264,7 +258,11 @@ wts <- function(dat_orig, scale="stabilized", type="true", return_strata=F) {
     for (i in c(1:max(strata1))) {
       Pi_n_vals[i] <- sum(as.integer(strata1==i)*dat_orig$delta) /
         sum(as.integer(strata1==i))
-      Pi_n_vals <- ifelse(Pi_n_vals==0, min(Pi_n_vals[Pi_n_vals!=0]), Pi_n_vals) # Hack to avoid NA values in small sample sizes
+      if (Pi_n_vals[i]==0) {
+        # Hack to avoid NA values in small sample sizes
+        warning(paste0("stratum ", i, " had no one sampled."))
+        Pi_n_vals[i] <- 1
+      }
     }
     weights <- dat_orig$delta / Pi_n_vals[strata1]
     
@@ -302,7 +300,7 @@ ss <- function(dat_orig, indices) {
     y_star = dat_orig$y_star[i],
     delta_star = dat_orig$delta_star[i],
     weights = dat_orig$weights[i],
-    # weights_true = dat_orig$weights_true[i], # !!!!!
+    weights_true = dat_orig$weights_true[i], # !!!!!
     strata = dat_orig$strata[i]
   ))
   
@@ -476,6 +474,10 @@ construct_S_n <- function(dat, vals, type, return_model=F) {
     v <- L$sc_params$v
     lmbd2 <- L$sc_params$lmbd2
     v2 <- L$sc_params$v2
+    if (L$surv_true=="exp") {
+      v <- 1   # Overwrite
+      v2 <- 1 # Overwrite
+    }
     
     fnc_srv <- function(t, w, a) {
       if (L$surv_true=="Cox PH") {
@@ -492,6 +494,8 @@ construct_S_n <- function(dat, vals, type, return_model=F) {
           lin <- C$alpha_1*pmax(0,2-8*abs(w[1]-0.5)) +
             2.5*alpha_3*w[2]*(1-a) + 0.7*alpha_3*(1-w[2])*(1-a) - 1.3
         }
+      } else if (L$surv_true=="exp") {
+        lin <- 0
       }
       return(exp(-1*lmbd*(t^v)*exp(lin)))
     }
@@ -501,6 +505,8 @@ construct_S_n <- function(dat, vals, type, return_model=F) {
         lin <- C$alpha_1*w[1] + C$alpha_2*w[2] - 1
       } else if (L$surv_true=="complex") {
         lin <- C$alpha_1*pmax(0,2-8*abs(w[1]-0.5)) - 0.35
+      } else if (L$surv_true=="exp") {
+        lin <- 0
       }
       return(exp(-1*lmbd2*(t^v2)*exp(lin)))
     }
@@ -783,33 +789,35 @@ construct_omega_n <- function(vals=NA, S_n, Sc_n, type="estimated") {
         i <- c(1:k)
         # i <- c(1:m)
         # k <- min(y_star,C$t_e)
-        
+
         w_long <- as.data.frame(
           matrix(rep(w,length(i)), ncol=length(w), byrow=T)
         )
         a_long <- rep(a,length(i))
-        
+
         integral <- 0.5 * sum(
           ( H_n(i,w_long,a_long) - H_n(i-1,w_long,a_long) ) * (
             ( S_n(i,w_long,a_long) * Sc_n(i,w_long,a_long) )^-1 +
               ( S_n(i-1,w_long,a_long) * Sc_n(i-1,w_long,a_long))^-1
           )
         )
-        
+
         # integral_diffgrid <- 0.5 * sum(
         #   ( H_n((i*k)/m,w,a) - H_n(((i-1)*k)/m,w,a) ) * (
         #     (S_n((i*k)/m,w,a))^-1 * (Sc_n((i*k)/m,w,a))^-1 +
         #       (S_n(((i-1)*k)/m,w,a))^-1 * (Sc_n(((i-1)*k)/m,w,a))^-1
         #   )
         # )
-        
+
       }
-      
+
       return(S_n(C$t_e,w,a) * (
         (delta_star * as.integer(y_star<=C$t_e)) /
           (S_n(k,w,a) * Sc_n(k,w,a)) -
           integral
       ))
+      
+      # return (0)
       
     }
     
@@ -1182,21 +1190,17 @@ construct_f_aIw_n <- function(dat, vals=NA, type, k=0, delta1=FALSE) {
     if (L$distr_A=="Unif(0,1)") {
       fnc <- function(a, w) { 1 }
     } else if (L$distr_A=="Unif(0.3,0.7)") {
-      fnc <- function(a, w) {
-        2.5 * as.integer(a>=0.3 & a<=0.7)
-      }
+      fnc <- function(a, w) { 2.5 * as.integer(a>=0.3 & a<=0.7) }
     } else if (L$distr_A=="N(0.5,0.01)") {
-      fnc <- function(a, w) {
-        dnorm(a, mean=0.5, sd=0.1)
-      }
+      fnc <- function(a, w) { dnorm(a, mean=0.5, sd=0.1) }
     } else if (L$distr_A=="N(0.5,0.04)") {
-      fnc <- function(a, w) {
-        dnorm(a, mean=0.5, sd=0.2)
-      }
+      fnc <- function(a, w) { dnorm(a, mean=0.5, sd=0.2) }
     } else if (L$distr_A=="N(0.4+0.2w1+0.1w2,0.01)") {
-      fnc <- function(a, w) {
-        dnorm(a, mean=0.4+0.2*w[1]+0.1*w[2], sd=0.1)
-      }
+      fnc <- function(a, w) { dnorm(a, mean=0.4+0.2*w[1]+0.1*w[2], sd=0.1) }
+    } else if (L$distr_A=="Tri UP") {
+      fnc <- function(a, w) { 2*a }
+    } else if (L$distr_A=="Tri DN") {
+      fnc <- function(a, w) { 2-2*a }
     }
     
     
@@ -2282,6 +2286,10 @@ construct_Gamma_os_n_star2 <- function(dat, dat_orig, omega_n, g_n_star,
   rm(omega_n,g_n_star,gcomp_n)
   
   fnc <- function(x) {
+    # eta_ss_n(x,c(0,0))
+    (1/n_orig) * sum(
+    eta_ss_n(rep(x,n_orig),dat_orig$w)
+    )
     (1/n_orig) * sum(dat$weights * (
       piece_1*as.integer(dat$a<=x)*piece_2 - (piece_1*alpha_star_n(x))/z_n
     )) +
@@ -2332,14 +2340,33 @@ construct_Theta_os_n2 <- function(dat, dat_orig, omega_n, f_aIw_n, q_star_n,
 #' @param dat Subsample of dataset returned by ss() for which delta==1
 #' @param t The end time of interest
 #' @param points The A-values of interest
-#' @param z_0 For debugging
+#' @param se_beta Estimates related to parameter vector beta_n
+#' @param se_bshz Estimates related to Breslow baseline cuml. hazard estimator
+#' @param se_surv Estimates related to survival at a point
+#' @param se_marg Estimates related to marginalized survival
 #' @param return_extras For debugging
-#' @param calc_bshz For debugging
-#' @param calc_surv For debugging
-#' @return A list containing the estimated information matrix and the variance
-#'     estimates corresponding to `points`
-cox_var <- function(dat, dat_orig, t, points, z_0=NA, return_extras=F,
-                    calc_bshz=F, calc_surv=F) {
+#' @param parallel Parallelize internal lapply calls
+#' @param verbose Print status updates and progress bars
+#' @return A list containing the selected return values
+cox_var <- function(dat_orig, dat, t, points, se_beta=F, se_bshz=F,
+                    se_surv=F, se_marg=F, return_extras=F, parallel=F,
+                    verbose=F) {
+  # Setup
+  if (verbose) {
+    print(paste("Check 0 (start):", Sys.time()))
+    pbapply::pboptions(type="txt", char="#", txt.width=40, style=3)
+  } else {
+    pbapply::pboptions(type="none")
+  }
+  if (parallel) {
+    n_cores <- parallel::detectCores() - 1
+    cl <- parallel::makeCluster(n_cores)
+    if (verbose) {
+      print(cl)
+    }
+  } else {
+    cl <- NULL
+  }
   
   # Fit a Cox model
   # Note: scaling the weights affects the SEs but not the estimates; thus, this
@@ -2351,42 +2378,76 @@ cox_var <- function(dat, dat_orig, t, points, z_0=NA, return_extras=F,
                  dat$w, a=dat$a),
     weights = dat$weights * (length(dat$weights)/sum(dat$weights))
   )
-  theta_n <- as.numeric(model$coefficients)
+  beta_n <- as.numeric(model$coefficients)
+  
+  if (verbose) { print(paste("Check 1 (Cox model fit):", Sys.time())) }
+  
+  # !!!!! Stabilize weights
   
   # Alias random variables
   WT <- dat$weights
   ST <- dat$strata
-  N <- round(sum(WT))
-  n <- length(WT)
+  N <- length(dat_orig$a)
+  n <- length(dat$a)
   Z_ <- t(as.matrix(cbind(dat$w,a=dat$a)))
   T_ <- dat$y_star
   Ds_ <- dat$delta_star
-  lin <- as.numeric(t(theta_n)%*%Z_)
+  lin <- as.numeric(t(beta_n)%*%Z_)
   d <- dim(Z_)[1]
   
   # Intermediate functions
   {
-    S_2n <- memoise(function(x) {
-      res <- matrix(NA, nrow=d, ncol=d)
-      for (i in c(1:d)) {
-        for (j in c(1:d)) {
-          if (!is.na(res[j,i])) {
-            res[i,j] <- res[j,i]
-          } else {
-            res[i,j] <- (1/N)*sum(WT*as.integer(T_>=x)*Z_[i,]*Z_[j,]*exp(lin))
-          }
+    S_2n <- (function() {
+      .cache <- new.env()
+      function(x) {
+        val <- .cache[[as.character(x)]]
+        if (is.null(val)) {
+          val <- (function(x) {
+            res <- matrix(NA, nrow=d, ncol=d)
+            for (i in c(1:d)) {
+              for (j in c(1:d)) {
+                if (!is.na(res[j,i])) {
+                  res[i,j] <- res[j,i]
+                } else {
+                  res[i,j] <- (1/N)*sum(WT*as.integer(T_>=x)*Z_[i,]*Z_[j,]*exp(lin))
+                }
+              }
+            }
+            return(res)
+          })(x)
+          .cache[[as.character(x)]] <- val
         }
+        return(val)
       }
-      return(res)
-    })
+    })()
     
-    S_0n <- function(x) { # memoise
-      (1/N) * sum(WT*as.integer(T_>=x)*exp(lin))
-    }
+    S_0n <- (function() {
+      .cache <- new.env()
+      function(x) {
+        val <- .cache[[as.character(x)]]
+        if (is.null(val)) {
+          val <- (function(x) {
+              (1/N) * sum(WT*as.integer(T_>=x)*exp(lin))
+          })(x)
+          .cache[[as.character(x)]] <- val
+        }
+        return(val)
+      }
+    })()
     
-    S_1n <- memoise(function(x) {
-      (1/N)*as.numeric(Z_ %*% (WT*as.integer(T_>=x)*exp(lin)))
-    })
+    S_1n <- (function() {
+      .cache <- new.env()
+      function(x) {
+        val <- .cache[[as.character(x)]]
+        if (is.null(val)) {
+          val <- (function(x) {
+            (1/N) * as.numeric(Z_ %*% (WT*as.integer(T_>=x)*exp(lin)))
+          })(x)
+          .cache[[as.character(x)]] <- val
+        }
+        return(val)
+      }
+    })()
     
     m_n <- function(x) {
       S_1n(x) / S_0n(x)
@@ -2402,48 +2463,36 @@ cox_var <- function(dat, dat_orig, t, points, z_0=NA, return_extras=F,
   i_ev <- which(Ds_==1)
   t_ev <- T_[which(Ds_==1)]
   
-  # Create estimated information matrix (for an individual)
+  # Estimated information matrix (for an individual)
   I_tilde <- Reduce("+", lapply(i_ev, function(i) {
     WT[i] * h(T_[i])
   }))
   I_tilde <- (1/N)*I_tilde
   I_tilde_inv <- solve(I_tilde)
   
-  # Create score function
+  # Score function (Cox model)
   l_star <- function(z_i,ds_i,t_i) {
     ds_i*(z_i-m_n(t_i)) - (1/N)*Reduce("+", lapply(i_ev, function(j) {
-      (WT[j]*exp(sum(z_i*theta_n))*as.integer(T_[j]<=t_i)*(z_i-m_n(T_[j]))) /
+      (WT[j]*exp(sum(z_i*beta_n))*as.integer(T_[j]<=t_i)*(z_i-m_n(T_[j]))) /
         S_0n(T_[j])
     }))
   }
-  l_tilde <- memoise(function(z_i,ds_i,t_i) {
-    I_tilde_inv %*% l_star(z_i,ds_i,t_i)
-  })
   
-  lstar_tilde <- memoise(function(wt_i,d_i,c_i,z_i,ds_i,t_i) {
-    j_set <- which(ST==c_i)
-    if (length(j_set)>0) {
-      pc_2 <- (1/N) * Reduce("+", lapply(j_set, function(j) {
-        ((p1_n[ST[j]]-p_n[ST[j]]*d_i) * l_tilde(Z_[,j],Ds_[j],T_[j])) /
-          (p1_n[ST[j]])^2
-      }))
-    } else {
-      pc_2 <- 0
+  # Influence function: beta_hat (regular Cox model)
+  l_tilde <- (function() {
+    .cache <- new.env()
+    function(z_i,ds_i,t_i) {
+      key <- paste(c(z_i,ds_i,t_i), collapse=" ")
+      val <- .cache[[key]]
+      if (is.null(val)) {
+        val <- (function(z_i,ds_i,t_i) {
+          I_tilde_inv %*% l_star(z_i,ds_i,t_i)
+        })(z_i,ds_i,t_i)
+        .cache[[key]] <- val
+      }
+      return(val)
     }
-    if (d_i==1) {
-      pc_1 <- wt_i*l_tilde(z_i,ds_i,t_i)
-      return(pc_1+pc_2)
-    } else {
-      return(pc_2)
-    }
-  })
-  
-  # # !!!!! Debugging: calculate information using score
-  # if (F) {
-  #   I_tilde2 <- (1/N) * Reduce("+", lapply(c(1:N), function(i) {
-  #     WT[i]*l_star(Z_[,i],Ds_[i],T_[i]) %*% t(WT[i]*l_star(Z_[,i],Ds_[i],T_[i]))
-  #   }))
-  # }
+  })()
   
   # Create p_n and p1_n vectors
   n_strata <- max(dat_orig$strata)
@@ -2454,143 +2503,320 @@ cox_var <- function(dat, dat_orig, t, points, z_0=NA, return_extras=F,
     p1_n[c] <- mean(c==dat_orig$strata & dat_orig$delta==1)
   }
   
-  # Influence function of theta_hat when weights are estimated
-  if_theta_n <- function(z_i,delta_i,ds_i,t_i,wt_i,st_i) {
-    if (delta_i) {
-      piece_1 <- wt_i*l_tilde(z_i,ds_i,t_i)
-    } else {
-      piece_1 <- as.matrix(rep(0,d))
-    }
-    js <- which(ST==st_i)
-    if (length(js)>0) {
-      piece_2 <- (1/N) * Reduce("+", lapply(js, function(j) {
-        ((p1_n[ST[j]]-delta_i*p_n[ST[j]])/(p1_n[ST[j]])^2) *
+  # Influence function: beta_hat (est. weights)
+  lstar_tilde <- (function() {
+    .cache <- new.env()
+    
+    exp_terms <- list()
+    for (i in c(1:max(dat_orig$strata))) {
+      js <- which(ST==i)
+      if (length(js)>0) {
+        exp_terms[[i]] <- (1/length(js)) * Reduce("+", lapply(js, function(j) {
           l_tilde(Z_[,j],Ds_[j],T_[j])
-      }))
-    } else {
-      piece_2 <- as.matrix(rep(0,d))
+        }))
+      } else {
+        exp_terms[[i]] <- as.matrix(rep(0,d)) # Hack to avoid NAs in small samples
+      }
     }
-    return(as.numeric(piece_1+piece_2))
-  }
+    
+    function(z_i,d_i,ds_i,t_i,wt_i,st_i) {
+      key <- paste(c(z_i,d_i,ds_i,t_i,wt_i,st_i), collapse=" ")
+      val <- .cache[[key]]
+      if (is.null(val)) {
+        val <- (function(z_i,d_i,ds_i,t_i,wt_i,st_i) {
+          if (d_i) {
+            piece_1 <- wt_i*l_tilde(z_i,ds_i,t_i)
+          } else {
+            piece_1 <- as.matrix(rep(0,d))
+          }
+          
+          if (p1_n[st_i]!=0) {
+            piece_2 <- (1 - (d_i*p_n[st_i])/p1_n[st_i]) * exp_terms[[st_i]]
+          } else {
+            piece_2 <- as.matrix(rep(0,d)) # Hack to avoid NAs in small samples
+          }
+          
+          return(as.numeric(piece_1+piece_2))
+        })(z_i,d_i,ds_i,t_i,wt_i,st_i)
+        .cache[[key]] <- val
+      }
+      return(val)
+    }
+  })()
   
-  # Variance of theta_hat when weights are estimated
-  var_est_theta_n <- (1/N^2) * Reduce("+", lapply(c(1:N), function(i) {
-    (if_theta_n(
-      z_i = as.numeric(c(dat_orig$w[i,], dat_orig$a[i])),
-      delta_i = dat_orig$delta[i],
-      ds_i = dat_orig$delta_star[i],
-      t_i = dat_orig$y_star[i],
-      # wt_i = dat_orig$weights_true[i], # !!!!!
-      wt_i = dat_orig$weights[i],
-      st_i = dat_orig$strata[i]
-    ))^2
-  }))
-  
-  # mu_n nuisance constant
+  # Nuisance constant: mu_n
   mu_n <- (1/N) * as.numeric(Reduce("+", lapply(t_ev, function(t_j) {
     (as.integer(t_j<=t) * S_1n(t_j)) / (S_0n(t_j))^2
   })))
   
-  # v_n nuisance function
-  v_n <- function(c_i,d_i,t_j,theta_n) {
-    k_set <- which(ST==c_i)
-    if (length(k_set)>0) {
-      return( (1/N) * sum(sapply(k_set, function(k) {
-        (as.integer(T_[k]>=t_j) *
-           (p1_n[ST[k]] - p_n[ST[k]]*d_i) *
-           exp(sum(theta_n*Z_[,k])) ) /
-          (p1_n[ST[k]])^2
-      })) )
-    } else {
-      return(0)
+  # Nuisance function: v_n
+  v_n <- (function() {
+    .cache <- new.env()
+    function(st_i,d_i,t_j) {
+      key <- paste(c(st_i,d_i,t_j), collapse=" ")
+      val <- .cache[[key]]
+      if (is.null(val)) {
+        val <- (function(st_i,d_i,t_j) {
+          k_set <- which(ST==st_i)
+          if (length(k_set)>0) {
+            return(
+              (1/N) * (p1_n[st_i]-p_n[st_i]*d_i)/(p1_n[st_i])^2 * sum(
+                unlist(lapply(k_set, function(k) {
+                  as.integer(T_[k]>=t_j) * exp(sum(beta_n*Z_[,k]))
+                }))
+              )
+            )
+          } else { return(0) }
+        })(st_i,d_i,t_j)
+        .cache[[key]] <- val
+      }
+      return(val)
     }
-  }
-  
-  # vstar_n nuisance function
-  vstar_n <- function(c_i,d_i,t) {
-    k_set <- which(ST==c_i & Ds_==1)
-    if (length(k_set)>0) {
-      return( (1/N) * sum(sapply(k_set, function(k) {
-        ( as.integer(T_[k]<=t) * (p1_n[ST[k]]-p_n[ST[k]]*d_i) ) /
-          ( (p1_n[ST[k]])^2 * S_0n(T_[k]))
-      })) )
-    } else {
-      return(0)
-    }
-  }
-  
-  # Create omega influence function
-  omega_n <- (function() {
-    
-    piece_3b <- (1/N) * sum(sapply(i_ev, function(j) {
-      (WT[j]*as.integer(T_[j]<=t)) / S_0n(T_[j])
-    }))
-    piece_3c <- (1/N) * Reduce("+", lapply(i_ev, function(j) {
-      (WT[j]*as.integer(T_[j]<=t)*m_n(T_[j])) / S_0n(T_[j])
-    }))
-    
-    return(memoise(function(z_i,ds_i,t_i,z) {
-      piece_1 <- (ds_i*as.integer(t_i<=t)) / S_0n(t_i)
-      piece_2 <- (1/N) * exp(sum(z_i*theta_n)) * sum(
-        sapply(i_ev, function(j) {
-          (WT[j]*as.integer(T_[j]<=min(t,t_i))) / ((S_0n(T_[j]))^2)
-        })
-      )
-      piece_3a <- t(z*piece_3b-piece_3c)
-      piece_3 <- as.numeric(piece_3a %*% l_tilde(z_i,ds_i,t_i))
-      piece_4 <- exp(sum(z*theta_n))
-      return(piece_4*(piece_1-piece_2+piece_3))
-    }))
-    
   })()
   
-  # Calculate Breslow estimator
-  Lambda_n <- Vectorize(memoise(function(x) {
-    (1/N) * sum(sapply(i_ev, function(i) {
-      (WT[i] * as.integer(T_[i]<=x)) / S_0n(T_[i])
-    }))
-  }))
-  
-  # Influence function of marginalized survival
-  S_n <- memoise(function(w,a) {
-    exp(-exp(sum(c(w,a)*theta_n))*Lambda_n(t))
-  })
-  infl_fn_marg <- memoise(function(w_i,a_i,ds_i,t_i,wt_i,a) {
-    piece_1 <- S_n(w_i,a)
-    piece_2 <- (1/N) * sum(sapply(c(1:N), function(j) {
-      w_j <- as.numeric(dat_orig$w[j,])
-      S_n(w_j,a) * (
-        wt_i * ifelse(wt_i==0, 0, omega_n(c(w_i,a_i),ds_i,t_i,c(w_j,a))) - 1
+  # Nuisance function: vstar_n
+  vstar_n <- function(st_i,d_i,t) {
+    k_set <- which(ST==st_i & Ds_==1)
+    if (length(k_set)>0) {
+      return(
+        (1/N) * (p1_n[st_i]-p_n[st_i]*d_i)/(p1_n[st_i])^2 * sum(
+          unlist(lapply(k_set, function(k) {
+            as.integer(T_[k]<=t) / S_0n(T_[k])
+          }))
+        )
       )
-    }))
-    return(piece_1+piece_2)
-  })
+    } else { return(0) }
+  }
   
-  # Variance estimate of marginalized survival
-  var_marg_ests <- sapply(points, function(a) {
-    (1/N^2) * sum(sapply(c(1:N), function(i) {
-      (infl_fn_marg(
-        w_i = as.numeric(dat_orig$w[i,]),
-        a_i = replace_na(dat_orig$a[i],0),
-        ds_i = dat_orig$delta_star[i],
-        t_i = dat_orig$y_star[i],
-        wt_i = dat_orig$weight[i],
-        a = a
-      ))^2
-    }))
-  })
+  # Breslow estimator
+  Lambda_n <- Vectorize((function() {
+    .cache <- new.env()
+    function(x) {
+      key <- as.character(x)
+      val <- .cache[[key]]
+      if (is.null(val)) {
+        val <- (function(x) {
+          (1/N) * sum(unlist(lapply(i_ev, function(i) {
+            (WT[i] * as.integer(T_[i]<=x)) / S_0n(T_[i])
+          })))
+        })(x)
+        .cache[[key]] <- val
+      }
+      return(val)
+    }
+  })())
+  
+  # Survival estimator (at a point)
+  S_n <- (function() {
+    .cache <- new.env()
+    function(z) {
+      key <- paste(z, collapse=" ")
+      val <- .cache[[key]]
+      if (is.null(val)) {
+        val <- (function(z) {
+          exp(-exp(sum(z*beta_n))*Lambda_n(t))
+        })(z)
+        .cache[[key]] <- val
+      }
+      return(val)
+    }
+  })()
+  
+  # Influence function: Breslow estimator (est. weights)
+  infl_fn_Bres <- (function() {
+    .cache <- new.env()
+    function(z_i,d_i,ds_i,t_i,wt_i,st_i) {
+      key <- paste(c(z_i,d_i,ds_i,t_i,wt_i,st_i), collapse=" ")
+      val <- .cache[[key]]
+      if (is.null(val)) {
+        val <- (function(z_i,d_i,ds_i,t_i,wt_i,st_i) {
+          pc_2 <- vstar_n(st_i,d_i,t)
+          pc_4 <- (1/N) * sum(unlist(lapply(t_ev, function(t_j) {
+            ( as.integer(t_j<=t) * v_n(st_i,d_i,t_j) ) / (S_0n(t_j))^2
+          })))
+          pc_5 <- sum(mu_n*lstar_tilde(z_i,d_i,ds_i,t_i,wt_i,st_i))
+          
+          if (d_i==1) {
+            pc_1 <- ( wt_i * ds_i * as.integer(t_i<=t) ) / S_0n(t_i)
+            pc_3 <- (1/N) * sum(unlist(lapply(t_ev, function(t_j) {
+              (as.integer(t_j<=t)*wt_i*as.integer(t_i>=t_j)*exp(sum(beta_n*z_i))) /
+                (S_0n(t_j))^2
+            })))
+            return(pc_1+pc_2-pc_3-pc_4-pc_5)
+          } else {
+            return(pc_2-pc_4-pc_5)
+          }
+        })(z_i,d_i,ds_i,t_i,wt_i,st_i)
+        .cache[[key]] <- val
+      }
+      return(val)
+    }
+  })()
+  
+  # Influence function: survival at a point (est. weights)
+  omega_n <- (function() {
+    .cache <- new.env()
+    function(z_i,d_i,ds_i,t_i,wt_i,st_i,z) {
+      key <- paste(c(z_i,d_i,ds_i,t_i,wt_i,st_i,z), collapse=" ")
+      val <- .cache[[key]]
+      if (is.null(val)) {
+        val <- (function(z_i,d_i,ds_i,t_i,wt_i,st_i,z) {
+          explin <- exp(sum(z*beta_n))
+          piece_1 <- Lambda_n(t) * explin *
+            (t(z)%*%lstar_tilde(z_i,d_i,ds_i,t_i,wt_i,st_i))[1]
+          piece_2 <- explin * infl_fn_Bres(z_i,d_i,ds_i,t_i,wt_i,st_i)
+          return(-1*S_n(z)*(piece_1+piece_2))
+        })(z_i,d_i,ds_i,t_i,wt_i,st_i,z)
+        .cache[[key]] <- val
+      }
+      return(val)
+    }
+  })()
+  
+  # Influence function: marginalized survival (est. weights)
+  infl_fn_marg <- (function() {
+    .cache <- new.env()
+    w_ <- as.list(as.data.frame(t(dat_orig$w)))
+    function(w_i,a_i,d_i,ds_i,t_i,wt_i,st_i,a) {
+      key <- paste(c(w_i,a_i,d_i,ds_i,t_i,wt_i,st_i,a), collapse=" ")
+      val <- .cache[[key]]
+      if (is.null(val)) {
+        val <- (function(w_i,a_i,d_i,ds_i,t_i,wt_i,st_i,a) {
+          piece_1 <- S_n(c(w_i,a))
+          piece_2 <- (1/N) * sum(unlist(lapply(c(1:N), function(j) {
+            w_j <- w_[[j]]
+            omgn <- omega_n(c(w_i,a_i),d_i,ds_i,t_i,wt_i,st_i,c(w_j,a))
+            return(omgn-S_n(c(w_j,a)))
+          })))
+          return(piece_1+piece_2)
+        })(w_i,a_i,d_i,ds_i,t_i,wt_i,st_i,a)
+        .cache[[key]] <- val
+      }
+      return(val)
+    }
+  })()
   
   # Construct results object
-  res <- list(
-    I_tilde_inv = I_tilde_inv,
-    var_marg_ests = var_marg_ests,
-    model = model,
-    theta_n = theta_n
-  )
+  res <- list(model=model, beta_n=beta_n)
   
-  # Debugging
-  if (T) {
-    # Variance estimate of marginalized survival
+  if (verbose) { print(paste("Check 2 (functions declared):", Sys.time())) }
+  
+  # Variance estimate: beta_hat
+  if (se_beta) {
+    
+    res$est_beta <- beta_n
+    
+    if (verbose) { print(paste("Check 3a (var est START: beta):", Sys.time())) }
+    res$var_est_beta <- (1/N^2) * Reduce("+", pblapply(c(1:N), function(i) {
+      (lstar_tilde(
+        z_i = as.numeric(c(dat_orig$w[i,], dat_orig$a[i])),
+        d_i = dat_orig$delta[i],
+        ds_i = dat_orig$delta_star[i],
+        t_i = dat_orig$y_star[i],
+        wt_i = dat_orig$weights[i], # dat_orig$weights_true[i]
+        st_i = dat_orig$strata[i]
+      ))^2
+    }, cl=cl))
+    if (verbose) { print(paste("Check 4a (var est END: beta):", Sys.time())) }
+    
+  }
+  
+  # Variance estimate: Breslow estimator
+  if (se_bshz) {
+    
+    res$est_bshz <- Lambda_n(t)
+    
+    if (verbose) { print(paste("Check 3b (var est START: bshz):", Sys.time())) }
+    res$var_est_bshz <- (1/N^2) * sum(unlist(pblapply(c(1:N), function(i) {
+      (infl_fn_Bres(
+        z_i = as.numeric(c(dat_orig$w[i,], dat_orig$a[i])),
+        d_i = dat_orig$delta[i],
+        ds_i = dat_orig$delta_star[i],
+        t_i = dat_orig$y_star[i],
+        wt_i = dat_orig$weights[i],
+        st_i = dat_orig$strata[i]
+      ))^2
+    }, cl=cl)))
+    if (verbose) { print(paste("Check 4b (var est END: bshz):", Sys.time())) }
+    
+  }
+  
+  # Variance estimate: survival at a point
+  if (se_surv) {
+    
+    z_0 <- c(0.3,1,0.5)
+    
+    res$est_surv <- S_n(z_0)
+    
+    if (verbose) { print(paste("Check 3c (var est START: surv):", Sys.time())) }
+    res$var_est_surv <- (1/N^2) * sum(unlist(pblapply(c(1:N), function(i) {
+      (omega_n(
+        z_i = as.numeric(c(dat_orig$w[i,], dat_orig$a[i])),
+        d_i = dat_orig$delta[i],
+        ds_i = dat_orig$delta_star[i],
+        t_i = dat_orig$y_star[i],
+        wt_i = dat_orig$weights[i],
+        st_i = dat_orig$strata[i],
+        z = z_0
+      ))^2
+    }, cl=cl)))
+    if (verbose) { print(paste("Check 4c (var est END: surv):", Sys.time())) }
+    
+  }
+  
+  # Variance estimate: marginalized survival
+  if (se_marg) {
+    
+    # !!!! basehaz vs. Lambda_hat
+    bh <- basehaz(model, centered=FALSE)
+    index <- max(which((bh$time<C$t_e)==T))
+    est_bshz <- bh$hazard[index]
+    N <- sum(dat$weights)
+    res$est_marg <- unlist(lapply(points, function(a) {
+      (1/N) * sum(unlist(lapply(c(1:N), function(i) {
+        exp(-1*exp(sum(beta_n*c(as.numeric(dat_orig$w[i,]),a)))*est_bshz)
+      })))
+    }))
+    
+    # !!!!! Pre-calculate omega_n values
+    
+    if (verbose) { print(paste("Check 3d (var est START: marg):", Sys.time())) }
+    res$var_est_marg <- unlist(lapply(points, function(a) {
+      if (verbose) { print(paste0("Check 4d (point=",a,"): ", Sys.time())) }
+      (1/N^2) * sum(unlist(pblapply(c(1:N), function(i) {
+        (infl_fn_marg(
+          w_i = as.numeric(dat_orig$w[i,]),
+          a_i = dat_orig$a[i],
+          d_i = dat_orig$delta[i],
+          ds_i = dat_orig$delta_star[i],
+          t_i = dat_orig$y_star[i],
+          wt_i = dat_orig$weights[i],
+          st_i = dat_orig$strata[i],
+          a = a
+        ))^2
+      }, cl=cl)))
+    }))
+    if (verbose) { print(paste("Check 5d (var est END: marg):", Sys.time())) }
+    
+  }
+  
+  if (return_extras) {
+    res$S_0n <- S_0n
+    res$S_1n <- S_1n
+    res$S_2n <- S_2n
+    res$I_tilde <- I_tilde
+    res$I_tilde_inv <- I_tilde_inv
+    res$l_tilde <- l_tilde
+    res$omega_n <- omega_n
+    res$Lambda_n <- Lambda_n
+  }
+  
+  return(res)
+  
+  # ARCHIVE
+  if (F) {
+    
+    # Beta estimates that don't account for weights
     var_est_betas <- (1/N^2) * Reduce("+", lapply(c(1:n), function(i) {
       (WT[i] * l_tilde(Z_[,i],Ds_[i],T_[i]))^2
     })) %>% as.numeric()
@@ -2598,112 +2824,10 @@ cox_var <- function(dat, dat_orig, t, points, z_0=NA, return_extras=F,
     res$se_w2_MC <- sqrt(var_est_betas[2])
     res$se_a_MC <- sqrt(var_est_betas[3])
     
-    # SE estimates that account for weights
-    res$se_w1_MCw <- sqrt(var_est_theta_n[1])
-    res$se_w2_MCw <- sqrt(var_est_theta_n[2])
-    res$se_a_MCw <- sqrt(var_est_theta_n[3])
-  }
-  
-  if (return_extras) {
-    
-    res$S_0n <- S_0n
-    res$S_1n <- S_1n
-    res$S_2n <- S_2n
-    res$I_tilde <- I_tilde
-    res$l_tilde <- l_tilde
-    res$omega_n <- omega_n
-    res$Lambda_n <- Lambda_n
-    
-  }
-  
-  if (calc_bshz) {
-    
-    # Calculate component estimator Q_n
-    Q_n <- memoise(function(z_i,ds_i,t_i) {
-      piece_1 <- (ds_i*as.integer(t_i<=t)) / S_0n(t_i)
-      piece_2 <- exp(sum(z_i*theta_n))
-      piece_3 <- (1/N) * sum(sapply(i_ev, function(j) {
-        WT[j] * as.integer(T_[j]<=min(t,t_i)) / (S_0n(T_[j]))^2
-      }))
-      return(piece_1-piece_2*piece_3)
-    })
-    
-    # Influence function of Breslow estiamtor
-    infl_fn_2 <- function(z_i,ds_i,t_i) {
-      pc_1 <- Q_n(z_i,ds_i,t_i)
-      pc_2 <- (1/N) * Reduce("+", lapply(c(1:n), function(j) {
-        WT[j] * Z_[,j] * (Ds_[j]-exp(sum(Z_[,j]*theta_n))*Lambda_n(T_[j])) *
-          Q_n(Z_[,j],Ds_[j],T_[j])
-      }))
-      pc_3 <- l_tilde(z_i,ds_i,t_i)
-      return(pc_1-sum(pc_2*pc_3))
-    }
-    
-    # Influence function of Breslow estimator (new derivation)
-    infl_fn_2b <- function(z_i,ds_i,t_i) {
-      pc_1 <- Q_n(z_i,ds_i,t_i)
-      pc_2 <- (1/N^2) * Reduce("+", lapply(c(1:n), function(i) {
-        WT[i] * Z_[,i] * exp(sum(Z_[,i]*theta_n)) *
-          sum(sapply(t_ev, function(t_j) {
-            as.integer(t_j<=min(t,T_[i])) / (S_0n(t_j))^2
-          }))
-      }))
-      pc_3 <- l_tilde(z_i,ds_i,t_i)
-      return(pc_1-sum(pc_2*pc_3))
-    }
-    
-    # Influence function of Breslow estimator (accounting for estimated weights)
-    infl_fn_2c <- function(wt_i,d_i,c_i,z_i,ds_i,t_i) {
-      
-      pc_2 <- vstar_n(c_i,d_i,t)
-      pc_4 <- (1/N) * sum(sapply(t_ev, function(t_j) {
-        ( as.integer(t_j<=t) * v_n(c_i,d_i,t_j,theta_n) ) / (S_0n(t_j))^2
-      }))
-      pc_5 <- sum(mu_n*lstar_tilde(wt_i,d_i,c_i,z_i,ds_i,t_i))
-      
-      if (d_i==1) {
-        pc_1 <- ( wt_i * ds_i * as.integer(t_i<=t) ) / S_0n(t_i)
-        pc_3 <- (1/N) * sum(sapply(t_ev, function(t_j) {
-          (as.integer(t_j<=t)*wt_i*as.integer(t_i>=t_j)*exp(sum(theta_n*z_i))) /
-            (S_0n(t_j))^2
-        }))
-        return(pc_1+pc_2-pc_3-pc_4-pc_5)
-      } else {
-        return(pc_2-pc_4-pc_5)
-      }
-    }
-    
-    # Variance estimate of Breslow estimator using influence function
-    var_bshz_est <- (1/N^2) * sum(sapply(c(1:n), function(i) {
-      (WT[i] * infl_fn_2(Z_[,i],Ds_[i],T_[i]))^2
+    # Calculate information using score
+    I_tilde2 <- (1/N) * Reduce("+", lapply(c(1:N), function(i) {
+      WT[i]*l_star(Z_[,i],Ds_[i],T_[i]) %*% t(WT[i]*l_star(Z_[,i],Ds_[i],T_[i]))
     }))
-    
-    # Variance estimate of Breslow estimator using influence function (new derivation)
-    var_bshz_est2 <- (1/N^2) * sum(sapply(c(1:n), function(i) {
-      (WT[i] * infl_fn_2b(Z_[,i],Ds_[i],T_[i]))^2
-    }))
-    
-    # Variance estimate of Breslow estimator using influence function (accounting for estimated weights)
-    var_bshz_est3 <- (1/N^2) * sum(sapply(c(1:N), function(i) {
-      (infl_fn_2c(
-        wt_i = dat_orig$weights[i],
-        d_i = dat_orig$delta[i],
-        c_i = dat_orig$strata[i],
-        z_i = as.numeric(c(dat_orig$w[i,], dat_orig$a[i])),
-        ds_i = dat_orig$delta_star[i],
-        t_i = dat_orig$y_star[i]
-      ))^2
-    }))
-    
-    res$est_bshz <- Lambda_n(t)
-    res$var_bshz_est <- var_bshz_est
-    res$var_bshz_est2 <- var_bshz_est2
-    res$var_bshz_est3 <- var_bshz_est3
-    
-  }
-  
-  # !!!!! Needs updating (points and generalize W, at least)
-  if (calc_surv) {
     
     # Variance of cumulative hazard estimator
     # !!!!! Adapt to two-phase sampling
@@ -2714,12 +2838,12 @@ cox_var <- function(dat, dat_orig, t, points, z_0=NA, return_extras=F,
     # Influence function of cumulative hazard estiamtor
     # !!!!! Adapt to two-phase sampling
     infl_fn_3 <- (function() {
-      pc_1 <- exp(sum(theta_n*z_0))
+      pc_1 <- exp(sum(beta_n*z_0))
       pc_3 <- z_0 * Lambda_n(t)
       return(function(z_i,ds_i,t_i) {
         pc_2 <- Q_n(z_i,ds_i,t_i)
         pc_4 <- (1/N) * Reduce("+", lapply(c(1:N), function(j) {
-          Z_[,j] * (Ds_[j]-exp(sum(Z_[,j]*theta_n))*Lambda_n(T_[j])) *
+          Z_[,j] * (Ds_[j]-exp(sum(Z_[,j]*beta_n))*Lambda_n(T_[j])) *
             Q_n(Z_[,j],Ds_[j],T_[j])
         }))
         pc_5 <- l_tilde(z_i,ds_i,t_i)
@@ -2735,7 +2859,7 @@ cox_var <- function(dat, dat_orig, t, points, z_0=NA, return_extras=F,
     
     # Variance estimate (survival) using influence function
     # !!!!! Adapt to two-phase sampling
-    surv_est <- exp(-exp(sum(z_0*theta_n))*Lambda_n(t))
+    surv_est <- exp(-exp(sum(z_0*beta_n))*Lambda_n(t))
     var_surv_est <- (1/N^2) * sum(sapply(c(1:N), function(i) {
       (surv_est*infl_fn_3(Z_[,i],Ds_[i],T_[i]))^2
     }))
@@ -2743,8 +2867,50 @@ cox_var <- function(dat, dat_orig, t, points, z_0=NA, return_extras=F,
     res$var_cmhz_est <- var_cmhz_est # !!!!! var_cmhz_est or var_cmhz_est2 ?????
     res$var_surv_est <- var_surv_est
     
+    # Calculate component estimator Q_n
+    Q_n <- memoise(function(z_i,ds_i,t_i) {
+      piece_1 <- (ds_i*as.integer(t_i<=t)) / S_0n(t_i)
+      piece_2 <- exp(sum(z_i*beta_n))
+      piece_3 <- (1/N) * sum(sapply(i_ev, function(j) {
+        WT[j] * as.integer(T_[j]<=min(t,t_i)) / (S_0n(T_[j]))^2
+      }))
+      return(piece_1-piece_2*piece_3)
+    })
+    
+    # Influence function of Breslow estiamtor
+    infl_fn_2 <- function(z_i,ds_i,t_i) {
+      pc_1 <- Q_n(z_i,ds_i,t_i)
+      pc_2 <- (1/N) * Reduce("+", lapply(c(1:n), function(j) {
+        WT[j] * Z_[,j] * (Ds_[j]-exp(sum(Z_[,j]*beta_n))*Lambda_n(T_[j])) *
+          Q_n(Z_[,j],Ds_[j],T_[j])
+      }))
+      pc_3 <- l_tilde(z_i,ds_i,t_i)
+      return(pc_1-sum(pc_2*pc_3))
+    }
+    
+    # Influence function of Breslow estimator (new derivation)
+    infl_fn_2b <- function(z_i,ds_i,t_i) {
+      pc_1 <- Q_n(z_i,ds_i,t_i)
+      pc_2 <- (1/N^2) * Reduce("+", lapply(c(1:n), function(i) {
+        WT[i] * Z_[,i] * exp(sum(Z_[,i]*beta_n)) *
+          sum(sapply(t_ev, function(t_j) {
+            as.integer(t_j<=min(t,T_[i])) / (S_0n(t_j))^2
+          }))
+      }))
+      pc_3 <- l_tilde(z_i,ds_i,t_i)
+      return(pc_1-sum(pc_2*pc_3))
+    }
+    
+    # Variance estimate of Breslow estimator using influence function
+    var_est_bshz <- (1/N^2) * sum(sapply(c(1:n), function(i) {
+      (WT[i] * infl_fn_2(Z_[,i],Ds_[i],T_[i]))^2
+    }))
+    
+    # Variance estimate of Breslow estimator using influence function (new derivation)
+    var_est_bshz2 <- (1/N^2) * sum(sapply(c(1:n), function(i) {
+      (WT[i] * infl_fn_2b(Z_[,i],Ds_[i],T_[i]))^2
+    }))
+    
   }
-  
-  return(res)
   
 }

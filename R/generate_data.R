@@ -12,7 +12,7 @@
 #'     (expit propensity model, prob=0.5), "complex 0.2" (non-logit propensity
 #'     model, prob=0.2).
 #' @param surv_true True form of the survival function; one c("Cox PH",
-#'     "complex")
+#'     "complex", "exp")
 #' @param sc_params Weibull parameters for the survival and censoring
 #'     distributions; a list of the form list(lmbd=1,v=1,lmbd2=1,v2=1)
 #' @param sampling Two-phase sampling mechanism; one of c("iid",
@@ -41,6 +41,10 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
     a <- rtruncnorm(n, a=0, b=1, mean=0.5, sd=0.2)
   } else if (distr_A=="N(0.4+0.2w1+0.1w2,0.01)") {
     a <- rtruncnorm(n, a=0, b=1, mean=0.4+0.2*w$w1+0.1*w$w2, sd=0.1)
+  } else if (distr_A=="Tri UP") {
+    a <- sqrt(runif(n))
+  } else if (distr_A=="Tri DN") {
+    a <- 1 - sqrt(runif(n))
   } else {
     stop("distr_A incorrectly specified")
   }
@@ -60,11 +64,9 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
   
   # Generate event times
   {
-    # Generate survival times (Weibull)
+    # Survival times (Weibull)
     U <- runif(n)
-    H_0_inv <- function(t) {
-      ((1/sc_params$lmbd)*t)^(1/sc_params$v)
-    }
+    H_0_inv <- function(t) { ((1/sc_params$lmbd)*t)^(1/sc_params$v) }
     if (surv_true=="Cox PH") {
       if (dir=="decr") {
         lin <- C$alpha_1*w$w1 + C$alpha_2*w$w2 + alpha_3*a - 1.7
@@ -79,18 +81,22 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
         lin <- C$alpha_1*pmax(0,2-8*abs(w$w1-0.5)) + 2.5*alpha_3*w$w2*(1-a) +
           0.7*alpha_3*(1-w$w2)*(1-a) - 1.3
       }
+    } else if (surv_true=="exp") {
+      H_0_inv <- function(t) { ((1/sc_params$lmbd)*t) }
+      lin <- 0
     }
     t <- H_0_inv(-1*log(U)*exp(-1*lin))
     
-    # Generate censoring times (Weibull)
+    # Censoring times (Weibull)
     U <- runif(n)
-    H_0_inv2 <- function(t) {
-      ((1/sc_params$lmbd2)*t)^(1/sc_params$v2)
-    }
+    H_0_inv2 <- function(t) { ((1/sc_params$lmbd2)*t)^(1/sc_params$v2) }
     if (surv_true=="Cox PH") {
       lin <- C$alpha_1*w$w1 + C$alpha_2*w$w2 - 1
     } else if (surv_true=="complex") {
       lin <- C$alpha_1*pmax(0,2-8*abs(w$w1-0.5)) - 0.35
+    } else if (surv_true=="exp") {
+      H_0_inv2 <- function(t) { ((1/sc_params$lmbd2)*t) }
+      lin <- 0
     }
     c <- H_0_inv2(-1*log(U)*exp(-1*lin))
     
@@ -135,20 +141,40 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
       }
     }
     
-    S_0 <- function(t, w1, w2, a) {
-      exp( -1 * sc_params$lmbd * (t^sc_params$v) * exp(lin(w1,w2,a)) )
+    if (surv_true %in% c("Cox PH", "complex")) {
+      S_0 <- function(t, w1, w2, a) {
+        exp( -1 * sc_params$lmbd * (t^sc_params$v) * exp(lin(w1,w2,a)) )
+      }
+    } else if (surv_true=="exp") {
+      S_0 <- function(t, w1, w2, a) { exp(-1*sc_params$lmbd*t) }
     }
     
-    theta_true_f <- Vectorize(function(a) {
-      return(1 - mean(S_0(C$t_e,w1,w2,a)))
-    })
+    theta_true_f <- Vectorize(function(a) { 1 - mean(S_0(C$t_e,w1,w2,a)) })
     
-    # Note: uncomment this to return true Theta_true
-    # a <- runif(m)
-    # Theta_true_f <- Vectorize(function(x) {
-    #   return(mean( as.integer(a<=x) * (1-S_0(C$t_e,w1,w2,a)) ))
-    # })
-    # attr(dat_orig, "Theta_true") <- Theta_true_f(C$points)
+    # Note: Uncomment this to return true Theta_true
+    #       Only holds if A and W are independent
+    if (T) {
+      
+      if (distr_A=="Unif(0,1)") {
+        a <- runif(m)
+      } else if (distr_A=="Unif(0.3,0.7)") {
+        a <- runif(m, min=0.3, max=0.7)
+      } else if (distr_A=="N(0.5,0.01)") {
+        a <- rtruncnorm(m, a=0, b=1, mean=0.5, sd=0.1)
+      } else if (distr_A=="N(0.5,0.04)") {
+        a <- rtruncnorm(m, a=0, b=1, mean=0.5, sd=0.2)
+      } else if (distr_A=="Tri UP") {
+        a <- sqrt(runif(m))
+      } else if (distr_A=="Tri DN") {
+        a <- 1 - sqrt(runif(m))
+      }
+      
+      Gamma_true_f <- Vectorize(function(x) {
+        mean( as.integer(a<=x) * (1-S_0(C$t_e,w1,w2,a)) )
+      })
+      attr(dat_orig, "Gamma_true") <- Gamma_true_f(C$points)
+      
+    }
     
   }
   

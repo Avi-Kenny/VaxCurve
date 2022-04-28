@@ -7,40 +7,29 @@ if (F) {
   
   sim %>% SimEngine::summarize(
     mean = list(
-      list(name="se_w1_MC", x="se_w1_MC"),
-      list(name="se_w1_MCw", x="se_w1_MCw"), # !!!!!
-      list(name="se_w2_MC", x="se_w2_MC"),
-      list(name="se_w2_MCw", x="se_w2_MCw"), # !!!!!
-      list(name="se_a_MC", x="se_a_MC"),
-      list(name="se_a_MCw", x="se_a_MCw"), # !!!!!
-      list(name="se_bshz_MC", x="se_bshz_MC"),
-      list(name="se_bshz_MC2", x="se_bshz_MC2"),
-      list(name="se_bshz_MC3", x="se_bshz_MC3"),
-      # list(name="se_cmhz_MC", x="se_cmhz_MC"),
-      # list(name="se_surv_MC", x="se_surv_MC"),
-      list(name="se_marg_MC", x="se_marg_MC")
+      list(name="mean_runtime", x="runtime"),
+      list(name="se_w1", x="se_w1"),
+      list(name="se_w2", x="se_w2"),
+      list(name="se_a", x="se_a"),
+      list(name="se_est_bshz", x="se_est_bshz"),
+      list(name="se_est_surv", x="se_est_surv"),
+      list(name="se_est_marg", x="se_est_marg")
     ),
     sd = list(
       list(name="se_w1_empr", x="est_w1"),
       list(name="se_w2_empr", x="est_w2"),
       list(name="se_a_empr", x="est_a"),
-      list(name="se_bshz_empr", x="est_bshz")
-      # list(name="se_cmhz_empr", x="est_cmhz"),
-      # list(name="se_surv_empr", x="est_surv"),
+      list(name="se_bshz_empr", x="est_bshz"),
+      list(name="se_surv_empr", x="est_surv"),
+      list(name="se_marg_empr", x="est_marg")
     ),
     coverage = list(
-      list(name="cov_w1_MC", truth="true_w1", estimate="est_w1", se="se_w1_MC"),
-      list(name="cov_w1_MCw", truth="true_w1", estimate="est_w1", se="se_w1_MCw"),
-      list(name="cov_w2_MC", truth="true_w2", estimate="est_w2", se="se_w2_MC"),
-      list(name="cov_w2_MCw", truth="true_w2", estimate="est_w2", se="se_w2_MCw"),
-      list(name="cov_a_MC", truth="true_a", estimate="est_a", se="se_a_MC"),
-      list(name="cov_a_MCw", truth="true_a", estimate="est_a", se="se_a_MCw"),
-      list(name="cov_bshz_MC", truth="true_bshz", estimate="est_bshz", se="se_bshz_MC"),
-      list(name="cov_bshz_MC2", truth="true_bshz", estimate="est_bshz", se="se_bshz_MC2"),
-      list(name="cov_bshz_MC3", truth="true_bshz", estimate="est_bshz", se="se_bshz_MC3"),
-      # list(name="cov_cmhz_MC", truth="true_cmhz", estimate="est_cmhz", se="se_cmhz_MC"),
-      # list(name="cov_surv_MC", truth="true_surv", estimate="est_surv", se="se_surv_MC"),
-      list(name="cov_marg_MC", truth="true_marg", estimate="est_marg", se="se_marg_MC")
+      list(name="cov_w1", truth="true_w1", estimate="est_w1", se="se_w1"),
+      list(name="cov_w2", truth="true_w2", estimate="est_w2", se="se_w2"),
+      list(name="cov_a", truth="true_a", estimate="est_a", se="se_a"),
+      list(name="cov_bshz", truth="true_bshz", estimate="est_bshz", se="se_est_bshz"),
+      list(name="cov_surv", truth="true_surv", estimate="est_surv", se="se_est_surv"),
+      list(name="cov_marg", truth="true_marg", estimate="est_marg", se="se_est_marg")
     )
   )
   

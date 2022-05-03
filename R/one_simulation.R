@@ -21,7 +21,8 @@ if (cfg$which_sim=="estimation") {
       estimator = L$estimator$est,
       params = L$estimator$params,
       points = C$points,
-      dir = L$dir
+      dir = L$dir,
+      return_extra = "deriv_theta_n" # !!!!!
       # return_extra = "Theta_os_n"
     )
 
@@ -34,7 +35,7 @@ if (cfg$which_sim=="estimation") {
       res_list[paste0("Gamma_",m)] <- Gamma_true[i] # !!!!!
       res_list[paste0("theta_",m)] <- theta_true[i]
       res_list[paste0("est_",m)] <- ests$est[i]
-      res_list[paste0("estG_",m)] <- ests$ests_Gamma[i] # !!!!!
+      # res_list[paste0("estG_",m)] <- ests$ests_Gamma[i] # !!!!!
       res_list[paste0("ci_lo_",m)] <- ests$ci_lo[i]
       res_list[paste0("ci_hi_",m)] <- ests$ci_hi[i]
     }

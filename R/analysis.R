@@ -11,14 +11,14 @@
   which_analysis <- "HVTN 705 (all)" # "Janssen" "Moderna" "AMP"
                               # "HVTN 705 (primary)" "HVTN 705 (all)"
   
-  # # Uncomment this code to run multiple analyses (e.g. 1=10=Moderna, 11-14=Janssen)
-  # ..tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
-  # if (..tid<=6) {
-  #   which_analysis <- "HVTN 705 (primary)"
-  # } else {
-  #   which_analysis <- "HVTN 705 (all)"
-  #   Sys.setenv("SLURM_ARRAY_TASK_ID"=as.character(round(..tid-6)))
-  # }
+  # Uncomment this code to run multiple analyses (e.g. 1=10=Moderna, 11-14=Janssen)
+  ..tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
+  if (..tid<=6) {
+    which_analysis <- "HVTN 705 (primary)"
+  } else {
+    which_analysis <- "HVTN 705 (all)"
+    Sys.setenv("SLURM_ARRAY_TASK_ID"=as.character(round(..tid-6)))
+  }
   
   # Set seed
   set.seed(1)
@@ -87,7 +87,7 @@
     cfg2$params = list(
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="linear",
       gamma_type="Super Learner", gamma_which="new", ci_type="regular",
-      omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none"
+      omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none"
     )
     C <- list(appx=list(t_e=1,w_tol=25,a=0.01))
     
@@ -180,7 +180,7 @@
     cfg2$params = list(
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="linear",
       gamma_type="Super Learner", gamma_which="new", ci_type="regular",
-      omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none"
+      omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none"
     )
     C <- list(appx=list(t_e=1,w_tol=25,a=0.01))
     
@@ -258,7 +258,7 @@
     cfg2$params = list(
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="linear",
       gamma_type="Super Learner", gamma_which="new", ci_type="regular",
-      omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none"
+      omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none"
     )
     C <- list(appx=list(t_e=10,w_tol=25,a=0.01))
     
@@ -297,8 +297,8 @@
   
   if (cfg2$analysis=="HVTN 705 (primary)") {
     
-    cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox"))
-    cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Cox"))
+    cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Qbins", "Cox GAM", "Cox"))
+    cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Qbins", "Cox GAM", "Cox"))
     cfg2$marker <- c("Day210ELCZ", "Day210ELISpotPTEEnv",
                      "Day210ADCPgp140C97ZAfib", "Day210IgG340mdw_V1V2",
                      "Day210IgG340mdw_gp120_gp140_vm",
@@ -349,9 +349,9 @@
     cfg2$folder_local <- "HVTN 705 (primary) data/"
     cfg2$folder_cluster <- paste0("Z:/vaccine/p705/analysis/lab/cc/copcor/")
     cfg2$params = list(
-      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="linear",
+      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="line", # deriv_type=linear
       gamma_type="Super Learner", gamma_which="new", ci_type="regular",
-      omega_n_type="estimated", cf_folds=1, n_bins=2, lod_shift="none" # , convex_type="LS"
+      omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none" # , convex_type="LS"
     )
     C <- list(appx=list(t_e=10,w_tol=15,a=0.01)) # !!!!! w_tol=25
     
@@ -388,8 +388,8 @@
   
   if (cfg2$analysis=="HVTN 705 (all)") {
     
-    cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox"))
-    cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Cox"))
+    cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Qbins", "Cox GAM", "Cox"))
+    cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Qbins", "Cox GAM", "Cox"))
     cfg2$marker <- c(
       "Day210ELCZ", "Day210ELMo", "Day210ELISpotPTEEnv",
       "Day210ADCPgp140C97ZAfib", "Day210ADCPgp140Mos1fib",
@@ -505,6 +505,8 @@
       "CVE, nonparametric" = c(0.05,0.95), # c(0.1,0.9)
       "Risk, Qbins" = c(0,1),
       "CVE, Qbins" = c(0,1),
+      "Risk, Cox GAM" = c(0.025,0.975),
+      "CVE, Cox GAM" = c(0.025,0.975),
       "Risk, Cox model" = c(0.025,0.975),
       "CVE, Cox model" = c(0.025,0.975)
     )
@@ -513,9 +515,9 @@
     cfg2$folder_local <- "HVTN 705 (all) data/"
     cfg2$folder_cluster <- paste0("Z:/vaccine/p705/analysis/lab/cc/copcor/")
     cfg2$params = list(
-      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="linear",
+      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="line",
       gamma_type="Super Learner", gamma_which="new", ci_type="regular",
-      omega_n_type="estimated", cf_folds=1, n_bins=2, lod_shift="none" # , convex_type="LS"
+      omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none" # , convex_type="LS"
     )
     C <- list(appx=list(t_e=10,w_tol=15,a=0.01)) # !!!!! w_tol=25
     
@@ -553,7 +555,7 @@
   
   # Set config based on local vs. cluster
   if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
-    cfg2$tid <- 2
+    cfg2$tid <- 22
     cfg2$dataset <- paste0(cfg2$folder_cluster,cfg2$dataset)
   } else {
     cfg2$tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
@@ -1312,8 +1314,8 @@ if (cfg2$run_hyptest) {
                 "Risk, Cox (analytic)", "CVE, Cox (analytic)", "Control",
                 "VRC01 10mg/kg", "VRC01 30mg/kg", "VRC01 Pooled")
     curve_colors <- c("darkgrey", "darkgrey", "darkgrey", "darkorchid3",
-                      "darkorchid3", "firebrick3", "firebrick3", "firebrick3",
-                      "firebrick3", "deepskyblue3", "deepskyblue3",
+                      "darkorchid3", "firebrick3", "firebrick3", "darkgreen",
+                      "darkgreen", "deepskyblue3", "deepskyblue3",
                       "deepskyblue3", "deepskyblue3", "deepskyblue3",
                       "darkorchid3", "firebrick3", "darkolivegreen3")
     names(curve_colors) <- curves

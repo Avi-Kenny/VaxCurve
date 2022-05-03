@@ -735,12 +735,11 @@ construct_deriv_theta_n <- function(theta_n, type, dir="incr") {
 
 #' Construct tau_n Chernoff scale factor function
 #' 
-#' @param deriv_theta_n A derivative estimator returned by
-#'     deriv_theta_n()
+#' @param deriv_theta_n A derivative estimator returned by deriv_theta_n()
 #' @param gamma_n Nuisance function estimator returned by construct_gamma_n()
 #' @param f_a_n Density estimator returned by construct_f_a_n()
 #' @return Chernoff scale factor estimator function
-construct_tau_n <- function(which="old", deriv_theta_n, gamma_n, f_a_n,
+construct_tau_n <- function(which="new", deriv_theta_n, gamma_n, f_a_n,
                             pi_star_n=NA, g_n=NA, dat_orig=NA) {
   
   if (which=="old") {

@@ -11,11 +11,11 @@
 # GitHub packages: tedwestling/ctsCausal, tedwestling/CFsurvival,
 #                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
-  main_task = "analysis.R", # run update analysis.R
+  main_task = "run", # run update analysis.R
   which_sim = "estimation", # "estimation" "edge" "testing" "Cox"
   level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
   # keep = c(1:3,7:9,16:18,22:24),
-  num_sim = 500,
+  num_sim = 1000,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm", "tidyr",
@@ -132,18 +132,19 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Estimation: ideal params
   level_set_estimation_1 <- list(
-    n = 1000, # 500-1000
+    n = c(1000,5000), # 500-1000
     alpha_3 = -2,
     dir = c("decr"), # "incr"
-    # sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
-    sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-4, v2=1.5)), # !!!!! exp
-    distr_A = c("N(0.5,0.04)"),
-    # distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
+    # sc_params = list("no cens"=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5)),
+    sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
+    # sc_params = list("exp"=list(lmbd=1e-3, v=1.5, lmbd2=5e-4, v2=1.5)),
+    # distr_A = c("Unif(0,1)"),
+    distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
     edge = c("none"), # c("none", "expit 0.2")
-    surv_true = c("exp"), # "complex" "exp"
-    # surv_true = c("Cox PH"), # "complex" "exp"
-    sampling = c("iid"),
-    # sampling = c("iid", "two-phase (72%)"),
+    # surv_true = c("exp"), # "complex" "exp"
+    surv_true = c("Cox PH"), # "complex" "exp"
+    # sampling = c("iid"),
+    sampling = c("iid", "two-phase (72%)"),
     estimator = list(
       # "Qbins (true)" = list(
       #   est = "Qbins",
@@ -154,14 +155,14 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
         est = "Grenander",
         params = list(marg="Gamma_star", S_n_type="Cox PH", # !!!!! Gamma_star2
                       convex_type="GCM", ecdf_type="linear (mid)", # !!!!! "step"
-                      g_n_type="binning") # !!!!! ci_type="none"
-      ),
-      "Grenander (LS)" = list(
-        est = "Grenander",
-        params = list(marg="Gamma_star", S_n_type="Cox PH", # !!!!! Gamma_star2
-                      convex_type="LS", ecdf_type="linear (mid)", # !!!!! "step"
-                      g_n_type="binning") # !!!!! ci_type="none"
+                      deriv_type="m-spline", g_n_type="binning") # !!!!! binning
       )
+      # "Grenander (LS)" = list(
+      #   est = "Grenander",
+      #   params = list(marg="Gamma_star", S_n_type="Cox PH", # !!!!! Gamma_star2
+      #                 convex_type="LS", ecdf_type="linear (mid)", # !!!!! "step"
+      #                 g_n_type="binning") # !!!!! ci_type="none"
+      # )
       # "Grenander (SL/true)" = list(
       #   est = "Grenander",
       #   params = list(marg="Gamma_star2", S_n_type="Super Learner",
@@ -261,7 +262,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   #   # sampling = c("iid", "two-phase (72%)", "two-phase (50%)", "two-phase (25%)")
   # )
   
-  level_set <- eval(as.name(cfg$level_set_which))
+  level_set <- get(cfg$level_set_which)
   
 }
 
@@ -365,7 +366,7 @@ if (FALSE) {
   
   # Summarize results
   summ_bias <- list()
-  summ_biasG <- list() # !!!!!
+  # summ_biasG <- list() # !!!!!
   summ_mse <- list()
   summ_cov <- list()
   for (i in c(1:51)) {
@@ -375,11 +376,11 @@ if (FALSE) {
       estimate = paste0("est_",m),
       truth = paste0("theta_",m)
     )
-    summ_biasG[[i]] <- list(        # !!!!!
-      name = paste0("biasG_",m),    # !!!!!
-      estimate = paste0("estG_",m), # !!!!!
-      truth = paste0("Gamma_",m)    # !!!!!
-    )                               # !!!!!
+    # summ_biasG[[i]] <- list(        # !!!!!
+    #   name = paste0("biasG_",m),    # !!!!!
+    #   estimate = paste0("estG_",m), # !!!!!
+    #   truth = paste0("Gamma_",m)    # !!!!!
+    # )                               # !!!!!
     summ_mse[[i]] <- list(
       name = paste0("mse_",m),
       estimate = paste0("est_",m),
@@ -393,8 +394,8 @@ if (FALSE) {
       na.rm = TRUE
     )
   }
-  # summ <- summarize(sim, bias_pct=summ_bias, mse=summ_mse, coverage=summ_cov)
-  summ <- summarize(sim, bias_pct=c(summ_bias,summ_biasG), mse=summ_mse, coverage=summ_cov) # !!!!!
+  summ <- summarize(sim, bias_pct=summ_bias, mse=summ_mse, coverage=summ_cov)
+  # summ <- summarize(sim, bias_pct=c(summ_bias,summ_biasG), mse=summ_mse, coverage=summ_cov) # !!!!!
   
   summ %<>% rename("Estimator"=estimator)
   
@@ -454,26 +455,26 @@ if (FALSE) {
   ggplot(
     filter(p_data, stat=="bias"),
     # aes(x=point, y=value)
-    aes(x=point, y=value, color=Estimator, group=Estimator)
+    aes(x=point, y=value, color=factor(n), group=factor(n))
   ) +
     geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
                 data=df_distr_A1, fill="grey", color=NA, alpha=0.4) +
     geom_vline(aes(xintercept=x), data=df_vlines, color="orange",
                linetype="dashed") +
     geom_line() +
-    facet_grid(rows=dplyr::vars(dir), cols=dplyr::vars(distr_A)) + # surv_true
+    facet_grid(rows=dplyr::vars(sampling), cols=dplyr::vars(distr_A)) + # surv_true
     scale_y_continuous(labels=percent, limits=c(-0.5,0.5)) +
     # scale_y_continuous(labels=percent) +
     # scale_color_manual(values=m_colors) +
     theme(legend.position="bottom") +
-    labs(title="Bias (%)", x="A", y=NULL, color="Estimator")
+    labs(title="Bias (%)", x="A", y=NULL, color="n")
   
   # Coverage plot
   # Export: 10" x 6"
   ggplot(
     filter(p_data, stat=="cov"),
     # aes(x=point, y=value)
-    aes(x=point, y=value, color=Estimator, group=Estimator)
+    aes(x=point, y=value, color=factor(n), group=factor(n))
   ) +
     geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
                 data=df_distr_A2, fill="grey", color=NA, alpha=0.4) +
@@ -481,27 +482,27 @@ if (FALSE) {
                linetype="dashed") +
     geom_hline(aes(yintercept=0.95), linetype="longdash", color="grey") +
     geom_line() +
-    facet_grid(rows=dplyr::vars(dir), cols=dplyr::vars(distr_A)) + # surv_true
+    facet_grid(rows=dplyr::vars(sampling), cols=dplyr::vars(distr_A)) + # surv_true
     scale_y_continuous(labels=percent, limits=c(0.7,1)) +
     # scale_y_continuous(labels=percent) +
     # scale_color_manual(values=m_colors) +
     theme(legend.position="bottom") +
-    labs(title="Coverage (%)", x="A", y=NULL, color="Estimator")
+    labs(title="Coverage (%)", x="A", y=NULL, color="n")
   
   # MSE plot
   # Export: 10" x 6"
   ggplot(
     filter(p_data, stat=="mse"),
     # aes(x=point, y=value)
-    aes(x=point, y=value, color=Estimator, group=Estimator)
+    aes(x=point, y=value, color=factor(n), group=factor(n))
   ) +
     geom_hline(aes(yintercept=0.95), linetype="longdash", color="grey") +
     geom_line() +
-    facet_grid(rows=dplyr::vars(dir), cols=dplyr::vars(distr_A)) + # surv_true
+    facet_grid(rows=dplyr::vars(sampling), cols=dplyr::vars(distr_A)) + # surv_true
     ylim(0,0.01) +
     # scale_color_manual(values=m_colors) +
     theme(legend.position="bottom") +
-    labs(title="MSE", x="A", y=NULL, color="Estimator")
+    labs(title="MSE", x="A", y=NULL, color="n")
   
 }
 
@@ -787,13 +788,14 @@ if (FALSE) {
     }
   }
   
+  points <- get("points", envir=sim$vars$env)
   ggplot(
-    data.frame(x=rep(sim$constants$points, n_paths), y=theta_est, which=which),
+    data.frame(x=rep(points, n_paths), y=theta_est, which=which),
     aes(x=x, y=y, group=which)
   ) +
     geom_line(alpha=0.05) +
     geom_line(
-      data = data.frame(x=sim$constants$points, y=theta_true),
+      data = data.frame(x=points, y=theta_true),
       aes(x=x, y=y),
       color = "white",
       inherit.aes = FALSE

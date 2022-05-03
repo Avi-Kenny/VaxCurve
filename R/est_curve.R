@@ -187,7 +187,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       theta_os_n_est <- theta_os_n(dat, pi_n, S_n, omega_n)
       sigma2_os_n_est <- sigma2_os_n(dat, pi_n, S_n, omega_n, theta_os_n_est)
     }
-      
+    
     # Compute GCM (or least squares line) and extract its derivative
     print(paste("Check 12:", Sys.time()))
     grid <- sort(unique(dat$a))
@@ -260,11 +260,37 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
                                  which=params$gamma_which, vals=vlist$A_grid,
                                  omega_n=omega_n, f_aIw_n=f_aIw_n, f_a_n=f_a_n,
                                  f_a_delta1_n=f_a_delta1_n)
+    # gamma_n <- function(w,a) { S_n(C$t_e,w,a)*(1-S_n(C$t_e,w,a)) } # !!!!!
     print(paste("Check 16:", Sys.time()))
     if (params$gamma_which=="new") {
       pi_star_n <- construct_pi_star_n(dat_orig, vals=NA, type="Super Learner",
                                        f_aIw_n, f_aIw_delta1_n)
       print(paste("Check 17:", Sys.time()))
+    }
+    
+    # !!!!! Debugging
+    if (F) {
+      
+      gamma_0 <- function(w,a) { S_n(C$t_e,w,a)*(1-S_n(C$t_e,w,a)) }
+      grid <- seq(0,1,0.1)
+      df_plot <- data.frame(
+        x = rep(grid,8),
+        y = c(sapply(grid, function(a) { gamma_n(c(0.2,0),a) }),
+              sapply(grid, function(a) { gamma_0(c(0.2,0),a) }),
+              sapply(grid, function(a) { gamma_n(c(0.8,0),a) }),
+              sapply(grid, function(a) { gamma_0(c(0.8,0),a) }),
+              sapply(grid, function(a) { gamma_n(c(0.2,1),a) }),
+              sapply(grid, function(a) { gamma_0(c(0.2,1),a) }),
+              sapply(grid, function(a) { gamma_n(c(0.8,1),a) }),
+              sapply(grid, function(a) { gamma_0(c(0.8,1),a) })),
+        which = rep(rep(c("gamma_n","gamma_0"), each=length(grid)), 4),
+        w = rep(c("(0.2,0)", "(0.8,0)", "(0.2,1)", "(0.8,1)"),
+                each=length(grid)*2)
+      )
+      ggplot(df_plot, aes(x=x, y=y, color=which)) +
+        geom_line() +
+        facet_wrap(~w)
+      
     }
     
     # Edge correction
@@ -311,6 +337,71 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     # Construct variance scale factor
     deriv_theta_n <- construct_deriv_theta_n(theta_n, type=params$deriv_type,
                                              dir=dir)
+    
+    # # !!!! Debugging
+    # if (T) {
+    #   if (params$deriv_type=="true") {
+    #     deriv_theta_n <- Vectorize(function(x) {
+    #       theta_0 <- attr(dat_orig, "theta_true")
+    #       index <- which.min(abs(x-seq(0,1,0.02)))
+    #       if (index==1) {
+    #         return((theta_0[2]-theta_0[1])/0.02)
+    #       } else if (index==51) {
+    #         return((theta_0[51]-theta_0[50])/0.02)
+    #       } else {
+    #         return((theta_0[round(index+1)]-theta_0[round(index-1)])/0.04)
+    #       }
+    #     })
+    #   } else {
+    #     deriv_theta_n <- construct_deriv_theta_n(theta_n, type=params$deriv_type,
+    #                                              dir=dir)
+    #   }
+    # }
+    
+    # !!!!! Debugging
+    if (F) {
+      
+      deriv_theta_0 <- Vectorize(function(x) {
+        theta_0 <- attr(dat_orig, "theta_true")
+        index <- which.min(abs(x-seq(0,1,0.02)))
+        if (index==1) {
+          return((theta_0[2]-theta_0[1])/0.02)
+        } else if (index==51) {
+          return((theta_0[51]-theta_0[50])/0.02)
+        } else {
+          return((theta_0[round(index+1)]-theta_0[round(index-1)])/0.04)
+        }
+      })
+      deriv_linear <- construct_deriv_theta_n(theta_n, type="linear", dir=dir)
+      deriv_line <- construct_deriv_theta_n(theta_n, type="line", dir=dir)
+      deriv_spline <- construct_deriv_theta_n(theta_n, type="spline", dir=dir)
+      deriv_mspl <- construct_deriv_theta_n(theta_n, type="m-spline", dir=dir)
+      
+      grid <- round(seq(0,1,0.02), 2)
+      # df_plot1 <- data.frame(
+      #   x = rep(grid,2),
+      #   y = c(attr(dat_orig, "theta_true"),
+      #         theta_n(grid)),
+      #   which = rep(c("theta_0","theta_n"), each=length(grid))
+      # )
+      # ggplot(df_plot1, aes(x=x, y=y, color=which)) +
+      #   geom_line()
+      df_plot2 <- data.frame(
+        x = rep(grid,5),
+        y = c(deriv_theta_0(grid),
+              deriv_linear(grid),
+              deriv_line(grid),
+              deriv_spline(grid),
+              deriv_mspl(grid)),
+        which = rep(c("true","linear", "line", "spline", "mspline"),
+                    each=length(grid))
+      )
+      ggplot(df_plot2, aes(x=x, y=y, color=which)) +
+        geom_line() +
+        ylim(-2.5,0)
+
+    }
+    
     print(paste("Check 20:", Sys.time()))
     if (params$gamma_which=="old") {
       tau_n <- construct_tau_n(which="old", deriv_theta_n, gamma_n, f_a_n)
@@ -513,7 +604,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   res <- list(
     point = points_orig,
     est = c(rep(NA,na_head), ests, rep(NA,na_tail)),
-    ests_Gamma = c(rep(NA,na_head), ests_Gamma, rep(NA,na_tail)),
+    # ests_Gamma = c(rep(NA,na_head), ests_Gamma, rep(NA,na_tail)),
     ci_lo = c(rep(NA,na_head), ci_lo, rep(NA,na_tail)),
     ci_hi = c(rep(NA,na_head), ci_hi, rep(NA,na_tail))
   )

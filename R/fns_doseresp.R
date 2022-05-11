@@ -294,7 +294,7 @@ ss <- function(dat_orig, indices) {
   
   return(list(
     id = dat_orig$id[i],
-    w = dat_orig$w[i,],
+    w = dat_orig$w[i,, drop=F],
     a = dat_orig$a[i],
     delta = dat_orig$delta[i],
     y_star = dat_orig$y_star[i],
@@ -385,8 +385,11 @@ construct_Phi_n <- function (dat, which="ecdf", type="step") {
 #' @param type One of c("true", "Cox PH", "Random Forest", "Super Learner")
 #' @param return_model Logical; if TRUE, return the model object instead of the
 #'     function
+#' @param print_coeffs Logical; if TRUE, print the algorithm coefficients for
+#'     the conditional survival and censoring functions (applicable only if
+#'     type=="Super Learner")
 #' @return Conditional density estimator function
-construct_S_n <- function(dat, vals, type, return_model=F) {
+construct_S_n <- function(dat, vals, type, return_model=F, print_coeffs=F) {
   
   if (type %in% c("Cox PH", "Super Learner")) {
     if (type=="Cox PH") {
@@ -416,6 +419,19 @@ construct_S_n <- function(dat, vals, type, return_model=F) {
     srv_pred <- srv$event.SL.predict
     cens_pred <- srv$cens.SL.predict
     rm(srv)
+    
+    if (print_coeffs && type=="Super Learner") {
+      cat("\n------------------------------\n")
+      cat("SuperLearner algorithm weights\n")
+      cat("------------------------------\n\n")
+      cat("event.coef\n")
+      cat("----------\n")
+      print(sort(srv$event.coef, decr=T))
+      cat("\ncens.coef\n")
+      cat("---------\n")
+      print(sort(srv$cens.coef, decr=T))
+      cat("\n------------------------------\n")
+    }
     
     # !!!!! Later consolidate these via a wrapper/constructor function
     fnc_srv <- function(t, w, a) {
@@ -816,7 +832,7 @@ construct_omega_n <- function(vals=NA, S_n, Sc_n, type="estimated") {
           integral
       ))
       
-      # return (0)
+      # return (0) # !!!!! DEBUG
       
     }
     
@@ -2285,7 +2301,7 @@ construct_Gamma_os_n_star2 <- function(dat, dat_orig, omega_n, g_n_star,
   rm(omega_n,g_n_star,gcomp_n)
   
   fnc <- function(x) {
-    # eta_ss_n(x,c(0,0))
+    # eta_ss_n(x,c(0,0)) # !!!!! DEBUG
     (1/n_orig) * sum(
     eta_ss_n(rep(x,n_orig),dat_orig$w)
     )

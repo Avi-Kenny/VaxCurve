@@ -43,7 +43,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   # Set default params
   .default_params <- list(
     S_n_type="Super Learner", g_n_type="binning", deriv_type="linear",
-    ecdf_type="linear (mid)", gamma_type="Super Learner", gamma_which="new",
+    ecdf_type="linear (mid)", gamma_type="Super Learner",
     omega_n_type="estimated", boot_reps=1000, ci_type="trunc", cf_folds=1, m=5,
     edge_corr="none", marg="Gamma_star2", lod_shift="none", n_bins=5,
     convex_type="GCM", f_aIw_n_bins=15
@@ -59,8 +59,12 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   # !!!!! Functionize and refactor w/ test_2.R
   a_min <- min(dat_orig$a,na.rm=T)
   a_max <- max(dat_orig$a,na.rm=T)
-  a_shift <- -1 * a_min # a_shift <- 0 # !!!!! DEBUG
-  a_scale <- 1/(a_max-a_min) # a_scale <- 1 # !!!!! DEBUG
+  a_shift <- -1 * a_min
+  a_scale <- 1/(a_max-a_min)
+  if (F) {
+    a_shift <- 0
+    a_scale <- 1
+  } # DEBUG
   dat_orig$a <- (dat_orig$a+a_shift)*a_scale
   
   # Round values
@@ -152,7 +156,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
                                                     vals=NA)
       print(paste("Check 11:", Sys.time()))
       
-      # !!!!! DEBUG: True Gamma_os_n_star
       if (F) {
         m <- 10^5
         if (L$distr_A=="Unif(0,1)") {
@@ -173,7 +176,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
           x <- (x+a_shift)*a_scale # x <- round((x+a_shift)*a_scale, -log10(C$appx$a))
           mean( as.integer(a<=x) * (1-exp(-1*L$sc_params$lmbd*C$t_e)) )
         })
-      }
+      } # DEBUG: True Gamma_os_n_star
       
     } else {
       stop(paste0("`params$marg` must be one of c('Theta', 'Gamma', 'Gamma_s",
@@ -255,41 +258,16 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_delta1_n)
     print(paste("Check 15:", Sys.time()))
     gamma_n <- construct_gamma_n(dat_orig, dat, type=p$gamma_type,
-                                 which=p$gamma_which, vals=vlist$A_grid,
+                                 vals=vlist$A_grid,
                                  omega_n=omega_n, f_aIw_n=f_aIw_n, f_a_n=f_a_n,
                                  f_a_delta1_n=f_a_delta1_n)
-    # gamma_n <- function(w,a) { S_n(C$t_e,w,a)*(1-S_n(C$t_e,w,a)) } # !!!!! DEBUG
-    print(paste("Check 16:", Sys.time()))
-    if (p$gamma_which=="new") {
-      pi_star_n <- construct_pi_star_n(dat_orig, vals=NA, type="Super Learner",
-                                       f_aIw_n, f_aIw_delta1_n)
-      print(paste("Check 17:", Sys.time()))
-    }
-    
-    # !!!!! Debugging
     if (F) {
-      
-      gamma_0 <- function(w,a) { S_n(C$t_e,w,a)*(1-S_n(C$t_e,w,a)) }
-      grid <- seq(0,1,0.1)
-      df_plot <- data.frame(
-        x = rep(grid,8),
-        y = c(sapply(grid, function(a) { gamma_n(c(0.2,0),a) }),
-              sapply(grid, function(a) { gamma_0(c(0.2,0),a) }),
-              sapply(grid, function(a) { gamma_n(c(0.8,0),a) }),
-              sapply(grid, function(a) { gamma_0(c(0.8,0),a) }),
-              sapply(grid, function(a) { gamma_n(c(0.2,1),a) }),
-              sapply(grid, function(a) { gamma_0(c(0.2,1),a) }),
-              sapply(grid, function(a) { gamma_n(c(0.8,1),a) }),
-              sapply(grid, function(a) { gamma_0(c(0.8,1),a) })),
-        which = rep(rep(c("gamma_n","gamma_0"), each=length(grid)), 4),
-        w = rep(c("(0.2,0)", "(0.8,0)", "(0.2,1)", "(0.8,1)"),
-                each=length(grid)*2)
-      )
-      ggplot(df_plot, aes(x=x, y=y, color=which)) +
-        geom_line() +
-        facet_wrap(~w)
-      
-    }
+      gamma_n <- function(w,a) { S_n(C$t_e,w,a)*(1-S_n(C$t_e,w,a)) }
+    } # DEBUG: alternate gamma_n estimator when there is no censoring
+    print(paste("Check 16:", Sys.time()))
+    pi_star_n <- construct_pi_star_n(dat_orig, vals=NA, type="Super Learner",
+                                     f_aIw_n, f_aIw_delta1_n)
+    print(paste("Check 17:", Sys.time()))
     
     # Edge correction
     if (p$edge_corr %in% c("none", "spread")) {
@@ -329,65 +307,19 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     # Generate estimates for each point
     print(paste("Check 18:", Sys.time()))
     ests <- theta_n(points)
-    # ests_Gamma <- Gamma_os_n_star(points) # !!!!! DEBUG
+    if (F) {
+      ests_Gamma <- Gamma_os_n_star(points)
+    } # DEBUG: return Gamma_n(x) estimates
     print(paste("Check 19:", Sys.time()))
     
     # Construct variance scale factor
     deriv_theta_n <- construct_deriv_theta_n(theta_n, type=p$deriv_type,
                                              dir=dir)
     
-    # !!!!! DEBUG
-    if (F) {
-      
-      deriv_theta_0 <- Vectorize(function(x) {
-        theta_0 <- attr(dat_orig, "theta_true")
-        index <- which.min(abs(x-seq(0,1,0.02)))
-        if (index==1) {
-          return((theta_0[2]-theta_0[1])/0.02)
-        } else if (index==51) {
-          return((theta_0[51]-theta_0[50])/0.02)
-        } else {
-          return((theta_0[round(index+1)]-theta_0[round(index-1)])/0.04)
-        }
-      })
-      deriv_linear <- construct_deriv_theta_n(theta_n, type="linear", dir=dir)
-      deriv_line <- construct_deriv_theta_n(theta_n, type="line", dir=dir)
-      deriv_spline <- construct_deriv_theta_n(theta_n, type="spline", dir=dir)
-      deriv_mspl <- construct_deriv_theta_n(theta_n, type="m-spline", dir=dir)
-      
-      grid <- round(seq(0,1,0.02), 2)
-      # df_plot1 <- data.frame(
-      #   x = rep(grid,2),
-      #   y = c(attr(dat_orig, "theta_true"),
-      #         theta_n(grid)),
-      #   which = rep(c("theta_0","theta_n"), each=length(grid))
-      # )
-      # ggplot(df_plot1, aes(x=x, y=y, color=which)) +
-      #   geom_line()
-      df_plot2 <- data.frame(
-        x = rep(grid,5),
-        y = c(deriv_theta_0(grid),
-              deriv_linear(grid),
-              deriv_line(grid),
-              deriv_spline(grid),
-              deriv_mspl(grid)),
-        which = rep(c("true","linear", "line", "spline", "mspline"),
-                    each=length(grid))
-      )
-      ggplot(df_plot2, aes(x=x, y=y, color=which)) +
-        geom_line() +
-        ylim(-2.5,0)
-
-    }
-    
     print(paste("Check 20:", Sys.time()))
-    if (p$gamma_which=="old") {
-      tau_n <- construct_tau_n(which="old", deriv_theta_n, gamma_n, f_a_n)
-    } else if (p$gamma_which=="new") {
-      tau_n <- construct_tau_n(which="new", deriv_theta_n, gamma_n, f_a_n,
-                               pi_star_n, g_n, dat_orig)
-      print(paste("Check 21:", Sys.time()))
-    }
+    tau_n <- construct_tau_n(which="new", deriv_theta_n, gamma_n, f_a_n,
+                             pi_star_n, g_n, dat_orig)
+    print(paste("Check 21:", Sys.time()))
     
     # Generate confidence limits
     if (p$ci_type=="none") {
@@ -591,7 +523,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     res$n <- n_ci
   }
   
-  # !!!!! DEBUG
   if (F) {
     p3 <- round((0.3+a_shift)*a_scale, -log10(C$appx$a)) # !!!!!
     p5 <- round((0.5+a_shift)*a_scale, -log10(C$appx$a)) # !!!!!
@@ -601,7 +532,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     res$alpha_star_n3 <- alpha_star_n(p3) # !!!!!
     res$alpha_star_n5 <- alpha_star_n(p5) # !!!!!
     res$gcomp_n <- gcomp_n(0.9) # !!!!!
-  }
+  } # DEBUG: return additional estimates
   
   if ("gcomp" %in% return_extra) {
     S_n2 <- (construct_S_n(dat, vlist$S_n, type="Cox PH"))$srv

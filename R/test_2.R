@@ -129,88 +129,6 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
       # Estimate variance
       var_n <- beta_n_var_hat(dat, dat_orig, infl_fn_1, infl_fn_2) / n_orig
       sd_n <- sqrt(var_n)
-      # var_n <- 999
-      # sd_n <- 999
-      
-      # !!!!! TEMP DEBUGGING
-      if (T) {
-        # Psi_1
-        Theta_true <- attr(dat_orig,"Theta_true")
-        Gamma_0 <- Vectorize(function(x) {
-          Theta_true[which.min(abs(x-seq(0,1,0.02)))[1]]
-        })
-        infl_fn_1 <- construct_infl_fn_1(dat, Gamma_0, Phi_n,
-                                         lambda_2, lambda_3)
-        Psi_1_var_est <- (1/n_orig^2) * sum((weights*infl_fn_1(dat$a))^2)
-        Psi_1_est <- (1/n_orig) * sum(weights*(
-          lambda_2*(Phi_n(dat$a))^2*Gamma_0(dat$a) -
-            lambda_3*Phi_n(dat$a)*Gamma_0(dat$a)
-        ))
-        test_stat_Psi_1 <- Psi_1_est^2/Psi_1_var_est
-        p_val_Psi_1 <- pchisq(test_stat_Psi_1, df=1, lower.tail=FALSE)
-        
-        # Psi_2
-        Phi_0 <- function(x) {x}
-        # infl_fn_Gamma <- construct_infl_fn_Gamma(omega_n, g_n, gcomp_n,
-        #                                          eta_n, Gamma_os_n)
-        infl_fn_Gamma <- construct_infl_fn_Gamma2(omega_n, g_n_star, gcomp_n,
-                                                  z_n, alpha_star_n, q_n,
-                                                  eta_ss_n,
-                                                  Gamma_os_n_star=Gamma_os_n)
-        infl_fn_2 <- construct_infl_fn_2(dat, Phi_0, infl_fn_Gamma, 1/3, 1/4)
-        # Psi_2_var_est <- (1/n_orig^2) * sum((
-        #   weights*infl_fn_2(dat$w,dat$y_star,dat$delta_star,dat$a)
-        # )^2)
-        Psi_2_var_est <- (1/n_orig^2) * sum((
-          infl_fn_2(dat_orig$w, dat_orig$y_star, dat_orig$delta_star,
-                    dat_orig$a, dat_orig$weights)
-        )^2)
-        a_mc <- runif(10^6)
-        Psi_2_est <- mean(
-          (1/3)*(Phi_0(a_mc))^2*Gamma_os_n(round(a_mc,-log10(C$appx$a))) -
-            (1/4)*Phi_0(a_mc)*Gamma_os_n(round(a_mc,-log10(C$appx$a)))
-        )
-        test_stat_Psi_2 <- Psi_2_est^2/Psi_2_var_est
-        p_val_Psi_2 <- pchisq(test_stat_Psi_2, df=1, lower.tail=FALSE)
-        
-        # Psi_G
-        xx <- 0.3
-        Psi_G_est <- Gamma_os_n(xx)
-        Psi_G_var_est <- (1/n_orig^2) * sum((
-          infl_fn_Gamma(rep(xx, n_orig), dat_orig$w, dat_orig$y_star,
-                        dat_orig$delta_star, dat_orig$a, dat_orig$weights)
-        )^2)
-        test_stat_Psi_G <- (Psi_G_est-Gamma_0(xx))^2/Psi_G_var_est
-        p_val_Psi_G <- pchisq(test_stat_Psi_G, df=1, lower.tail=FALSE)
-        
-        # Covariance
-        Psi_12_covar <- 999 # !!!!! Below is wrong bc infl_fn_2 needs dat_orig
-        # Psi_12_covar <- (1/n_orig^2) * sum(
-        #   weights *
-        #     infl_fn_1(dat$a) *
-        #     infl_fn_2(dat$w,dat$y_star,dat$delta_star,dat$a,dat$weights)
-        # )
-        
-        # Combined (Psi_1+Psi_2)
-        # infl_fn_sum12 <- function(a,w,y_star,delta_star) {
-        #   infl_fn_1(a) + infl_fn_2(w,y_star,delta_star,a)
-        # }
-        # sum12_var_est <- (1/n_orig^2) * sum((
-        #   weights*infl_fn_sum12(dat$a,dat$w,dat$y_star,dat$delta_star)
-        # )^2)
-        # test_stat_sum12 <- (Psi_1_est+Psi_2_est)^2/sum12_var_est
-        # p_val_sum12 <- pchisq(test_stat_sum12, df=1, lower.tail=FALSE)
-        # test_stat_sum12b <- beta_n^2/sum12_var_est
-        # p_val_sum12b <- pchisq(test_stat_sum12b, df=1, lower.tail=FALSE)
-        
-        # Infl fn means
-        if1_mean <- (1/n_orig) * sum(weights * infl_fn_1(dat$a))
-        if2_mean <- (1/n_orig) * sum(infl_fn_2(
-          dat_orig$w, dat_orig$y_star, dat_orig$delta_star,
-          dat_orig$a, dat_orig$weights
-        ))
-        
-      }
       
       # Calculate P-value
       if (alt_type=="incr") {
@@ -220,12 +138,11 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
       } else if (alt_type=="two-tailed") {
         test_stat_chisq <- beta_n^2/var_n
         p_val <- pchisq(test_stat_chisq, df=1, lower.tail=FALSE)
-        # !!!!! TEMP DEBUGGING
-        if (T) {
+        
+        if (F) {
           test_stat_chisq_alt <- (Psi_1_est+Psi_2_est)^2/var_n
           p_val_alt <- pchisq(test_stat_chisq_alt, df=1, lower.tail=FALSE)
-          # p_val <- 999
-        }
+        } # DEBUG: alternate test stat
       }
       
     }
@@ -325,8 +242,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
           Gamma_os_n(round(dat$a,-log10(C$appx$a)))
       )
       
-      # !!!!! Debugging
-      if (T) {
+      if (F) {
         
         # Psi_1
         Theta_true <- attr(dat_orig,"Theta_true")
@@ -346,7 +262,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
             (1/4)*Phi_0(a_mc)*Gamma_os_n(round(a_mc,-log10(C$appx$a)))
         )
         
-      }
+      } # DEBUG
       
       return(list(beta_n=beta_n, Psi_1_est=Psi_1_est, Psi_2_est=Psi_2_est))
       
@@ -504,7 +420,6 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     res$Theta_os_n <- Theta_os_n
   }
   
-  # Return debugging components (var="asymptotic")
   if (F) {
     # res$if1_mean <- if1_mean
     # res$if2_mean <- if2_mean
@@ -531,7 +446,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     # res$reject_sum12 <- as.integer(p_val_sum12<0.05)
     # res$reject_sum12b <- as.integer(p_val_sum12b<0.05)
     # res$reject_alt <- as.integer(p_val_alt<0.05)
-  }
+  } # DEBUG: return debugging components (var="asymptotic")
   
   return(res)
   

@@ -28,24 +28,29 @@ if (cfg$which_sim=="estimation") {
 
     # Return results
     theta_true <- attr(dat_orig, "theta_true")
-    Gamma_true <- attr(dat_orig, "Gamma_true") # !!!!!
+    Gamma_true <- attr(dat_orig, "Gamma_true")
     res_list <- list()
     for (i in 1:length(C$points)) {
       m <- format(C$points[i], nsmall=1)
-      res_list[paste0("Gamma_",m)] <- Gamma_true[i] # !!!!!
       res_list[paste0("theta_",m)] <- theta_true[i]
       res_list[paste0("est_",m)] <- ests$est[i]
-      # res_list[paste0("estG_",m)] <- ests$ests_Gamma[i] # !!!!!
       res_list[paste0("ci_lo_",m)] <- ests$ci_lo[i]
       res_list[paste0("ci_hi_",m)] <- ests$ci_hi[i]
+      if (F) {
+        res_list[paste0("Gamma_",m)] <- Gamma_true[i]
+        res_list[paste0("estG_",m)] <- ests$ests_Gamma[i]
+      } # DEBUG: return Gamma estimates
     }
-    # res_list$g_n_star <- ests$g_n_star # !!!!!
-    # res_list$eta_ss_n3 <- ests$eta_ss_n3 # !!!!!
-    # res_list$eta_ss_n5 <- ests$eta_ss_n5 # !!!!!
-    # res_list$alpha_star_n3 <- ests$alpha_star_n3 # !!!!!
-    # res_list$alpha_star_n5 <- ests$alpha_star_n5 # !!!!!
-    # res_list$gcomp_n <- ests$gcomp_n # !!!!!
-
+    
+    if (F) {
+      res_list$g_n_star <- ests$g_n_star
+      res_list$eta_ss_n3 <- ests$eta_ss_n3
+      res_list$eta_ss_n5 <- ests$eta_ss_n5
+      res_list$alpha_star_n3 <- ests$alpha_star_n3
+      res_list$alpha_star_n5 <- ests$alpha_star_n5
+      res_list$gcomp_n <- ests$gcomp_n
+    } # DEBUG: return extras
+    
     # # Return extra results
     # res_list[[".complex"]] <- list(Theta_os_n = ests$Theta_os_n)
 

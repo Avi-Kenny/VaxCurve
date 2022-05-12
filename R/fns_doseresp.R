@@ -826,13 +826,15 @@ construct_omega_n <- function(vals=NA, S_n, Sc_n, type="estimated") {
 
       }
 
+      if (F) {
+        return (0)
+      } # DEBUG
+      
       return(S_n(C$t_e,w,a) * (
         (delta_star * as.integer(y_star<=C$t_e)) /
           (S_n(k,w,a) * Sc_n(k,w,a)) -
           integral
       ))
-      
-      # return (0) # !!!!! DEBUG
       
     }
     
@@ -893,28 +895,15 @@ construct_omega_n <- function(vals=NA, S_n, Sc_n, type="estimated") {
 #' @param f_aIw_n A conditional density estimator returned by
 #'     construct_f_aIw_n() among the observations for which delta==1
 #' @return gamma_n nuisance estimator function
-construct_gamma_n <- function(dat_orig, dat, type="Super Learner", which="old",
-                              vals=NA, omega_n=NA, f_aIw_n=NA, f_a_n=NA,
+construct_gamma_n <- function(dat_orig, dat, type="Super Learner", vals=NA,
+                              omega_n=NA, f_aIw_n=NA, f_a_n=NA,
                               f_a_delta1_n=NA) {
   
-  # Estimate marginal delta probability and construct I_star variable
-  if (which=="old") {
-    delta_prob <- mean(dat_orig$delta)
-    I_star <- dat$delta_star*as.integer(dat$y_star<=C$t_e)
-  } else {
-    I_star <- rep(NA, length(dat$delta_star))
-  }
-  
   # Construct pseudo-outcomes
-  if (which=="old") {
-    po <- ((dat$weights*omega_n(dat$w,dat$a,dat$y_star,dat$delta_star)) /
-             f_aIw_n(dat$a,dat$w))^2
-  } else if (which=="new") {
-    po <- (dat$weights*omega_n(dat$w,dat$a,dat$y_star,dat$delta_star))^2
-  }
+  po <- (dat$weights*omega_n(dat$w,dat$a,dat$y_star,dat$delta_star))^2
   
   # Create dataframe for regression
-  df <- data.frame(a=dat$a, po=po, I_star=I_star)
+  df <- data.frame(a=dat$a, po=po)
   if (sum(!is.finite(df$po))!=0) {
     df %<>% filter(is.finite(po))
     warning(paste("construct_gamma_n:", sum(!is.finite(df$po)),
@@ -923,21 +912,15 @@ construct_gamma_n <- function(dat_orig, dat, type="Super Learner", which="old",
   
   # Setup
   x_grid <- round(seq(0,1,C$appx$a), -log10(C$appx$a))
-  if (which=="old") {
-    X <- data.frame(a=dat$a)
-    newX <- data.frame(a=x_grid)
-  } else if (which=="new") {
-    X <- cbind(dat$w, a=dat$a)
-    W_reduced <- distinct(dat_orig$w)
-    W_reduced <- cbind("w_index"=c(1:nrow(W_reduced)), W_reduced)
-    # a <- round(seq(0,1,C$appx$a),-log10(C$appx$a))
-    newX <- expand.grid(
-      w_index = W_reduced$w_index,
-      a = x_grid
-    )
-    newX <- inner_join(W_reduced, newX, by="w_index")
-    newX$w_index <- NULL
-  }
+  X <- cbind(dat$w, a=dat$a)
+  W_reduced <- distinct(dat_orig$w)
+  W_reduced <- cbind("w_index"=c(1:nrow(W_reduced)), W_reduced)
+  newX <- expand.grid(
+    w_index = W_reduced$w_index,
+    a = x_grid
+  )
+  newX <- inner_join(W_reduced, newX, by="w_index")
+  newX$w_index <- NULL
   
   # Run regression
   if (type=="Super Learner") {
@@ -954,111 +937,36 @@ construct_gamma_n <- function(dat_orig, dat, type="Super Learner", which="old",
       warning(paste("construct_gamma_n:", sum(pred<0),
                     "negative predicted values"))
     }
-    # coef(model_sl)
+    if (F) {
+      print(coef(model_sl))
+    } # DEBUG: Print algorithm coeffs
+    
     rm(model_sl)
     
-    if (which=="old") {
-      reg <- function(a) {
-        index <- which.min(abs(a-x_grid))
-        return(max(pred[index],0))
+    newX$index <- c(1:nrow(newX))
+    reg <- function(w,a) {
+      # Dynamically filter to select index
+      cond <- paste0("a==",a,"")
+      for (i in c(1:length(w))) {
+        cond <- paste0(cond," & w",i,"==",w[i])
       }
-    } else if (which=="new") {
-      newX$index <- c(1:nrow(newX))
-      reg <- function(w,a) {
-        # Dynamically filter to select index
-        cond <- paste0("a==",a,"")
-        for (i in c(1:length(w))) {
-          cond <- paste0(cond," & w",i,"==",w[i])
-        }
-        index <- (dplyr::filter(newX, eval(parse(text=cond))))$index
-        if (length(index)!=1) {
-          stop(paste0("Error in construct_gamma_n; ", "w=(",
-                      paste(w,collapse=","), "), a=",a))
-        }
-        
-        # Return prediction
-        return(pred[index])
-      }
-    }
-    
-  } else if (type=="kernel" && which=="old") {
-    
-    # Select bandwidth via cross-validation
-    {
-      # CV prep
-      n_folds <- 5
-      folds <- sample(cut(c(1:nrow(df)), breaks=n_folds, labels=FALSE))
-      bws <- seq(0.02,0.4,0.02)
-      
-      # Conduct CV
-      best <- list(bw=999, sum_sse=999)
-      for (bw in bws) {
-        sum_sse <- 0
-        for (i in c(1:n_folds)) {
-          df_train <- df[-which(folds==i),]
-          df_test <- df[which(folds==i),]
-          ks <- ksmooth(x=df_train$a, y=df_train$po,
-                        kernel="normal", bandwidth=bw)
-          reg <- Vectorize(function(a) {
-            index <- which.min(abs(a-ks$x))
-            return(ks$y[index])
-          })
-          sum_sse <- sum_sse + sum((reg(df_test$a)-df_test$po)^2, na.rm=T)
-        }
-        if (sum_sse<best$sum_sse || best$sum_sse==999) {
-          best$bw <- bw
-          best$sum_sse <- sum_sse
-        }
-        
+      index <- (dplyr::filter(newX, eval(parse(text=cond))))$index
+      if (length(index)!=1) {
+        stop(paste0("Error in construct_gamma_n; ", "w=(",
+                    paste(w,collapse=","), "), a=",a))
       }
       
+      # Return prediction
+      return(pred[index])
     }
     
-    # Construct optimal function from true data
-    ks <- ksmooth(x=df_train$a, y=df_train$po, kernel="normal",
-                  bandwidth=best$bw)
-    reg <- function(a) {
-      index <- which.min(abs(a-ks$x))
-      return(ks$y[index])
-    }
-    
-  }
-  
-  # !!!!! Check results
-  if (F) {
-    # OLD
-    ggplot(df, aes(x=a, y=po)) +
-      geom_point(alpha=0.3) +
-      # ylim(c(0,1)) +
-      geom_line(data=data.frame(
-        a = x_grid,
-        po = reg(x_grid)
-      ),
-      color="forestgreen") +
-      labs(x=paste0("a (bw=",round(best$bw,4),")"))
-    
-    # NEW
-    reg2 <- construct_superfunc(reg, aux=NA, vec=c(2,1), vals=NA)
-    ggplot(
-      data.frame(x=po, y=reg2(dat$w,dat$a), z=dat$a),
-      aes(x=x, y=y, color=z)
-    ) +
-      geom_point() +
-      geom_abline(slope=1, intercept=0, color="grey")
   }
   
   # Remove large intermediate objects
   rm(dat_orig,dat,omega_n,f_aIw_n)
   
-  if (which=="old") {
-    fnc <- function(a) {
-      delta_prob*(f_a_delta1_n(a)/f_a_n(a)) * reg(a)
-    }
-    return(construct_superfunc(fnc, aux=NA, vec=T, vals=vals))
-  } else if (which=="new") {
-    fnc <- reg
-    return(construct_superfunc(fnc, aux=NA, vec=c(2,1), vals=vals))
-  }
+  fnc <- reg
+  return(construct_superfunc(fnc, aux=NA, vec=c(2,1), vals=vals))
   
 }
 
@@ -2301,7 +2209,9 @@ construct_Gamma_os_n_star2 <- function(dat, dat_orig, omega_n, g_n_star,
   rm(omega_n,g_n_star,gcomp_n)
   
   fnc <- function(x) {
-    # eta_ss_n(x,c(0,0)) # !!!!! DEBUG
+    if (F) {
+      eta_ss_n(x,c(0,0))
+    } # DEBUG
     (1/n_orig) * sum(
     eta_ss_n(rep(x,n_orig),dat_orig$w)
     )

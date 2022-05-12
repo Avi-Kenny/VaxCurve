@@ -86,7 +86,7 @@
                                   "linded_Phase_Data/adata/")
     cfg2$params = list(
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="linear",
-      gamma_type="Super Learner", gamma_which="new", ci_type="regular",
+      gamma_type="Super Learner", ci_type="regular",
       omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
       f_aIw_n_bins=15
     )
@@ -180,7 +180,7 @@
                                   "linded_Phase_Data/adata/")
     cfg2$params = list(
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="linear",
-      gamma_type="Super Learner", gamma_which="new", ci_type="regular",
+      gamma_type="Super Learner", ci_type="regular",
       omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
       f_aIw_n_bins=15
     )
@@ -259,7 +259,7 @@
                                   "y/adata/")
     cfg2$params = list(
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="linear",
-      gamma_type="Super Learner", gamma_which="new", ci_type="regular",
+      gamma_type="Super Learner", ci_type="regular",
       omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
       f_aIw_n_bins=15
     )
@@ -353,7 +353,7 @@
     cfg2$folder_cluster <- paste0("Z:/vaccine/p705/analysis/lab/cc/copcor/")
     cfg2$params = list(
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="line", # deriv_type=linear
-      gamma_type="Super Learner", gamma_which="new", ci_type="regular",
+      gamma_type="Super Learner", ci_type="regular",
       omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none",
       f_aIw_n_bins=15
     )
@@ -520,7 +520,7 @@
     cfg2$folder_cluster <- paste0("Z:/vaccine/p705/analysis/lab/cc/copcor/")
     cfg2$params = list(
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="line",
-      gamma_type="Super Learner", gamma_which="new", ci_type="regular",
+      gamma_type="Super Learner", ci_type="regular",
       omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none",
       f_aIw_n_bins=15
     )
@@ -601,7 +601,7 @@
     cfg2$folder_cluster <- paste0("Z:/covpn/p3002/analysis/correlates/Part_A_Blinded_Phase_Data/adata/")
     cfg2$params = list(
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="line",
-      gamma_type="Super Learner", gamma_which="new", ci_type="regular",
+      gamma_type="Super Learner", ci_type="regular",
       omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none",
       f_aIw_n_bins=15
     )

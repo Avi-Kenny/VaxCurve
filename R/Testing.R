@@ -11,7 +11,7 @@
   params <- list(
     S_n_type="Cox PH", g_n_type="binning", ci_type="regular", cf_folds=1,
     edge_corr="none", ecdf_type="linear (mid)", deriv_type="linear",
-    gamma_type="Super Learner", gamma_which="new", omega_n_type="estimated",
+    gamma_type="Super Learner", omega_n_type="estimated",
     marg="Gamma_star"
   )
   C <- list(points=round(seq(0,1,0.02),2), alpha_1=0.5, alpha_2=0.7, t_e=200,

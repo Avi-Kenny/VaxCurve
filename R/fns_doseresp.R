@@ -778,23 +778,17 @@ construct_deriv_theta_n <- function(theta_n, type, dir="incr") {
 #' @param gamma_n Nuisance function estimator returned by construct_gamma_n()
 #' @param f_a_n Density estimator returned by construct_f_a_n()
 #' @return Chernoff scale factor estimator function
-construct_tau_n <- function(which="new", deriv_theta_n, gamma_n, f_a_n,
+construct_tau_n <- function(deriv_theta_n, gamma_n, f_a_n,
                             pi_star_n=NA, g_n=NA, dat_orig=NA) {
   
-  if (which=="old") {
-    return(Vectorize(function(x){
-      abs(4*deriv_theta_n(x)*f_a_n(x)*gamma_n(x))^(1/3)
-    }))
-  } else if (which=="new") {
-    n_orig <- length(dat_orig$a)
-    w <- dat_orig$w
-    return(Vectorize(function(x) {
-      abs(
-        ((4*deriv_theta_n(x))/(n_orig*f_a_n(x))) *
-          sum((gamma_n(w,x)*pi_star_n(w,x))/g_n(x,w))
-      )^(1/3)
-    }))
-  }
+  n_orig <- length(dat_orig$a)
+  w <- dat_orig$w
+  return(Vectorize(function(x) {
+    abs(
+      ((4*deriv_theta_n(x))/(n_orig*f_a_n(x))) *
+        sum((gamma_n(w,x)*pi_star_n(w,x))/g_n(x,w))
+    )^(1/3)
+  }))
   
 }
 

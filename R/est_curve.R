@@ -302,8 +302,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
                                              dir=dir)
     
     print(paste("Check 20:", Sys.time()))
-    tau_n <- construct_tau_n(which="new", deriv_theta_n, gamma_n, f_a_n,
-                             pi_star_n, g_n, dat_orig)
+    tau_n <- construct_tau_n(deriv_theta_n, gamma_n, f_a_n, pi_star_n, g_n,
+                             dat_orig)
     print(paste("Check 21:", Sys.time()))
     
     # Generate confidence limits

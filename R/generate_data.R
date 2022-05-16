@@ -187,8 +187,9 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
   dat_orig$weights <- wts_str$weights
   dat_orig$strata <- wts_str$strata
   
-  # # !!!!!
-  # dat_orig$weights_true <- wts(dat_orig, type="true", return_strata=T)$weights
+  if (F) {
+    dat_orig$weights_true <- wts(dat_orig, type="true", return_strata=T)$weights
+  } # DEBUG: Return true weights in addition to estimated weights
   
   return(dat_orig)
   

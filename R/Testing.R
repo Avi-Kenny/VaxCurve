@@ -433,7 +433,6 @@
                                f_aIw_n=f_aIw_n, f_a_n=f_a_n,
                                f_a_delta1_n=f_a_delta1_n)
   
-  
   # Plot true curves against estimated curve
   grid <- round(seq(0,1,0.05),2)
   df <- data.frame(

@@ -11,7 +11,7 @@
 # GitHub packages: tedwestling/ctsCausal, tedwestling/CFsurvival,
 #                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
-  main_task = "run", # run update analysis.R
+  main_task = "analysis.R", # run update analysis.R
   which_sim = "estimation", # "estimation" "edge" "testing" "Cox"
   level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
   # keep = c(1:3,7:9,16:18,22:24),
@@ -153,15 +153,15 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       # "Cox gcomp" = list(est="Cox gcomp")
       "Grenander (GCM)" = list(
         est = "Grenander",
-        params = list(marg="Gamma_star", S_n_type="Cox PH", # !!!!! Gamma_star2
-                      convex_type="GCM", ecdf_type="linear (mid)", # !!!!! "step"
-                      deriv_type="m-spline", g_n_type="binning") # !!!!! binning
+        params = list(marg="Gamma_star", S_n_type="Cox PH", # Gamma_star2
+                      convex_type="GCM", ecdf_type="linear (mid)",
+                      deriv_type="m-spline", g_n_type="binning")
       )
       # "Grenander (LS)" = list(
       #   est = "Grenander",
-      #   params = list(marg="Gamma_star", S_n_type="Cox PH", # !!!!! Gamma_star2
-      #                 convex_type="LS", ecdf_type="linear (mid)", # !!!!! "step"
-      #                 g_n_type="binning") # !!!!! ci_type="none"
+      #   params = list(marg="Gamma_star", S_n_type="Cox PH",
+      #                 convex_type="LS", ecdf_type="linear (mid)",
+      #                 g_n_type="binning")
       # )
       # "Grenander (SL/true)" = list(
       #   est = "Grenander",
@@ -366,7 +366,7 @@ if (FALSE) {
   
   # Summarize results
   summ_bias <- list()
-  # summ_biasG <- list() # !!!!!
+  # summ_biasG <- list() # DEBUG: Gamma
   summ_mse <- list()
   summ_cov <- list()
   for (i in c(1:51)) {
@@ -376,11 +376,11 @@ if (FALSE) {
       estimate = paste0("est_",m),
       truth = paste0("theta_",m)
     )
-    # summ_biasG[[i]] <- list(        # !!!!!
-    #   name = paste0("biasG_",m),    # !!!!!
-    #   estimate = paste0("estG_",m), # !!!!!
-    #   truth = paste0("Gamma_",m)    # !!!!!
-    # )                               # !!!!!
+    # summ_biasG[[i]] <- list(        # DEBUG: Gamma
+    #   name = paste0("biasG_",m),    # DEBUG: Gamma
+    #   estimate = paste0("estG_",m), # DEBUG: Gamma
+    #   truth = paste0("Gamma_",m)    # DEBUG: Gamma
+    # )                               # DEBUG: Gamma
     summ_mse[[i]] <- list(
       name = paste0("mse_",m),
       estimate = paste0("est_",m),
@@ -395,7 +395,7 @@ if (FALSE) {
     )
   }
   summ <- summarize(sim, bias_pct=summ_bias, mse=summ_mse, coverage=summ_cov)
-  # summ <- summarize(sim, bias_pct=c(summ_bias,summ_biasG), mse=summ_mse, coverage=summ_cov) # !!!!!
+  # summ <- summarize(sim, bias_pct=c(summ_bias,summ_biasG), mse=summ_mse, coverage=summ_cov) # DEBUG: Gamma
   
   summ %<>% rename("Estimator"=estimator)
   

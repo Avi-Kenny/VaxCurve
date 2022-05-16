@@ -29,27 +29,17 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
   }
   p <- params
   
-  # Rescale A to lie in [0,1]
-  # !!!!! Functionize and refactor w/ est_curve.R
-  a_lims <- c(min(dat_orig$a,na.rm=T),max(dat_orig$a,na.rm=T))
-  a_shift <- -1 * a_lims[1]
-  a_scale <- 1/(a_lims[2]-a_lims[1])
+  # Rescale A to lie in [0,1] and round values
+  a_min <- min(dat_orig$a,na.rm=T)
+  a_max <- max(dat_orig$a,na.rm=T)
+  a_shift <- -1 * a_min
+  a_scale <- 1/(a_max-a_min)
+  if (F) {
+    a_shift <- 0
+    a_scale <- 1
+  } # DEBUG
   dat_orig$a <- (dat_orig$a+a_shift)*a_scale
-  
-  # Round values
-  # !!!!! Functionize and refactor w/ est_curve.R
-  dat_orig$a <- round(dat_orig$a, -log10(C$appx$a))
-  dat_orig$y_star <- round(dat_orig$y_star, -log10(C$appx$t_e))
-  for (i in c(1:length(dat_orig$w))) {
-    rnd <- 8
-    tol <- C$appx$w_tol
-    n_unique <- tol + 1
-    while(n_unique>tol) {
-      rnd <- rnd - 1
-      n_unique <- length(unique(round(dat_orig$w[,i],rnd)))
-    }
-    dat_orig$w[,i] <- round(dat_orig$w[,i],rnd)
-  }
+  dat_orig <- round_dat(dat_orig)
   
   if (p$var=="asymptotic") {
     
@@ -172,7 +162,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
                                              etastar_n, Theta_os_n)
     
     # Construct pieces needed for hypothesis test
-    x_mc <- round(seq(0,1,C$appx$a),-log10(C$appx$a)) # round(runif(10^5),-log10(C$appx$a))
+    x_mc <- round(seq(0,1,C$appx$a),-log10(C$appx$a))
     m <- length(x_mc)
     lambda_2 <- mean((x_mc)^2) # ~1/3
     lambda_3 <- mean((x_mc)^3) # ~1/4
@@ -309,7 +299,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     #   n_orig <- length(dat_0_orig$delta)
     #   dat_0 <- ss(dat_0_orig, which(dat_0_orig$delta==1))
     #   n_0 <- length(dat_0$a)
-    #   weights_0 <- wts(dat_0) # !!!!!
+    #   weights_0 <- wts(dat_0)
     #   
     #   G_0 <- construct_Phi_n(dat_0, type=p$ecdf_type)
     #   srvSL <- construct_S_n(dat, vlist$S_n, type=p$S_n_type)
@@ -344,7 +334,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     #   dat_b_orig <- dat_orig[indices,]
     #   dat_b <- ss(dat_b_orig, which(dat_b_orig$delta==1))
     #   n_b <- length(dat_b$a)
-    #   weights_b <- wts(dat_b) # !!!!!
+    #   weights_b <- wts(dat_b)
     #   Phi_n <- construct_Phi_n(dat_b, type=p$ecdf_type)
     #   
     #   piece_1 <- (1/n_orig) * sum(

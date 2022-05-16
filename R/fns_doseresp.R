@@ -70,8 +70,6 @@ construct_superfunc <- function(fnc, aux=NA, vec=TRUE, vals=NA, rnd=NA) {
   htab <- new.env()
   ..new_fnc <- function() {
     
-    # !!!!! add .. in front of all local variables
-    # !!!!! Need to throw an error for values not previously pre-calculated
     ..e <- parent.env(environment())
     ..mc <- lapply(as.list(match.call())[-1L], eval, parent.frame())
     ..mc1 <- ..mc[[1]]
@@ -300,9 +298,33 @@ ss <- function(dat_orig, indices) {
     y_star = dat_orig$y_star[i],
     delta_star = dat_orig$delta_star[i],
     weights = dat_orig$weights[i],
-    weights_true = dat_orig$weights_true[i], # !!!!!
     strata = dat_orig$strata[i]
   ))
+  
+}
+
+
+
+#' Round values in dat_orig
+#' 
+#' @param dat_orig Dataset returned by generate_data()
+#' @return Dataset with values rounded
+round_dat <- function(dat_orig) {
+  
+  dat_orig$a <- round(dat_orig$a, -log10(C$appx$a))
+  dat_orig$y_star <- round(dat_orig$y_star, -log10(C$appx$t_e))
+  for (i in c(1:length(dat_orig$w))) {
+    rnd <- 8
+    tol <- C$appx$w_tol
+    n_unique <- tol + 1
+    while(n_unique>tol) {
+      rnd <- rnd - 1
+      n_unique <- length(unique(round(dat_orig$w[,i],rnd)))
+    }
+    dat_orig$w[,i] <- round(dat_orig$w[,i],rnd)
+  }
+  
+  return(dat_orig)
   
 }
 
@@ -416,9 +438,6 @@ construct_S_n <- function(dat, vals, type, return_model=F, print_coeffs=F) {
         max.SL.iter = 10
       )
     )
-    srv_pred <- srv$event.SL.predict
-    cens_pred <- srv$cens.SL.predict
-    rm(srv)
     
     if (print_coeffs && type=="Super Learner") {
       cat("\n------------------------------\n")
@@ -432,6 +451,10 @@ construct_S_n <- function(dat, vals, type, return_model=F, print_coeffs=F) {
       print(sort(srv$cens.coef, decr=T))
       cat("\n------------------------------\n")
     }
+    
+    srv_pred <- srv$event.SL.predict
+    cens_pred <- srv$cens.SL.predict
+    rm(srv)
     
     # !!!!! Later consolidate these via a wrapper/constructor function
     fnc_srv <- function(t, w, a) {
@@ -2638,7 +2661,7 @@ cox_var <- function(dat_orig, dat, t, points, se_beta=F, se_bshz=F,
         d_i = dat_orig$delta[i],
         ds_i = dat_orig$delta_star[i],
         t_i = dat_orig$y_star[i],
-        wt_i = dat_orig$weights[i], # dat_orig$weights_true[i]
+        wt_i = dat_orig$weights[i],
         st_i = dat_orig$strata[i]
       ))^2
     }, cl=cl))

@@ -55,8 +55,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   }
   p <- params
   
-  # Rescale A to lie in [0,1]
-  # !!!!! Functionize and refactor w/ test_2.R
+  # Rescale A to lie in [0,1] and round values
   a_min <- min(dat_orig$a,na.rm=T)
   a_max <- max(dat_orig$a,na.rm=T)
   a_shift <- -1 * a_min
@@ -66,21 +65,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     a_scale <- 1
   } # DEBUG
   dat_orig$a <- (dat_orig$a+a_shift)*a_scale
-  
-  # Round values
-  # !!!!! Functionize and refactor w/ test_2.R
-  dat_orig$a <- round(dat_orig$a, -log10(C$appx$a))
-  dat_orig$y_star <- round(dat_orig$y_star, -log10(C$appx$t_e))
-  for (i in c(1:length(dat_orig$w))) {
-    rnd <- 8
-    tol <- C$appx$w_tol
-    n_unique <- tol + 1
-    while(n_unique>tol) {
-      rnd <- rnd - 1
-      n_unique <- length(unique(round(dat_orig$w[,i],rnd)))
-    }
-    dat_orig$w[,i] <- round(dat_orig$w[,i],rnd)
-  }
+  dat_orig <- round_dat(dat_orig)
   
   # Obtain minimum value (excluding edge point mass)
   if (p$edge_corr=="min") {
@@ -211,7 +196,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
         f = 0
       )
     } else if (p$convex_type=="LS") {
-      gcm <- function(x) { 1 } # !!!!!
+      gcm <- function(x) { 1 } # Ignored
       fit <- cvx.lse.reg(t=x_vals, z=y_vals)
       pred_x <- round(seq(0,1,0.001),3)
       pred_y <- predict(fit, newdata=pred_x)
@@ -258,8 +243,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_delta1_n)
     print(paste("Check 15:", Sys.time()))
     gamma_n <- construct_gamma_n(dat_orig, dat, type=p$gamma_type,
-                                 vals=vlist$A_grid,
-                                 omega_n=omega_n, f_aIw_n=f_aIw_n, f_a_n=f_a_n,
+                                 vals=vlist$A_grid, omega_n=omega_n,
+                                 f_aIw_n=f_aIw_n, f_a_n=f_a_n,
                                  f_a_delta1_n=f_a_delta1_n)
     if (F) {
       gamma_n <- function(w,a) { S_n(C$t_e,w,a)*(1-S_n(C$t_e,w,a)) }
@@ -377,9 +362,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   
   if (estimator=="Qbins") {
     
-    # !!!!! Implement cross-fitted version
-    # !!!!! Adapt for `points` as above; make sure NA values can be handled
-    
     # Construct bin cutoffs
     {
       Phi_n_inv <- construct_Phi_n(dat, which="inverse", type="step")
@@ -397,7 +379,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     }
     
     # Function to transform A values to categorical bins values
-    # !!!!! Wrapped this in Vectorize()
     transform_a <- Vectorize(function(a) {
       cut(a, breaks=cutoffs, right=F, include.lowest=T)
     })
@@ -412,7 +393,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     # Transform A values
     dat$a <- transform_a(dat$a)
     
-    # !!!!! Check to see if these need to be modified to handle factor A (including different S_n types)
     # Note: S_n and Sc_n will not work with type="true"
     srvSL <- construct_S_n(dat, vlist$S_n, type=p$S_n_type, print_coeffs=T)
     S_n <- srvSL$srv
@@ -435,7 +415,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     n_orig <- length(dat_orig$delta)
     ci_lo <- ests - 1.96*sqrt(sigma2s/n_orig)
     ci_hi <- ests + 1.96*sqrt(sigma2s/n_orig)
-    # !!!!! Deal with CI truncation
     
   }
   
@@ -457,7 +436,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
   }
   
-  # !!!!! Experimental
+  # !!!!! Update
   if (estimator=="Cox GAM") {
     
     # Setup
@@ -524,14 +503,14 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   }
   
   if (F) {
-    p3 <- round((0.3+a_shift)*a_scale, -log10(C$appx$a)) # !!!!!
-    p5 <- round((0.5+a_shift)*a_scale, -log10(C$appx$a)) # !!!!!
-    res$g_n_star <- g_n_star(0.5,c(0,0)) # !!!!!
-    res$eta_ss_n3 <- eta_ss_n(p3,c(0,0)) # !!!!!
-    res$eta_ss_n5 <- eta_ss_n(p5,c(0,0)) # !!!!!
-    res$alpha_star_n3 <- alpha_star_n(p3) # !!!!!
-    res$alpha_star_n5 <- alpha_star_n(p5) # !!!!!
-    res$gcomp_n <- gcomp_n(0.9) # !!!!!
+    p3 <- round((0.3+a_shift)*a_scale, -log10(C$appx$a))
+    p5 <- round((0.5+a_shift)*a_scale, -log10(C$appx$a))
+    res$g_n_star <- g_n_star(0.5,c(0,0))
+    res$eta_ss_n3 <- eta_ss_n(p3,c(0,0))
+    res$eta_ss_n5 <- eta_ss_n(p5,c(0,0))
+    res$alpha_star_n3 <- alpha_star_n(p3)
+    res$alpha_star_n5 <- alpha_star_n(p5)
+    res$gcomp_n <- gcomp_n(0.9)
   } # DEBUG: return additional estimates
   
   if ("gcomp" %in% return_extra) {

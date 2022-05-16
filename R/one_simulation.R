@@ -22,8 +22,7 @@ if (cfg$which_sim=="estimation") {
       params = L$estimator$params,
       points = C$points,
       dir = L$dir,
-      return_extra = "deriv_theta_n" # !!!!!
-      # return_extra = "Theta_os_n"
+      return_extra = "deriv_theta_n" # "Theta_os_n"
     )
 
     # Return results
@@ -147,8 +146,6 @@ if (cfg$which_sim=="edge") {
   
   one_simulation <- function() {
     
-    # !!!!! Update function calls (htab-->superfunc)
-    
     # Generate dataset
     dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
                               L$sc_params, L$sampling, L$dir)
@@ -223,13 +220,15 @@ if (cfg$which_sim=="Cox") {
     res_cox <- cox_var(dat_orig=dat_orig, dat=dat, t=C$t_e, points=seq(0.1,0.9,0.1), se_marg=T, verbose=T)
     
     # Calculate certain true values
-    z_0 <- c(0.3,1,0.5) # !!!!! Needs to be consistent with the value in cox_var()
-    H_0_true <- function(t) {
-      L$sc_params$lmbd*exp(-1.7) * t^L$sc_params$v # !!!!!
-    }
-    true_lp <- sum(c(C$alpha_1,C$alpha_2,L$alpha_3)*z_0)
-    true_surv <- exp(-1*exp(true_lp)*H_0_true(C$t_e))
-    true_marg <- 1-attr(dat_orig, "theta_true")[26] # Corresponds to A=0.5
+    if (F) {
+      z_0 <- c(0.3,1,0.5) # Needs to be consistent with the value in cox_var()
+      H_0_true <- function(t) {
+        L$sc_params$lmbd*exp(-1.7) * t^L$sc_params$v
+      }
+      true_lp <- sum(c(C$alpha_1,C$alpha_2,L$alpha_3)*z_0)
+      true_surv <- exp(-1*exp(true_lp)*H_0_true(C$t_e))
+      true_marg <- 1-attr(dat_orig, "theta_true")[26] # Corresponds to A=0.5
+    } # DEBUG: intermediate objects
     
     # Construct simulation results object
     # This needs to line up with res_cox based on the se_* flags

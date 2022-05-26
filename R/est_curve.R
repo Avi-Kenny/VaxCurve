@@ -21,12 +21,10 @@
 #'     different estimator).
 #'   - `cf_folds` Number of cross-fitting folds; 1 for no cross-fitting
 #'   - `m` If params$ci_type=="sample split", the number of splits
-#'   - `edge_corr` One of c("none", "spread", "point", "weighted", "min").
-#'     "point" uses the root-n estimator to replace the Grenander-based
-#'     estimator only at the leftmost point. "weighted" and "min" both use the
-#'     precision-weighted estimator to adjust both the leftmost point and the
-#'     rest of the curve. "spread" adds a small amount of noise to the edge
-#'     points
+#'   - `edge_corr` One of c("none", "point", "min"). "point" uses the
+#'     root-n estimator to replace the Grenander-based estimator only at the
+#'     leftmost point. "min" adjusts both the leftmost point and the rest of the
+#'     curve.
 #'   - `marg` One of c("Gamma", "Theta"); whether or not to transform by the
 #'     marginal distribution of A
 #'   - `convex_type` One of c("GCM", "LS"); whether to fit the GCM to the
@@ -255,7 +253,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     print(paste("Check 17:", Sys.time()))
     
     # Edge correction
-    if (p$edge_corr %in% c("none", "spread")) {
+    if (p$edge_corr=="none") {
       
       theta_n <- theta_n_Gr
       
@@ -346,7 +344,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       if (p$edge_corr=="point") {
         ci_lo[1] <- ests[1] - 1.96*sqrt(sigma2_os_n_est/n_orig)
         ci_hi[1] <- ests[1] + 1.96*sqrt(sigma2_os_n_est/n_orig)
-      } else if (p$edge_corr %in% c("weighted", "min")) {
+      } else if (p$edge_corr=="min") {
         ci_lo2 <- ests - 1.96*sqrt(sigma2_os_n_est/n_orig)
         ci_hi2 <- ests + 1.96*sqrt(sigma2_os_n_est/n_orig)
         ci_lo <- (1-gren_points)*ci_lo2 + replace_na(gren_points*ci_lo, 0)

@@ -107,7 +107,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
             cf_folds = c(1,10),
             S_n_type = c("Cox PH", "Random Forest"),
             g_n_type = c("parametric", "binning"),
-            edge_corr = c("none", "point", "spread", "min"),
+            edge_corr = c("none", "point", "min"),
             deriv_type = c("line", "spline", "m-spline", "linear", "gcomp"),
             ecdf_type = c("step", "linear", "true"),
             omega_n_type = c("estimated", "true"),

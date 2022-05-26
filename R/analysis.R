@@ -8,16 +8,16 @@
 
 {
   # Choose analysis
-  which_analysis <- "Moderna" # "Janssen" "Moderna" "AMP" "AZD1222"
+  which_analysis <- "HVTN 705 (primary)" # "Janssen" "Moderna" "AMP" "AZD1222"
                               # "HVTN 705 (primary)" "HVTN 705 (all)"
   
   # # Uncomment this code to run multiple analyses (e.g. 1=10=Moderna, 11-14=Janssen)
   # ..tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
-  # if (..tid<=6) {
-  #   which_analysis <- "HVTN 705 (primary)"
+  # if (..tid<=4) {
+  #   which_analysis <- "Janssen"
   # } else {
-  #   which_analysis <- "HVTN 705 (all)"
-  #   Sys.setenv("SLURM_ARRAY_TASK_ID"=as.character(round(..tid-6)))
+  #   which_analysis <- "Moderna"
+  #   Sys.setenv("SLURM_ARRAY_TASK_ID"=as.character(round(..tid-4)))
   # }
   
   # Set seed
@@ -30,7 +30,7 @@
     analysis = which_analysis,
     run_analysis = T,
     run_dqa = F,
-    run_debug = list(gren_var=F, objs=T),
+    run_debug = list(gren_var=F, objs=F),
     run_hyptest = F
   )
   

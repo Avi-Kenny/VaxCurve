@@ -52,8 +52,8 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
   # Adjust A for point mass at the edge
   if (edge=="expit 0.2") {
     edge_probs <- expit(w$w1+w$w2-2.5)
-  } else if (edge=="expit 0.5") {
-    edge_probs <- expit(w$w1+w$w2-1.0)
+  } else if (edge=="expit 0.4") {
+    edge_probs <- expit(w$w1+w$w2-1.4)
   } else if (edge=="complex 0.2") {
     edge_probs <- 1.7*w$w2*pmax(0,1-4*abs(w$w1-0.5))
   } else if (edge=="none") {

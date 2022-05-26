@@ -11,7 +11,7 @@
 # GitHub packages: tedwestling/ctsCausal, tedwestling/CFsurvival,
 #                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
-  main_task = "analysis.R", # run update analysis.R
+  main_task = "run", # run update analysis.R
   which_sim = "estimation", # "estimation" "edge" "testing" "Cox"
   level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
   # keep = c(1:3,7:9,16:18,22:24),
@@ -140,11 +140,12 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     # sc_params = list("exp"=list(lmbd=1e-3, v=1.5, lmbd2=5e-4, v2=1.5)),
     # distr_A = c("Unif(0,1)"),
     distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
-    edge = c("none"), # c("none", "expit 0.2")
+    edge = c("expit 0.4"),
+    # edge = c("none"),
     # surv_true = c("exp"), # "complex" "exp"
     surv_true = c("Cox PH"), # "complex" "exp"
     # sampling = c("iid"),
-    sampling = c("iid", "two-phase (72%)"),
+    sampling = c("iid", "two-phase (50%)"),
     estimator = list(
       # "Qbins (true)" = list(
       #   est = "Qbins",
@@ -155,6 +156,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
         est = "Grenander",
         params = list(marg="Gamma_star", S_n_type="Cox PH", # Gamma_star2
                       convex_type="GCM", ecdf_type="linear (mid)",
+                      edge_corr="min", # "min" "none"
                       deriv_type="m-spline", g_n_type="binning")
       )
       # "Grenander (LS)" = list(
@@ -200,15 +202,14 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     n = 1000,
     # n = c(100,200,400,800), # 1000
     # n = c(1000,2000),
-    alpha_3 = 0,
-    # alpha_3 = c(0,-0.25,-0.5),
+    # alpha_3 = 0,
+    alpha_3 = c(0,-0.25,-0.5),
     dir = "decr",
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_A = "Unif(0,1)",
-    # distr_A = c("Unif(0,1)", "N(0.5,0.04)", "N(0.5,0.01)"),
+    distr_A = c("Unif(0,1)", "N(0.5,0.04)"), # "N(0.5,0.01)"
     edge = c("none", "expit 0.5"),
     surv_true = "Cox PH",
-    sampling = c("iid"),
+    sampling = c("iid", "two-phase (72%)"),
     # sampling = c("iid", "w1", "w2", "two-phase (50%)", "two-phase (50% random)"),
     # sampling = c("w1", "w2", "two-phase (50%)"),
     # sampling = c("iid", "cycle", "two-phase (72%)", "two-phase (70% random)"),
@@ -524,9 +525,7 @@ if (FALSE) {
   # Summarize resuls
   summ <- summarize(sim)
   
-  summ %<>% rename(
-    "Power" = mean_reject
-  )
+  summ %<>% rename("Power"=mean_reject)
   
   cb_colors <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
                  "#F0E442", "#0072B2", "#D55E00", "#CC79A7")

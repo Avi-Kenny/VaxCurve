@@ -1116,12 +1116,23 @@ construct_q_n <- function(which="q_n", type="Super Learner", dat, dat_orig,
 #'     bins will be selected via cross-validation); ignored for the parametric
 #'     estimator
 #' @param delta1 Compute the density conditional on Delta=1
+#' @param edge_corr Edge correction (see est_curve)
 #' @return Conditional density estimator function
 #' @notes
 #'   - Assumes support of A is [0,1]
-construct_f_aIw_n <- function(dat, vals=NA, type, k=0, delta1=FALSE) {
+construct_f_aIw_n <- function(dat, vals=NA, type, k=0, delta1=F,
+                              edge_corr="none") {
   
   if (delta1) { dat$weights <- rep(1, length(dat$weights)) }
+  
+  # Create normalization factor (to multiply density by if there is a point mass
+  # at the edge)
+  if (edge_corr=="none") {
+    norm_factor <- 1
+  } else {
+    norm_factor <- sum(dat$a!=0)/length(dat$a)
+    dat <- ss(dat, which(dat$a!=0))
+  }
   
   if (type=="true") {
     
@@ -1224,7 +1235,7 @@ construct_f_aIw_n <- function(dat, vals=NA, type, k=0, delta1=FALSE) {
         p1 <- ifelse(bin==k, 1, hz[bin])
         p2 <- ifelse(bin==1, 1, prod(1-hz[1:(bin-1)]))
         
-        return(k*p1*p2)
+        return(norm_factor*k*p1*p2)
         
       }
       

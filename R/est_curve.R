@@ -21,12 +21,10 @@
 #'     different estimator).
 #'   - `cf_folds` Number of cross-fitting folds; 1 for no cross-fitting
 #'   - `m` If params$ci_type=="sample split", the number of splits
-#'   - `edge_corr` One of c("none", "spread", "point", "weighted", "min").
-#'     "point" uses the root-n estimator to replace the Grenander-based
-#'     estimator only at the leftmost point. "weighted" and "min" both use the
-#'     precision-weighted estimator to adjust both the leftmost point and the
-#'     rest of the curve. "spread" adds a small amount of noise to the edge
-#'     points
+#'   - `edge_corr` One of c("none", "point", "min"). "point" uses the
+#'     root-n estimator to replace the Grenander-based estimator only at the
+#'     leftmost point. "min" adjusts both the leftmost point and the rest of the
+#'     curve.
 #'   - `marg` One of c("Gamma", "Theta"); whether or not to transform by the
 #'     marginal distribution of A
 #'   - `convex_type` One of c("GCM", "LS"); whether to fit the GCM to the
@@ -68,9 +66,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   dat_orig <- round_dat(dat_orig)
   
   # Obtain minimum value (excluding edge point mass)
-  if (p$edge_corr=="min") {
-    a_min2 <- min(dat_orig$a[dat_orig$a!=0],na.rm=T)
-  }
+  if (p$edge_corr=="min") { a_min2 <- min(dat_orig$a[dat_orig$a!=0],na.rm=T) }
   
   # Rescale points and remove points outside the range of A
   points_orig <- points
@@ -97,7 +93,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n, type=p$omega_n_type)
     print(paste("Check 2:", Sys.time()))
     f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=p$g_n_type,
-                                 k=p$f_aIw_n_bins)
+                                 k=p$f_aIw_n_bins, edge_corr=p$edge_corr)
     f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
     g_n <- construct_g_n(f_aIw_n, f_a_n)
     print(paste("Check 3:", Sys.time()))
@@ -255,7 +251,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     print(paste("Check 17:", Sys.time()))
     
     # Edge correction
-    if (p$edge_corr %in% c("none", "spread")) {
+    if (p$edge_corr=="none") {
       
       theta_n <- theta_n_Gr
       
@@ -323,21 +319,21 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       # The Normal approximation would use qnorm(0.975, sd=0.52) instead
       qnt <- 1.00
       n_orig <- length(dat_orig$delta)
-      pct_a <- sum(dat$a==0)/length(dat$a)
-      n_ci <- round(n_orig*(1-pct_a))
+      # pct_a <- sum(dat$a==0)/length(dat$a)
+      # n_ci <- round(n_orig*(1-pct_a))
       if (p$ci_type=="regular") {
-        ci_lo <- ests - (qnt*tau_ns)/(n_ci^(1/3))
-        ci_hi <- ests + (qnt*tau_ns)/(n_ci^(1/3))
+        ci_lo <- ests - (qnt*tau_ns)/(n_orig^(1/3))
+        ci_hi <- ests + (qnt*tau_ns)/(n_orig^(1/3))
       } else if (p$ci_type=="logit") {
         ci_lo <- expit(
-          logit(ests) - (qnt*tau_ns*deriv_logit(ests))/(n_ci^(1/3))
+          logit(ests) - (qnt*tau_ns*deriv_logit(ests))/(n_orig^(1/3))
         )
         ci_hi <- expit(
-          logit(ests) + (qnt*tau_ns*deriv_logit(ests))/(n_ci^(1/3))
+          logit(ests) + (qnt*tau_ns*deriv_logit(ests))/(n_orig^(1/3))
         )
       } else if (p$ci_type=="trunc") {
-        ci_lo <- ests - (qnt*tau_ns)/(n_ci^(1/3))
-        ci_hi <- ests + (qnt*tau_ns)/(n_ci^(1/3))
+        ci_lo <- ests - (qnt*tau_ns)/(n_orig^(1/3))
+        ci_hi <- ests + (qnt*tau_ns)/(n_orig^(1/3))
         ci_lo %<>% pmax(0) %>% pmin(1)
         ci_hi %<>% pmax(0) %>% pmin(1)
       }
@@ -346,7 +342,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       if (p$edge_corr=="point") {
         ci_lo[1] <- ests[1] - 1.96*sqrt(sigma2_os_n_est/n_orig)
         ci_hi[1] <- ests[1] + 1.96*sqrt(sigma2_os_n_est/n_orig)
-      } else if (p$edge_corr %in% c("weighted", "min")) {
+      } else if (p$edge_corr=="min") {
         ci_lo2 <- ests - 1.96*sqrt(sigma2_os_n_est/n_orig)
         ci_hi2 <- ests + 1.96*sqrt(sigma2_os_n_est/n_orig)
         ci_lo <- (1-gren_points)*ci_lo2 + replace_na(gren_points*ci_lo, 0)
@@ -499,7 +495,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   
   if (estimator=="Grenander") {
     res$tau_ns <- c(rep(NA,na_head), tau_ns, rep(NA,na_tail))
-    res$n <- n_ci
+    res$n <- n_orig
   }
   
   if (F) {

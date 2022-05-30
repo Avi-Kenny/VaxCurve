@@ -132,16 +132,17 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Estimation: ideal params
   level_set_estimation_1 <- list(
-    n = c(1000,5000), # 500-1000
+    n = 1000,
+    # n = c(1000,5000),
     alpha_3 = -2,
     dir = c("decr"), # "incr"
     # sc_params = list("no cens"=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5)),
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
     # sc_params = list("exp"=list(lmbd=1e-3, v=1.5, lmbd2=5e-4, v2=1.5)),
-    # distr_A = c("Unif(0,1)"),
-    distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
-    edge = c("expit 0.4"),
-    # edge = c("none"),
+    distr_A = c("Unif(0,1)"),
+    # distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
+    # edge = c("expit 0.4"),
+    edge = c("none"),
     # surv_true = c("exp"), # "complex" "exp"
     surv_true = c("Cox PH"), # "complex" "exp"
     # sampling = c("iid"),
@@ -395,14 +396,10 @@ if (FALSE) {
       na.rm = TRUE
     )
   }
-  summ <- summarize(sim, bias_pct=summ_bias, mse=summ_mse, coverage=summ_cov)
-  # summ <- summarize(sim, bias_pct=c(summ_bias,summ_biasG), mse=summ_mse, coverage=summ_cov) # DEBUG: Gamma
+  summ <- summarize(sim, bias=summ_bias, mse=summ_mse, coverage=summ_cov)
+  # summ <- summarize(sim, bias=c(summ_bias,summ_biasG), mse=summ_mse, coverage=summ_cov) # DEBUG: Gamma
   
   summ %<>% rename("Estimator"=estimator)
-  
-  # summ %<>% filter(distr_A=="N(0.5,0.01)")
-  # summ %<>% filter(distr_A=="N(0.5,0.04)")
-  # summ %<>% filter(distr_A=="N(0.4+0.2w1+0.1w2,0.01)")
   
   p_data <- pivot_longer(
     data = summ,
@@ -419,21 +416,17 @@ if (FALSE) {
     # `Grenander (Est S_n/g_n)` = cb_colors[2],
   # )
   
-  # df_distr_A <- data.frame(
-  #   x = rep(seq(0,1,0.01),3),
-  #   ymax = c(dnorm(seq(0,1,0.01), mean=0.5, sd=0.1),
-  #            dunif(seq(0,1,0.01),0.3,0.7),
-  #            rep(1,101)),
-  #   distr_A = rep(c("N(0.5,0.01)", "Unif(0.3,0.7)", "Unif(0,1)"), each=101),
-  #   value = 0
-  # )
-  # df_distr_A1 <- mutate(df_distr_A, ymin=-0.2, ymax=(ymax/15-0.2))
-  # df_distr_A2 <- mutate(df_distr_A, ymin=0.7, ymax=(ymax/20+0.7))
-  # df_vlines <- data.frame(
-  #   x = c(qnorm(0.1,0.5,0.1),qunif(0.1,0.3,0.7),qunif(0.1,0,1),
-  #         qnorm(0.9,0.5,0.1),qunif(0.9,0.3,0.7),qunif(0.9,0,1)),
-  #   distr_A = rep(c("N(0.5,0.01)", "Unif(0.3,0.7)", "Unif(0,1)"),2)
-  # )
+  # PLot Y-axis limits
+  plot_lims <- list(b=c(-0.2,0.2), c=c(0.7,1), m=c(0,0.01))
+  
+  # Orange 10/90 quantile lines
+  df_vlines <- data.frame(
+    x = c(qnorm(0.1,0.5,0.1),qnorm(0.1,0.5,0.2),qunif(0.1,0,1),
+          qnorm(0.9,0.5,0.1),qnorm(0.9,0.5,0.2),qunif(0.9,0,1)),
+    distr_A = rep(c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"),2)
+  )
+  
+  # Grey background densities
   df_distr_A <- data.frame(
     x = rep(seq(0,1,0.01),3),
     ymax = c(dnorm(seq(0,1,0.01), mean=0.5, sd=0.1),
@@ -442,50 +435,53 @@ if (FALSE) {
     distr_A = rep(c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"), each=101),
     value = 0
   )
-  df_distr_A1 <- mutate(df_distr_A, ymin=-0.2, ymax=(ymax/15-0.2))
-  df_distr_A2 <- mutate(df_distr_A, ymin=0.7, ymax=(ymax/20+0.7))
-  df_vlines <- data.frame(
-    x = c(qnorm(0.1,0.5,0.1),qnorm(0.1,0.5,0.2),qunif(0.1,0,1),
-          qnorm(0.9,0.5,0.1),qnorm(0.9,0.5,0.2),qunif(0.9,0,1)),
-    distr_A = rep(c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"),2)
-  )
+  if (sim$levels$edge!="none") {
+    mass <- as.numeric(strsplit(sim$levels$edge," ",fixed=T)[[1]][2])
+    height <- 10 * mass
+    df_distr_A %<>% mutate(
+      ymax = ifelse(x<0.1, 10*mass, (1-mass)*df_distr_A$ymax)
+    )
+    df_vlines <- df_vlines[4:6,]
+  }
+  df_distr_b <- mutate(df_distr_A, ymin=plot_lims$b[1],
+                       ymax=((ymax*diff(plot_lims$b))/6+plot_lims$b[1]))
+  df_distr_c <- mutate(df_distr_A, ymin=plot_lims$c[1],
+                       ymax=((ymax*diff(plot_lims$c))/6+plot_lims$c[1]))
+  df_distr_m <- mutate(df_distr_A, ymin=plot_lims$m[1],
+                       ymax=((ymax*diff(plot_lims$m))/6+plot_lims$m[1]))
   
   # Bias plot
   # Export: 10" x 6"
   # Note: change "bias" to "biasG" for Gamma bias
   ggplot(
     filter(p_data, stat=="bias"),
-    # aes(x=point, y=value)
     aes(x=point, y=value, color=factor(n), group=factor(n))
   ) +
     geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
-                data=df_distr_A1, fill="grey", color=NA, alpha=0.4) +
+                data=df_distr_b, fill="grey", color=NA, alpha=0.4) +
     geom_vline(aes(xintercept=x), data=df_vlines, color="orange",
                linetype="dashed") +
     geom_line() +
     facet_grid(rows=dplyr::vars(sampling), cols=dplyr::vars(distr_A)) + # surv_true
-    scale_y_continuous(labels=percent, limits=c(-0.5,0.5)) +
-    # scale_y_continuous(labels=percent) +
+    scale_y_continuous(limits=plot_lims$b) + # labels=percent
     # scale_color_manual(values=m_colors) +
     theme(legend.position="bottom") +
-    labs(title="Bias (%)", x="A", y=NULL, color="n")
+    labs(title="Bias", x="A", y=NULL, color="n")
   
   # Coverage plot
   # Export: 10" x 6"
   ggplot(
     filter(p_data, stat=="cov"),
-    # aes(x=point, y=value)
     aes(x=point, y=value, color=factor(n), group=factor(n))
   ) +
     geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
-                data=df_distr_A2, fill="grey", color=NA, alpha=0.4) +
+                data=df_distr_c, fill="grey", color=NA, alpha=0.4) +
     geom_vline(aes(xintercept=x), data=df_vlines, color="orange",
                linetype="dashed") +
     geom_hline(aes(yintercept=0.95), linetype="longdash", color="grey") +
     geom_line() +
     facet_grid(rows=dplyr::vars(sampling), cols=dplyr::vars(distr_A)) + # surv_true
-    scale_y_continuous(labels=percent, limits=c(0.7,1)) +
-    # scale_y_continuous(labels=percent) +
+    scale_y_continuous(labels=percent, limits=plot_lims$c) +
     # scale_color_manual(values=m_colors) +
     theme(legend.position="bottom") +
     labs(title="Coverage (%)", x="A", y=NULL, color="n")
@@ -494,13 +490,16 @@ if (FALSE) {
   # Export: 10" x 6"
   ggplot(
     filter(p_data, stat=="mse"),
-    # aes(x=point, y=value)
     aes(x=point, y=value, color=factor(n), group=factor(n))
   ) +
+    geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
+                data=df_distr_m, fill="grey", color=NA, alpha=0.4) +
+    geom_vline(aes(xintercept=x), data=df_vlines, color="orange",
+               linetype="dashed") +
     geom_hline(aes(yintercept=0.95), linetype="longdash", color="grey") +
     geom_line() +
     facet_grid(rows=dplyr::vars(sampling), cols=dplyr::vars(distr_A)) + # surv_true
-    ylim(0,0.01) +
+    scale_y_continuous(limits=plot_lims$m) +
     # scale_color_manual(values=m_colors) +
     theme(legend.position="bottom") +
     labs(title="MSE", x="A", y=NULL, color="n")

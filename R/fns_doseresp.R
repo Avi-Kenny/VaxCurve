@@ -343,13 +343,14 @@ construct_Phi_n <- function (dat, which="ecdf", type="step") {
   if (type!="true") {
     
     n_orig <- sum(dat$weights)
-    a <- sort(dat$a)
-    vals_x <- unique(a)
+    df <- data.frame(a=dat$a, weights=dat$weights)
+    df %<>% arrange(a)
+    vals_x <- unique(df$a)
     vals_y <- c()
     
     for (j in 1:length(vals_x)) {
-      indices <- which(a==vals_x[j])
-      weights_j <- dat$weights[indices]
+      indices <- which(df$a==vals_x[j])
+      weights_j <- df$weights[indices]
       new_y_val <- (1/n_orig) * sum(weights_j)
       vals_y <- c(vals_y, new_y_val)
     }

@@ -288,9 +288,10 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     # Generate estimates for each point
     print(paste("Check 18:", Sys.time()))
     ests <- theta_n(points)
-    if (F) {
+    if (T) {
       ests_Gamma <- Gamma_os_n_star(points)
-    } # DEBUG: return Gamma_n(x) estimates
+      ests_Phi <- Phi_n(points)
+    } # DEBUG: return Gamma/Phi estimates
     print(paste("Check 19:", Sys.time()))
     
     # Construct variance scale factor
@@ -488,10 +489,14 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   res <- list(
     point = points_orig,
     est = c(rep(NA,na_head), ests, rep(NA,na_tail)),
-    # ests_Gamma = c(rep(NA,na_head), ests_Gamma, rep(NA,na_tail)),
     ci_lo = c(rep(NA,na_head), ci_lo, rep(NA,na_tail)),
     ci_hi = c(rep(NA,na_head), ci_hi, rep(NA,na_tail))
   )
+  
+  if (T) {
+    res$ests_Gamma = c(rep(NA,na_head), ests_Gamma, rep(NA,na_tail))
+    res$ests_Phi = c(rep(NA,na_head), ests_Phi, rep(NA,na_tail))
+  } # DEBUG: return Gamma/Phi estimates
   
   if (estimator=="Grenander") {
     res$tau_ns <- c(rep(NA,na_head), tau_ns, rep(NA,na_tail))

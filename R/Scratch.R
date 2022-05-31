@@ -1,4 +1,49 @@
 
+# Graphs of Phi_n
+if (F) {
+  
+  # Summarize results
+  summ_biasP <- list()
+  for (i in c(1:51)) {
+    m <- format(round(i/50-0.02,2), nsmall=1)
+    summ_biasP[[i]] <- list(
+      name = paste0("biasP_",m),
+      estimate = paste0("estP_",m),
+      truth = paste0("Phi_",m)
+    )
+  }
+  summ <- summarize(sim, bias=summ_biasP)
+  p_data <- pivot_longer(
+    data = summ,
+    cols = -c(level_id,n,alpha_3,sc_params,distr_A,edge,
+              surv_true,sampling,estimator,dir),
+    names_to = c("stat","point"),
+    names_sep = "_"
+  )
+  p_data %<>% mutate(point = as.numeric(point))
+  df_vlines <- data.frame(
+    x = c(qunif(0.1,0,1), qunif(0.9,0,1)),
+    distr_A = rep("Unif(0,1)",2)
+  )
+  
+  # Bias plot
+  # Export: 10" x 6"
+  # Note: change "bias" to "biasG" for Gamma and "biasP" for Phi
+  ggplot(
+    filter(p_data, stat=="biasP"),
+    aes(x=point, y=value, color=factor(sampling), group=factor(sampling))
+  ) +
+    geom_vline(aes(xintercept=x), data=df_vlines, color="orange",
+               linetype="dashed") +
+    geom_line() +
+    facet_grid(rows=dplyr::vars(surv_true), cols=dplyr::vars(estimator)) +
+    scale_y_continuous(limits=plot_lims$b) + # labels=percent
+    # scale_color_manual(values=m_colors) +
+    theme(legend.position="bottom") +
+    labs(title="Bias", x="A", y=NULL, color="n")
+  
+}
+
 # Checking Gamma_os_n_star vs Gamma_os_n_star2
 if (F) {
   

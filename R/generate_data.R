@@ -5,14 +5,14 @@
 #'     zero or negative.
 #' @param distr_A Distribution of A, possibly dependent on covariates; one of
 #'     c("Unif(0,1)", "Unif(0.3,0.7)", "N(0.5,0.01)", "N(0.5,0.04)",
-#'     "N(0.4+0.2w1+0.1w2,0.01)"). The Normals are truncated to lie in [0,1].
+#'     "N(0.3+0.4w2,0.04)"). The Normals are truncated to lie in [0,1].
 #' @param edge Propensity mechanism for point mass at edge. The distribution of
 #'     A will be (1-pi(w))*distr_A. One of the following: "none" (no point mass
 #'     at the edge), "expit 0.2" (expit propensity model, prob=0.2), "expit 0.5"
-#'     (expit propensity model, prob=0.5), "complex 0.2" (non-logit propensity
+#'     (expit propensity model, prob=0.5), "Complex 0.2" (non-logit propensity
 #'     model, prob=0.2).
 #' @param surv_true True form of the survival function; one c("Cox PH",
-#'     "complex", "exp")
+#'     "Non PH", "Complex", "exp")
 #' @param sc_params Weibull parameters for the survival and censoring
 #'     distributions; a list of the form list(lmbd=1,v=1,lmbd2=1,v2=1)
 #' @param sampling Two-phase sampling mechanism; one of c("iid",
@@ -39,8 +39,8 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
     a <- rtruncnorm(n, a=0, b=1, mean=0.5, sd=0.1)
   } else if (distr_A=="N(0.5,0.04)") {
     a <- rtruncnorm(n, a=0, b=1, mean=0.5, sd=0.2)
-  } else if (distr_A=="N(0.4+0.2w1+0.1w2,0.01)") {
-    a <- rtruncnorm(n, a=0, b=1, mean=0.4+0.2*w$w1+0.1*w$w2, sd=0.1)
+  } else if (distr_A=="N(0.3+0.4w2,0.04)") {
+    a <- rtruncnorm(n, a=0, b=1, mean=0.3+0.4*w$w2, sd=0.2)
   } else if (distr_A=="Tri UP") {
     a <- sqrt(runif(n))
   } else if (distr_A=="Tri DN") {
@@ -54,7 +54,7 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
     edge_probs <- expit(w$w1+w$w2-2.5)
   } else if (edge=="expit 0.4") {
     edge_probs <- expit(w$w1+w$w2-1.4)
-  } else if (edge=="complex 0.2") {
+  } else if (edge=="Complex 0.2") {
     edge_probs <- 1.7*w$w2*pmax(0,1-4*abs(w$w1-0.5))
   } else if (edge=="none") {
     edge_probs <- 0
@@ -73,27 +73,31 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
       } else {
         lin <- C$alpha_1*w$w1 + C$alpha_2*w$w2 + alpha_3*(1-a) - 1.7
       }
-    } else if (surv_true=="complex") {
+    } else if (surv_true=="Complex") {
       if (dir=="decr") {
-        lin <- C$alpha_1*pmax(0,2-8*abs(w$w1-0.5)) + 2.5*alpha_3*w$w2*a +
-          0.7*alpha_3*(1-w$w2)*a - 1.3
+        lin <- alpha_3*expit(10*(2*a-1)) - 0.5
       } else {
-        lin <- C$alpha_1*pmax(0,2-8*abs(w$w1-0.5)) + 2.5*alpha_3*w$w2*(1-a) +
-          0.7*alpha_3*(1-w$w2)*(1-a) - 1.3
+        lin <- alpha_3*expit(10*(2*(1-a)-1)) - 0.5
       }
     } else if (surv_true=="exp") {
       H_0_inv <- function(t) { ((1/sc_params$lmbd)*t) }
       lin <- 0
     }
-    t <- H_0_inv(-1*log(U)*exp(-1*lin))
+    if (surv_true=="Non PH") {
+      if (dir=="decr") {
+        t <- -1 * (1.1*expit(10-50*a))^-1 * log(U) - 1
+      } else {
+        # !!!!!
+      }
+    } else {
+      t <- H_0_inv(-1*log(U)*exp(-1*lin))
+    }
     
     # Censoring times (Weibull)
     U <- runif(n)
     H_0_inv2 <- function(t) { ((1/sc_params$lmbd2)*t)^(1/sc_params$v2) }
-    if (surv_true=="Cox PH") {
+    if (surv_true %in% c("Cox PH", "Complex", "Non PH")) {
       lin <- C$alpha_1*w$w1 + C$alpha_2*w$w2 - 1
-    } else if (surv_true=="complex") {
-      lin <- C$alpha_1*pmax(0,2-8*abs(w$w1-0.5)) - 0.35
     } else if (surv_true=="exp") {
       H_0_inv2 <- function(t) { ((1/sc_params$lmbd2)*t) }
       lin <- 0
@@ -130,20 +134,26 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
         } else {
           C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*(1-a) - 1.7
         }
-      } else if (surv_true=="complex") {
+      } else if (surv_true=="Complex") {
         if (dir=="decr") {
-          C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2.5*alpha_3*w2*a +
-            0.7*alpha_3*(1-w2)*a - 1.3
+          alpha_3*expit(10*(2*a-1)) - 0.5
         } else {
-          C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2.5*alpha_3*w2*(1-a) +
-            0.7*alpha_3*(1-w2)*(1-a) - 1.3
+          alpha_3*expit(10*(2*(1-a)-1)) - 0.5
         }
       }
     }
     
-    if (surv_true %in% c("Cox PH", "complex")) {
+    if (surv_true %in% c("Cox PH", "Complex")) {
       S_0 <- function(t, w1, w2, a) {
         exp( -1 * sc_params$lmbd * (t^sc_params$v) * exp(lin(w1,w2,a)) )
+      }
+    } else if (surv_true=="Non PH") {
+      S_0 <- function(t, w1, w2, a) {
+        if (dir=="decr") {
+          exp(-1*1.1*(t+1)*expit(10-50*a))
+        } else {
+          # !!!!!
+        }
       }
     } else if (surv_true=="exp") {
       S_0 <- function(t, w1, w2, a) { exp(-1*sc_params$lmbd*t) }
@@ -163,6 +173,8 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
         a <- rtruncnorm(m, a=0, b=1, mean=0.5, sd=0.1)
       } else if (distr_A=="N(0.5,0.04)") {
         a <- rtruncnorm(m, a=0, b=1, mean=0.5, sd=0.2)
+      } else if (distr_A=="N(0.3+0.4w2,0.04)") {
+        a <- rtruncnorm(m, a=0, b=1, mean=0.3+0.4*w2, sd=0.2)
       } else if (distr_A=="Tri UP") {
         a <- sqrt(runif(m))
       } else if (distr_A=="Tri DN") {

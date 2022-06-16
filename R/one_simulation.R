@@ -13,7 +13,7 @@ if (cfg$which_sim=="estimation") {
     
     # Generate dataset
     dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
-                              L$sc_params, L$sampling, L$dir)
+                              L$sc_params, L$sampling, L$dir, L$wts_type)
     
     # Obtain estimates
     ests <- est_curve(
@@ -21,8 +21,8 @@ if (cfg$which_sim=="estimation") {
       estimator = L$estimator$est,
       params = L$estimator$params,
       points = C$points,
-      dir = L$dir,
-      return_extra = "deriv_theta_n" # "Theta_os_n"
+      dir = L$dir
+      # return_extra = "deriv_theta_n" # "Theta_os_n"
     )
 
     # Return results
@@ -30,12 +30,12 @@ if (cfg$which_sim=="estimation") {
     Gamma_true <- attr(dat_orig, "Gamma_true")
     res_list <- list()
     for (i in 1:length(C$points)) {
-      m <- format(C$points[i], nsmall=1)
+      m <- format(C$points[i], nsmall=2)
       res_list[paste0("theta_",m)] <- theta_true[i]
       res_list[paste0("est_",m)] <- ests$est[i]
       res_list[paste0("ci_lo_",m)] <- ests$ci_lo[i]
       res_list[paste0("ci_hi_",m)] <- ests$ci_hi[i]
-      if (T) {
+      if (F) {
         res_list[paste0("Gamma_",m)] <- Gamma_true[i]
         res_list[paste0("estG_",m)] <- ests$ests_Gamma[i]
         res_list[paste0("Phi_",m)] <- C$points[i] # Only works for Unif(0,1)
@@ -77,7 +77,7 @@ if (cfg$which_sim=="testing") {
     
     # Generate dataset
     dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
-                              L$sc_params, L$sampling, L$dir)
+                              L$sc_params, L$sampling, L$dir, L$wts_type)
     
     msg <- "Direction of monotonicity does not align with test type"
     if (L$dir=="incr" && L$test$alt_type=="decr") { stop(msg) }
@@ -150,7 +150,7 @@ if (cfg$which_sim=="edge") {
     
     # Generate dataset
     dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
-                              L$sc_params, L$sampling, L$dir)
+                              L$sc_params, L$sampling, L$dir, L$wts_type)
     
     # Prep
     n_orig <- length(dat_orig$delta)
@@ -307,7 +307,7 @@ if (cfg$which_sim=="debugging") {
     
     # Generate dataset
     dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
-                              L$sc_params, L$sampling, L$dir)
+                              L$sc_params, L$sampling, L$dir, L$wts_type)
     
     points <- C$points
     params <- L$estimator$params

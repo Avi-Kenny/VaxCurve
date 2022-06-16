@@ -1,4 +1,104 @@
 
+# Old pieces related to cox_var()
+if (F) {
+  
+  # Beta estimates that don't account for weights
+  var_est_betas <- (1/N^2) * Reduce("+", lapply(c(1:n), function(i) {
+    (WT[i] * l_tilde(Z_[,i],Ds_[i],T_[i]))^2
+  })) %>% as.numeric()
+  res$se_w1_MC <- sqrt(var_est_betas[1])
+  res$se_w2_MC <- sqrt(var_est_betas[2])
+  res$se_a_MC <- sqrt(var_est_betas[3])
+  
+  # Calculate information using score
+  I_tilde2 <- (1/N) * Reduce("+", lapply(c(1:N), function(i) {
+    WT[i]*l_star(Z_[,i],Ds_[i],T_[i]) %*% t(WT[i]*l_star(Z_[,i],Ds_[i],T_[i]))
+  }))
+  
+  # Variance of cumulative hazard estimator
+  # !!!!! Adapt to two-phase sampling
+  var_cmhz_est <- (1/N^2) * sum(sapply(c(1:N), function(i) {
+    (omega_n(Z_[,i],Ds_[i],T_[i],z_0))^2
+  }))
+  
+  # Influence function of cumulative hazard estiamtor
+  # !!!!! Adapt to two-phase sampling
+  infl_fn_3 <- (function() {
+    pc_1 <- exp(sum(beta_n*z_0))
+    pc_3 <- z_0 * Lambda_n(t)
+    return(function(z_i,ds_i,t_i) {
+      pc_2 <- Q_n(z_i,ds_i,t_i)
+      pc_4 <- (1/N) * Reduce("+", lapply(c(1:N), function(j) {
+        Z_[,j] * (Ds_[j]-exp(sum(Z_[,j]*beta_n))*Lambda_n(T_[j])) *
+          Q_n(Z_[,j],Ds_[j],T_[j])
+      }))
+      pc_5 <- l_tilde(z_i,ds_i,t_i)
+      return(pc_1*(pc_2+sum((pc_3-pc_4)*pc_5)))
+    })
+  })()
+  
+  # Variance estimate (cumulative hazard) using influence function
+  # !!!!! Adapt to two-phase sampling
+  var_cmhz_est2 <- (1/N^2) * sum(sapply(c(1:N), function(i) {
+    (infl_fn_3(Z_[,i],Ds_[i],T_[i]))^2
+  }))
+  
+  # Variance estimate (survival) using influence function
+  # !!!!! Adapt to two-phase sampling
+  surv_est <- exp(-exp(sum(z_0*beta_n))*Lambda_n(t))
+  var_surv_est <- (1/N^2) * sum(sapply(c(1:N), function(i) {
+    (surv_est*infl_fn_3(Z_[,i],Ds_[i],T_[i]))^2
+  }))
+  
+  res$var_cmhz_est <- var_cmhz_est # !!!!! var_cmhz_est or var_cmhz_est2 ?????
+  res$var_surv_est <- var_surv_est
+  
+  # Calculate component estimator Q_n
+  Q_n <- memoise(function(z_i,ds_i,t_i) {
+    piece_1 <- (ds_i*as.integer(t_i<=t)) / S_0n(t_i)
+    piece_2 <- exp(sum(z_i*beta_n))
+    piece_3 <- (1/N) * sum(sapply(i_ev, function(j) {
+      WT[j] * as.integer(T_[j]<=min(t,t_i)) / (S_0n(T_[j]))^2
+    }))
+    return(piece_1-piece_2*piece_3)
+  })
+  
+  # Influence function of Breslow estiamtor
+  infl_fn_2 <- function(z_i,ds_i,t_i) {
+    pc_1 <- Q_n(z_i,ds_i,t_i)
+    pc_2 <- (1/N) * Reduce("+", lapply(c(1:n), function(j) {
+      WT[j] * Z_[,j] * (Ds_[j]-exp(sum(Z_[,j]*beta_n))*Lambda_n(T_[j])) *
+        Q_n(Z_[,j],Ds_[j],T_[j])
+    }))
+    pc_3 <- l_tilde(z_i,ds_i,t_i)
+    return(pc_1-sum(pc_2*pc_3))
+  }
+  
+  # Influence function of Breslow estimator (new derivation)
+  infl_fn_2b <- function(z_i,ds_i,t_i) {
+    pc_1 <- Q_n(z_i,ds_i,t_i)
+    pc_2 <- (1/N^2) * Reduce("+", lapply(c(1:n), function(i) {
+      WT[i] * Z_[,i] * exp(sum(Z_[,i]*beta_n)) *
+        sum(sapply(t_ev, function(t_j) {
+          as.integer(t_j<=min(t,T_[i])) / (S_0n(t_j))^2
+        }))
+    }))
+    pc_3 <- l_tilde(z_i,ds_i,t_i)
+    return(pc_1-sum(pc_2*pc_3))
+  }
+  
+  # Variance estimate of Breslow estimator using influence function
+  var_est_bshz <- (1/N^2) * sum(sapply(c(1:n), function(i) {
+    (WT[i] * infl_fn_2(Z_[,i],Ds_[i],T_[i]))^2
+  }))
+  
+  # Variance estimate of Breslow estimator using influence function (new derivation)
+  var_est_bshz2 <- (1/N^2) * sum(sapply(c(1:n), function(i) {
+    (WT[i] * infl_fn_2b(Z_[,i],Ds_[i],T_[i]))^2
+  }))
+  
+}
+
 # Comparing old gamma_n estimators
 if (F) {
   

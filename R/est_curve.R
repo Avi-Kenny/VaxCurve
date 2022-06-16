@@ -127,12 +127,16 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
                                                    alpha_star_n, vals=NA)
     } else if (p$marg=="Gamma_star2") {
       print(paste("Check 9:", Sys.time()))
-      q_n <- construct_q_n(which="q_n", type="Super Learner", dat, dat_orig,
-                           omega_n=omega_n, g_n_star=g_n_star, z_n=z_n,
-                           gcomp_n=gcomp_n, alpha_star_n=alpha_star_n)
+      # q_n <- construct_q_n(which="q_n", type="Super Learner", dat, dat_orig,
+      #                      omega_n=omega_n, g_n_star=g_n_star, z_n=z_n,
+      #                      gcomp_n=gcomp_n, alpha_star_n=alpha_star_n)
+      q_n <- construct_q_n(which="q_n", type="new", dat, dat_orig,
+                           omega_n=omega_n, g_n=g_n, z_n=z_n,
+                           gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
+                           S_n=S_n, Sc_n=Sc_n)
       print(paste("Check 10:", Sys.time()))
       Gamma_os_n_star <- construct_Gamma_os_n_star2(dat, dat_orig, omega_n,
-                                                    g_n_star, eta_ss_n, z_n,
+                                                    g_n, eta_ss_n, z_n, # g_n_star
                                                     q_n, gcomp_n, alpha_star_n,
                                                     vals=NA)
       print(paste("Check 11:", Sys.time()))
@@ -171,6 +175,22 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       sigma2_os_n_est <- sigma2_os_n(dat, pi_n, S_n, omega_n, theta_os_n_est)
     }
     
+    # !!!!!
+    if (F) {
+      q_n <- construct_q_n(which="q_n", type="new", dat, dat_orig,
+                           omega_n=omega_n, g_n=g_n, z_n=z_n,
+                           gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
+                           S_n=S_n, Sc_n=Sc_n)
+      # q_n(dat_orig$w[1,],dat_orig$y_star[1],dat_orig$delta_star[1],x=0.5)
+      q_n(dat_orig$w[1:3,],dat_orig$y_star[1:3],dat_orig$delta_star[1:3],x=0.5)
+      q_n(dat_orig$w[4:6,],dat_orig$y_star[4:6],dat_orig$delta_star[4:6],x=0.5)
+      
+      
+      # q_n(dat_orig$w[1:99,],dat_orig$y_star[1:99],dat_orig$delta_star[1:99],x=0.5)
+      # q_n(dat_orig$w,dat_orig$y_star,dat_orig$delta_star,x=0.5)
+      # Gamma_os_n_star(0.1)
+    }
+    
     # Compute GCM (or least squares line) and extract its derivative
     print(paste("Check 12:", Sys.time()))
     grid <- sort(unique(dat$a))
@@ -178,9 +198,21 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     indices_to_keep <- !base::duplicated(x_vals)
     x_vals <- x_vals[indices_to_keep]
     if (dir=="incr") {
-      y_vals <- Gamma_os_n_star(grid[indices_to_keep])
+      if (p$marg=="Gamma") {
+        y_vals <- Gamma_os_n(grid[indices_to_keep])
+      } else {
+        y_vals <- Gamma_os_n_star(grid[indices_to_keep])
+      }
     } else {
-      y_vals <- -1 * Gamma_os_n_star(grid[indices_to_keep])
+      if (p$marg=="Gamma") {
+        y_vals <- -1 * Gamma_os_n(grid[indices_to_keep])
+      } else {
+        y_vals <- -1 * Gamma_os_n_star(grid[indices_to_keep])
+      }
+    }
+    if (!any(x_vals==0)) {
+      x_vals <- c(0, x_vals)
+      y_vals <- c(0, y_vals)
     }
     if (p$convex_type=="GCM") {
       gcm <- gcmlcm(x=x_vals, y=y_vals, type="gcm")
@@ -288,7 +320,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     # Generate estimates for each point
     print(paste("Check 18:", Sys.time()))
     ests <- theta_n(points)
-    if (T) {
+    if (F) {
       ests_Gamma <- Gamma_os_n_star(points)
       ests_Phi <- Phi_n(points)
     } # DEBUG: return Gamma/Phi estimates
@@ -423,13 +455,15 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     # Fit Cox model and compute variance
     res_cox <- cox_var(dat_orig=dat_orig, dat=dat, t=C$t_e,
-                   points=points, se_marg=T)
+                   points=points, se_marg=T) # !!!!! verbose=T
     
-    # Compute CIs
-    ests <- res_cox$est_marg
+    # Compute CIs (logit transformed)
+    ests <- 1-res_cox$est_marg
     ses <- sqrt(res_cox$var_est_marg)
-    ci_lo <- (ests - 1.96*ses) %>% pmax(0) %>% pmin(1)
-    ci_hi <- (ests + 1.96*ses) %>% pmax(0) %>% pmin(1)
+    ci_lo <- expit(logit(ests) - 1.96*deriv_logit(ests)*ses)
+    ci_hi <- expit(logit(ests) + 1.96*deriv_logit(ests)*ses)
+    # ci_lo <- (ests - 1.96*ses) %>% pmax(0) %>% pmin(1)
+    # ci_hi <- (ests + 1.96*ses) %>% pmax(0) %>% pmin(1)
     
   }
   
@@ -493,7 +527,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     ci_hi = c(rep(NA,na_head), ci_hi, rep(NA,na_tail))
   )
   
-  if (T) {
+  if (F) {
     res$ests_Gamma = c(rep(NA,na_head), ests_Gamma, rep(NA,na_tail))
     res$ests_Phi = c(rep(NA,na_head), ests_Phi, rep(NA,na_tail))
   } # DEBUG: return Gamma/Phi estimates

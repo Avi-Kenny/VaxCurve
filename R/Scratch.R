@@ -1,4 +1,92 @@
 
+# Misc
+if (F) {
+  
+  dat_orig <- generate_data(300, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+                            L$sc_params, L$sampling, L$dir) # wts_type="estimated"
+  if (T) {
+    a_min <- min(dat_orig$a,na.rm=T)
+    a_max <- max(dat_orig$a,na.rm=T)
+    a_shift <- -1 * a_min
+    a_scale <- 1/(a_max-a_min)
+    dat_orig$a <- (dat_orig$a+a_shift)*a_scale
+    dat_orig <- round_dat(dat_orig)
+  }
+  dat <- ss(dat_orig, which(dat_orig$delta==1))
+  vlist <- create_val_list(dat_orig)
+  srvSL <- construct_S_n(dat, vlist$S_n, type="Cox PH", print_coeffs=T)
+  S_n <- srvSL$srv
+  Sc_n <- srvSL$cens
+  omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n, type="estimated")
+  
+  # Profile this line
+  # omega_n(dat$w,dat$a,dat$y_star,dat$delta_star)
+  sapply(c(1:length(dat$a)), function(i) {
+    omega_n(as.numeric(dat$w[i,]),dat$a[i],dat$y_star[i],dat$delta_star[i])
+  })
+  omega_n(dat$w[1,],dat$a[1],dat$y_star[1],dat$delta_star[1]) # -0.4827077
+  omega_n(dat$w[2,],dat$a[2],dat$y_star[2],dat$delta_star[2]) # 0.3532617
+  
+}
+
+# Coming up with a DGM where the COx model fails
+if (F) {
+  
+  # Setup
+  C <- list(points=round(seq(0,1,0.02),2), alpha_1=0.5, alpha_2=0.7, t_e=200,
+            appx=list(t_e=10, w_tol=25, a=0.01))
+  L <- list(
+    n=5000, alpha_3=-2, dir="decr",
+    sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5),
+    distr_A="Unif(0,1)", edge="none", surv_true="Complex", # "Complex" "Non PH"
+    sampling="iid", wts_type="true"
+  )
+  
+  # Generate dataset
+  d <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+                            L$sc_params, L$sampling, L$dir, L$wts_type)
+  
+  # Fit a Cox model and extract coefficients
+  df <- data.frame(time=d$y_star, ev=d$delta_star, w1=d$w$w1, w2=d$w$w2, a=d$a)
+  model <- coxph(Surv(time, ev)~w1+w2+a, data=df)
+  beta_n <- as.numeric(model$coefficients)
+  
+  # Survival estimator (at a point)
+  bh <- basehaz(model, centered=F)
+  Lambda_n <- bh$hazard[which.min(abs(C$t_e-bh$time))]
+  S_n <- (function() {
+    .cache <- new.env()
+    function(z) {
+      key <- paste(z, collapse=" ")
+      val <- .cache[[key]]
+      if (is.null(val)) {
+        val <- (function(z) {
+          # exp(-exp(sum(z*beta_n))*Lambda_n(C$t_e))
+          exp(-exp(sum(z*beta_n))*Lambda_n)
+        })(z)
+        .cache[[key]] <- val
+      }
+      return(val)
+    }
+  })()
+  
+  theta_hat <- Vectorize(function(a) {
+    1 - mean(sapply(c(1:length(d$a)), function(i) {
+      S_n(c(df$w1[i],df$w2[i],a))
+    }))
+  })
+  
+  # Plot results
+  grid <- round(seq(0,1,0.02),2)
+  plot_data <- data.frame(x = rep(grid,2),
+                          y = c(attr(d, "theta_true"), theta_hat(grid)),
+                          which = rep(c("true", "estimated"), each=51))
+  ggplot(plot_data, aes(x=x, y=y, color=which)) +
+    geom_line() +
+    ylim(c(0,1))
+  
+}
+
 # Graphs of Phi_n
 if (F) {
   
@@ -1866,7 +1954,7 @@ if (F) {
 if (F) {
   
   r_cox <- filter(sim$results, surv_true=="Cox PH")
-  r_com <- filter(sim$results, surv_true=="complex")
+  r_com <- filter(sim$results, surv_true=="Complex")
   cox <- r_cox$est_0.0
   com <- r_com$est_0.0
   tr_cox <- r_cox[1,"theta_0.0"]
@@ -1878,7 +1966,7 @@ if (F) {
   df <- data.frame(
     x = c(cox,com),
     grp = c(rep("Cox PH", length(cox)),
-            rep("complex", length(com)))
+            rep("Complex", length(com)))
   )
   
   ggplot(df, aes(x=x, group=grp, fill=factor(grp))) +
@@ -1886,7 +1974,7 @@ if (F) {
     facet_wrap(~grp, ncol=2) +
     geom_vline(
       aes(xintercept=tr),
-      data = data.frame(tr=c(tr_cox,tr_com), grp=c("Cox PH","complex"))
+      data = data.frame(tr=c(tr_cox,tr_com), grp=c("Cox PH","Complex"))
     )
   
 }
@@ -1928,7 +2016,7 @@ if (F) {
     alpha_3 = -3,
     distr_A = "N(1.5+w1,1.5+w2)", # "Unif(0,1)"
     edge = "none",
-    surv_true = "complex",
+    surv_true = "Complex",
     sc_params = L$sc_params,
     sampling = "two-phase (72%)",
     dir = "decr"

@@ -9,18 +9,18 @@
   
   # 2. Set global constants
   params <- list(
-    S_n_type="Cox PH", g_n_type="binning", ci_type="regular", cf_folds=1,
+    S_n_type="Cox PH", g_n_type="parametric", ci_type="regular", cf_folds=1,
     edge_corr="none", ecdf_type="linear (mid)", deriv_type="linear",
     gamma_type="Super Learner", omega_n_type="estimated",
-    marg="Gamma_star"
+    marg="Gamma_star2"
   )
   C <- list(points=round(seq(0,1,0.02),2), alpha_1=0.5, alpha_2=0.7, t_e=200,
             appx=list(t_e=10, w_tol=25, a=0.01))
   L <- list(
-    n=500, alpha_3=-2, dir="decr",
+    n=1000, alpha_3=-2, dir="decr",
     sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5), # sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5), # Uncomment this for (almost) no censoring
-    distr_A="Unif(0,1)", edge="none", surv_true="Cox PH",
-    sampling="iid", estimator=list(est="Grenander",params=params) # two-phase (72%)
+    distr_A="N(0.3+0.4w2,0.04)", edge="none", surv_true="Complex", # "Cox PH"
+    sampling="two-phase (50%)", estimator=list(est="Grenander",params=params) # two-phase (72%)
     # n=15000, alpha_3=-4, dir="decr",
     # sc_params=list(lmbd=3e-5, v=1.5, lmbd2=3e-5, v2=1.5), # sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5), # Uncomment this for (almost) no censoring
     # distr_A="N(0.5,0.04)", edge="none", surv_true="Cox PH",
@@ -30,6 +30,8 @@
   # 3. Generate dataset
   dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
                             L$sc_params, L$sampling, L$dir) # wts_type="estimated"
+  dat <- ss(dat_orig, which(dat_orig$delta==1))
+  vlist <- create_val_list(dat_orig)
   
 }
 
@@ -220,7 +222,7 @@
           } else {
             C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*(1-a) - 1.7
           }
-        } else if (L$surv_true=="complex") {
+        } else if (L$surv_true=="Complex") {
           if (L$dir=="decr") {
             C$alpha_1*pmax(0,2-8*abs(w1-0.5)) + 2.5*alpha_3*w2*a +
               0.7*alpha_3*(1-w2)*a - 1.3
@@ -708,33 +710,31 @@
 ####################################################.
 
 {
-  
   # Set C$appx$t_e to 10 in "Setup" section
   S_0 <- (construct_S_n(dat, vlist$S_n, type="true"))$srv
   S_CoxPH <- (construct_S_n(dat, vlist$S_n, type="Cox PH"))$srv
-  S_SL <- (construct_S_n(dat, vlist$S_n, type="Super Learner"))$srv
+  # S_SL <- (construct_S_n(dat, vlist$S_n, type="Super Learner"))$srv
+  S_SL <- (construct_S_n(dat, vlist$S_n, type="Random Forest"))$srv
   
-  # Plot true curve against estimated curve
+  # Plot true curve against estimated curve (as function of T)
   times <- round(seq(0,200,10))
   n <- length(times)
   w_a <- as.data.frame(cbind(w1=rep(0.2,n), w2=rep(1,n)))
   w_b <- as.data.frame(cbind(w1=rep(0.5,n), w2=rep(1,n)))
   df <- data.frame(
     time = rep(times, 12),
-    survival = c(
-      S_n_CoxPH(t=times, w=w_a, a=rep(0.2,n)),
-      S_n_CoxPH(t=times, w=w_b, a=rep(0.2,n)),
-      S_n_CoxPH(t=times, w=w_a, a=rep(0.8,n)),
-      S_n_CoxPH(t=times, w=w_b, a=rep(0.8,n)),
-      S_n_SL(t=times, w=w_a, a=rep(0.2,n)),
-      S_n_SL(t=times, w=w_b, a=rep(0.2,n)),
-      S_n_SL(t=times, w=w_a, a=rep(0.8,n)),
-      S_n_SL(t=times, w=w_b, a=rep(0.8,n)),
-      S_0(t=times, w=w_a, a=rep(0.2,n)),
-      S_0(t=times, w=w_b, a=rep(0.2,n)),
-      S_0(t=times, w=w_a, a=rep(0.8,n)),
-      S_0(t=times, w=w_b, a=rep(0.8,n))
-    ),
+    survival = c(S_CoxPH(t=times, w=w_a, a=rep(0.2,n)),
+                 S_CoxPH(t=times, w=w_b, a=rep(0.2,n)),
+                 S_CoxPH(t=times, w=w_a, a=rep(0.8,n)),
+                 S_CoxPH(t=times, w=w_b, a=rep(0.8,n)),
+                 S_SL(t=times, w=w_a, a=rep(0.2,n)),
+                 S_SL(t=times, w=w_b, a=rep(0.2,n)),
+                 S_SL(t=times, w=w_a, a=rep(0.8,n)),
+                 S_SL(t=times, w=w_b, a=rep(0.8,n)),
+                 S_0(t=times, w=w_a, a=rep(0.2,n)),
+                 S_0(t=times, w=w_b, a=rep(0.2,n)),
+                 S_0(t=times, w=w_a, a=rep(0.8,n)),
+                 S_0(t=times, w=w_b, a=rep(0.8,n))),
     which = rep(c("Cox PH","SL","True S_0"), each=4*length(times)),
     covs = rep(rep(c("w1=0.2,w2=1,a=0.2","w1=0.5,w2=1,a=0.2",
                      "w1=0.2,w2=1,a=0.8","w1=0.5,w2=1,a=0.8"),3),
@@ -743,6 +743,22 @@
   ggplot(df, aes(x=time, y=survival, color=which)) +
     geom_line() +
     facet_wrap(~covs, ncol=2) +
+    labs(title="Estimation of conditional survival: S_0[t|W,A]",
+         color="Estimator")
+  
+  # Plot true curve against estimated curve (as function of A)
+  a_grid <- round(seq(0,1,0.02),2)
+  n <- length(a_grid)
+  w_a <- as.data.frame(cbind(w1=rep(0.2,n), w2=rep(1,n)))
+  df <- data.frame(
+    a = rep(a_grid, 3),
+    survival = c(S_CoxPH(t=rep(C$t_e,n), w=w_a, a=a_grid),
+                 S_SL(t=rep(C$t_e,n), w=w_a, a=a_grid),
+                 S_0(t=rep(C$t_e,n), w=w_a, a=a_grid)),
+    which = rep(c("Cox PH","SL","True S_0"), each=n)
+  )
+  ggplot(df, aes(x=a, y=survival, color=which)) +
+    geom_line() +
     labs(title="Estimation of conditional survival: S_0[t|W,A]",
          color="Estimator")
   
@@ -924,21 +940,10 @@
 ##########################################.
 
 {
-  
-  # Construct vlist
-  vlist <- create_val_list(dat_orig)
-  
-  # # !!!!!
-  # R.utils::withTimeout({
-  #   f_aIw_n_semi <- construct_f_aIw_n(dat, NA, type="binning", k=15)
-  # }, timeout=5)
-  
   # True conditional density function
   f_aIw_0 <- construct_f_aIw_n(dat, NA, type="true", k=15)
   f_aIw_n_semi <- construct_f_aIw_n(dat, NA, type="binning", k=15)
-  # f_aIw_0 <- construct_f_aIw_n(dat, vlist$AW_grid, type="true", k=15)
-  # f_aIw_n_semi <- construct_f_aIw_n(dat, vlist$AW_grid, type="binning", k=15)
-  f_aIw_n_para <- f_aIw_0 # !!!!!
+  f_aIw_n_para <- construct_f_aIw_n(dat, NA, type="parametric")
   
   # Generate plot data
   grid <- round(seq(0,1,0.01),2)
@@ -1027,7 +1032,7 @@
     function(w) {
       if (edge=="expit") {
         return(expit(w[1]+w[2]-3.3))
-      } else if (edge=="complex") {
+      } else if (edge=="Complex") {
         return(0.84*w[2]*pmax(0,1-4*abs(w[1]-0.5)))
       }
     },

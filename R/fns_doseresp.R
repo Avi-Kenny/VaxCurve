@@ -871,15 +871,16 @@ construct_omega_n <- function(vals=NA, S_n, Sc_n, type="estimated") {
       if (k==0) {
         integral <- 0
       } else {
-        i <- c(1:k)
+        i <- round(seq(C$appx$t_e,k,C$appx$t_e), -log10(C$appx$t_e))
+        incr <- C$appx$t_e
         w_long <- as.data.frame(
           matrix(rep(w,length(i)), ncol=length(w), byrow=T)
         )
         a_long <- rep(a,length(i))
         integral <- 0.5 * sum(
-          ( H_n(i,w_long,a_long) - H_n(i-1,w_long,a_long) ) * (
+          ( H_n(i,w_long,a_long) - H_n(i-incr,w_long,a_long) ) * (
             ( S_n(i,w_long,a_long) * Sc_n(i,w_long,a_long) )^-1 +
-              ( S_n(i-1,w_long,a_long) * Sc_n(i-1,w_long,a_long))^-1
+              ( S_n(i-incr,w_long,a_long) * Sc_n(i-incr,w_long,a_long))^-1
           )
         )
       }
@@ -889,7 +890,7 @@ construct_omega_n <- function(vals=NA, S_n, Sc_n, type="estimated") {
     
     fnc <- function(w,a,y_star,delta_star) {
       
-      k <- round(min(y_star,C$t_e))
+      k <- round(min(y_star,C$t_e), -log10(C$appx$t_e))
       
       if (F) {
         return (0)
@@ -940,8 +941,7 @@ construct_omega_n <- function(vals=NA, S_n, Sc_n, type="estimated") {
     
   }
   
-  # return(construct_superfunc(fnc, aux=NA, vec=c(2,1,1,1), vals=vals))
-  return(fnc)
+  return(construct_superfunc(fnc, aux=NA, vec=c(2,1,1,1), vals=vals))
   
 }
 
@@ -1051,9 +1051,9 @@ construct_q_n <- function(which="q_n", type="Super Learner", dat, dat_orig,
   if (type=="new") {
     
     surv_deriv <- function(S_n) {
-      
+
       fnc <- function(t, w, a) {
-        
+
         width <- 40
         t1 <- t - width/2
         t2 <- t + width/2
@@ -1062,23 +1062,28 @@ construct_q_n <- function(which="q_n", type="Super Learner", dat, dat_orig,
         t1 <- round(t1,-log10(C$appx$t_e))
         t2 <- round(t2,-log10(C$appx$t_e))
         ch_y <- S_n(t2,w,a) - S_n(t1,w,a)
-        
+
         return(ch_y/width)
-        
+
       }
-      
+
       return(construct_superfunc(fnc, aux=NA, vec=c(1,2,1), vals=NA))
-      
+
     }
     
     S_n_deriv <- surv_deriv(S_n)
     Sc_n_deriv <- surv_deriv(Sc_n)
     
+    q_n_star_inner <- function(y_star, delta_star, w, a) {
+      In(a!=0)*omega_n(w,a,y_star,delta_star)/g_n(a,w) + gcomp_n(a)
+    }
+    q_n_star_inner <- construct_superfunc(q_n_star_inner, aux=NA, vec=c(1,1,2,1), vals=NA)
+    
     q_n_star <- function(y_star, delta_star, w, a, x) {
-      In(a!=0)*In(a<=x)*(omega_n(w,a,y_star,delta_star)/g_n(a,w) + gcomp_n(a)) -
+      In(a<=x)*q_n_star_inner(y_star, delta_star, w, a) -
         In(a!=0)*alpha_star_n(x)
     }
-    q_n_star <- construct_superfunc(q_n_star, aux=NA, vec=c(1,1,2,1,0), vals=NA)
+    q_n_star <- construct_superfunc(q_n_star, aux=NA, vec=c(1,1,2,1,1), vals=NA)
     
     f_n_srv <- function(y_star, delta_star, w, a) {
       if (delta_star==1) {
@@ -1087,20 +1092,30 @@ construct_q_n <- function(which="q_n", type="Super Learner", dat, dat_orig,
         return(-1*S_n(y_star,w,a)*Sc_n_deriv(y_star,w,a))
       }
     }
+    f_n_srv <- construct_superfunc(f_n_srv, aux=NA, vec=c(1,1,2,1), vals=NA)
+    
+    n <- length(dat$a)
     
     fnc <- function(w, y_star, delta_star, x) {
+      # asdf
+      y_star_ <- rep(y_star,n)
+      delta_star_ <- rep(delta_star,n)
+      w_ <- as.data.frame(matrix(rep(w,n), ncol=length(w), byrow=T))
+      x_ <- rep(x,n)
+      f_n_srv_ <- f_n_srv(y_star_, delta_star_, w_, dat$a)
+      q_n_star_ <- q_n_star(y_star, delta_star_, w_, dat$a, x_)
+      g_n_ <- g_n(dat$a,w_)
       
-      (sum(
-        dat$weights *
-          sapply(dat$a, function(a) { f_n_srv(y_star, delta_star, w, a) }) *
-          g_n(dat$a,w)
-      ))^-1 * sum(
-        dat$weights *
-          sapply(dat$a, function(a) { q_n_star(y_star, delta_star, w, a, x) }) *
-          sapply(dat$a, function(a) { f_n_srv(y_star, delta_star, w, a) }) *
-          g_n(dat$a,w)
-      )
+      denom <- sum(dat$weights*f_n_srv_*g_n_)
+      if (denom==0) {
+        return (0)
+      } else {
+        num <- sum(dat$weights*q_n_star_*f_n_srv_*g_n_)
+        return(num/denom)
+      }
+      
     }
+    
   }
   
   if (type=="Super Learner") {
@@ -1433,11 +1448,13 @@ construct_f_a_n <- function(dat_orig, vals=NA, f_aIw_n) {
 #' @param f_aIw_n Conditional density estimator returned by construct_f_aIw_n
 #' @param f_a_n Marginal density estimator returned by construct_f_a_n
 #' @return Density ratio estimator function
-construct_g_n <- function(f_aIw_n, f_a_n) {
+construct_g_n <- function(f_aIw_n, f_a_n, vals=NA) {
   
-  function(a,w) {
+  fnc <- function(a,w) {
     f_aIw_n(a,w) / f_a_n(a)
   }
+  
+  return(construct_superfunc(fnc, aux=NA, vec=c(1,2), vals=vals))
   
 }
 
@@ -2352,6 +2369,15 @@ construct_Gamma_os_n_star2 <- function(dat, dat_orig, omega_n, g_n, # g_n_star
   
   fnc <- function(x) {
     
+    if (F) {
+      eta_ss_n(x,c(0,0))
+      return(
+        (1/n_orig) * sum(
+          eta_ss_n(rep(x,n_orig),dat_orig$w)
+        )
+      )
+    } # DEBUG
+    
     (1/(n_orig*z_n)) * sum(dat$weights * (
       piece_1*In(dat$a<=x)*piece_2 - piece_1*alpha_star_n(x)
     )) +
@@ -2361,13 +2387,6 @@ construct_Gamma_os_n_star2 <- function(dat, dat_orig, omega_n, g_n, # g_n_star
         ) +
           eta_ss_n(rep(x,n_orig),dat_orig$w)
       )
-    
-    if (F) {
-      eta_ss_n(x,c(0,0))
-      (1/n_orig) * sum(
-        eta_ss_n(rep(x,n_orig),dat_orig$w)
-      )
-    } # DEBUG
     
   }
   

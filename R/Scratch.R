@@ -1,4 +1,215 @@
 
+# New superfunc pattern (v2)
+if (F) {
+  
+  # Benchmarking
+  i <- round(seq(10,200,10),-1)
+  w_long <- as.data.frame(
+    matrix(rep(c(0.5,1),length(i)), ncol=length(c(0.5,1)), byrow=T)
+  )
+  a_long <- rep(0.8,length(i))
+  microbenchmark({
+    S_n(i,w_long,a_long) # Mean: 1178 microsec
+  }, times=1000L)
+  microbenchmark({
+    S_n2(i,w_long,a_long) # Mean: 1178 microsec
+  }, times=1000L)
+  
+  for (j in c(1:1000)) {
+    S_n(i,w_long,a_long)
+  }
+  
+  S_n2 <- construct_superfunc2(S_n, vec=c(1,2,1))
+  
+  construct_superfunc2 <- function(fnc, aux=NA, vec=TRUE, vals=NA, rnd=NA) {
+    
+    htab <- new.env()
+    ..new_fnc <- function() {
+      
+      ..e <- parent.env(environment())
+      ..mc <- lapply(as.list(match.call())[-1L], eval, parent.frame()) # Simplify?
+      
+      for (j in 1:length(..e$arg_names)) {
+        if (j==2) { # ..e$vec[j]==2
+          ..mc[[..e$arg_names[j]]] <- as.list(
+            as.data.frame(t(..mc[[..e$arg_names[j]]]), row.names=NA)
+          )
+        }
+      }
+      FUN <- function(...) {
+        keylist <- lapply(..e$arg_names, function(arg_name) {
+          as.numeric(list(...)[[arg_name]])
+        })
+        key <- paste(keylist, collapse=";")
+        val <- ..e$htab[[key]]
+        if (is.null(val)) { # !!!!! We can remove this by pre-calculating
+          val <- do.call(..e$fnc, list(...))
+          ..e$htab[[key]] <- val
+        }
+        return(val)
+      }
+      
+      # Return value
+      return(do.call(mapply, c(FUN=FUN, ..mc, MoreArgs=NULL, USE.NAMES=F)))
+      
+    }
+    
+    # Transform `vec` (if needed) and validate
+    if (identical(vec[1],T)) { vec <- rep(1, length(names(formals(fnc)))) }
+    if (!is.numeric(vec) || any(!(vec %in% c(0,1,2)))) {
+      stop("`vec` must be a vector of 0s, 1s, and 2s")
+    }
+    
+    # Set formals and set up environment
+    formals(..new_fnc) <- formals(fnc)
+    f_env <- new.env(parent=environment(fnc))
+    f_env$arg_names <- names(formals(fnc))
+    f_env$vec <- vec
+    f_env$rnd <- rnd
+    f_env$htab <- htab
+    f_env$aux <- aux
+    f_env$fnc <- fnc
+    environment(..new_fnc) <- f_env
+    
+    # Run function on vals list
+    if (is.list(vals)) { do.call(..new_fnc, vals) }
+    
+    return(..new_fnc)
+    
+  }
+  
+}
+
+# New superfunc pattern
+if (F) {
+  
+  construct_superfunc2 <- function(fnc, aux=NA, vec=TRUE, vals=NA, rnd=NA) {
+    
+    htab <- new.env()
+    ..new_fnc <- function() {
+      
+      ..e <- parent.env(environment())
+      ..mc <- lapply(as.list(match.call())[-1L], eval, parent.frame())
+      
+      keylist <- lapply(..e$arg_names, function(arg_name) {
+        as.numeric(..mc[[arg_name]])
+      })
+      key <- paste(keylist, collapse=";")
+      val <- ..e$htab[[key]]
+      if (is.null(val)) {
+        val <- do.call(..e$fnc, ..mc)
+        ..e$htab[[key]] <- val
+      }
+      res <- val
+      
+      # Return value
+      return(res)
+      
+    }
+    
+    # Set formals and set up environment
+    formals(..new_fnc) <- formals(fnc)
+    f_env <- new.env(parent=environment(fnc))
+    f_env$arg_names <- names(formals(fnc))
+    f_env$vec <- vec
+    f_env$rnd <- rnd
+    f_env$htab <- htab
+    f_env$aux <- aux
+    f_env$fnc <- fnc
+    environment(..new_fnc) <- f_env
+    
+    # Run function on vals list
+    if (is.list(vals)) { do.call(..new_fnc, vals) }
+    
+    return(..new_fnc)
+    
+  }
+  
+
+  S_n2 <- construct_superfunc2(S_n, vec=F)
+  
+  S_n3 <- (function() {
+    .cache <- new.env()
+    function(t,w,a) {
+      key <- paste(c(t,w,a), collapse=" ")
+      val <- .cache[[key]]
+      if (is.null(val)) {
+        val <- (function(t,w,a) {
+          S_n(t,w,a)
+        })(t,w,a)
+        .cache[[key]] <- val
+      }
+      return(val)
+    }
+  })()
+  
+
+  
+  
+  
+  n <- length(dat$a)
+  microbenchmark({
+    S_n(rep(C$t_e, length(dat$a)),dat$w,dat$a)
+  }, times=50L)
+  microbenchmark({
+    unlist(lapply(c(1:n), function(i) { S_n(C$t_e, dat$w[i,], dat$a[i]) }))
+  }, times=50L)
+  microbenchmark({
+    unlist(lapply(c(1:n), function(i) { S_n2(C$t_e, dat$w[i,], dat$a[i]) }))
+  }, times=50L)
+  microbenchmark({
+    unlist(lapply(c(1:n), function(i) { S_n3(C$t_e, dat$w[i,], dat$a[i]) }))
+  }, times=50L)
+
+  w_lst <- list()
+  dat_lst <- list()
+  for (i in c(1:n)) {
+    dat_lst[[i]] <- list(
+      t = C$t_e,
+      w = as.numeric(dat$w[i,]),
+      a = dat$a[i]
+    )
+    w_lst[[i]] <- as.numeric(dat$w[i,])
+  }
+  microbenchmark({
+    unlist(lapply(dat_lst, function(l) { S_n3(l$t, l$w, l$a) }))
+  }, times=50L)
+  
+  microbenchmark({
+    do.call(mapply, c(
+      FUN = S_n3,
+      list(t=rep(C$t_e,n), w=w_lst, a=dat$a),
+      USE.NAMES = F
+    ))
+  }, times=50L)
+  
+  
+  
+  
+  
+  dat2 <- list(
+    w = data.frame(w1=c(1,2,3), w2=c(11,22,33)),
+    w_alt = data.frame(w1=c(1,2,3), w2=c(11,22,33)),
+    a = c(0.1,0.2)
+  )
+  n <- length(dat2$a)
+  
+  fnc_plain <- function(w,a) { sum(w*a) }
+  fnc_plain(as.numeric(dat2$w[1,]), dat2$a[1])
+  fnc_plain(as.numeric(dat2$w[2,]), dat2$a[2])
+  
+  # Current
+  fnc_plain(dat2$w,dat2$a)
+  
+  # New
+  sapply(c(1:n), function(i) { fnc_plain(dat2$w[i,],dat2$a[i]) })
+  
+  fnc_vec <- function(fnc) {
+    
+  }
+  
+}
+
 # Misc
 if (F) {
   

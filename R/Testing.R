@@ -12,14 +12,14 @@
     S_n_type="Cox PH", g_n_type="parametric", ci_type="regular", cf_folds=1,
     edge_corr="none", ecdf_type="linear (mid)", deriv_type="linear",
     gamma_type="Super Learner", omega_n_type="estimated",
-    marg="Gamma_star2"
+    marg="Gamma_star2" # Gamma_star
   )
   C <- list(points=round(seq(0,1,0.02),2), alpha_1=0.5, alpha_2=0.7, t_e=200,
             appx=list(t_e=10, w_tol=25, a=0.01))
   L <- list(
-    n=1000, alpha_3=-2, dir="decr",
+    n=500, alpha_3=-2, dir="decr",
     sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5), # sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5), # Uncomment this for (almost) no censoring
-    distr_A="N(0.3+0.4w2,0.04)", edge="none", surv_true="Complex", # "Cox PH"
+    distr_A="Unif(0,1)", edge="none", surv_true="Cox PH", # "N(0.3+0.4w2,0.04)"
     sampling="two-phase (50%)", estimator=list(est="Grenander",params=params) # two-phase (72%)
     # n=15000, alpha_3=-4, dir="decr",
     # sc_params=list(lmbd=3e-5, v=1.5, lmbd2=3e-5, v2=1.5), # sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5), # Uncomment this for (almost) no censoring

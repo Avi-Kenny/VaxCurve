@@ -91,6 +91,19 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     Sc_n <- srvSL$cens
     print(paste("Check 1:", Sys.time()))
     omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n, type=p$omega_n_type)
+    
+    # !!!!!
+    if (F) {
+      
+      # omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n, type=p$omega_n_type)
+      system.time({
+        for (a in seq(0,1,0.01)) {
+          ooo <- omega_n(dat$w,rep(a,length(dat$a)),dat$y_star,dat$delta_star)
+        }
+      })
+
+    }
+    
     print(paste("Check 2:", Sys.time()))
     f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=p$g_n_type,
                                  k=p$f_aIw_n_bins, edge_corr=p$edge_corr)
@@ -124,7 +137,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     } else if (p$marg=="Gamma_star") {
       Gamma_os_n_star <- construct_Gamma_os_n_star(dat, omega_n, g_n_star,
                                                    eta_ss_n, z_n, gcomp_n,
-                                                   alpha_star_n, vals=NA)
+                                                   alpha_star_n,
+                                                   vals=vlist$A_grid)
     } else if (p$marg=="Gamma_star2") {
       print(paste("Check 9:", Sys.time()))
       # q_n <- construct_q_n(which="q_n", type="Super Learner", dat, dat_orig,
@@ -138,7 +152,14 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       Gamma_os_n_star <- construct_Gamma_os_n_star2(dat, dat_orig, omega_n,
                                                     g_n, eta_ss_n, z_n, # g_n_star
                                                     q_n, gcomp_n, alpha_star_n,
-                                                    vals=NA)
+                                                    vals=vlist$A_grid)
+      # !!!!!
+      if (F) {
+        Gamma_os_n_star(0.5) # Don't profile this line
+        Gamma_os_n_star(0.6)
+        Gamma_os_n_star(0.7)
+      }
+      
       print(paste("Check 11:", Sys.time()))
       
       if (F) {
@@ -207,9 +228,22 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       if (p$marg=="Gamma") {
         y_vals <- -1 * Gamma_os_n(grid[indices_to_keep])
       } else {
+        
+        # !!!!! Debugging !!!!!
+        if (T) {
+          for (aa in grid[indices_to_keep]) {
+            print("SPECIAL CHECK")
+            print(Sys.time())
+            print(paste("aa:",aa))
+            bb <- Gamma_os_n_star(aa)
+            print(paste("bb:",bb))
+          }
+        }
+        
         y_vals <- -1 * Gamma_os_n_star(grid[indices_to_keep])
       }
     }
+    print(paste("Check 13:", Sys.time()))
     if (!any(x_vals==0)) {
       x_vals <- c(0, x_vals)
       y_vals <- c(0, y_vals)
@@ -239,7 +273,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
         return((y2-y1)/width)
       })
     }
-    print(paste("Check 13:", Sys.time()))
+    print(paste("Check 14:", Sys.time()))
     
     # Construct Grenander-based theta_n
     if (p$marg=="Theta") {
@@ -265,11 +299,11 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     }
     
     # Compute variance component functions
-    print(paste("Check 14:", Sys.time()))
+    print(paste("Check 15:", Sys.time()))
     f_aIw_delta1_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=p$g_n_type,
                                         k=p$f_aIw_n_bins, delta1=TRUE)
     f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_delta1_n)
-    print(paste("Check 15:", Sys.time()))
+    print(paste("Check 16:", Sys.time()))
     gamma_n <- construct_gamma_n(dat_orig, dat, type=p$gamma_type,
                                  vals=vlist$A_grid, omega_n=omega_n,
                                  f_aIw_n=f_aIw_n, f_a_n=f_a_n,
@@ -277,10 +311,10 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     if (F) {
       gamma_n <- function(w,a) { S_n(C$t_e,w,a)*(1-S_n(C$t_e,w,a)) }
     } # DEBUG: alternate gamma_n estimator when there is no censoring
-    print(paste("Check 16:", Sys.time()))
+    print(paste("Check 17:", Sys.time()))
     pi_star_n <- construct_pi_star_n(dat_orig, vals=NA, type="Super Learner",
                                      f_aIw_n, f_aIw_delta1_n)
-    print(paste("Check 17:", Sys.time()))
+    print(paste("Check 18:", Sys.time()))
     
     # Edge correction
     if (p$edge_corr=="none") {
@@ -318,22 +352,22 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     }
     
     # Generate estimates for each point
-    print(paste("Check 18:", Sys.time()))
+    print(paste("Check 19:", Sys.time()))
     ests <- theta_n(points)
     if (F) {
       ests_Gamma <- Gamma_os_n_star(points)
       ests_Phi <- Phi_n(points)
     } # DEBUG: return Gamma/Phi estimates
-    print(paste("Check 19:", Sys.time()))
+    print(paste("Check 20:", Sys.time()))
     
     # Construct variance scale factor
     deriv_theta_n <- construct_deriv_theta_n(theta_n, type=p$deriv_type,
                                              dir=dir)
     
-    print(paste("Check 20:", Sys.time()))
+    print(paste("Check 21:", Sys.time()))
     tau_n <- construct_tau_n(deriv_theta_n, gamma_n, f_a_n, pi_star_n, g_n,
                              dat_orig)
-    print(paste("Check 21:", Sys.time()))
+    print(paste("Check 22:", Sys.time()))
     
     # Generate confidence limits
     if (p$ci_type=="none") {
@@ -345,15 +379,13 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       
       # Generate variance scale factor for each point
       tau_ns <- tau_n(points)
-      print(paste("Check 22:", Sys.time()))
+      print(paste("Check 23:", Sys.time()))
       
       # Construct CIs
       # The 0.975 quantile of the Chernoff distribution occurs at roughly 1.00
       # The Normal approximation would use qnorm(0.975, sd=0.52) instead
       qnt <- 1.00
       n_orig <- length(dat_orig$delta)
-      # pct_a <- sum(dat$a==0)/length(dat$a)
-      # n_ci <- round(n_orig*(1-pct_a))
       if (p$ci_type=="regular") {
         ci_lo <- ests - (qnt*tau_ns)/(n_orig^(1/3))
         ci_hi <- ests + (qnt*tau_ns)/(n_orig^(1/3))

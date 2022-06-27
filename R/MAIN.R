@@ -15,7 +15,7 @@ cfg <- list(
   which_sim = "estimation", # "estimation" "edge" "testing" "Cox" "debugging"
   level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
   # keep = c(1:3,7:9,16:18,22:24),
-  num_sim = 5,
+  num_sim = 1000,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm", "tidyr",
@@ -24,7 +24,7 @@ cfg <- list(
                      "data.table", "latex2exp"),
   parallel = "none",
   stop_at_error = F,
-  appx = list(t_e=1, w_tol=25, a=0.01) # !!!!! a=0.001
+  appx = list(t_e=1, w_tol=25, a=0.01) # !!!!! t_e=1, a=0.001
 )
 
 # Set cluster config
@@ -71,7 +71,6 @@ if (load_pkgs_local) {
   source("generate_data.R", local=T)
   source("est_curve.R", local=T)
   source("test_2.R", local=T)
-  source("MarginalizedCox.R", local=T)
   source("fns_doseresp.R", local=T)
 }
 
@@ -85,29 +84,29 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Estimation: ideal params
   level_set_estimation_1 <- list(
-    n = 500, # 1000
+    n = 1000, # 1000
     alpha_3 = -2,
     dir = c("decr"), # "incr"
     # sc_params = list("no cens"=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5)),
     # sc_params = list("exp"=list(lmbd=1e-3, v=1.5, lmbd2=5e-4, v2=1.5)),
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_A = c("N(0.3+0.4w2,0.04)"),
-    # distr_A = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4w2,0.04)"),
+    # distr_A = c("N(0.3+0.4w2,0.04)"),
+    distr_A = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4w2,0.04)"),
     # edge = c("expit 0.4"),
     edge = c("none"),
-    surv_true = c("Cox PH"),
-    # surv_true = c("Cox PH", "Complex"), # "Cox PH" "Complex" "exp"
-    sampling = c("two-phase (50%)"),
-    # sampling = c("iid", "two-phase (50%)"),
-    wts_type = "true", # "estimated"
+    # surv_true = c("Complex"),
+    surv_true = c("Cox PH", "Complex"), # "Cox PH" "Complex" "exp"
+    sampling = c("two-phase (50%)"), # "iid"
+    wts_type = c("true", "estimated"), # "estimated"
     estimator = list(
       "Grenander (Cox)" = list(
         est = "Grenander",
-        params = list(marg="Gamma_star", S_n_type="Cox PH",
+        params = list(marg="Gamma_star2", S_n_type="Cox PH", # Gamma_star
                       convex_type="GCM", ecdf_type="linear (mid)",
                       edge_corr="none",
                       deriv_type="m-spline", g_n_type="parametric")
-      )
+      ),
+      "Cox PH" = list(est="Cox gcomp")
       
       # "Grenander (Cox)" = list(
       #   est = "Grenander",
@@ -123,7 +122,6 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       #                 edge_corr="none", # "min" "none"
       #                 deriv_type="m-spline", g_n_type="parametric") # binning
       # )
-      # # "Cox PH" = list(est="Cox gcomp")
       
       
       # "Grenander (true)" = list(
@@ -279,7 +277,7 @@ if (cfg$main_task=="run") {
   
   # Set global constants
   C <- list(
-    # points = round(seq(0,1,0.25),2), # !!!!!
+    # points = round(seq(0,1,0.1),2), # !!!!!
     points = round(seq(0,1,0.02),2),
     alpha_1 = 0.5,
     alpha_2 = 0.7,
@@ -414,7 +412,7 @@ if (F) {
   # )
   
   # PLot Y-axis limits
-  plot_lims <- list(b=c(-0.25,0.25), c=c(0.7,1), m=c(0,0.01))
+  plot_lims <- list(b=c(-0.25,0.25), c=c(0,1), m=c(0,0.02)) # c=c(0.7,1)
   
   # Set faceting vectors
   distr_As <- c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4w2,0.04)")
@@ -511,7 +509,6 @@ if (F) {
                 data=df_distr_m, fill="grey", color=NA, alpha=0.4) +
     geom_vline(aes(xintercept=x), data=df_vlines, color="orange",
                linetype="dashed") +
-    geom_hline(aes(yintercept=0.95), linetype="longdash", color="grey") +
     geom_line() +
     facet_grid(rows = dplyr::vars(factor(surv_true, levels=surv_trues)),
                cols = dplyr::vars(factor(distr_A, levels=distr_As))) +
@@ -683,6 +680,44 @@ if (F) {
     )
   )
   summ
+  
+}
+
+
+
+#######################################.
+##### MISC: Process Cox gcomp sim #####
+#######################################.
+
+if (F) {
+  
+  sim %>% SimEngine::summarize(
+    mean = list(
+      list(name="mean_runtime", x="runtime"),
+      list(name="se_w1", x="se_w1"),
+      list(name="se_w2", x="se_w2"),
+      list(name="se_a", x="se_a"),
+      list(name="se_est_bshz", x="se_est_bshz"),
+      list(name="se_est_surv", x="se_est_surv"),
+      list(name="se_est_marg", x="se_est_marg")
+    ),
+    sd = list(
+      list(name="se_w1_empr", x="est_w1"),
+      list(name="se_w2_empr", x="est_w2"),
+      list(name="se_a_empr", x="est_a"),
+      list(name="se_bshz_empr", x="est_bshz"),
+      list(name="se_surv_empr", x="est_surv"),
+      list(name="se_marg_empr", x="est_marg")
+    ),
+    coverage = list(
+      list(name="cov_w1", truth="true_w1", estimate="est_w1", se="se_w1"),
+      list(name="cov_w2", truth="true_w2", estimate="est_w2", se="se_w2"),
+      list(name="cov_a", truth="true_a", estimate="est_a", se="se_a"),
+      list(name="cov_bshz", truth="true_bshz", estimate="est_bshz", se="se_est_bshz"),
+      list(name="cov_surv", truth="true_surv", estimate="est_surv", se="se_est_surv"),
+      list(name="cov_marg", truth="true_marg", estimate="est_marg", se="se_est_marg")
+    )
+  )
   
 }
 

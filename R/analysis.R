@@ -8,7 +8,7 @@
 
 {
   # Choose analysis
-  which_analysis <- "HVTN 705 (primary)" # "Janssen" "Moderna" "AMP" "AZD1222"
+  which_analysis <- "Moderna" # "Janssen" "Moderna" "AMP" "AZD1222"
                               # "HVTN 705 (primary)" "HVTN 705 (all)"
   
   # # Uncomment this code to run multiple analyses (e.g. 1=10=Moderna, 11-14=Janssen)
@@ -173,18 +173,20 @@
       "Risk, Cox model" = c(0.025,0.975),
       "CVE, Cox model" = c(0.025,0.975)
     )
-    cfg2$zoom_x <- "zoomed"
+    cfg2$zoom_x <- "zoomed llox"
     cfg2$zoom_y <- "zoomed"
     cfg2$folder_local <- "Moderna data/"
     cfg2$folder_cluster <- paste0("Z:/covpn/p3001/analysis/correlates/Part_A_B",
                                   "linded_Phase_Data/adata/")
+    cfg2$llox_label <- c("LOD") # NEW
+    cfg2$llox <- c(0.3076,1.594,2.42,15.02,22.66) # NEW
     cfg2$params = list(
-      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="linear",
+      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="m-spline",
       gamma_type="Super Learner", ci_type="regular",
       omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
       f_aIw_n_bins=15
     )
-    C <- list(appx=list(t_e=1,w_tol=25,a=0.01))
+    C <- list(appx=list(t_e=1,w_tol=25,a=0.001))
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
@@ -203,7 +205,9 @@
       v_wt = c(1,2,1,2,1,2,1,2,1,2),
       v_ph1 = c(1,2,1,2,1,2,1,2,1,2),
       v_ph2 = c(1,2,1,2,1,2,1,2,1,2),
-      v_covariates = c(1,1,1,1,1,1,1,1,1,1)
+      v_covariates = c(1,1,1,1,1,1,1,1,1,1),
+      llox_label = c(1,1,1,1,1,1,1,1,1,1), # NEW
+      llox = c(1,1,2,2,3,3,4,4,5,5) # NEW
     )
     
     # Secondary map for variations within a graph; map_row corresponds to which
@@ -212,7 +216,7 @@
       tid = c(1:10),
       map_row = c(1:10),
       S_n_type = rep("Super Learner",10),
-      marg = rep("Gamma_star2", 10)
+      marg = rep("Gamma_star", 10)
     )
     
   }
@@ -650,7 +654,7 @@
   # Set config based on cfg2$map and cfg2$map2
   i <- cfg2$map2[cfg2$tid,"map_row"]
   for (x in c("marker", "lab_x", "lab_title", "day", "dataset", "cr2_trial",
-              "cr2_COR", "cr2_marker", "t_e")) {
+              "cr2_COR", "cr2_marker", "t_e", "llox_label", "llox")) {
     cfg2[[x]] <- cfg2[[x]][cfg2$map[i,x]]
   }
   for (x in c("id", "time", "event", "wt", "ph1", "ph2", "covariates")) {
@@ -828,26 +832,19 @@
   draw.x.axis.cor <- function(xlim, llox) {
     xx <- seq(ceiling(xlim[1]), floor(xlim[2]))
     x_axis <- list(ticks=c(), labels=list())
-    if (is.na(llox)) {
-      for (x in xx) {
-        if (x>=3) {
-          label <- bquote(10^.(x))
-        } else {
-          label <- 10^x
-        }
-        x_axis$ticks[length(x_axis$ticks)+1] <- x
-        x_axis$labels[[length(x_axis$labels)+1]] <- label
+    for (x in xx) {
+      if (x>=3) {
+        label <- bquote(10^.(x))
+      } else {
+        label <- 10^x
       }
-    } else {
-      # !!!!! TO DO
-      # for (x in xx) {
-      #   if (x>log10(llox*1.8)) {
-      #     if (log10(llox)==x) { label <- "lod" } else if (x>=3) { label <- bquote(10^.(x)) } else { label <- 10^x }
-      #     x_axis$ticks[length(x_axis$ticks)+1] <- x
-      #     x_axis$labels[[length(x_axis$labels)+1]] <- label
-      #   }
-      # }
-      # axis(1, at=log10(llox), labels=config$llox_label)
+      x_axis$ticks[length(x_axis$ticks)+1] <- x
+      x_axis$labels[[length(x_axis$labels)+1]] <- label
+    }
+    if (!is.na(llox)) {
+      x_axis$ticks[length(x_axis$ticks)+1] <- log10(cfg2$llox)
+      x_axis$labels[[length(x_axis$labels)+1]] <- cfg2$llox_label
+      # which(abs(x_axis$ticks-cfg2$llox)<0.1) # suppress label if it overlaps with LOD
     }
     if (length(xx)<=3) {
       for (i in 2:length(xx)) {
@@ -1210,16 +1207,17 @@ if (cfg2$run_analysis &&
   if (cfg2$params$marg=="Theta") { return_extra <- c(return_extra,"etastar_n") }
   a_orig <- dat_orig$a[!is.na(dat_orig$a)]
   a_grid <- seq(from=min(a_orig), to=max(a_orig), length.out=101)
-  ests <- est_curve(
-    dat_orig = dat_orig,
-    estimator = "Grenander",
-    params = cfg2$params,
-    points = a_grid,
-    dir = "decr",
-    return_extra = return_extra
-  )
-  
-  saveRDS(ests, paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds")) # !!!!!
+  # ests <- est_curve(
+  #   dat_orig = dat_orig,
+  #   estimator = "Grenander",
+  #   params = cfg2$params,
+  #   points = a_grid,
+  #   dir = "decr",
+  #   return_extra = return_extra
+  # )
+  # 
+  # saveRDS(ests, paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds"))
+  ests <- readRDS(paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds"))
   
   run_cve <- as.logical("Grenander" %in% cfg2$plot_cve$est)
   ests2 <- process_ests(ests, a_grid, run_cve=run_cve,
@@ -1438,24 +1436,31 @@ if (cfg2$run_hyptest) {
                             !is.na(y))$x
       z_x_L <- min(zz, na.rm=T)
       z_x_R <- max(zz, na.rm=T)
-      zoom_x <- c(z_x_L - 0.1*(z_x_R-z_x_L),
-                  z_x_R + 0.1*(z_x_R-z_x_L))
+      zoom_x <- c(z_x_L - 0.05*(z_x_R-z_x_L),
+                  z_x_R + 0.05*(z_x_R-z_x_L))
+    } else if (zoom_x[1]=="zoomed llox") {
+      zz <- dplyr::filter(plot_data, tag %in% c("Gren", "Qbins", "Cox") &
+                            !is.na(y))$x
+      z_x_R <- max(zz, na.rm=T)
+      z_x_L <- log10(cfg2$llox)
+      zoom_x <- c(z_x_L - 0.05*(z_x_R-z_x_L),
+                  z_x_R + 0.05*(z_x_R-z_x_L))
     }
     if (is.na(zoom_y[1])) {
       zoom_y <- c(0,1)
       zoom_y[2] <- zoom_y[2] + 0.05*(zoom_y[2]-zoom_y[1])
     } else if (zoom_y[1]=="zoomed") {
-      zz <- dplyr::filter(plot_data, x>=z_x_L & x<=z_x_R)
+      zz <- dplyr::filter(plot_data, x>=zoom_x[1] & x<=zoom_x[2])
       z_y_L <- min(zz$ci_lo, na.rm=T)
       z_y_U <- max(zz$ci_hi, na.rm=T)
-      zoom_y <- c(z_y_L - 0.1*(z_y_U-z_y_L),
-                  z_y_U + 0.1*(z_y_U-z_y_L))
+      zoom_y <- c(z_y_L - 0.05*(z_y_U-z_y_L),
+                  z_y_U + 0.05*(z_y_U-z_y_L))
     } else if (zoom_y[1]=="zoomed (risk)") {
-      zz <- dplyr::filter(plot_data, x>=z_x_L & x<=z_x_R)
+      zz <- dplyr::filter(plot_data, x>=zoom_x[1] & x<=zoom_x[2])
       z_y_L <- 0
       z_y_U <- max(plot_data$ci_hi, na.rm=T)
-      zoom_y <- c(z_y_L - 0.1*(z_y_U-z_y_L),
-                  z_y_U + 0.1*(z_y_U-z_y_L))
+      zoom_y <- c(z_y_L - 0.05*(z_y_U-z_y_L),
+                  z_y_U + 0.05*(z_y_U-z_y_L))
     }
     
     # Generate histogram data
@@ -1516,7 +1521,11 @@ if (cfg2$run_hyptest) {
       labs(title=labs$title, x=labs$x, y=labs$y, color=NULL, fill=NULL)
     if (log10_x_axis) {
       xlim <- c(min(dat_orig$a, na.rm=T), max(dat_orig$a, na.rm=T))
-      x_axis <- draw.x.axis.cor(xlim, NA)
+      if (is.null(cfg2$llox)) {
+        x_axis <- draw.x.axis.cor(xlim, NA)
+      } else {
+        x_axis <- draw.x.axis.cor(xlim, cfg2$llox)
+      }
       
       # !!!!! Temp Janssen
       if (cfg2$analysis=="Janssen" && cfg2$marker=="Day29pseudoneutid50") {
@@ -1603,7 +1612,7 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
                          " by day ", cfg2$t_e)
     if (F) {
       cfg2$lab_title <- "IgG3 V1V2 breadth (Weighted avg log10 Net MFI): Month 7"
-      draw.x.axis.cor <- function(xlim, llox) {
+      draw.x.axis.cor <- function(xlim, llox) { # llox currently unused
         xx <- seq(ceiling(xlim[1]), floor(xlim[2]))
         x_axis <- list(ticks=c(), labels=list())
         if (is.na(llox)) {
@@ -1639,6 +1648,11 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
       filename = paste0(cfg2$analysis," plots/plot_cve_",cfg2$tid,".pdf"),
       plot=plot, device="pdf", width=6, height=4
     )
+    
+    write.table(trim_plot_data(plot_data_cve),
+                file=paste0(cfg2$analysis," plots/cve_",cfg2$tid,".csv"),
+                sep=",",
+                row.names=FALSE) # !!!!! asdf
   }
   
 }

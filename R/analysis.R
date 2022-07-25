@@ -80,7 +80,7 @@
       "CVE, Cox model" = c(0,0.975)
     )
     cfg2$zoom_x <- NA
-    cfg2$zoom_y_cve <- "zoomed"
+    cfg2$zoom_y_cve <- NA
     cfg2$zoom_y_risk <- "zoomed (risk)"
     cfg2$folder_local <- "Janssen data/"
     cfg2$folder_cluster <- paste0("Z:/covpn/p3003/analysis/correlates/Part_A_B",

@@ -1,4 +1,42 @@
 
+# Cox model for interaction figure
+if (F) {
+  
+  df_raw
+  
+}
+
+# 
+if (F) {
+  
+  library(SimEngine)
+  run_on_cluster(
+    
+    first = {
+      sim <- new_sim()
+      create_data <- function(n) { rnorm(n) }
+      sim %<>% set_script(function() {
+        data <- create_data(L$n)
+        return(list("mean"=mean(data)))
+      })
+      sim %<>% set_levels(n=c(100,1000))
+      sim %<>% set_config(num_sim=10)
+    },
+    
+    main = {
+      sim %<>% run()
+    },
+    
+    last = {
+      sim %>% SimEngine::summarize()
+    },
+    
+    cluster_config = list(js="ge")
+    
+  )  
+  
+}
+
 # New superfunc pattern (v2)
 if (F) {
   

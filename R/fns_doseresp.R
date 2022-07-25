@@ -1039,11 +1039,10 @@ construct_gamma_n <- function(dat_orig, dat, type="Super Learner", vals=NA,
 
 #' Construct q_n nuisance estimator function
 #' 
-#' @param which One of c("q_n", "q_star_n")
-#' @param type One of c("Super Learner", "new")
+#' @param type One of c("new", "zero")
 #' @return q_n nuisance estimator function
 #' !!!!! Eventually phase out type="Super Learner"
-construct_q_n <- function(which="q_n", type="Super Learner", dat, dat_orig,
+construct_q_n <- function(type="Super Learner", dat, dat_orig,
                           omega_n=NA, g_n=NA, z_n=NA, gcomp_n=NA, # g_n_star=NA
                           alpha_star_n=NA, f_aIw_n=NA, S_n=NA, Sc_n=NA,
                           vals=NA) {
@@ -1097,7 +1096,7 @@ construct_q_n <- function(which="q_n", type="Super Learner", dat, dat_orig,
     n <- length(dat$a)
     
     fnc <- function(w, y_star, delta_star, x) {
-      # asdf
+      
       y_star_ <- rep(y_star,n)
       delta_star_ <- rep(delta_star,n)
       w_ <- as.data.frame(matrix(rep(w,n), ncol=length(w), byrow=T))
@@ -1118,110 +1117,9 @@ construct_q_n <- function(which="q_n", type="Super Learner", dat, dat_orig,
     
   }
   
-  if (type=="Super Learner") {
+  if (type=="zero") {
     
-    # Create grid of x-values and container for regression predictions
-    x_grid <- round(seq(0.1,1,0.1),1) # Try 0.01, 0.02, or 0.05 !!!!!
-    preds <- list()
-    
-    # Set up objects
-    a <- dat$a
-    w <- dat$w
-    y_star <- dat$y_star
-    delta_star <- dat$delta_star
-    X <- cbind(w, y_star=y_star, delta_star=delta_star)
-    newX <- distinct(cbind(
-      dat_orig$w,
-      y_star = dat_orig$y_star,
-      delta_star = dat_orig$delta_star
-    ))
-    
-    # Set library
-    if (type=="Super Learner") {
-      SL.library <- c("SL.mean", "SL.gam", "SL.ranger", "SL.earth", "SL.nnet",
-                      "SL.svm")
-    } else if (type=="GAM") {
-      SL.library <- c("SL.gam")
-    }
-    
-    for (i in c(1:length(x_grid))) {
-      
-      # Create pseudo-outcomes
-      x <- x_grid[i]
-      if (which=="q_n") {
-        po <- (
-          (In(a!=0 & a<=x)*omega_n(w,a,y_star,delta_star))/g_n_star(a,w)
-        ) + (
-          (In(a!=0)/z_n) * (In(a<=x)*gcomp_n(a) - alpha_star_n(x))
-        )
-      } else if (which=="q_star_n") {
-        po <- (In(a<=x)*omega_n(w,a,y_star,delta_star))/f_aIw_n(a,w)
-      }
-      
-      # Fit SuperLearner regression
-      model_sl <- SuperLearner(Y=po, X=X, newX=newX, family="gaussian",
-                               SL.library=SL.library, verbose=F)
-      preds[[i]] <- as.numeric(model_sl$SL.predict)
-      rm(model_sl)
-      
-    }
-    
-    # Construct function
-    newX$index <- c(1:nrow(newX))
-    fnc <- function(w, y_star, delta_star, x) {
-      
-      if (x==0) { return(0) } else {
-        
-        # Choose which regression to use based on `x`
-        pred <- preds[[which.min(abs(x-x_grid))]]
-        
-        # Dynamically filter to select index
-        # !!!!! Test if this works for factors
-        # !!!!! Modify construct_S_n to follow this paradigm instead
-        cond <- paste0("y_star==",y_star," & delta_star==",delta_star,"")
-        for (i in c(1:length(w))) {
-          cond <- paste0(cond," & w",i,"==",w[i])
-        }
-        index <- (dplyr::filter(newX, eval(parse(text=cond))))$index
-        if (length(index)!=1) {
-          stop(paste0("Error in construct_q_n; ", "w=(", paste(w,collapse=","),
-                      "), y_star=",y_star,", delta_star=",delta_star,", x=",x))
-        }
-        
-        # Return prediction
-        return(pred[index])
-      }
-      
-    }
-    
-    # Remove large intermediate objects
-    rm(dat,dat_orig,omega_n,g_n_star,gcomp_n,alpha_star_n,f_aIw_n)
-    
-    # !!!!! Plot regression predictions
-    if (F) {
-      
-      # Omit `newX = newX` and set `newX <- X` to test
-      
-      # Generate predictions
-      sfnc <- construct_superfunc(fnc, aux=NA, vec=c(2,1,1,0), vals=NA)
-      pred_y <- sfnc(dat$w, dat$y_star, dat$delta_star, x)
-      
-      # Plot pseudo-outcomes against predictions
-      plot_data <- data.frame(x=po, y=pred_y, w1=dat$w$w1, w2=dat$w$w2,
-                              y_star=y_star, delta_star=delta_star)
-      ggplot(plot_data, aes(x=x, y=y, color=factor(delta_star))) +
-        geom_point() +
-        lims(x=c(-1.6,1.6), y=c(-1.6,1.6)) +
-        # labs(title="SL.xgboost") +
-        geom_abline(slope=1, intercept=0, color="grey")
-      
-      # Calculate MSE
-      mean((pred_y-po)^2)
-      
-      # See SL weights (need to remove `rm(model_sl)`)
-      coef(model_sl)
-      
-    }
+    fnc <- function(w, y_star, delta_star, x) { 0 }
     
   }
   

@@ -8,7 +8,7 @@
 
 {
   # Choose analysis
-  which_analysis <- "HVTN 705 (all)" # "Janssen" "Moderna" "AMP" "AZD1222"
+  which_analysis <- "Janssen" # "Janssen" "Moderna" "AMP" "AZD1222"
                               # "HVTN 705 (primary)" "HVTN 705 (all)"
   
   # # Uncomment this code to run multiple analyses (e.g. 1=10=Moderna, 11-14=Janssen)
@@ -80,14 +80,14 @@
       "CVE, Cox model" = c(0,0.975)
     )
     cfg2$zoom_x <- NA
-    cfg2$zoom_y_cve <- NA
-    cfg2$zoom_y_risk <- NA
+    cfg2$zoom_y_cve <- "zoomed"
+    cfg2$zoom_y_risk <- "zoomed (risk)"
     cfg2$folder_local <- "Janssen data/"
     cfg2$folder_cluster <- paste0("Z:/covpn/p3003/analysis/correlates/Part_A_B",
                                   "linded_Phase_Data/adata/")
     cfg2$params = list(
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="linear",
-      gamma_type="Super Learner", ci_type="regular",
+      gamma_type="Super Learner", ci_type="regular", q_n_type="zero",
       omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
       f_aIw_n_bins=15
     )
@@ -193,7 +193,7 @@
     cfg2$llox <- c(0.3076,1.594,2.42,15.02,22.66) # NEW
     cfg2$params = list(
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="m-spline",
-      gamma_type="Super Learner", ci_type="regular",
+      gamma_type="Super Learner", ci_type="regular", q_n_type="zero",
       omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
       f_aIw_n_bins=15
     )
@@ -278,7 +278,7 @@
                                   "y/adata/")
     cfg2$params = list(
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="linear",
-      gamma_type="Super Learner", ci_type="regular",
+      gamma_type="Super Learner", ci_type="regular", q_n_type="zero",
       omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
       f_aIw_n_bins=15
     )
@@ -376,7 +376,7 @@
     cfg2$folder_cluster <- paste0("Z:/vaccine/p705/analysis/lab/cc/copcor/")
     cfg2$params = list(
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="line", # deriv_type=linear
-      gamma_type="Super Learner", ci_type="regular",
+      gamma_type="Super Learner", ci_type="regular", q_n_type="zero",
       omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none",
       f_aIw_n_bins=15
     )
@@ -547,7 +547,7 @@
     cfg2$folder_cluster <- paste0("Z:/vaccine/p705/analysis/lab/cc/copcor/")
     cfg2$params = list(
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="line",
-      gamma_type="Super Learner", ci_type="regular",
+      gamma_type="Super Learner", ci_type="regular", q_n_type="zero",
       omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none",
       f_aIw_n_bins=15
     )
@@ -626,13 +626,13 @@
       "CVE, Cox model" = c(0.025,0.975)
     )
     cfg2$zoom_x <- NA
-    cfg2$zoom_y_cve <- NA
-    cfg2$zoom_y_risk <- NA
+    cfg2$zoom_y_cve <- "zoomed"
+    cfg2$zoom_y_risk <- "zoomed (risk)"
     cfg2$folder_local <- "AZD1222 data/"
     cfg2$folder_cluster <- paste0("Z:/covpn/p3002/analysis/correlates/Part_A_Blinded_Phase_Data/adata/")
     cfg2$params = list(
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="line",
-      gamma_type="Super Learner", ci_type="regular",
+      gamma_type="Super Learner", ci_type="regular", q_n_type="zero",
       omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none",
       f_aIw_n_bins=15
     )
@@ -1239,17 +1239,17 @@ if (cfg2$run_analysis &&
   if (cfg2$params$marg=="Theta") { return_extra <- c(return_extra,"etastar_n") }
   a_orig <- dat_orig$a[!is.na(dat_orig$a)]
   a_grid <- seq(from=min(a_orig), to=max(a_orig), length.out=101)
-  # ests <- est_curve(
-  #   dat_orig = dat_orig,
-  #   estimator = "Grenander",
-  #   params = cfg2$params,
-  #   points = a_grid,
-  #   dir = "decr",
-  #   return_extra = return_extra
-  # )
-  # 
-  # saveRDS(ests, paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds"))
-  ests <- readRDS(paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds"))
+  ests <- est_curve(
+    dat_orig = dat_orig,
+    estimator = "Grenander",
+    params = cfg2$params,
+    points = a_grid,
+    dir = "decr",
+    return_extra = return_extra
+  )
+
+  saveRDS(ests, paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds"))
+  # ests <- readRDS(paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds"))
   
   run_cve <- as.logical("Grenander" %in% cfg2$plot_cve$est)
   ests2 <- process_ests(ests, a_grid, run_cve=run_cve,

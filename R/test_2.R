@@ -78,9 +78,9 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
       # Gamma_os_n <- construct_Gamma_os_n_star(dat, omega_n, g_n_star,
       #                                              eta_ss_n, z_n, gcomp_n,
       #                                              alpha_star_n, vals=NA)
-      q_n <- construct_q_n(which="q_n", type="GAM", dat, dat_orig, # !!!!! Super Learner
-                           omega_n=omega_n, g_n_star=g_n_star, z_n=z_n,
-                           gcomp_n=gcomp_n, alpha_star_n=alpha_star_n)
+      q_n <- construct_q_n(type="new", dat, dat_orig, omega_n=omega_n,
+                           g_n_star=g_n_star, z_n=z_n, gcomp_n=gcomp_n,
+                           alpha_star_n=alpha_star_n)
       Gamma_os_n <- construct_Gamma_os_n_star2(dat, dat_orig, omega_n, g_n_star,
                                                eta_ss_n, z_n, q_n, gcomp_n,
                                                alpha_star_n, vals=NA)
@@ -154,8 +154,8 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     Sc_n <- srvSL$cens
     omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n, type=p$omega_n_type)
     etastar_n <- construct_etastar_n(S_n)
-    q_star_n <- construct_q_n(which="q_star_n", type="Super Learner", dat,
-                              dat_orig, omega_n=omega_n, f_aIw_n=f_aIw_n)
+    q_star_n <- construct_q_n(which="q_star_n", type="Super Learner", dat, # ?????
+                              dat_orig, omega_n=omega_n, f_aIw_n=f_aIw_n) # ?????
     Theta_os_n <- construct_Theta_os_n2(dat, dat_orig, omega_n, f_aIw_n,
                                         q_star_n, etastar_n, vals=NA)
     infl_fn_Theta <- construct_infl_fn_Theta(omega_n, f_aIw_n, q_star_n,

@@ -41,7 +41,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   # Set default params
   .default_params <- list(
     S_n_type="Super Learner", g_n_type="binning", deriv_type="linear",
-    ecdf_type="linear (mid)", gamma_type="Super Learner",
+    ecdf_type="linear (mid)", gamma_type="Super Learner", q_n_type="new",
     omega_n_type="estimated", boot_reps=1000, ci_type="trunc", cf_folds=1, m=5,
     edge_corr="none", marg="Gamma_star2", lod_shift="none", n_bins=5,
     convex_type="GCM", f_aIw_n_bins=15
@@ -141,12 +141,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
                                                    vals=vlist$A_grid)
     } else if (p$marg=="Gamma_star2") {
       print(paste("Check 9:", Sys.time()))
-      # q_n <- construct_q_n(which="q_n", type="Super Learner", dat, dat_orig,
-      #                      omega_n=omega_n, g_n_star=g_n_star, z_n=z_n,
-      #                      gcomp_n=gcomp_n, alpha_star_n=alpha_star_n)
-      q_n <- construct_q_n(which="q_n", type="new", dat, dat_orig,
-                           omega_n=omega_n, g_n=g_n, z_n=z_n,
-                           gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
+      q_n <- construct_q_n(type=p$q_n_type, dat, dat_orig, omega_n=omega_n, g_n=g_n,
+                           z_n=z_n, gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
                            S_n=S_n, Sc_n=Sc_n)
       print(paste("Check 10:", Sys.time()))
       Gamma_os_n_star <- construct_Gamma_os_n_star2(dat, dat_orig, omega_n,
@@ -198,9 +194,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     # !!!!!
     if (F) {
-      q_n <- construct_q_n(which="q_n", type="new", dat, dat_orig,
-                           omega_n=omega_n, g_n=g_n, z_n=z_n,
-                           gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
+      q_n <- construct_q_n(type="new", dat, dat_orig, omega_n=omega_n, g_n=g_n,
+                           z_n=z_n, gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
                            S_n=S_n, Sc_n=Sc_n)
       # q_n(dat_orig$w[1,],dat_orig$y_star[1],dat_orig$delta_star[1],x=0.5)
       q_n(dat_orig$w[1:3,],dat_orig$y_star[1:3],dat_orig$delta_star[1:3],x=0.5)

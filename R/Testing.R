@@ -233,11 +233,11 @@
         }
       }
       
-      S_0 <- function(t, w1, w2, a) {
+      Q_0 <- function(t, w1, w2, a) {
         exp( -1 * lmbd * (t^v) * exp(lin(w1,w2,a)) )
       }
       
-      return(1 - mean(S_0(C$t_0, w1, w2, a)))
+      return(1 - mean(Q_0(C$t_0, w1, w2, a)))
       
     })
     
@@ -329,8 +329,8 @@
   
   # True omega_0
   srvSL <- construct_Q_n(dat, vlist$Q_n, type=params$Q_n_type)
-  S_0 <- srvSL$srv
-  Sc_0 <- srvSL$cens
+  Q_0 <- srvSL$srv
+  Qc_0 <- srvSL$cens
   omega_0 <- Vectorize(function(w1,w2,a,y_star,delta_star) {
     
     # Shorten parameter variable names
@@ -365,8 +365,8 @@
   })
   
   # Construct omega_n
-  # Q_n <- S_0
-  # Qc_n <- Sc_0
+  # Q_n <- Q_0
+  # Qc_n <- Qc_0
   # Q_n <- construct_Q_n(dat, vlist$Q_n, type="Random Forest")
   # Qc_n <- construct_Q_n(dat, vlist$Q_n, type="Random Forest", csf=TRUE)
   omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n)
@@ -711,10 +711,10 @@
 
 {
   # Set C$appx$t_0 to 10 in "Setup" section
-  S_0 <- (construct_Q_n(dat, vlist$Q_n, type="true"))$srv
-  S_CoxPH <- (construct_Q_n(dat, vlist$Q_n, type="Cox PH"))$srv
-  # S_SL <- (construct_Q_n(dat, vlist$Q_n, type="Super Learner"))$srv
-  S_SL <- (construct_Q_n(dat, vlist$Q_n, type="Random Forest"))$srv
+  Q_0 <- (construct_Q_n(dat, vlist$Q_n, type="true"))$srv
+  Q_CoxPH <- (construct_Q_n(dat, vlist$Q_n, type="Cox PH"))$srv
+  # Q_SL <- (construct_Q_n(dat, vlist$Q_n, type="Super Learner"))$srv
+  Q_SL <- (construct_Q_n(dat, vlist$Q_n, type="Random Forest"))$srv
   
   # Plot true curve against estimated curve (as function of T)
   times <- round(seq(0,200,10))
@@ -723,19 +723,19 @@
   w_b <- as.data.frame(cbind(w1=rep(0.5,n), w2=rep(1,n)))
   df <- data.frame(
     time = rep(times, 12),
-    survival = c(S_CoxPH(t=times, w=w_a, a=rep(0.2,n)),
-                 S_CoxPH(t=times, w=w_b, a=rep(0.2,n)),
-                 S_CoxPH(t=times, w=w_a, a=rep(0.8,n)),
-                 S_CoxPH(t=times, w=w_b, a=rep(0.8,n)),
-                 S_SL(t=times, w=w_a, a=rep(0.2,n)),
-                 S_SL(t=times, w=w_b, a=rep(0.2,n)),
-                 S_SL(t=times, w=w_a, a=rep(0.8,n)),
-                 S_SL(t=times, w=w_b, a=rep(0.8,n)),
-                 S_0(t=times, w=w_a, a=rep(0.2,n)),
-                 S_0(t=times, w=w_b, a=rep(0.2,n)),
-                 S_0(t=times, w=w_a, a=rep(0.8,n)),
-                 S_0(t=times, w=w_b, a=rep(0.8,n))),
-    which = rep(c("Cox PH","SL","True S_0"), each=4*length(times)),
+    survival = c(Q_CoxPH(t=times, w=w_a, a=rep(0.2,n)),
+                 Q_CoxPH(t=times, w=w_b, a=rep(0.2,n)),
+                 Q_CoxPH(t=times, w=w_a, a=rep(0.8,n)),
+                 Q_CoxPH(t=times, w=w_b, a=rep(0.8,n)),
+                 Q_SL(t=times, w=w_a, a=rep(0.2,n)),
+                 Q_SL(t=times, w=w_b, a=rep(0.2,n)),
+                 Q_SL(t=times, w=w_a, a=rep(0.8,n)),
+                 Q_SL(t=times, w=w_b, a=rep(0.8,n)),
+                 Q_0(t=times, w=w_a, a=rep(0.2,n)),
+                 Q_0(t=times, w=w_b, a=rep(0.2,n)),
+                 Q_0(t=times, w=w_a, a=rep(0.8,n)),
+                 Q_0(t=times, w=w_b, a=rep(0.8,n))),
+    which = rep(c("Cox PH","SL","True Q_0"), each=4*length(times)),
     covs = rep(rep(c("w1=0.2,w2=1,a=0.2","w1=0.5,w2=1,a=0.2",
                      "w1=0.2,w2=1,a=0.8","w1=0.5,w2=1,a=0.8"),3),
                each=length(times))
@@ -743,7 +743,7 @@
   ggplot(df, aes(x=time, y=survival, color=which)) +
     geom_line() +
     facet_wrap(~covs, ncol=2) +
-    labs(title="Estimation of conditional survival: S_0[t|W,A]",
+    labs(title="Estimation of conditional survival: Q_0[t|W,A]",
          color="Estimator")
   
   # Plot true curve against estimated curve (as function of A)
@@ -752,14 +752,14 @@
   w_a <- as.data.frame(cbind(w1=rep(0.2,n), w2=rep(1,n)))
   df <- data.frame(
     a = rep(a_grid, 3),
-    survival = c(S_CoxPH(t=rep(C$t_0,n), w=w_a, a=a_grid),
-                 S_SL(t=rep(C$t_0,n), w=w_a, a=a_grid),
-                 S_0(t=rep(C$t_0,n), w=w_a, a=a_grid)),
-    which = rep(c("Cox PH","SL","True S_0"), each=n)
+    survival = c(Q_CoxPH(t=rep(C$t_0,n), w=w_a, a=a_grid),
+                 Q_SL(t=rep(C$t_0,n), w=w_a, a=a_grid),
+                 Q_0(t=rep(C$t_0,n), w=w_a, a=a_grid)),
+    which = rep(c("Cox PH","SL","True Q_0"), each=n)
   )
   ggplot(df, aes(x=a, y=survival, color=which)) +
     geom_line() +
-    labs(title="Estimation of conditional survival: S_0[t|W,A]",
+    labs(title="Estimation of conditional survival: Q_0[t|W,A]",
          color="Estimator")
   
 }
@@ -785,7 +785,7 @@
   )
   vlist <- create_val_list(dat_orig)
   
-  Sc_0 <- (construct_Q_n(dat, vlist$Q_n, type="true"))$cens
+  Qc_0 <- (construct_Q_n(dat, vlist$Q_n, type="true"))$cens
   Qc_n_Cox <- (construct_Q_n(dat, vlist$Q_n, type="Cox PH"))$cens
   Qc_n_SL <- (construct_Q_n(dat, vlist$Q_n, type="Super Learner"))$cens
   
@@ -805,19 +805,19 @@
       Qc_n_SL(t=times, w_05, a=rep(0.2,n)),
       Qc_n_SL(t=times, w_02, a=rep(0.8,n)),
       Qc_n_SL(t=times, w_05, a=rep(0.8,n)),
-      Sc_0(t=times, w_02, a=rep(0.2,n)),
-      Sc_0(t=times, w_05, a=rep(0.2,n)),
-      Sc_0(t=times, w_02, a=rep(0.8,n)),
-      Sc_0(t=times, w_05, a=rep(0.8,n))
+      Qc_0(t=times, w_02, a=rep(0.2,n)),
+      Qc_0(t=times, w_05, a=rep(0.2,n)),
+      Qc_0(t=times, w_02, a=rep(0.8,n)),
+      Qc_0(t=times, w_05, a=rep(0.8,n))
     ),
-    which = rep(c("Old","New","True Sc_0"), each=4*length(times)),
+    which = rep(c("Old","New","True Qc_0"), each=4*length(times)),
     covs = rep(rep(c("w1=0.2,w2=1,a=0.2","w1=0.5,w2=1,a=0.2",
                      "w1=0.2,w2=1,a=0.8","w1=0.5,w2=1,a=0.8"),3), each=length(times))
   )
   ggplot(df, aes(x=time, y=survival, color=which)) +
     geom_line() +
     facet_wrap(~covs, ncol=2) +
-    labs(title="Estimation of conditional (censoring) survival: Sc_0[t|W,A]",
+    labs(title="Estimation of conditional (censoring) survival: Qc_0[t|W,A]",
          color="Estimator")
   
 }

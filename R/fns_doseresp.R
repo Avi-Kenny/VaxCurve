@@ -856,8 +856,8 @@ construct_tau_n <- function(deriv_r_Mn, gamma_n, f_a_n,
 #' @param Qc_n Conditional censoring survival function estimator returned by
 #'     construct_Q_n
 #' @param type Defaults to "estimated". Override with "true" for debugging. Note
-#'     that type="true" only works for surv_true="Cox PH" and assumes that S_0
-#'     and Sc_0 (i.e. the true functions) are passed in.
+#'     that type="true" only works for surv_true="Cox PH" and assumes that Q_0
+#'     and Qc_0 (i.e. the true functions) are passed in.
 #' @return Estimator function of nuisance omega_0
 construct_omega_n <- function(vals=NA, Q_n, Qc_n, type="estimated") {
   

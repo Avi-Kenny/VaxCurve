@@ -303,17 +303,17 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     #   
     #   G_0 <- construct_Phi_n(dat_0, type=p$ecdf_type)
     #   srvSL <- construct_Q_n(dat, vlist$Q_n, type=p$Q_n_type)
-    #   S_0 <- srvSL$srv
-    #   Sc_0 <- srvSL$cens
-    #   omega_0 <- construct_omega_n(S_0, Sc_0)
+    #   Qc_0 <- srvSL$srv
+    #   Qc_0 <- srvSL$cens
+    #   omega_0 <- construct_omega_n(Qc_0, Qc_0)
     #   f_aIw_n <- construct_f_aIw_n(dat_0, type=p$g_n_type, k=p$f_aIw_n_bins)
     #   f_a_n <- construct_f_a_n(dat_0_orig, f_aIw_n=f_aIw_n)
     #   g_0 <- construct_g_n(f_aIw_n, f_a_n)
-    #   Gamma_0 <- construct_Gamma_os_n(dat_0, vlist$A_grid, omega_0, S_0, g_0)
+    #   Gamma_0 <- construct_Gamma_os_n(dat_0, vlist$A_grid, omega_0, Qc_0, g_0)
     #   lambda_2 <- lambda(dat_0_orig, k=2, G_0)
     #   lambda_3 <- lambda(dat_0_orig, k=3, G_0)
-    #   eta_0 <- construct_eta_n(dat_0, vlist$AW_grid, S_0)
-    #   gcomp_0 <- construct_gcomp_n(dat_0_orig, vlist$A_grid, S_0)
+    #   eta_0 <- construct_eta_n(dat_0, vlist$AW_grid, Qc_0)
+    #   gcomp_0 <- construct_gcomp_n(dat_0_orig, vlist$A_grid, Qc_0)
     # 
     #   beta_0 <- (1/n_orig) * sum(
     #     weights_0 *

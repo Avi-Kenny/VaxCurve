@@ -197,7 +197,7 @@
 
 
 #########################.
-##### deriv_theta_n #####
+##### deriv_r_Mn #####
 #########################.
 
 {
@@ -244,7 +244,7 @@
     deriv_theta_0 <- function (x) { grad(func=r_M0_f, x=x) }
   }
   
-  # Esimate deriv_theta_n n_samples times
+  # Esimate deriv_r_Mn n_samples times
   deriv_ests <- c()
   grid <- round(seq(0,1,0.1),1)
   n_samples <- 3 # !!!!!
@@ -291,11 +291,11 @@
                                  f_a_delta1_n=f_a_delta1_n)
     
     theta_n <- theta_n_Gr
-    deriv_theta_n <- construct_deriv_theta_n(theta_n, type=params$deriv_type,
+    deriv_r_Mn <- construct_deriv_r_Mn(theta_n, type=params$deriv_type,
                                              L$dir="decr")
     
     # Compute estimates
-    deriv_ests <- c(deriv_ests, deriv_theta_n(grid))
+    deriv_ests <- c(deriv_ests, deriv_r_Mn(grid))
     
   }
   
@@ -847,7 +847,7 @@
       params = params,
       points = C$points,
       dir = L$dir,
-      return_extra = c("Phi_n_inv", "deriv_theta_n", "f_a_n", "gamma_n", "Psi_n",
+      return_extra = c("Phi_n_inv", "deriv_r_Mn", "f_a_n", "gamma_n", "Psi_n",
                        "omega_n", "f_aIw_n", "S_n", "gcm", "dGCM", "etastar_n")
     )
     

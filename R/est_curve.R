@@ -9,7 +9,7 @@
 #'     construct_f_aIw_n()
 #'   - `ecdf_type` Type of CDF estimator; corresponds to construct_Phi_n()
 #'   - `deriv_type` Type of derivative estimator; corresponds to
-#'     construct_deriv_theta_n()
+#'     construct_deriv_r_Mn()
 #'   - `gamma_type` Type of nuisance estimator; corresponds to
 #'     construct_gamma_n()
 #'   - `omega_n_type` Type of nuisance estimator; corresponds to
@@ -356,11 +356,11 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     print(paste("Check 20:", Sys.time()))
     
     # Construct variance scale factor
-    deriv_theta_n <- construct_deriv_theta_n(theta_n, type=p$deriv_type,
+    deriv_r_Mn <- construct_deriv_r_Mn(theta_n, type=p$deriv_type,
                                              dir=dir)
     
     print(paste("Check 21:", Sys.time()))
-    tau_n <- construct_tau_n(deriv_theta_n, gamma_n, f_a_n, pi_star_n, g_n,
+    tau_n <- construct_tau_n(deriv_r_Mn, gamma_n, f_a_n, pi_star_n, g_n,
                              dat_orig)
     print(paste("Check 22:", Sys.time()))
     
@@ -579,7 +579,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     S_n2 <- (construct_S_n(dat, vlist$S_n, type="Cox PH"))$srv
     res$gcomp <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n=S_n2)
   }
-  fns_extra <- c("f_a_n", "gamma_n", "deriv_theta_n", "Phi_n_inv", "Theta_os_n",
+  fns_extra <- c("f_a_n", "gamma_n", "deriv_r_Mn", "Phi_n_inv", "Theta_os_n",
                  "Phi_n", "omega_n", "f_aIw_n", "etastar_n", "S_n", "gcm",
                  "dGCM", "grid", "Gamma_os_n_star",
                  "theta_n_Gr")

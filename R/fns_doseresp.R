@@ -665,7 +665,7 @@ construct_gcomp_n <- function(dat_orig, vals=NA, S_n) {
 #' @param theta_n An estimator of theta_0 (usually theta_n or gcomp_n)
 #' @param type One of c("gcomp", "linear", "spline")
 #' @param dir Direction of monotonicity; one of c("incr", "decr")
-construct_deriv_theta_n <- function(theta_n, type, dir="incr") {
+construct_deriv_r_Mn <- function(theta_n, type, dir="incr") {
   
   # Estimate entire function on grid
   grid <- round(seq(0,1,0.01),2)
@@ -828,18 +828,18 @@ construct_deriv_theta_n <- function(theta_n, type, dir="incr") {
 
 #' Construct tau_n Chernoff scale factor function
 #' 
-#' @param deriv_theta_n A derivative estimator returned by deriv_theta_n()
+#' @param deriv_r_Mn A derivative estimator returned by construct_deriv_r_Mn()
 #' @param gamma_n Nuisance function estimator returned by construct_gamma_n()
 #' @param f_a_n Density estimator returned by construct_f_a_n()
 #' @return Chernoff scale factor estimator function
-construct_tau_n <- function(deriv_theta_n, gamma_n, f_a_n,
+construct_tau_n <- function(deriv_r_Mn, gamma_n, f_a_n,
                             pi_star_n=NA, g_n=NA, dat_orig=NA) {
   
   n_orig <- length(dat_orig$a)
   w <- dat_orig$w
   return(Vectorize(function(x) {
     abs(
-      ((4*deriv_theta_n(x))/(n_orig*f_a_n(x))) *
+      ((4*deriv_r_Mn(x))/(n_orig*f_a_n(x))) *
         sum((gamma_n(w,x)*pi_star_n(w,x))/g_n(x,w))
     )^(1/3)
   }))

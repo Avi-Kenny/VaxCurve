@@ -1246,7 +1246,7 @@ if (cfg2$run_analysis &&
                       "Phi_n", "Gamma_os_n_star", "gcm", "dGCM", "theta_n_Gr")
   }
   if (cfg2$run_debug$gren_var) {
-    return_extra <- c(return_extra, "deriv_theta_n", "f_a_n", "gamma_n")
+    return_extra <- c(return_extra, "deriv_r_Mn", "f_a_n", "gamma_n")
   }
   if (cfg2$params$marg=="Theta") { return_extra <- c(return_extra,"etastar_n") }
   a_orig <- dat_orig$a[!is.na(dat_orig$a)]
@@ -1924,20 +1924,20 @@ if (cfg2$run_debug$gren_var) {
   # Debugging: Grenander variance scale factor components
   
   print("Grenander variance scale factor components")
-  print("deriv_theta_n")
-  print(ests$deriv_theta_n(seq(0,1,0.05)))
+  print("deriv_r_Mn")
+  print(ests$deriv_r_Mn(seq(0,1,0.05)))
   print("f_a_n")
   print(ests$f_a_n(seq(0,1,0.05)))
   # print("gamma_n")
   # print(ests$gamma_n(seq(0,1,0.05)))
-  print("deriv_theta_n*f_a_n")
-  print(ests$deriv_theta_n(seq(0,1,0.05))*ests$f_a_n(seq(0,1,0.05)))
-  # print("deriv_theta_n*gamma_n")
-  # print(ests$deriv_theta_n(seq(0,1,0.05))*ests$gamma_n(seq(0,1,0.05)))
+  print("deriv_r_Mn*f_a_n")
+  print(ests$deriv_r_Mn(seq(0,1,0.05))*ests$f_a_n(seq(0,1,0.05)))
+  # print("deriv_r_Mn*gamma_n")
+  # print(ests$deriv_r_Mn(seq(0,1,0.05))*ests$gamma_n(seq(0,1,0.05)))
   # print("f_a_n*gamma_n")
   # print(ests$f_a_n(seq(0,1,0.05))*ests$gamma_n(seq(0,1,0.05)))
-  # print("deriv_theta_n*f_a_n*gamma_n")
-  # print(ests$deriv_theta_n(seq(0,1,0.05))*ests$f_a_n(seq(0,1,0.05))*
+  # print("deriv_r_Mn*f_a_n*gamma_n")
+  # print(ests$deriv_r_Mn(seq(0,1,0.05))*ests$f_a_n(seq(0,1,0.05))*
   #         ests$gamma_n(seq(0,1,0.05)))
 }
 

@@ -2298,24 +2298,45 @@ construct_Gamma_os_n_star2 <- function(dat, dat_orig, omega_n, g_n, # g_n_star
 #' 
 #' @param x !!!!!
 construct_Theta_os_n2 <- function(dat, dat_orig, omega_n, f_aIw_n, q_star_n,
-                                  etastar_n, vals=NA) {
+                                  etastar_n, vals=NA) { # eta_ss_n, z_n, q_n, gcomp_n, alpha_star_n
   
-  n_orig <- round(sum(dat$weights))
-  piece_2 <- omega_n(dat$w,dat$a,dat$y_star,dat$delta_star)/f_aIw_n(dat$a,dat$w)
-  piece_3 <- (1-dat_orig$weights)
+  # n_orig <- round(sum(dat$weights))
+  # piece_1 <- In(dat$a!=0)
+  # piece_2 <- (omega_n(dat$w,dat$a,dat$y_star,dat$delta_star) /
+                # g_n(dat$a,dat$w)) + gcomp_n(dat$a)
+  # piece_3 <- (1-dat_orig$weights)
   
   # Remove large intermediate objects
-  rm(omega_n,f_aIw_n)
+  # rm(omega_n,g_n,gcomp_n)
   
-  fnc <- function(x) {
-    (1/n_orig) * sum(dat$weights * In(dat$a<=x) * piece_2) +
-      (1/n_orig) * sum(
-        piece_3 * q_star_n(dat_orig$w,dat_orig$y_star,dat_orig$delta_star,x) +
-          etastar_n(rep(x,n_orig),dat_orig$w)
-      )
-  }
+  # fnc <- function(x) {
+  #   (1/(n_orig*z_n)) * sum(dat$weights * (
+  #     piece_1*In(dat$a<=x)*piece_2 - piece_1*alpha_star_n(x)
+  #   )) +
+  #     (1/n_orig) * sum(
+  #       piece_3 * (
+  #         q_n(dat_orig$w,dat_orig$y_star,dat_orig$delta_star,x)/z_n
+  #       ) +
+  #         eta_ss_n(rep(x,n_orig),dat_orig$w)
+  #     )
+  # }
   
-  return(construct_superfunc(fnc, aux=NA, vec=T, vals=vals))
+  # n_orig <- round(sum(dat$weights))
+  # piece_2 <- omega_n(dat$w,dat$a,dat$y_star,dat$delta_star)/f_aIw_n(dat$a,dat$w)
+  # piece_3 <- (1-dat_orig$weights)
+  
+  # Remove large intermediate objects
+  # rm(omega_n,f_aIw_n)
+  
+  # fnc <- function(x) {
+  #   (1/n_orig) * sum(dat$weights * In(dat$a<=x) * piece_2) +
+  #     (1/n_orig) * sum(
+  #       piece_3 * q_star_n(dat_orig$w,dat_orig$y_star,dat_orig$delta_star,x) +
+  #         etastar_n(rep(x,n_orig),dat_orig$w)
+  #     )
+  # }
+  
+  # return(construct_superfunc(fnc, aux=NA, vec=T, vals=vals))
   
 }
 

@@ -14,8 +14,8 @@
     gamma_type="Super Learner", omega_n_type="estimated",
     marg="Gamma_star2" # Gamma_star
   )
-  C <- list(points=round(seq(0,1,0.02),2), alpha_1=0.5, alpha_2=0.7, t_e=200,
-            appx=list(t_e=10, w_tol=25, a=0.01))
+  C <- list(points=round(seq(0,1,0.02),2), alpha_1=0.5, alpha_2=0.7, t_0=200,
+            appx=list(t_0=10, w_tol=25, a=0.01))
   L <- list(
     n=500, alpha_3=-2, dir="decr",
     sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5), # sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5), # Uncomment this for (almost) no censoring
@@ -76,9 +76,9 @@
     
   }
   
-  res("% right-censored by t_e", pct_rc, 3)
-  res("# of infections by t_e", num_inf, 0)
-  res("% of infections by t_e", pct_inf, 4)
+  res("% right-censored by t_0", pct_rc, 3)
+  res("# of infections by t_0", num_inf, 0)
+  res("% of infections by t_0", pct_inf, 4)
   res("# in phase-2 sample", num_tp, 0)
   res("True inf rate (A=0)", pct_inf_a0, 5)
   res("True inf rate (A=0.3)", pct_inf_a3, 5)
@@ -237,7 +237,7 @@
         exp( -1 * lmbd * (t^v) * exp(lin(w1,w2,a)) )
       }
       
-      return(1 - mean(S_0(C$t_e, w1, w2, a)))
+      return(1 - mean(S_0(C$t_0, w1, w2, a)))
       
     })
     
@@ -349,15 +349,15 @@
     lin2 <- C$alpha_1*w1 + C$alpha_2*w2 - 1
     
     # Compute omega_0
-    piece_1 <- exp(-1*lmbd*(C$t_e^v)*exp(lin))
-    piece_2 <- (delta_star*as.integer(y_star<=C$t_e)) /
+    piece_1 <- exp(-1*lmbd*(C$t_0^v)*exp(lin))
+    piece_2 <- (delta_star*as.integer(y_star<=C$t_0)) /
       exp(-1*(lmbd*y_star^v*exp(lin)+lmbd2*y_star^v2*exp(lin2)))
     integral <- integrate(
       function(t) {
         t^(v-1) * exp(lin+lmbd*t^v*exp(lin)+lmbd2*t^v2*exp(lin2))
       },
       lower = 0,
-      upper = min(C$t_e,y_star)
+      upper = min(C$t_0,y_star)
     )$value
     piece_3 <- lmbd*v*integral
     return(piece_1*(piece_2-piece_3))
@@ -386,7 +386,7 @@
     }
   }
   vlist$omega[highs,]
-  # highs have delta_star=1, y_star<C$t_e, and A=0 or A>0.19
+  # highs have delta_star=1, y_star<C$t_0, and A=0 or A>0.19
   
   # Scatterplot of estimated vs true
   ggplot(data.frame(x=omegas_true, y=omegas_est), aes(x=x, y=y)) +
@@ -710,7 +710,7 @@
 ####################################################.
 
 {
-  # Set C$appx$t_e to 10 in "Setup" section
+  # Set C$appx$t_0 to 10 in "Setup" section
   S_0 <- (construct_Q_n(dat, vlist$Q_n, type="true"))$srv
   S_CoxPH <- (construct_Q_n(dat, vlist$Q_n, type="Cox PH"))$srv
   # S_SL <- (construct_Q_n(dat, vlist$Q_n, type="Super Learner"))$srv
@@ -752,9 +752,9 @@
   w_a <- as.data.frame(cbind(w1=rep(0.2,n), w2=rep(1,n)))
   df <- data.frame(
     a = rep(a_grid, 3),
-    survival = c(S_CoxPH(t=rep(C$t_e,n), w=w_a, a=a_grid),
-                 S_SL(t=rep(C$t_e,n), w=w_a, a=a_grid),
-                 S_0(t=rep(C$t_e,n), w=w_a, a=a_grid)),
+    survival = c(S_CoxPH(t=rep(C$t_0,n), w=w_a, a=a_grid),
+                 S_SL(t=rep(C$t_0,n), w=w_a, a=a_grid),
+                 S_0(t=rep(C$t_0,n), w=w_a, a=a_grid)),
     which = rep(c("Cox PH","SL","True S_0"), each=n)
   )
   ggplot(df, aes(x=a, y=survival, color=which)) +

@@ -176,7 +176,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
         a <- (a+a_shift)*a_scale
         Gamma_os_n_star <- Vectorize(function(x) {
           x <- (x+a_shift)*a_scale # x <- round((x+a_shift)*a_scale, -log10(C$appx$a))
-          mean( as.integer(a<=x) * (1-exp(-1*L$sc_params$lmbd*C$t_e)) )
+          mean( as.integer(a<=x) * (1-exp(-1*L$sc_params$lmbd*C$t_0)) )
         })
       } # DEBUG: True Gamma_os_n_star
       
@@ -304,7 +304,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
                                  f_aIw_n=f_aIw_n, f_a_n=f_a_n,
                                  f_a_delta1_n=f_a_delta1_n)
     if (F) {
-      gamma_n <- function(w,a) { Q_n(C$t_e,w,a)*(1-Q_n(C$t_e,w,a)) }
+      gamma_n <- function(w,a) { Q_n(C$t_0,w,a)*(1-Q_n(C$t_0,w,a)) }
     } # DEBUG: alternate gamma_n estimator when there is no censoring
     print(paste("Check 17:", Sys.time()))
     pi_star_n <- construct_pi_star_n(dat_orig, vals=NA, type="Super Learner",
@@ -481,7 +481,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     vlist <- create_val_list(dat_orig)
     
     # Fit Cox model and compute variance
-    res_cox <- cox_var(dat_orig=dat_orig, dat=dat, t=C$t_e,
+    res_cox <- cox_var(dat_orig=dat_orig, dat=dat, t=C$t_0,
                    points=points, se_marg=T) # !!!!! verbose=T
     
     # Compute CIs (logit transformed)
@@ -523,7 +523,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     # Get Breslow estimator
     bh4 <- basehaz(model4, centered=FALSE)
-    index4 <- max(which((bh4$time<C$t_e)==T))
+    index4 <- max(which((bh4$time<C$t_0)==T))
     est_bshz4 <- bh4$hazard[index4]
     
     # Construct conditional survival function

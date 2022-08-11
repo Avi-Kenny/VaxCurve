@@ -25,7 +25,7 @@
   
   # Set configuration variables
   # Note: NA param values are set below based on the task ID
-  # !!!!! In the correlates repo, if t_e=0, it is inferred from the data
+  # !!!!! In the correlates repo, if t_0=0, it is inferred from the data
   cfg2 <- list(
     analysis = which_analysis,
     run_analysis = T,
@@ -52,7 +52,7 @@
                     "Pseudovirus-nAb ID50 (IU50/ml) (=s)",
                     "Phagocytic Score (=s)")
     cfg2$endpoint <- "COVID"
-    cfg2$t_e <- c(54)
+    cfg2$t_0 <- c(54)
     cfg2$dataset <- c(
       "janssen_pooled_real_data_processed_with_riskscore.csv",
       "janssen_pooled_realADCP_data_processed_with_riskscore.csv"
@@ -91,14 +91,14 @@
       omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
       f_aIw_n_bins=15
     )
-    C <- list(appx=list(t_e=1,w_tol=25,a=0.01))
+    C <- list(appx=list(t_0=1,w_tol=25,a=0.01))
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
       marker = c(1,2,3,4),
       lab_x = c(1,2,3,4),
       lab_title = c(1,2,3,4),
-      t_e = c(1,1,1,1),
+      t_0 = c(1,1,1,1),
       dataset = c(1,1,1,2),
       cr2_trial = c(1,1,1,2),
       cr2_COR = c(1,1,1,1),
@@ -152,7 +152,7 @@
                     "Pseudovirus-nAb ID80 (IU80/ml) (=s)",
                     "Live Virus-mnAb ID50 (IU50/ml) (=s)")
     cfg2$endpoint <- "COVID"
-    cfg2$t_e <- c(126,100)
+    cfg2$t_0 <- c(126,100)
     cfg2$dataset <- c(paste0("P3001ModernaCOVEimmunemarkerdata_correlates_proc",
                              "essed_v1.1_lvmn_added_Jan14_2022.csv"))
     cfg2$txct <- T
@@ -197,14 +197,14 @@
       omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
       f_aIw_n_bins=15
     )
-    C <- list(appx=list(t_e=1,w_tol=25,a=0.001))
+    C <- list(appx=list(t_0=1,w_tol=25,a=0.001))
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
       marker = c(1,2,3,4,5,6,7,8,9,10),
       lab_x = c(1,1,2,2,3,3,4,4,5,5),
       lab_title = c(1,2,3,4,5,6,7,8,9,10),
-      t_e = c(1,2,1,2,1,2,1,2,1,2),
+      t_0 = c(1,2,1,2,1,2,1,2,1,2),
       dataset = c(1,1,1,1,1,1,1,1,1,1),
       cr2_trial = c(1,1,1,1,1,1,1,1,1,1),
       cr2_COR = c(1,2,1,2,1,2,1,2,1,2),
@@ -245,7 +245,7 @@
     cfg2$endpoint <- "HIV-1 infection"
     cfg2$amp_protocol <- c("HVTN 703", "HVTN 704", "Pooled")
     cfg2$amp_tx <- c("C3", "T1", "T2", "T1+T2")
-    cfg2$t_e <- c(595,595) # c(601,609)
+    cfg2$t_0 <- c(595,595) # c(601,609)
     cfg2$dataset <- "amp_survival_all.csv"
     cfg2$txct <- F
     cfg2$cr2_trial <- F
@@ -282,7 +282,7 @@
       omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
       f_aIw_n_bins=15
     )
-    C <- list(appx=list(t_e=10,w_tol=25,a=0.01))
+    C <- list(appx=list(t_0=10,w_tol=25,a=0.01))
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
@@ -291,7 +291,7 @@
       marker = rep(1,12),
       lab_x = rep(1,12),
       lab_title = c(1,1,1,1,2,2,2,2,3,3,3,3),
-      t_e = c(1,1,1,1,2,2,2,2,1,1,1,1),
+      t_0 = c(1,1,1,1,2,2,2,2,1,1,1,1),
       dataset = rep(1,12),
       cr2_trial = rep(1,12),
       cr2_COR = rep(1,12),
@@ -344,7 +344,7 @@
                     "IgG3 gp120+gp140 breadth (=s)",
                     "Expanded multi-epitope functions (=s)")
     cfg2$endpoint <- "HIV"
-    cfg2$t_e <- c(550)
+    cfg2$t_0 <- c(550)
     cfg2$dataset <- c("HVTN705_secondcasecontrolprocesseddata.csv")
     cfg2$txct <- T
     cfg2$cr2_trial <- c("hvtn705secondprimary")
@@ -381,14 +381,14 @@
       omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none",
       f_aIw_n_bins=15
     )
-    C <- list(appx=list(t_e=10,w_tol=15,a=0.01)) # !!!!! w_tol=25
+    C <- list(appx=list(t_0=10,w_tol=15,a=0.01)) # !!!!! w_tol=25
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
       marker = c(1:6),
       lab_x = c(1:6),
       lab_title = c(1:6),
-      t_e = rep(1,6),
+      t_0 = rep(1,6),
       dataset = rep(1,6),
       cr2_trial = rep(1,6),
       cr2_COR = rep(1,6),
@@ -518,7 +518,7 @@
       "IgG gp70-Ce1086.B2 V1V2 (=s)", "IgG gp70.B.CaseA V1V2 (=s)"
     )
     cfg2$endpoint <- "HIV"
-    cfg2$t_e <- c(550)
+    cfg2$t_0 <- c(550)
     cfg2$dataset <- c("HVTN705_secondcasecontrolprocesseddata_excludeELISpotmarkers.csv") # c("HVTN705_secondcasecontrolprocesseddata.csv")
     cfg2$txct <- T
     cfg2$cr2_trial <- c("hvtn705second")
@@ -556,14 +556,14 @@
       omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none",
       f_aIw_n_bins=15
     )
-    C <- list(appx=list(t_e=10,w_tol=15,a=0.01)) # !!!!! w_tol=25
+    C <- list(appx=list(t_0=10,w_tol=15,a=0.01)) # !!!!! w_tol=25
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
       marker = c(1:39), # c(1:41)
       lab_x = c(1:39), # c(1:41)
       lab_title = c(1:39), # c(1:41)
-      t_e = rep(1,39), # rep(1,41)
+      t_0 = rep(1,39), # rep(1,41)
       dataset = rep(1,39), # rep(1,41)
       cr2_trial = rep(1,39), # rep(1,41)
       cr2_COR = rep(1,39), # rep(1,41)
@@ -610,7 +610,7 @@
     cfg2$lab_x <- c("Pseudovirus-nAb ID50 (IU50/ml) (=s)",
                     "Anti Spike IgG (BAU/ml) (=s)")
     cfg2$endpoint <- "COVID"
-    cfg2$t_e <- c(117,92)
+    cfg2$t_0 <- c(117,92)
     cfg2$dataset <- c("azd1222_data_processed_with_riskscore.csv",
                       "azd1222_bAb_data_processed_with_riskscore.csv")
     cfg2$txct <- T
@@ -648,14 +648,14 @@
       omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none",
       f_aIw_n_bins=15
     )
-    C <- list(appx=list(t_e=10,w_tol=25,a=0.01))
+    C <- list(appx=list(t_0=10,w_tol=25,a=0.01))
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
       marker = c(1,2,3,4),
       lab_x = c(1,1,2,2),
       lab_title = c(1,2,3,4),
-      t_e = c(1,2,1,2),
+      t_0 = c(1,2,1,2),
       dataset = c(1,1,2,2),
       cr2_trial = c(1,1,2,2),
       cr2_COR = c(1,2,1,2),
@@ -696,7 +696,7 @@
   # Set config based on cfg2$map and cfg2$map2
   i <- cfg2$map2[cfg2$tid,"map_row"]
   for (x in c("marker", "lab_x", "lab_title", "day", "dataset", "cr2_trial",
-              "cr2_COR", "cr2_marker", "t_e", "zoom_x", "zoom_y_cve",
+              "cr2_COR", "cr2_marker", "t_0", "zoom_x", "zoom_y_cve",
               "zoom_y_risk", "llox_label", "llox")) {
     cfg2[[x]] <- cfg2[[x]][[cfg2$map[i,x]]]
   }
@@ -712,7 +712,7 @@
   cfg2$v$covariates <- formula(cfg2$v$covariates)
   cfg2$params$Q_n_type <- cfg2$map2[cfg2$tid,"Q_n_type"]
   cfg2$params$marg <- cfg2$map2[cfg2$tid,"marg"]
-  C$t_e <- cfg2$t_e
+  C$t_0 <- cfg2$t_0
   if ((i %in% c(5,7,9)) && cfg2$analysis=="Moderna") {
     cfg2$qnt <- lapply(cfg2$qnt, function(x) { c(0,x[2]) }) # !!!!! temp hack
   }
@@ -986,9 +986,9 @@ if (cfg2$run_analysis && any(unlist(c(cfg2$plot_cve,cfg2$plot_risk))=="Cox")) {
 if (cfg2$run_analysis && cfg2$plot_risk$overall=="KM") {
   
   srv_ov <- survfit(Surv(dat_orig$y_star,dat_orig$delta_star)~1)
-  risk_ov <- 1 - srv_ov$surv[which.min(abs(srv_ov$time-C$t_e))]
-  ci_lo_ov <- 1 - srv_ov$upper[which.min(abs(srv_ov$time-C$t_e))]
-  ci_hi_ov <- 1 - srv_ov$lower[which.min(abs(srv_ov$time-C$t_e))]
+  risk_ov <- 1 - srv_ov$surv[which.min(abs(srv_ov$time-C$t_0))]
+  ci_lo_ov <- 1 - srv_ov$upper[which.min(abs(srv_ov$time-C$t_0))]
+  ci_hi_ov <- 1 - srv_ov$lower[which.min(abs(srv_ov$time-C$t_0))]
   
   plot_data_risk <- rbind(plot_data_risk, data.frame(
     x = c(999,999),
@@ -1083,25 +1083,25 @@ if (cfg2$run_dqa) {
   # Number of cases in each group
   num_case_tx <- sum(ind_tx)
   num_case_ct <- sum(ind_ct)
-  num_case_tx_t_e <- sum(ind_tx[time_tx<=C$t_e])
-  num_case_ct_t_e <- sum(ind_ct[time_ct<=C$t_e])
+  num_case_tx_t_0 <- sum(ind_tx[time_tx<=C$t_0])
+  num_case_ct_t_0 <- sum(ind_ct[time_ct<=C$t_0])
   num_atrisk_tx <- length(ind_tx)
   num_atrisk_ct <- length(ind_ct)
   print(paste0("Number of cases in vaccine group: ", num_case_tx))
   print(paste0("Number of cases in control group: ", num_case_ct))
-  print(paste0("Number of cases by day ", C$t_e, " in vaccine group: ",
-              num_case_tx_t_e))
-  print(paste0("Number of cases by day ", C$t_e, " in control group: ",
-              num_case_ct_t_e))
+  print(paste0("Number of cases by day ", C$t_0, " in vaccine group: ",
+              num_case_tx_t_0))
+  print(paste0("Number of cases by day ", C$t_0, " in control group: ",
+              num_case_ct_t_0))
   print(paste0("Number at-risk in vaccine group: ", num_atrisk_tx))
   print(paste0("Number at-risk in control group: ", num_atrisk_ct))
-  print(paste0("Naive P(COVID by day ", C$t_e, ") in vaccine group: ",
-              round(num_case_tx_t_e/num_atrisk_tx,3)))
-  print(paste0("Naive P(COVID by day ", C$t_e, ") in control group: ",
-              round(num_case_ct_t_e/num_atrisk_ct,3)))
+  print(paste0("Naive P(COVID by day ", C$t_0, ") in vaccine group: ",
+              round(num_case_tx_t_0/num_atrisk_tx,3)))
+  print(paste0("Naive P(COVID by day ", C$t_0, ") in control group: ",
+              round(num_case_ct_t_0/num_atrisk_ct,3)))
   print(paste0("Naive vaccine efficacy: ",
-              round(1 - (num_case_tx_t_e/num_atrisk_tx) /
-                      (num_case_ct_t_e/num_atrisk_ct),3)))
+              round(1 - (num_case_tx_t_0/num_atrisk_tx) /
+                      (num_case_ct_t_0/num_atrisk_ct),3)))
   
   # Fraction of point mass at edge
   a <- dat_orig$a
@@ -1181,7 +1181,7 @@ if (cfg2$run_dqa) {
     # Compute CVE estimates
     if (run_cve) {
       if (!exists("df_ct")) { stop("df_ct does not exist") }
-      risk_ct <- get.marginalized.risk.no.marker(df_ct, C$t_e)
+      risk_ct <- get.marginalized.risk.no.marker(df_ct, C$t_0)
       cve <- Vectorize(function(x) { 1 - x/risk_ct })
       ests_cve <- cve(ests_risk)
       if (ci_type=="regular") {
@@ -1635,7 +1635,7 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
   )
   
   if (nrow(plot_data_risk)>0) {
-    cfg2$lab_y <- paste0("Probability of ", cfg2$endpoint, " by day ", cfg2$t_e)
+    cfg2$lab_y <- paste0("Probability of ", cfg2$endpoint, " by day ", cfg2$t_0)
     plot <- create_plot(
       plot_data = trim_plot_data(plot_data_risk),
       which = "Risk",
@@ -1653,7 +1653,7 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
   
   if (nrow(plot_data_cve)>0) {
     cfg2$lab_y <- paste0("Controlled VE against ", cfg2$endpoint,
-                         " by day ", cfg2$t_e)
+                         " by day ", cfg2$t_0)
     
     if (F) {
       cfg2$lab_title <- "IgG3 V1V2 breadth (Weighted avg log10 Net MFI): Month 7"
@@ -1712,7 +1712,7 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
 if (F) {
   
   # Temp
-  cfg2$t_e <- 595
+  cfg2$t_0 <- 595
   cfg2$lab_title <- c("HVTN703/HPTN081", "HVTN704/HPTN085", "Pooled AMP trials")
   cfg2$amp_tx2 <- rep(c("Control", "VRC01 10mg/kg", "VRC01 30mg/kg",
                     "VRC01 Pooled"), 3)
@@ -1759,9 +1759,9 @@ if (F) {
       
       # Generate KM object
       srv_ov <- survfit(Surv(dat_orig$y_star,dat_orig$delta_star)~1)
-      risk_ov <- 1 - srv_ov$surv[which.min(abs(srv_ov$time-C$t_e))]
-      ci_lo_ov <- 1 - srv_ov$upper[which.min(abs(srv_ov$time-C$t_e))]
-      ci_hi_ov <- 1 - srv_ov$lower[which.min(abs(srv_ov$time-C$t_e))]
+      risk_ov <- 1 - srv_ov$surv[which.min(abs(srv_ov$time-C$t_0))]
+      ci_lo_ov <- 1 - srv_ov$upper[which.min(abs(srv_ov$time-C$t_0))]
+      ci_hi_ov <- 1 - srv_ov$lower[which.min(abs(srv_ov$time-C$t_0))]
       km <- data.frame(
         x = c(999,999),
         y = rep(risk_ov, 2),
@@ -1803,7 +1803,7 @@ if (F) {
     }
     
     # Generate and save plot
-    cfg2$lab_y <- paste0("Probability of ", cfg2$endpoint, " by day ", cfg2$t_e)
+    cfg2$lab_y <- paste0("Probability of ", cfg2$endpoint, " by day ", cfg2$t_0)
     lab_title <- cfg2$lab_title[plot_map$lab_title[i]]
     plot <- create_plot(
       plot_data = plot_data_risk,
@@ -1863,7 +1863,7 @@ if (cfg2$run_debug$objs) {
   #   ests$etastar_n(a,w=c(0,0))
   # })
   # Q_n <- Vectorize(function(a) {
-  #   ests$Q_n(t=C$t_e, w=c(0,0), a)
+  #   ests$Q_n(t=C$t_0, w=c(0,0), a)
   # })
   # 
   # int_data <- data.frame(
@@ -1992,9 +1992,9 @@ if (F) {
            EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
       data = df_ct
     )
-    rate_ct <- 1 - srv_ct$surv[which.min(abs(srv_ct$time-C$t_e))]
-    ci_lo_ct <- 1 - srv_ct$upper[which.min(abs(srv_ct$time-C$t_e))]
-    ci_hi_ct <- 1 - srv_ct$lower[which.min(abs(srv_ct$time-C$t_e))]
+    rate_ct <- 1 - srv_ct$surv[which.min(abs(srv_ct$time-C$t_0))]
+    ci_lo_ct <- 1 - srv_ct$upper[which.min(abs(srv_ct$time-C$t_0))]
+    ci_hi_ct <- 1 - srv_ct$lower[which.min(abs(srv_ct$time-C$t_0))]
     var_ct <- ((ci_hi_ct-ci_lo_ct)/3.92)^2
     
     # Calculate treatment group survival (KM; with SE)
@@ -2003,9 +2003,9 @@ if (F) {
            EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
       data = df_tx
     )
-    rate_tx <- 1 - srv_tx$surv[which.min(abs(srv_tx$time-C$t_e))]
-    ci_lo_tx <- 1 - srv_tx$upper[which.min(abs(srv_tx$time-C$t_e))]
-    ci_hi_tx <- 1 - srv_tx$lower[which.min(abs(srv_tx$time-C$t_e))]
+    rate_tx <- 1 - srv_tx$surv[which.min(abs(srv_tx$time-C$t_0))]
+    ci_lo_tx <- 1 - srv_tx$upper[which.min(abs(srv_tx$time-C$t_0))]
+    ci_hi_tx <- 1 - srv_tx$lower[which.min(abs(srv_tx$time-C$t_0))]
     var_tx <- ((ci_hi_tx-ci_lo_tx)/3.92)^2
     
     # Calculate overall vaccine efficacy (KM; delta method; with SE+CI)
@@ -2024,7 +2024,7 @@ if (F) {
       data = dplyr::filter(df_tx, ph2.D29start1==1),
       weights = wt.D29start1
     ))
-    rate_tx_sub <- 1 - srv_tx_sub$surv[which.min(abs(srv_tx_sub$time-C$t_e))]
+    rate_tx_sub <- 1 - srv_tx_sub$surv[which.min(abs(srv_tx_sub$time-C$t_0))]
     ve_subcohort <- 1 - (rate_tx_sub/rate_ct)
     print(paste0("Overall VE (subcohort): ", round(100*ve_subcohort,1), "%"))
     

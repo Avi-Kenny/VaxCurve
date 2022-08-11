@@ -214,7 +214,7 @@ Pi <- function(sampling, delta_star, y_star, w) {
   } else if (sampling=="cycle") {
     probs <- rep(c(0.8,0.6,0.4,0.2), length.out=length(y_star))
   } else {
-    ev <- In(delta_star==1 & y_star<=C$t_e)
+    ev <- In(delta_star==1 & y_star<=C$t_0)
     if (sampling=="two-phase (6%)") {
       probs <- ev + (1-ev)*expit(w$w1+w$w2-3.85)
     } else if (sampling=="two-phase (72%)") {
@@ -319,7 +319,7 @@ ss <- function(dat_orig, indices) {
 round_dat <- function(dat_orig) {
   
   dat_orig$a <- round(dat_orig$a, -log10(C$appx$a))
-  dat_orig$y_star <- round(dat_orig$y_star, -log10(C$appx$t_e))
+  dat_orig$y_star <- round(dat_orig$y_star, -log10(C$appx$t_0))
   for (i in c(1:length(dat_orig$w))) {
     rnd <- 8
     tol <- C$appx$w_tol
@@ -646,7 +646,7 @@ construct_gcomp_n <- function(dat_orig, vals=NA, Q_n) {
   
   fnc <- function(a) {
     1 - mean(Q_n(
-      rep(C$t_e, nrow(dat_orig$w)),
+      rep(C$t_0, nrow(dat_orig$w)),
       dat_orig$w,
       rep(a, nrow(dat_orig$w))
     ))
@@ -871,8 +871,8 @@ construct_omega_n <- function(vals=NA, Q_n, Qc_n, type="estimated") {
       if (k==0) {
         integral <- 0
       } else {
-        i <- round(seq(C$appx$t_e,k,C$appx$t_e), -log10(C$appx$t_e))
-        incr <- C$appx$t_e
+        i <- round(seq(C$appx$t_0,k,C$appx$t_0), -log10(C$appx$t_0))
+        incr <- C$appx$t_0
         w_long <- as.data.frame(
           matrix(rep(w,length(i)), ncol=length(w), byrow=T)
         )
@@ -890,14 +890,14 @@ construct_omega_n <- function(vals=NA, Q_n, Qc_n, type="estimated") {
     
     fnc <- function(w,a,y_star,delta_star) {
       
-      k <- round(min(y_star,C$t_e), -log10(C$appx$t_e))
+      k <- round(min(y_star,C$t_0), -log10(C$appx$t_0))
       
       if (F) {
         return (0)
       } # DEBUG
       
-      return(Q_n(C$t_e,w,a) * (
-        (delta_star * In(y_star<=C$t_e)) / (Q_n(k,w,a) * Qc_n(k,w,a)) -
+      return(Q_n(C$t_0,w,a) * (
+        (delta_star * In(y_star<=C$t_0)) / (Q_n(k,w,a) * Qc_n(k,w,a)) -
           omega_integral(k,w,a)
       ))
       
@@ -923,15 +923,15 @@ construct_omega_n <- function(vals=NA, Q_n, Qc_n, type="estimated") {
       lin2 <- C$alpha_1*w[1] + C$alpha_2*w[2] - 1
       
       # Compute omega_0
-      piece_1 <- exp(-1*lmbd*(C$t_e^v)*exp(lin))
-      piece_2 <- (delta_star*In(y_star<=C$t_e)) /
+      piece_1 <- exp(-1*lmbd*(C$t_0^v)*exp(lin))
+      piece_2 <- (delta_star*In(y_star<=C$t_0)) /
         exp(-1*(lmbd*y_star^v*exp(lin)+lmbd2*y_star^v2*exp(lin2)))
       integral <- integrate(
         function(t) {
           t^(v-1) * exp(lin+lmbd*t^v*exp(lin)+lmbd2*t^v2*exp(lin2))
         },
         lower = 0,
-        upper = min(C$t_e,y_star)
+        upper = min(C$t_0,y_star)
       )$value
       piece_3 <- lmbd*v*integral
       
@@ -1057,9 +1057,9 @@ construct_q_n <- function(type="Super Learner", dat, dat_orig,
         t1 <- t - width/2
         t2 <- t + width/2
         if (t1<0) { t2<-width; t1<-0; }
-        if (t2>C$t_e) { t1<-C$t_e-width; t2<-C$t_e; }
-        t1 <- round(t1,-log10(C$appx$t_e))
-        t2 <- round(t2,-log10(C$appx$t_e))
+        if (t2>C$t_0) { t1<-C$t_0-width; t2<-C$t_0; }
+        t1 <- round(t1,-log10(C$appx$t_0))
+        t2 <- round(t2,-log10(C$appx$t_0))
         ch_y <- Q_n(t2,w,a) - Q_n(t1,w,a)
 
         return(ch_y/width)
@@ -1378,7 +1378,7 @@ construct_eta_n <- function(dat, vals=NA, Q_n) {
     return(
       (1/n_orig) * sum(
         dat$weights * In(dat$a<=x) *
-          (1-Q_n(rep(C$t_e,length(dat$a)),w_long,dat$a))
+          (1-Q_n(rep(C$t_0,length(dat$a)),w_long,dat$a))
       )
     )
   }
@@ -1404,7 +1404,7 @@ construct_etastar_n <- function(Q_n, vals=NA) {
       integral <- 0
     } else {
       integral <- sum(sapply(seq(C$appx$a,x,C$appx$a), function(a) {
-        C$appx$a * Q_n(C$t_e, w, round(a,-log10(C$appx$a)))
+        C$appx$a * Q_n(C$t_0, w, round(a,-log10(C$appx$a)))
       }))
     }
     return(x-integral)
@@ -1503,7 +1503,7 @@ construct_Gamma_os_n <- function(dat, vals=NA, omega_n, Q_n, g_n,
         g_n(dat$a,dat$w)
     ) )
     subpiece_2a <- (weights_i_long*weights_j_long) *
-      Q_n(rep(C$t_e, length(a_i_long)),w_j_long,a_i_long)
+      Q_n(rep(C$t_0, length(a_i_long)),w_j_long,a_i_long)
     
     # Remove large intermediate objects
     rm(dat,delta_star_i_long,delta_star_j_long,i_long,j_long,omega_n,Q_n,
@@ -1528,7 +1528,7 @@ construct_Gamma_os_n <- function(dat, vals=NA, omega_n, Q_n, g_n,
   if (type=="plug-in") {
     
     piece <- weights_i_long*weights_j_long *
-      (1 - Q_n(rep(C$t_e, length(a_i_long)),w_j_long,a_i_long))
+      (1 - Q_n(rep(C$t_0, length(a_i_long)),w_j_long,a_i_long))
     
     # Remove large intermediate objects
     rm(dat,delta_star_i_long,delta_star_j_long,i_long,j_long,omega_n,Q_n,
@@ -1787,7 +1787,7 @@ create_val_list <- function(dat_orig, factor_A=NA) {
     a <- factor_A
   }
   Q_n_pre <- expand.grid(
-    t = round(seq(0,C$t_e,C$appx$t_e),-log10(C$appx$t_e)),
+    t = round(seq(0,C$t_0,C$appx$t_0),-log10(C$appx$t_0)),
     w_index = W_reduced$w_index,
     a = a
   )
@@ -2111,7 +2111,7 @@ r_Mn_edge <- function(dat, pi_n, Q_n, omega_n, val=0) {
   
   return(
     1 - (1/n_orig) * sum(dat$weights * (
-      Q_n(rep(C$t_e,n_dat),dat$w,a=rep(val,n_dat)) - (
+      Q_n(rep(C$t_0,n_dat),dat$w,a=rep(val,n_dat)) - (
         (In(dat$a==val)/pi_n(dat$w, rep(val,n_dat))) *
           omega_n(dat$w,a=rep(val,n_dat),dat$y_star,dat$delta_star)
       )
@@ -2138,7 +2138,7 @@ sigma2_edge <- function(dat, pi_n, Q_n, omega_n, r_Mn_edge_est, val=0) {
   
   return(
     (1/n_orig) * sum((dat$weights * (
-      Q_n(rep(C$t_e,n_dat),dat$w,a=rep(val,n_dat)) - (
+      Q_n(rep(C$t_0,n_dat),dat$w,a=rep(val,n_dat)) - (
         (In(dat$a==val)/pi_n(dat$w, rep(val,n_dat))) *
           omega_n(dat$w,a=rep(val,n_dat),dat$y_star,dat$delta_star)
       ) -
@@ -2207,7 +2207,7 @@ construct_eta_ss_n <- function(dat, Q_n, z_n, vals=NA) {
     )
     (1/(n_orig*z_n)) * sum(
       piece_1 * In(dat$a<=x) *
-        (1-Q_n(rep(C$t_e,length(dat$a)),w_long,dat$a))
+        (1-Q_n(rep(C$t_0,length(dat$a)),w_long,dat$a))
     )
   }
   
@@ -2779,7 +2779,7 @@ cox_var <- function(dat_orig, dat, t, points, se_beta=F, se_bshz=F,
     
     # !!!! basehaz vs. Lambda_hat
     bh <- basehaz(model, centered=FALSE)
-    index <- max(which((bh$time<C$t_e)==T))
+    index <- max(which((bh$time<C$t_0)==T))
     est_bshz <- bh$hazard[index]
     N <- sum(dat$weights)
     res$est_marg <- unlist(lapply(points, function(a) {

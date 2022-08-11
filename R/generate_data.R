@@ -159,7 +159,7 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
       S_0 <- function(t, w1, w2, a) { exp(-1*sc_params$lmbd*t) }
     }
     
-    theta_true_f <- Vectorize(function(a) { 1 - mean(S_0(C$t_e,w1,w2,a)) })
+    r_M0_f <- Vectorize(function(a) { 1 - mean(S_0(C$t_e,w1,w2,a)) })
     
     # Note: Uncomment this to return true Theta_true
     #       Only holds if A and W are independent
@@ -191,7 +191,7 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
   }
   
   # Add attributes to dataframe
-  attr(dat_orig, "theta_true") <- theta_true_f(C$points)
+  attr(dat_orig, "r_M0") <- r_M0_f(C$points)
   attr(dat_orig, "sampling") <- sampling
   
   # Add (stabilized) inverse weights

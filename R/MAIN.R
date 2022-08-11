@@ -11,11 +11,11 @@
 # GitHub packages: tedwestling/ctsCausal, tedwestling/CFsurvival,
 #                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
-  main_task = "analysis.R", # run update analysis.R
+  main_task = "run", # run update analysis.R
   which_sim = "estimation", # "estimation" "edge" "testing" "Cox" "debugging"
   level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
   # keep = c(1:3,7:9,16:18,22:24),
-  num_sim = 500,
+  num_sim = 250,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm", "tidyr",
@@ -90,94 +90,26 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     # sc_params = list("no cens"=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5)),
     # sc_params = list("exp"=list(lmbd=1e-3, v=1.5, lmbd2=5e-4, v2=1.5)),
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
-    # distr_A = c("N(0.3+0.4w2,0.04)"),
-    distr_A = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4w2,0.04)"),
-    # edge = c("expit 0.4"),
-    edge = c("none"),
+    distr_A = c("Unif(0,1)", "N(0.5,0.04)"),
+    # distr_A = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4w2,0.04)"),
+    edge = c("none"), # "expit 0.4"
     # surv_true = c("Complex"),
-    surv_true = c("Cox PH", "Complex"), # "Cox PH" "Complex" "exp"
+    surv_true = c("Cox PH"), # "Cox PH" "Complex" "exp"
+    # surv_true = c("Cox PH", "Complex"), # "Cox PH" "Complex" "exp"
     sampling = c("two-phase (50%)"), # "iid"
     wts_type = c("estimated"), # c("true", "estimated")
     estimator = list(
       "Grenander (Cox)" = list(
         est = "Grenander",
-        params = list(marg="Gamma_star2", S_n_type="Cox PH", # Gamma_star
-                      convex_type="GCM", ecdf_type="linear (mid)",
-                      edge_corr="none",
-                      deriv_type="m-spline", g_n_type="parametric")
-      ),
-      "Cox PH" = list(est="Cox gcomp")
-      
-      # "Grenander (Cox)" = list(
-      #   est = "Grenander",
-      #   params = list(marg="Gamma_star", S_n_type="Cox PH", # Gamma_star2
-      #                 convex_type="GCM", ecdf_type="linear (mid)",
-      #                 edge_corr="none", # "min" "none"
-      #                 deriv_type="m-spline", g_n_type="parametric") # binning
-      # ),
-      # "Grenander (RF)" = list(
-      #   est = "Grenander",
-      #   params = list(marg="Gamma_star", S_n_type="Random Forest", # Gamma_star2
-      #                 convex_type="GCM", ecdf_type="linear (mid)",
-      #                 edge_corr="none", # "min" "none"
-      #                 deriv_type="m-spline", g_n_type="parametric") # binning
-      # )
-      
-      
-      # "Grenander (true)" = list(
-      #   est = "Grenander",
-      #   params = list(marg="Gamma_star", S_n_type="true", # Gamma_star2
-      #                 convex_type="GCM", ecdf_type="linear (mid)",
-      #                 edge_corr="none", # "min" "none"
-      #                 deriv_type="m-spline", g_n_type="parametric")
-      # ),
-      # "Grenander (Cox, Gamma)" = list(
-      #   est = "Grenander",
-      #   params = list(marg="Gamma", S_n_type="Cox PH", # Gamma_star2
-      #                 convex_type="GCM", ecdf_type="linear (mid)",
-      #                 edge_corr="none", # "min" "none"
-      #                 deriv_type="m-spline", g_n_type="parametric")
-      # ),
-      # "Grenander (constant)" = list(
-      #   est = "Grenander",
-      #   params = list(marg="Gamma_star", S_n_type="constant", # Gamma_star2
-      #                 convex_type="GCM", ecdf_type="linear (mid)",
-      #                 edge_corr="none", # "min" "none"
-      #                 deriv_type="m-spline", g_n_type="parametric")
-      # )
-      # "Grenander (RF)" = list(
-      #   est = "Grenander",
-      #   params = list(marg="Gamma_star", S_n_type="Random Forest", # Gamma_star2
-      #                 convex_type="GCM", ecdf_type="linear (mid)",
-      #                 edge_corr="none", # "min" "none"
-      #                 deriv_type="m-spline", g_n_type="parametric")
-      # ),
-      # "Grenander (SL)" = list(
-      #   est = "Grenander",
-      #   params = list(marg="Gamma_star", S_n_type="Super Learner", # Gamma_star2
-      #                 convex_type="GCM", ecdf_type="linear (mid)",
-      #                 edge_corr="min", # "min" "none"
-      #                 deriv_type="m-spline", g_n_type="parametric")
-      # )
+        params = list(marg="Gamma_star2", S_n_type="Cox PH", # marg="Gamma_star", S_n_type="Random Forest", S_n_type="true"
+                      convex_type="GCM", ecdf_type="linear (mid)", # convex_type="LS"
+                      edge_corr="none", # edge_corr="min"
+                      deriv_type="m-spline", g_n_type="parametric") # g_n_type="binning", g_n_type="true"
+      )
+      # "Cox PH" = list(est="Cox gcomp")
       # "Qbins (true)" = list(
       #   est = "Qbins",
       #   params = list(n_bins=8, S_n_type="Cox PH")
-      # ),
-      # "Grenander (LS)" = list(
-      #   est = "Grenander",
-      #   params = list(marg="Gamma_star", S_n_type="Cox PH",
-      #                 convex_type="LS", ecdf_type="linear (mid)",
-      #                 g_n_type="binning")
-      # )
-      # "Grenander (SL/true)" = list(
-      #   est = "Grenander",
-      #   params = list(marg="Gamma_star2", S_n_type="Super Learner",
-      #                 g_n_type="true")
-      # ),
-      # "Grenander (SL/binning)" = list(
-      #   est = "Grenander",
-      #   params = list(marg="Gamma_star2", S_n_type="Super Learner",
-      #                 g_n_type="binning")
       # )
     )
   )
@@ -362,8 +294,8 @@ if (F) {
     # m <- format(round(i/4-0.25,2), nsmall=2)
     summ_bias[[i]] <- list(
       name = paste0("bias_",m),
-      estimate = paste0("est_",m),
-      truth = paste0("theta_",m)
+      estimate = paste0("r_Mn_",m),
+      truth = paste0("r_M0_",m)
     )
     if (F) {
       summ_biasG[[i]] <- list(
@@ -379,16 +311,16 @@ if (F) {
     } # DEBUG: Gamma/Phi
     summ_var[[i]] <- list(
       name = paste0("var_",m),
-      x = paste0("est_",m)
+      x = paste0("r_Mn_",m)
     )
     summ_mse[[i]] <- list(
       name = paste0("mse_",m),
-      estimate = paste0("est_",m),
-      truth = paste0("theta_",m)
+      estimate = paste0("r_Mn_",m),
+      truth = paste0("r_M0_",m)
     )
     summ_cov[[i]] <- list(
       name = paste0("cov_",m),
-      truth = paste0("theta_",m),
+      truth = paste0("r_M0_",m),
       lower = paste0("ci_lo_",m),
       upper = paste0("ci_hi_",m),
       na.rm = T
@@ -693,12 +625,12 @@ if (F) {
   summ <- sim %>% summarize(
     bias_pct = list(
       name = "bias_pct",
-      estimate = "theta_est",
-      truth = "theta_true"
+      estimate = "r_Mn",
+      truth = "r_M0"
     ),
     coverage = list(
       name = "coverage",
-      truth = "theta_true",
+      truth = "r_M0",
       lower = "ci_lo",
       upper = "ci_hi"
       # na.rm = T
@@ -763,8 +695,8 @@ if (F) {
   d %<>% filter(level_id==1)
   
   # Set up vector containers
-  theta_true <- c()
-  theta_est <- c()
+  r_M0 <- c()
+  r_Mn <- c()
   ci_lo <- c()
   ci_hi <- c()
   which <- c()
@@ -774,12 +706,12 @@ if (F) {
   row_offset <- 10
   for (i in c(1:51)) {
     m <- format(round(i/50-0.02,2), nsmall=1)
-    theta_true <- c(theta_true, d[1,paste0("theta_",m)])
+    r_M0 <- c(r_M0, d[1,paste0("r_M0_",m)])
   }
   for (i in 1:n_paths) {
     for (j in c(1:51)) {
       m <- format(round(j/50-0.02,2), nsmall=1)
-      theta_est <- c(theta_est, d[i+row_offset,paste0("est_",m)])
+      r_Mn <- c(r_Mn, d[i+row_offset,paste0("r_Mn_",m)])
       ci_lo <- c(ci_lo, d[i+row_offset,paste0("ci_lo_",m)])
       ci_hi <- c(ci_hi, d[i+row_offset,paste0("ci_hi_",m)])
       which <- c(which, i)
@@ -788,7 +720,7 @@ if (F) {
   
   plot_data <- data.frame(
     x = rep(sim$constants$points, n_paths),
-    y = theta_est,
+    y = r_Mn,
     ci_lo = ci_lo,
     ci_hi = ci_hi,
     which = which
@@ -803,7 +735,7 @@ if (F) {
       linetype = "dashed"
     ) +
     geom_line(
-      data = data.frame(x=sim$constants$points, y=theta_true),
+      data = data.frame(x=sim$constants$points, y=r_M0),
       color = "#222222"
     ) +
     geom_line() +
@@ -839,9 +771,9 @@ if (F) {
   d %<>% filter(level_id==1)
   
   # Set up vector containers
-  theta_true <- c()
+  r_M0 <- c()
   # Theta_true <- c()
-  theta_est <- c()
+  r_Mn <- c()
   # Theta_est <- c()
   which <- c()
   
@@ -850,13 +782,13 @@ if (F) {
   row_offset <- 0
   for (i in c(1:51)) {
     m <- format(round(i/50-0.02,2), nsmall=2)
-    theta_true <- c(theta_true, d[1,paste0("theta_",m)])
+    r_M0 <- c(r_M0, d[1,paste0("r_M0_",m)])
     # Theta_true <- c(Theta_true, d[1,paste0("Theta_",m)])
   }
   for (i in 1:n_paths) {
     for (j in c(1:51)) {
       m <- format(round(j/50-0.02,2), nsmall=2)
-      theta_est <- c(theta_est, d[i+row_offset,paste0("est_",m)])
+      r_Mn <- c(r_Mn, d[i+row_offset,paste0("r_Mn_",m)])
       # Theta_est <- c(Theta_est, d[i+row_offset,paste0("esT_",m)])
       which <- c(which, i)
     }
@@ -865,12 +797,12 @@ if (F) {
   # points <- get("points", envir=sim$vars$env)
   points <- C$points
   ggplot(
-    data.frame(x=rep(points, n_paths), y=theta_est, which=which),
+    data.frame(x=rep(points, n_paths), y=r_Mn, which=which),
     aes(x=x, y=y, group=which)
   ) +
     geom_line(alpha=0.05) +
     geom_line(
-      data = data.frame(x=points, y=theta_true),
+      data = data.frame(x=points, y=r_M0),
       aes(x=x, y=y),
       color = "white",
       inherit.aes = F

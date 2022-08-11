@@ -544,7 +544,8 @@
       "Risk, Cox model" = c(0.025,0.975),
       "CVE, Cox model" = c(0.025,0.975)
     )
-    cfg2$zoom_x <- "zoomed" # !!!!! Changed from NA
+    cfg2$zoom_x <- NA # !!!!! Temporarily switched back to this
+    # cfg2$zoom_x <- "zoomed" # !!!!! Changed from NA
     cfg2$zoom_y_cve <- "zoomed"
     cfg2$zoom_y_risk <- "zoomed (risk)"
     cfg2$folder_local <- "HVTN 705 (all) data/"
@@ -1258,7 +1259,7 @@ if (cfg2$run_analysis &&
     dir = "decr",
     return_extra = return_extra
   )
-
+  
   saveRDS(ests, paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds"))
   # ests <- readRDS(paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds"))
   

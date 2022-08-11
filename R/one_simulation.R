@@ -22,17 +22,17 @@ if (cfg$which_sim=="estimation") {
       params = L$estimator$params,
       points = C$points,
       dir = L$dir
-      # return_extra = "deriv_theta_n" # "Theta_os_n"
+      # return_extra = "deriv_r_Mn" # "Theta_os_n"
     )
 
     # Return results
-    theta_true <- attr(dat_orig, "theta_true")
+    r_M0 <- attr(dat_orig, "r_M0")
     Gamma_true <- attr(dat_orig, "Gamma_true")
     res_list <- list()
     for (i in 1:length(C$points)) {
       m <- format(C$points[i], nsmall=2)
-      res_list[paste0("theta_",m)] <- theta_true[i]
-      res_list[paste0("est_",m)] <- ests$est[i]
+      res_list[paste0("r_M0_",m)] <- r_M0[i]
+      res_list[paste0("r_Mn_",m)] <- ests$r_Mn[i]
       res_list[paste0("ci_lo_",m)] <- ests$ci_lo[i]
       res_list[paste0("ci_hi_",m)] <- ests$ci_hi[i]
       if (F) {
@@ -166,15 +166,15 @@ if (cfg$which_sim=="edge") {
     omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n,
                                  type=params$omega_n_type)
     pi_n <- construct_pi_n(dat, vlist$W_grid, type="logistic")
-    theta_os_n_est <- theta_os_n(dat, pi_n, S_n, omega_n)
-    sigma2_os_n_est <- sigma2_os_n(dat, pi_n, S_n, omega_n, theta_os_n_est)
+    r_Mn <- theta_os_n(dat, pi_n, S_n, omega_n)
+    sigma2_r_Mn <- sigma2_os_n(dat, pi_n, S_n, omega_n, r_Mn)
     
     # Return results
     return(list(
-      theta_true = attr(dat_orig, "theta_true")[1],
-      theta_est = theta_os_n_est,
-      ci_lo = theta_os_n_est - 1.96*sqrt(sigma2_os_n_est/n_orig),
-      ci_hi = theta_os_n_est + 1.96*sqrt(sigma2_os_n_est/n_orig)
+      r_M0 = attr(dat_orig, "r_M0")[1],
+      r_Mn = r_Mn,
+      ci_lo = r_Mn - 1.96*sqrt(sigma2_r_Mn/n_orig),
+      ci_hi = r_Mn + 1.96*sqrt(sigma2_r_Mn/n_orig)
     ))
     
   }
@@ -229,7 +229,7 @@ if (cfg$which_sim=="Cox") {
       }
       true_lp <- sum(c(C$alpha_1,C$alpha_2,L$alpha_3)*z_0)
       true_surv <- exp(-1*exp(true_lp)*H_0_true(C$t_e))
-      true_marg <- 1-attr(dat_orig, "theta_true")[26] # Corresponds to A=0.5
+      true_marg <- 1-attr(dat_orig, "r_M0")[26] # Corresponds to A=0.5
     } # DEBUG: intermediate objects
     
     # Construct simulation results object

@@ -68,11 +68,11 @@
     pct_inf <- c(pct_inf, mean(as.integer(dat_orig$delta_star==1)*
                                  as.integer(dat_orig$y_star<=200)))
     num_tp <- c(num_tp, sum(dat_orig$delta))
-    pct_inf_a0 <- c(pct_inf_a0, attr(dat_orig,"theta_true")[1])
-    pct_inf_a3 <- c(pct_inf_a3, attr(dat_orig,"theta_true")[16])
-    pct_inf_a5 <- c(pct_inf_a5, attr(dat_orig,"theta_true")[26])
-    pct_inf_a7 <- c(pct_inf_a7, attr(dat_orig,"theta_true")[36])
-    pct_inf_a1 <- c(pct_inf_a1, attr(dat_orig,"theta_true")[51])
+    pct_inf_a0 <- c(pct_inf_a0, attr(dat_orig,"r_M0")[1])
+    pct_inf_a3 <- c(pct_inf_a3, attr(dat_orig,"r_M0")[16])
+    pct_inf_a5 <- c(pct_inf_a5, attr(dat_orig,"r_M0")[26])
+    pct_inf_a7 <- c(pct_inf_a7, attr(dat_orig,"r_M0")[36])
+    pct_inf_a1 <- c(pct_inf_a1, attr(dat_orig,"r_M0")[51])
     
   }
   
@@ -213,7 +213,7 @@
     lmbd <- L$sc_params$lmbd
     v <- L$sc_params$v
     
-    theta_true_f <- Vectorize(function(a) {
+    r_M0_f <- Vectorize(function(a) {
       
       lin <- function(w1,w2,a) {
         if (L$surv_true=="Cox PH") {
@@ -241,7 +241,7 @@
       
     })
     
-    deriv_theta_0 <- function (x) { grad(func=theta_true_f, x=x) }
+    deriv_theta_0 <- function (x) { grad(func=r_M0_f, x=x) }
   }
   
   # Esimate deriv_theta_n n_samples times
@@ -862,7 +862,7 @@
   {
     i=7
     ests<-eval(as.name(paste0("ests",i)))
-    theta_true <- attr(dat_orig, "theta_true")
+    r_M0 <- attr(dat_orig, "r_M0")
     theta_ests <- ests$est
     ci_lo <- ests$ci_lo
     ci_hi <- ests$ci_hi
@@ -871,10 +871,10 @@
     # Plot theta_n (estimate vs. truth)
     plot_data <- data.frame(
       x = rep(C$points, 2),
-      theta = c(theta_ests, theta_true),
+      theta = c(theta_ests, r_M0),
       which = rep(c("Est","Truth"), each=len),
-      ci_lo = c(ci_lo, theta_true),
-      ci_hi = c(ci_hi, theta_true)
+      ci_lo = c(ci_lo, r_M0),
+      ci_hi = c(ci_hi, r_M0)
     )
     ggplot(plot_data, aes(x=x, y=theta, color=factor(which))) +
       geom_line() +

@@ -1243,7 +1243,7 @@ if (cfg2$run_analysis &&
   return_extra <- c()
   if (cfg2$run_debug$objs) {
     return_extra <- c(return_extra, "omega_n", "f_aIw_n", "S_n", "grid",
-                      "Phi_n", "Gamma_os_n_star", "gcm", "dGCM", "theta_n_Gr")
+                      "Phi_n", "Gamma_os_n_star", "gcm", "dGCM", "r_Mn_Gr")
   }
   if (cfg2$run_debug$gren_var) {
     return_extra <- c(return_extra, "deriv_r_Mn", "f_a_n", "gamma_n")
@@ -1840,10 +1840,10 @@ if (cfg2$run_debug$objs) {
                      method="linear", rule=1)
   df_A <- data.frame(x=x_vals, y=y_vals, y2=GCM_f(x_vals))
   grid2 <- round(seq(0,1,0.02),2)
-  df_B <- data.frame(x=grid2, y=ests$theta_n_Gr(grid2))
+  df_B <- data.frame(x=grid2, y=ests$r_Mn_Gr(grid2))
   plot1 <- ggplot(df_A, aes(x=x,y=y)) + geom_point(alpha=0.4) + geom_line(aes(y=y2)) +
     labs(title="x=Phi(A), y=Gamma_n(A)")
-  plot2 <- ggplot(df_B, aes(x=x,y=y)) + geom_line() + labs(title="theta_n estimates")
+  plot2 <- ggplot(df_B, aes(x=x,y=y)) + geom_line() + labs(title="r_Mn estimates")
   
   ggsave(
     filename = paste0(cfg2$analysis," plots/debug_A_",cfg2$tid,".pdf"),
@@ -1869,7 +1869,7 @@ if (cfg2$run_debug$objs) {
   # int_data <- data.frame(
   #   x = rep(grid,3),
   #   y = c(ests$Psi_n(grid), gcm(grid), ests$dGCM(grid)),
-  #   which = rep(c("Psi_n (-1*Theta_os_n)","gcm","dGCM (-1*theta_n)"), each=101)
+  #   which = rep(c("Psi_n (-1*Theta_os_n)","gcm","dGCM (-1*r_Mn)"), each=101)
   # )
   # plot1 <- ggplot(int_data, aes(x=x, y=y, color=which)) +
   #   geom_line() +

@@ -270,24 +270,24 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     }
     print(paste("Check 14:", Sys.time()))
     
-    # Construct Grenander-based theta_n
+    # Construct Grenander-based r_Mn
     if (p$marg=="Theta") {
       if (dir=="incr") {
-        theta_n_Gr <- Vectorize(function(x) {
+        r_Mn_Gr <- Vectorize(function(x) {
           min(max(dGCM(x),0),1) # dGCM(x)
         })
       } else {
-        theta_n_Gr <- Vectorize(function(x) {
+        r_Mn_Gr <- Vectorize(function(x) {
           min(max(-1*dGCM(x),0),1) # -1*dGCM(x)
         })
       }
     } else if (p$marg %in% c("Gamma", "Gamma_star", "Gamma_star2")) {
       if (dir=="incr") {
-        theta_n_Gr <- Vectorize(function(x) {
+        r_Mn_Gr <- Vectorize(function(x) {
           min(max(dGCM(Phi_n(x)),0),1) # dGCM(Phi_n(x))
         })
       } else {
-        theta_n_Gr <- Vectorize(function(x) {
+        r_Mn_Gr <- Vectorize(function(x) {
           min(max(-1 * dGCM(Phi_n(x)),0),1) # -1 * dGCM(Phi_n(x))
         })
       }
@@ -314,33 +314,33 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     # Edge correction
     if (p$edge_corr=="none") {
       
-      theta_n <- theta_n_Gr
+      r_Mn <- r_Mn_Gr
       
     } else if (p$edge_corr=="point") {
       
-      theta_n <- function(x) {
-        if(x==0) { r_Mn_edge_est } else { theta_n_Gr(x) }
+      r_Mn <- function(x) {
+        if(x==0) { r_Mn_edge_est } else { r_Mn_Gr(x) }
       }
       
     } else if (p$edge_corr=="min") {
       
-      theta_n <- Vectorize(function(x) {
+      r_Mn <- Vectorize(function(x) {
         if(x==0 || x<a_min2) {
           r_Mn_edge_est
         } else {
           if (dir=="incr") {
-            max(r_Mn_edge_est, theta_n_Gr(x))
+            max(r_Mn_edge_est, r_Mn_Gr(x))
           } else {
-            min(r_Mn_edge_est, theta_n_Gr(x))
+            min(r_Mn_edge_est, r_Mn_Gr(x))
           }
         }
       })
       
       gren_points <- sapply(c(1:length(points)), function(i) {
         if (dir=="incr") {
-          as.numeric(theta_n(points[i])>r_Mn_edge_est)
+          as.numeric(r_Mn(points[i])>r_Mn_edge_est)
         } else {
-          as.numeric(theta_n(points[i])<r_Mn_edge_est)
+          as.numeric(r_Mn(points[i])<r_Mn_edge_est)
         }
       })
       
@@ -348,7 +348,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     # Generate estimates for each point
     print(paste("Check 19:", Sys.time()))
-    ests <- theta_n(points)
+    ests <- r_Mn(points)
     if (F) {
       ests_Gamma <- Gamma_os_n_star(points)
       ests_Phi <- Phi_n(points)
@@ -356,7 +356,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     print(paste("Check 20:", Sys.time()))
     
     # Construct variance scale factor
-    deriv_r_Mn <- construct_deriv_r_Mn(theta_n, type=p$deriv_type,
+    deriv_r_Mn <- construct_deriv_r_Mn(r_Mn, type=p$deriv_type,
                                              dir=dir)
     
     print(paste("Check 21:", Sys.time()))
@@ -582,7 +582,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   fns_extra <- c("f_a_n", "gamma_n", "deriv_r_Mn", "Phi_n_inv", "Theta_os_n",
                  "Phi_n", "omega_n", "f_aIw_n", "etastar_n", "S_n", "gcm",
                  "dGCM", "grid", "Gamma_os_n_star",
-                 "theta_n_Gr")
+                 "r_Mn_Gr")
   for (fn in fns_extra) {
     if (fn %in% return_extra) { res[[fn]] <- eval(as.name(fn)) }
   }

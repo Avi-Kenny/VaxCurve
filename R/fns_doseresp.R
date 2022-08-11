@@ -662,28 +662,28 @@ construct_gcomp_n <- function(dat_orig, vals=NA, S_n) {
 #' Construct derivative estimator theta'_n
 #' 
 #' 
-#' @param theta_n An estimator of theta_0 (usually theta_n or gcomp_n)
+#' @param r_Mn An estimator of r_M0
 #' @param type One of c("gcomp", "linear", "spline")
 #' @param dir Direction of monotonicity; one of c("incr", "decr")
-construct_deriv_r_Mn <- function(theta_n, type, dir="incr") {
+construct_deriv_r_Mn <- function(r_Mn, type, dir="incr") {
   
   # Estimate entire function on grid
   grid <- round(seq(0,1,0.01),2)
-  theta_ns <- theta_n(grid)
+  r_Mns <- r_Mn(grid)
   
   if (type=="linear") {
     
     grid_width <- grid[2] - grid[1]
     points_x <- c(grid[1])
-    points_y <- c(theta_ns[1])
+    points_y <- c(r_Mns[1])
     for (i in 2:length(grid)) {
-      if (theta_ns[i]-theta_ns[i-1]!=0) {
+      if (r_Mns[i]-r_Mns[i-1]!=0) {
         points_x <- c(points_x, grid[i]-(grid_width/2))
-        points_y <- c(points_y, mean(c(theta_ns[i],theta_ns[i-1])))
+        points_y <- c(points_y, mean(c(r_Mns[i],r_Mns[i-1])))
       }
     }
     points_x <- c(points_x, grid[length(grid)])
-    points_y <- c(points_y, theta_ns[length(grid)])
+    points_y <- c(points_y, r_Mns[length(grid)])
     points_sl <- c()
     for (i in 2:length(points_x)) {
       slope <- (points_y[i]-points_y[i-1]) /
@@ -706,16 +706,16 @@ construct_deriv_r_Mn <- function(theta_n, type, dir="incr") {
     
   } else if (type=="line") {
     
-    theta_n_left <- theta_n(0) # 0.1
-    theta_n_right <- theta_n(1) # 0.9
-    fnc <- function(a) { (theta_n_right-theta_n_left)/1 } # 0.8
+    r_Mn_left <- r_Mn(0) # 0.1
+    r_Mn_right <- r_Mn(1) # 0.9
+    fnc <- function(a) { (r_Mn_right-r_Mn_left)/1 } # 0.8
     
   } else if (type=="spline") {
     
     # Identify jump points of step function
     jump_points <- c(0)
     for (i in 2:length(grid)) {
-      if (theta_ns[i]!=theta_ns[i-1]) {
+      if (r_Mns[i]!=r_Mns[i-1]) {
         jump_points <- c(jump_points, mean(c(grid[i],grid[i-1])))
       }
     }
@@ -725,7 +725,7 @@ construct_deriv_r_Mn <- function(theta_n, type, dir="incr") {
     midpoints <- jump_points[1:(length(jump_points)-1)]+(diff(jump_points)/2)
     
     # Fit cubic smoothing spline
-    theta_n_smoothed <- smooth.spline(x=midpoints, y=theta_n(midpoints))
+    r_Mn_smoothed <- smooth.spline(x=midpoints, y=r_Mn(midpoints))
     
     # Construct derivative function
     fnc <- function(a) {
@@ -736,8 +736,8 @@ construct_deriv_r_Mn <- function(theta_n, type, dir="incr") {
       if (x1<0) { x2<-width; x1<-0 }
       if (x2>1) { x1<-1-width; x2<-1; }
       
-      y1 <- predict(theta_n_smoothed, x=x1)$y
-      y2 <- predict(theta_n_smoothed, x=x2)$y
+      y1 <- predict(r_Mn_smoothed, x=x1)$y
+      y2 <- predict(r_Mn_smoothed, x=x2)$y
       
       if (dir=="incr") {
         return(max((y2-y1)/width,0))
@@ -752,7 +752,7 @@ construct_deriv_r_Mn <- function(theta_n, type, dir="incr") {
     # Identify jump points of step function
     jump_points <- c(0)
     for (i in 2:length(grid)) {
-      if (theta_ns[i]!=theta_ns[i-1]) {
+      if (r_Mns[i]!=r_Mns[i-1]) {
         jump_points <- c(jump_points, mean(c(grid[i],grid[i-1])))
       }
     }
@@ -763,16 +763,16 @@ construct_deriv_r_Mn <- function(theta_n, type, dir="incr") {
     
     if (length(midpoints)>=2) {
       # Fit monotone cubic smoothing spline
-      theta_n_smoothed <- splinefun(
+      r_Mn_smoothed <- splinefun(
         x = midpoints,
-        y = theta_n(midpoints),
+        y = r_Mn(midpoints),
         method = "monoH.FC"
       )
     } else {
       # Fit a straight line instead if there are <2 midpoints
-      theta_n_smoothed <- function(x) {
-        slope <- theta_n(1) - theta_n(0)
-        intercept <- theta_n(0)
+      r_Mn_smoothed <- function(x) {
+        slope <- r_Mn(1) - r_Mn(0)
+        intercept <- r_Mn(0)
         return(intercept + slope*x)
       }
     }
@@ -787,8 +787,8 @@ construct_deriv_r_Mn <- function(theta_n, type, dir="incr") {
       if (x1<0) { x2<-width; x1<-0; }
       if (x2>1) { x1<-1-width; x2<-1; }
       
-      y1 <- theta_n_smoothed(x1)
-      y2 <- theta_n_smoothed(x2)
+      y1 <- r_Mn_smoothed(x1)
+      y2 <- r_Mn_smoothed(x2)
       
       if (dir=="incr") {
         return(max((y2-y1)/width,0))
@@ -811,9 +811,9 @@ construct_deriv_r_Mn <- function(theta_n, type, dir="incr") {
       c(p1,p2)
       
       if (dir=="incr") {
-        return(max((theta_n(p2)-theta_n(p1))/width,0))
+        return(max((r_Mn(p2)-r_Mn(p1))/width,0))
       } else {
-        return(min((theta_n(p2)-theta_n(p1))/width,0))
+        return(min((r_Mn(p2)-r_Mn(p1))/width,0))
       }
       
     }

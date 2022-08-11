@@ -280,7 +280,7 @@
       }
       return(gcm$slope.knots[index])
     })
-    theta_n_Gr <- function(x) { dGCM(Phi_n(x)) }
+    r_Mn_Gr <- function(x) { dGCM(Phi_n(x)) }
     f_aIw_delta1_n <- construct_f_aIw_n(dat, vlist$AW_grid,
                                         type=params$g_n_type, k=15, delta1=TRUE)
     f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid,
@@ -290,8 +290,8 @@
                                  f_aIw_n=f_aIw_n, f_a_n=f_a_n,
                                  f_a_delta1_n=f_a_delta1_n)
     
-    theta_n <- theta_n_Gr
-    deriv_r_Mn <- construct_deriv_r_Mn(theta_n, type=params$deriv_type,
+    r_Mn <- r_Mn_Gr
+    deriv_r_Mn <- construct_deriv_r_Mn(r_Mn, type=params$deriv_type,
                                              L$dir="decr")
     
     # Compute estimates
@@ -825,7 +825,7 @@
 
 
 #############################.
-##### theta_n estimator #####
+##### r_Mn estimator #####
 #############################.
 
 {
@@ -868,7 +868,7 @@
     ci_hi <- ests$ci_hi
     len <- length(C$points)
     
-    # Plot theta_n (estimate vs. truth)
+    # Plot r_Mn (estimate vs. truth)
     plot_data <- data.frame(
       x = rep(C$points, 2),
       theta = c(theta_ests, r_M0),
@@ -892,7 +892,7 @@
     plot_data <- data.frame(
       x = rep(grid,3),
       y = c(ests$Psi_n(grid), gcm(grid), ests$dGCM(grid)),
-      which = rep(c("Psi_n (-1*Theta_os_n)","gcm","dGCM (-1*theta_n)"), each=101)
+      which = rep(c("Psi_n (-1*Theta_os_n)","gcm","dGCM (-1*r_Mn)"), each=101)
     )
     ggplot(plot_data, aes(x=x, y=y, color=which)) +
       geom_line() +

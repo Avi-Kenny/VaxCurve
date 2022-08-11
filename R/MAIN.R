@@ -15,7 +15,7 @@ cfg <- list(
   which_sim = "estimation", # "estimation" "edge" "testing" "Cox" "debugging"
   level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
   # keep = c(1:3,7:9,16:18,22:24),
-  num_sim = 1000,
+  num_sim = 500,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm", "tidyr",
@@ -97,7 +97,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     # surv_true = c("Complex"),
     surv_true = c("Cox PH", "Complex"), # "Cox PH" "Complex" "exp"
     sampling = c("two-phase (50%)"), # "iid"
-    wts_type = c("true", "estimated"), # "estimated"
+    wts_type = c("estimated"), # c("true", "estimated")
     estimator = list(
       "Grenander (Cox)" = list(
         est = "Grenander",
@@ -354,6 +354,7 @@ if (F) {
     summ_biasP <- list()
   } # DEBUG: Gamma/Phi
   summ_mse <- list()
+  summ_var <- list()
   summ_cov <- list()
   for (i in c(1:51)) {
   # for (i in c(1:5)) {
@@ -376,6 +377,10 @@ if (F) {
         truth = paste0("Phi_",m)
       )
     } # DEBUG: Gamma/Phi
+    summ_var[[i]] <- list(
+      name = paste0("var_",m),
+      x = paste0("est_",m)
+    )
     summ_mse[[i]] <- list(
       name = paste0("mse_",m),
       estimate = paste0("est_",m),
@@ -389,7 +394,7 @@ if (F) {
       na.rm = T
     )
   }
-  summ <- summarize(sim, bias=summ_bias, mse=summ_mse, coverage=summ_cov)
+  summ <- summarize(sim, bias=summ_bias, mse=summ_mse, var=summ_var, coverage=summ_cov)
   if (F) {
     summ <- summarize(sim, bias=c(summ_bias,summ_biasG,summ_biasP), mse=summ_mse, coverage=summ_cov)
   } # DEBUG: Gamma/Phi
@@ -412,7 +417,7 @@ if (F) {
   # )
   
   # PLot Y-axis limits
-  plot_lims <- list(b=c(-0.25,0.25), c=c(0,1), m=c(0,0.02)) # c=c(0.7,1)
+  plot_lims <- list(b=c(-0.25,0.25), c=c(0,1), m=c(0,0.02), v=c(0,0.01)) # c=c(0.7,1)
   
   # Set faceting vectors
   distr_As <- c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4w2,0.04)")
@@ -460,6 +465,8 @@ if (F) {
                        ymax=((ymax*diff(plot_lims$c))/6+plot_lims$c[1]))
   df_distr_m <- mutate(df_distr_A, ymin=plot_lims$m[1],
                        ymax=((ymax*diff(plot_lims$m))/6+plot_lims$m[1]))
+  df_distr_v <- mutate(df_distr_A, ymin=plot_lims$v[1],
+                       ymax=((ymax*diff(plot_lims$v))/6+plot_lims$v[1]))
   
   # Bias plot
   # Export: 10" x 6"
@@ -478,7 +485,7 @@ if (F) {
     scale_y_continuous(limits=plot_lims$b) + # labels=percent
     # scale_color_manual(values=m_colors) +
     theme(legend.position="bottom") +
-    labs(title="Bias", x="A", y=NULL, color="Estimator")
+    labs(y="Bias", x="S", color="Estimator")
   
   # Coverage plot
   # Export: 10" x 6"
@@ -497,25 +504,43 @@ if (F) {
     scale_y_continuous(labels=percent, limits=plot_lims$c) +
     # scale_color_manual(values=m_colors) +
     theme(legend.position="bottom") +
-    labs(title="Coverage (%)", x="A", y=NULL, color="Estimator")
+    labs(y="Coverage (%)", x="S", color="Estimator")
   
-  # MSE plot
+  # Variance plot
   # Export: 10" x 6"
   ggplot(
-    filter(p_data, stat=="mse"),
+    filter(p_data, stat=="var"),
     aes(x=point, y=value, color=factor(Estimator), group=factor(Estimator))
   ) +
     geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
-                data=df_distr_m, fill="grey", color=NA, alpha=0.4) +
+                data=df_distr_v, fill="grey", color=NA, alpha=0.4) +
     geom_vline(aes(xintercept=x), data=df_vlines, color="orange",
                linetype="dashed") +
     geom_line() +
     facet_grid(rows = dplyr::vars(factor(surv_true, levels=surv_trues)),
                cols = dplyr::vars(factor(distr_A, levels=distr_As))) +
-    scale_y_continuous(limits=plot_lims$m) +
+    scale_y_continuous(limits=plot_lims$v) +
     # scale_color_manual(values=m_colors) +
     theme(legend.position="bottom") +
-    labs(title="MSE", x="A", y=NULL, color="Estimator")
+    labs(y="Variance", x="S", color="Estimator")
+  
+  # # MSE plot
+  # # Export: 10" x 6"
+  # ggplot(
+  #   filter(p_data, stat=="mse"),
+  #   aes(x=point, y=value, color=factor(Estimator), group=factor(Estimator))
+  # ) +
+  #   geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
+  #               data=df_distr_m, fill="grey", color=NA, alpha=0.4) +
+  #   geom_vline(aes(xintercept=x), data=df_vlines, color="orange",
+  #              linetype="dashed") +
+  #   geom_line() +
+  #   facet_grid(rows = dplyr::vars(factor(surv_true, levels=surv_trues)),
+  #              cols = dplyr::vars(factor(distr_A, levels=distr_As))) +
+  #   scale_y_continuous(limits=plot_lims$m) +
+  #   # scale_color_manual(values=m_colors) +
+  #   theme(legend.position="bottom") +
+  #   labs(y="MSE", x="S", color="Estimator")
   
 }
 

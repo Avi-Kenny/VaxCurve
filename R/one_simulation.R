@@ -166,15 +166,15 @@ if (cfg$which_sim=="edge") {
     omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n,
                                  type=params$omega_n_type)
     pi_n <- construct_pi_n(dat, vlist$W_grid, type="logistic")
-    r_Mn <- theta_os_n(dat, pi_n, S_n, omega_n)
-    sigma2_r_Mn <- sigma2_os_n(dat, pi_n, S_n, omega_n, r_Mn)
+    r_Mn_edge_est <- r_Mn_edge(dat, pi_n, S_n, omega_n)
+    sigma2_edge_est <- sigma2_edge(dat, pi_n, S_n, omega_n, r_Mn_edge_est)
     
     # Return results
     return(list(
       r_M0 = attr(dat_orig, "r_M0")[1],
-      r_Mn = r_Mn,
-      ci_lo = r_Mn - 1.96*sqrt(sigma2_r_Mn/n_orig),
-      ci_hi = r_Mn + 1.96*sqrt(sigma2_r_Mn/n_orig)
+      r_Mn = r_Mn_edge_est,
+      ci_lo = r_Mn_edge_est - 1.96*sqrt(sigma2_edge_est/n_orig),
+      ci_hi = r_Mn_edge_est + 1.96*sqrt(sigma2_edge_est/n_orig)
     ))
     
   }

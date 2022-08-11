@@ -2104,7 +2104,7 @@ construct_pi_star_n <- function(dat_orig, vals=NA, type="Super Learner",
 #' @param omega_n A nuisance influence function returned by construct_omega_n()
 #' @param val Value of A
 #' @return Value of one-step estiamtor
-theta_os_n <- function(dat, pi_n, S_n, omega_n, val=0) {
+r_Mn_edge <- function(dat, pi_n, S_n, omega_n, val=0) {
   
   n_orig <- sum(dat$weights)
   n_dat <- nrow(dat$w)
@@ -2122,16 +2122,16 @@ theta_os_n <- function(dat, pi_n, S_n, omega_n, val=0) {
 
 
 
-#' Compute asymptotic variance of one-step estimator theta_os_n
+#' Compute asymptotic variance of one-step estimator r_Mn_edge
 #' 
 #' @param dat Subsample of dataset returned by ss() for which delta==1
 #' @param pi_n Propensity score estimator returned by construct_pi_n()
 #' @param S_n Conditional survival function estimator returned by construct_S_n
 #' @param omega_n A nuisance influence function returned by construct_omega_n()
-#' @param theta_os_n_est Estimate returned by one-step estimator theta_os_n()
+#' @param r_Mn_edge_est Estimate returned by one-step estimator r_Mn_edge()
 #' @param val Value of A
 #' @return Asymptotic variance estimate
-sigma2_os_n <- function(dat, pi_n, S_n, omega_n, theta_os_n_est, val=0) {
+sigma2_edge <- function(dat, pi_n, S_n, omega_n, r_Mn_edge_est, val=0) {
   
   n_orig <- sum(dat$weights)
   n_dat <- nrow(dat$w)
@@ -2142,7 +2142,7 @@ sigma2_os_n <- function(dat, pi_n, S_n, omega_n, theta_os_n_est, val=0) {
         (In(dat$a==val)/pi_n(dat$w, rep(val,n_dat))) *
           omega_n(dat$w,a=rep(val,n_dat),dat$y_star,dat$delta_star)
       ) -
-        (1-theta_os_n_est)
+        (1-r_Mn_edge_est)
     ))^2)
   )
   

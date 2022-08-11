@@ -188,8 +188,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     # Construct one-step edge estimator
     if (p$edge_corr!="none") {
       pi_n <- construct_pi_n(dat, vlist$W_grid, type="logistic")
-      theta_os_n_est <- theta_os_n(dat, pi_n, S_n, omega_n)
-      sigma2_os_n_est <- sigma2_os_n(dat, pi_n, S_n, omega_n, theta_os_n_est)
+      r_Mn_edge_est <- r_Mn_edge(dat, pi_n, S_n, omega_n)
+      sigma2_edge_est <- sigma2_edge(dat, pi_n, S_n, omega_n, r_Mn_edge_est)
     }
     
     # !!!!!
@@ -319,28 +319,28 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     } else if (p$edge_corr=="point") {
       
       theta_n <- function(x) {
-        if(x==0) { theta_os_n_est } else { theta_n_Gr(x) }
+        if(x==0) { r_Mn_edge_est } else { theta_n_Gr(x) }
       }
       
     } else if (p$edge_corr=="min") {
       
       theta_n <- Vectorize(function(x) {
         if(x==0 || x<a_min2) {
-          theta_os_n_est
+          r_Mn_edge_est
         } else {
           if (dir=="incr") {
-            max(theta_os_n_est, theta_n_Gr(x))
+            max(r_Mn_edge_est, theta_n_Gr(x))
           } else {
-            min(theta_os_n_est, theta_n_Gr(x))
+            min(r_Mn_edge_est, theta_n_Gr(x))
           }
         }
       })
       
       gren_points <- sapply(c(1:length(points)), function(i) {
         if (dir=="incr") {
-          as.numeric(theta_n(points[i])>theta_os_n_est)
+          as.numeric(theta_n(points[i])>r_Mn_edge_est)
         } else {
-          as.numeric(theta_n(points[i])<theta_os_n_est)
+          as.numeric(theta_n(points[i])<r_Mn_edge_est)
         }
       })
       
@@ -400,11 +400,11 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       
       # Edge correction
       if (p$edge_corr=="point") {
-        ci_lo[1] <- ests[1] - 1.96*sqrt(sigma2_os_n_est/n_orig)
-        ci_hi[1] <- ests[1] + 1.96*sqrt(sigma2_os_n_est/n_orig)
+        ci_lo[1] <- ests[1] - 1.96*sqrt(sigma2_edge_est/n_orig)
+        ci_hi[1] <- ests[1] + 1.96*sqrt(sigma2_edge_est/n_orig)
       } else if (p$edge_corr=="min") {
-        ci_lo2 <- ests - 1.96*sqrt(sigma2_os_n_est/n_orig)
-        ci_hi2 <- ests + 1.96*sqrt(sigma2_os_n_est/n_orig)
+        ci_lo2 <- ests - 1.96*sqrt(sigma2_edge_est/n_orig)
+        ci_hi2 <- ests + 1.96*sqrt(sigma2_edge_est/n_orig)
         ci_lo <- (1-gren_points)*ci_lo2 + replace_na(gren_points*ci_lo, 0)
         ci_hi <- (1-gren_points)*ci_hi2 + replace_na(gren_points*ci_hi, 0)
       }
@@ -460,11 +460,11 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     # Generate estimates and standard deviations for each point
     ests <- sapply(c(1:length(points)), function(i) {
       a_binned <- transform_a(points[i])
-      return(theta_os_n(dat, pi_n, S_n, omega_n, val=a_binned))
+      return(r_Mn_edge(dat, pi_n, S_n, omega_n, val=a_binned))
     })
     sigma2s <- sapply(c(1:length(points)), function(i) {
       a_binned <- transform_a(points[i])
-      return(sigma2_os_n(dat, pi_n, S_n, omega_n, ests[i], val=a_binned))
+      return(sigma2_edge(dat, pi_n, S_n, omega_n, ests[i], val=a_binned))
     })
     
     # Construct CIs

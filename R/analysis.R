@@ -492,7 +492,9 @@
     )
     cfg2$endpoint <- "HIV"
     cfg2$t_e <- c(550)
-    cfg2$dataset <- c("HVTN705_secondcasecontrolprocesseddata.csv")
+    cfg2$dataset <- c(paste0("HVTN705_secondcasecontrolprocesseddata_excludeEL",
+                             "ISpotmarkers.csv"))
+    # cfg2$dataset <- c("HVTN705_secondcasecontrolprocesseddata.csv")
     cfg2$txct <- T
     cfg2$cr2_trial <- c("hvtn705second")
     cfg2$cr2_COR <- c("D210")
@@ -603,7 +605,8 @@
     cfg2$zoom_x <- NA
     cfg2$zoom_y <- NA
     cfg2$folder_local <- "AZD1222 data/"
-    cfg2$folder_cluster <- paste0("Z:/covpn/p3002/analysis/correlates/Part_A_Blinded_Phase_Data/adata/")
+    cfg2$folder_cluster <- paste0("Z:/covpn/p3002/analysis/correlates/Part_A_B",
+                                  "linded_Phase_Data/adata/")
     cfg2$params = list(
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="line",
       gamma_type="Super Learner", ci_type="regular",
@@ -1224,7 +1227,8 @@ if (cfg2$run_analysis &&
     return_extra = return_extra
   )
   
-  saveRDS(ests, paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds")) # !!!!!
+  saveRDS(ests, paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds"))
+  # ests <- readRDS(paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds"))
   
   run_cve <- as.logical("Grenander" %in% cfg2$plot_cve$est)
   ests2 <- process_ests(ests, a_grid, run_cve=run_cve,
@@ -1535,13 +1539,17 @@ if (cfg2$run_hyptest) {
       )
     }
     if (which=="Risk") {
-      x_r <- max(hst$breaks)
+      # x_r <- max(hst$breaks)
       y_plac <- filter(plot_data, curve=="Placebo overall")[1,"y"]
       y_vacc <- filter(plot_data, curve=="Vaccine overall")[1,"y"]
-      plot <- plot + annotate("text", x=x_r, y=y_plac, label="Placebo overall",
-                              size=2.5, hjust=1, vjust=-0.5)
-      plot <- plot + annotate("text", x=x_r, y=y_vacc, label="Vaccine overall",
-                              size=2.5, hjust=1, vjust=-0.5)
+      # plot <- plot + annotate("text", x=x_r, y=y_plac, label="Placebo overall",
+      #                         size=2.5, hjust=1, vjust=-0.5)
+      # plot <- plot + annotate("text", x=x_r, y=y_vacc, label="Vaccine overall",
+      #                         size=2.5, hjust=1, vjust=-0.5)
+      plot <- plot + annotate("text", label="Placebo overall", x=zoom_x[2],
+                              y=y_plac, size=2.5, hjust=1.05, vjust=-0.5)
+      plot <- plot + annotate("text", label="Vaccine overall", x=zoom_x[2],
+                              y=y_vacc, size=2.5, hjust=1.05, vjust=-0.5)
     }
     
     return(plot)

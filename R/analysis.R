@@ -8,7 +8,7 @@
 
 {
   # Choose analysis
-  which_analysis <- "AZD1222" # "Janssen" "Moderna" "AMP" "AZD1222"
+  which_analysis <- "HVTN 705 (all)" # "Janssen" "Moderna" "AMP" "AZD1222"
                               # "HVTN 705 (primary)" "HVTN 705 (all)"
   
   # # Uncomment this code to run multiple analyses (e.g. 1=10=Moderna, 11-14=Janssen)
@@ -320,6 +320,7 @@
     
   }
   
+  # Note: this can probably be archived
   if (cfg2$analysis=="HVTN 705 (primary)") {
     
     cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox"))
@@ -421,7 +422,8 @@
     cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox"))
     cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Cox"))
     cfg2$marker <- c(
-      "Day210ELCZ", "Day210ELMo", "Day210ELISpotPTEEnv",
+      "Day210ELCZ", "Day210ELMo",
+      # "Day210ELISpotPTEEnv",
       "Day210ADCPgp140C97ZAfib", "Day210ADCPgp140Mos1fib",
       "Day210IgG3gp140C97ZAfibritin40delta",
       "Day210IgG3gp140Mos1fibritin40delta", "Day210IgG340mdw_gp120",
@@ -431,7 +433,8 @@
       "Day210ADCCCH58_pk", "Day210ADCCWITO_pk", "Day210ADCCCAP8_pAUC",
       "Day210ADCCCH58_pAUC", "Day210ADCCWITO_pAUC",
       "Day210ICS4AnyEnvIFNg_OR_IL2", "Day210ICS8AnyEnvIFNg_OR_IL2",
-      "Day210mdw_xassay_overall", "Day210IgG3AE.A244.V1V2.Tags_293F40delta",
+      # "Day210mdw_xassay_overall",
+      "Day210IgG3AE.A244.V1V2.Tags_293F40delta",
       "Day210IgG3C.1086C.V1.V2.Tags40delta",
       "Day210IgG3gp70.001428.2.42.V1V240delta",
       "Day210IgG3gp70.1012.11.TC21.3257.V1V240delta",
@@ -452,7 +455,7 @@
     cfg2$lab_title <- c(
       "IgG to VT-C (EU/ml): Day 210",
       "IgG to VT-M (EU/ml): Day 210",
-      "ELISpot PTE Env (SFC/million PBMC): Day 210",
+      # "ELISpot PTE Env (SFC/million PBMC): Day 210",
       "Average phagocytosis score to gp140 C97ZA: Day 210",
       "Average phagocytosis score to gp140 Mos1: Day 210",
       "IgG3 Net MFI to gp140 C97ZA: Day 210",
@@ -473,7 +476,7 @@
       "AUC baseline-subtracted pct loss luc activity to WITO: Day 210",
       "Pct CD4+ T-cells expressing IFN-g/IL-2: Day 210",
       "Pct CD8+ T-cells expressing IFN-g/IL-2: Day 210",
-      "Expanded Multi-epitope functions: Day 210",
+      # "Expanded Multi-epitope functions: Day 210",
       "IgG3 Net MFI to AE.A244 V1V2 Tags 293F: Day 210",
       "IgG3 Net MFI to C.1086C V1V2 Tags: Day 210",
       "IgG3 Net MFI to gp70-001428.2.42 V1V2: Day 210",
@@ -493,7 +496,8 @@
       "IgG Net MFI to gp70.B.CaseA V1V2: Day 210"
     )
     cfg2$lab_x <- c(
-      "IgG to VT-C (=s)", "IgG to VT-M (=s)", "ELISpot PTE Env (=s)",
+      "IgG to VT-C (=s)", "IgG to VT-M (=s)",
+      # "ELISpot PTE Env (=s)",
       "ADCP gp140 C97ZA (=s)", "ADCP gp140 Mos1 (=s)", "IgG3 gp140 C97ZA (=s)",
       "IgG3 gp140 Mosaic (=s)", "IgG3 gp120 breadth (=s)",
       "IgG3 gp140 breadth (=s)", "IgG3 V1V2 breadth (=s)", "IgG3 gp41 (=s)",
@@ -502,7 +506,7 @@
       "ADCC Peak CAP8 (=s)", "ADCC Peak CH58 (=s)", "ADCC Peak WITO (=s)",
       "ADCC  AUC CAP8 (=s)", "ADCC AUC CH58 (=s)", "ADCC AUC WITO (=s)",
       "CD4+ T-cells IFN-g/IL-2 (=s)", "CD8+ T-cells IFN-g/IL-2 (=s)",
-      "Expanded multi-epitope functions (=s)",
+      # "Expanded multi-epitope functions (=s)",
       "IgG3 AE.A244 V1V2 Tags 293F (=s)", "IgG3 C.1086C V1V2 Tags (=s)",
       "IgG3 gp70-001428.2.42 V1V2 (=s)",
       "IgG3 gp70-1012.11.TC21.3257 V1V2 (=s)", "IgG3 gp70-1394C9G1 V1V2 (=s)",
@@ -515,11 +519,11 @@
     )
     cfg2$endpoint <- "HIV"
     cfg2$t_e <- c(550)
-    cfg2$dataset <- c("HVTN705_secondcasecontrolprocesseddata.csv")
+    cfg2$dataset <- c("HVTN705_secondcasecontrolprocesseddata_excludeELISpotmarkers.csv") # c("HVTN705_secondcasecontrolprocesseddata.csv")
     cfg2$txct <- T
     cfg2$cr2_trial <- c("hvtn705second")
     cfg2$cr2_COR <- c("D210")
-    cfg2$cr2_marker <- c(1:41)
+    cfg2$cr2_marker <- c(1:39) # c(1:41)
     cfg2$edge_corr <- c("none", "min")
     cfg2$v <- list(
       id = c("Subjectid"),
@@ -555,35 +559,37 @@
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
-      marker = c(1:41),
-      lab_x = c(1:41),
-      lab_title = c(1:41),
-      t_e = rep(1,41),
-      dataset = rep(1,41),
-      cr2_trial = rep(1,41),
-      cr2_COR = rep(1,41),
-      cr2_marker = c(1:41),
-      edge_corr = c(1,1,2,1,1,1,1,2,1,2,1,1,1,2,1,2,2,2,2,2,2,
-                    2,2,1,1,2,2,2,2,2,2,2,1,1,2,2,2,2,2,1,2),
-      v_id = rep(1,41),
-      v_time = rep(1,41),
-      v_event = rep(1,41),
-      v_wt = rep(1,41),
-      v_ph1 = rep(1,41),
-      v_ph2 = rep(1,41),
-      v_covariates = rep(1,41),
-      zoom_x = rep(1,41),
-      zoom_y_cve = rep(1,41),
-      zoom_y_risk = rep(1,41)
+      marker = c(1:39), # c(1:41)
+      lab_x = c(1:39), # c(1:41)
+      lab_title = c(1:39), # c(1:41)
+      t_e = rep(1,39), # rep(1,41)
+      dataset = rep(1,39), # rep(1,41)
+      cr2_trial = rep(1,39), # rep(1,41)
+      cr2_COR = rep(1,39), # rep(1,41)
+      cr2_marker = c(1:39), # c(1:41)
+      edge_corr = c(1,1,1,1,1,1,2,1,2,1,1,1,2,1,2,2,2,2,2,2,
+                    2,2,1,2,2,2,2,2,2,2,1,1,2,2,2,2,2,1,2),
+      # edge_corr = c(1,1,2,1,1,1,1,2,1,2,1,1,1,2,1,2,2,2,2,2,2,
+      #               2,2,1,1,2,2,2,2,2,2,2,1,1,2,2,2,2,2,1,2),
+      v_id = rep(1,39), # rep(1,41)
+      v_time = rep(1,39), # rep(1,41)
+      v_event = rep(1,39), # rep(1,41)
+      v_wt = rep(1,39), # rep(1,41)
+      v_ph1 = rep(1,39), # rep(1,41)
+      v_ph2 = rep(1,39), # rep(1,41)
+      v_covariates = rep(1,39), # rep(1,41)
+      zoom_x = rep(1,39), # rep(1,41)
+      zoom_y_cve = rep(1,39), # rep(1,41)
+      zoom_y_risk = rep(1,39) # rep(1,41)
     )
     
     # Secondary map for variations within a graph; map_row corresponds to which
     #     row of cfg2$map to use
     cfg2$map2 <- data.frame(
-      tid = c(1:41),
-      map_row = c(1:41),
-      S_n_type = rep("Super Learner",41),
-      marg = rep("Gamma_star",41)
+      tid = c(1:39), # c(1:41)
+      map_row = c(1:39), # c(1:41)
+      S_n_type = rep("Super Learner",39), # 41
+      marg = rep("Gamma_star",39) # 41
     )
     
   }

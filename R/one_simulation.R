@@ -153,8 +153,8 @@ if (cfg$which_sim=="edge") {
                               L$sc_params, L$sampling, L$dir, L$wts_type)
     
     # Prep
-    n_orig <- length(dat_orig$delta)
-    dat <- ss(dat_orig, which(dat_orig$delta==1))
+    n_orig <- length(dat_orig$z)
+    dat <- ss(dat_orig, which(dat_orig$z==1))
     
     # Construct dataframes of values to pre-compute functions on
     vlist <- create_val_list(dat_orig)
@@ -209,8 +209,8 @@ if (cfg$which_sim=="Cox") {
     # Round data values and construct dat
     dat_orig$a <- round(dat_orig$a,2)
     dat_orig$weights <- round(dat_orig$weights,3)
-    dat_orig$y_star <- round(dat_orig$y_star,0)
-    dat <- ss(dat_orig, which(dat_orig$delta==1))
+    dat_orig$y <- round(dat_orig$y,0)
+    dat <- ss(dat_orig, which(dat_orig$z==1))
     
     # Calculate variance estimates
     a <- 0.5
@@ -262,7 +262,7 @@ if (cfg$which_sim=="Cox") {
       # z_0 <- c(0.3,1,0.5) # c(W1,W2,A)
       # 
       # # Calculate the cumulative hazard via predict()
-      # newdata <- data.frame(y_star=C$t_0, delta_star=1, w1=z_0[1],
+      # newdata <- data.frame(y=C$t_0, delta=1, w1=z_0[1],
       #                       w2=z_0[2], a=z_0[3])
       # pred <- predict(res_cox$model, newdata=newdata, type="expected", se.fit=T)
       
@@ -352,7 +352,7 @@ if (cfg$which_sim=="debugging") {
         points <- points[-c((length(points)-na_tail+1):length(points))]
       }
       
-      dat <- ss(dat_orig, which(dat_orig$delta==1))
+      dat <- ss(dat_orig, which(dat_orig$z==1))
       dat2 <- ss(dat, which(dat$a!=0))
       Phi_n <- construct_Phi_n(dat2, type=p$ecdf_type)
       ests_Phi <- Phi_n(points)

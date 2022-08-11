@@ -30,7 +30,7 @@
   # 3. Generate dataset
   dat_orig <- generate_data(L$n, L$alpha_3, L$distr_S, L$edge, L$surv_true,
                             L$sc_params, L$sampling, L$dir) # wts_type="estimated"
-  dat <- ss(dat_orig, which(dat_orig$delta==1))
+  dat <- ss(dat_orig, which(dat_orig$z==1))
   vlist <- create_val_list(dat_orig)
   
 }
@@ -61,13 +61,13 @@
                               L$sc_params, L$sampling, L$dir)
     
     # Calculate summary stats
-    pct_rc <- c(pct_rc, mean(as.integer(dat_orig$delta_star==0)*
-                                     as.integer(dat_orig$y_star<=200)))
-    num_inf <- c(num_inf, sum(as.integer(dat_orig$delta_star==1)*
-                                as.integer(dat_orig$y_star<=200)))
-    pct_inf <- c(pct_inf, mean(as.integer(dat_orig$delta_star==1)*
-                                 as.integer(dat_orig$y_star<=200)))
-    num_tp <- c(num_tp, sum(dat_orig$delta))
+    pct_rc <- c(pct_rc, mean(as.integer(dat_orig$delta==0)*
+                                     as.integer(dat_orig$y<=200)))
+    num_inf <- c(num_inf, sum(as.integer(dat_orig$delta==1)*
+                                as.integer(dat_orig$y<=200)))
+    pct_inf <- c(pct_inf, mean(as.integer(dat_orig$delta==1)*
+                                 as.integer(dat_orig$y<=200)))
+    num_tp <- c(num_tp, sum(dat_orig$z))
     pct_inf_a0 <- c(pct_inf_a0, attr(dat_orig,"r_M0")[1])
     pct_inf_a3 <- c(pct_inf_a3, attr(dat_orig,"r_M0")[16])
     pct_inf_a5 <- c(pct_inf_a5, attr(dat_orig,"r_M0")[26])
@@ -103,7 +103,7 @@
     print(paste("rep:",i))
     dat_orig <- generate_data(L$n, L$alpha_3, L$distr_S, L$edge, L$surv_true,
                               L$sc_params, L$sampling, L$dir)
-    dat <- ss(dat_orig, which(dat_orig$delta==1))
+    dat <- ss(dat_orig, which(dat_orig$z==1))
     Phi_n1 <- construct_Phi_n(dat, type="step")
     Phi_n2 <- construct_Phi_n(dat, type="linear (mid)")
     p1a <- c(p1a, Phi_n1(0.5))
@@ -129,7 +129,7 @@
   # !!!!!
   dat_orig <- generate_data(L$n, L$alpha_3, L$distr_S, L$edge, L$surv_true,
                             L$sc_params, "iid", L$dir) # L$sampling
-  dat <- ss(dat_orig, which(dat_orig$delta==1))
+  dat <- ss(dat_orig, which(dat_orig$z==1))
   vlist <- create_val_list(dat_orig)
   Phi_n1 <- construct_Phi_n(dat, type="step")
   Phi_n2 <- ecdf(dat$a)
@@ -281,14 +281,14 @@
       return(gcm$slope.knots[index])
     })
     r_Mn_Gr <- function(x) { dGCM(Phi_n(x)) }
-    f_aIw_delta1_n <- construct_f_aIw_n(dat, vlist$AW_grid,
-                                        type=params$g_n_type, k=15, delta1=TRUE)
-    f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid,
-                                    f_aIw_delta1_n)
+    f_aIw_z1_n <- construct_f_aIw_n(dat, vlist$AW_grid,
+                                        type=params$g_n_type, k=15, z1=TRUE)
+    f_a_z1_n <- construct_f_a_n(dat_orig, vlist$A_grid,
+                                    f_aIw_z1_n)
     gamma_n <- construct_gamma_n(dat_orig, dat, type=params$gamma_type,
                                  vals=vlist$A_grid, omega_n=omega_n,
                                  f_aIw_n=f_aIw_n, f_a_n=f_a_n,
-                                 f_a_delta1_n=f_a_delta1_n)
+                                 f_a_z1_n=f_a_z1_n)
     
     r_Mn <- r_Mn_Gr
     deriv_r_Mn <- construct_deriv_r_Mn(r_Mn, type=params$deriv_type,
@@ -331,7 +331,7 @@
   srvSL <- construct_Q_n(dat, vlist$Q_n, type=params$Q_n_type)
   Q_0 <- srvSL$srv
   Qc_0 <- srvSL$cens
-  omega_0 <- Vectorize(function(w1,w2,a,y_star,delta_star) {
+  omega_0 <- Vectorize(function(w1,w2,a,y,delta) {
     
     # Shorten parameter variable names
     lmbd <- L$sc_params$lmbd
@@ -350,14 +350,14 @@
     
     # Compute omega_0
     piece_1 <- exp(-1*lmbd*(C$t_0^v)*exp(lin))
-    piece_2 <- (delta_star*as.integer(y_star<=C$t_0)) /
-      exp(-1*(lmbd*y_star^v*exp(lin)+lmbd2*y_star^v2*exp(lin2)))
+    piece_2 <- (delta*as.integer(y<=C$t_0)) /
+      exp(-1*(lmbd*y^v*exp(lin)+lmbd2*y^v2*exp(lin2)))
     integral <- integrate(
       function(t) {
         t^(v-1) * exp(lin+lmbd*t^v*exp(lin)+lmbd2*t^v2*exp(lin2))
       },
       lower = 0,
-      upper = min(C$t_0,y_star)
+      upper = min(C$t_0,y)
     )$value
     piece_3 <- lmbd*v*integral
     return(piece_1*(piece_2-piece_3))
@@ -386,7 +386,7 @@
     }
   }
   vlist$omega[highs,]
-  # highs have delta_star=1, y_star<C$t_0, and A=0 or A>0.19
+  # highs have delta=1, y<C$t_0, and A=0 or A>0.19
   
   # Scatterplot of estimated vs true
   ggplot(data.frame(x=omegas_true, y=omegas_est), aes(x=x, y=y)) +
@@ -408,12 +408,12 @@
       d <- list(
         w = dat_mc$w[i,],
         a = dat_mc$a[i],
-        delta = dat_mc$delta[i],
-        y_star = dat_mc$y_star[i],
-        delta_star = dat_mc$delta_star[i]
+        z = dat_mc$z[i],
+        y = dat_mc$y[i],
+        delta = dat_mc$delta[i]
       )
       return(mean(
-        (omega_0(d$w,d$a,d$y_star,d$delta_star) /
+        (omega_0(d$w,d$a,d$y,d$delta) /
            f_aIw_0(d$a,d$w))^2
       ))
     }))
@@ -423,17 +423,17 @@
   # Construct gamma_n
   f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=params$g_n_type, k=15)
   f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
-  f_aIw_delta1_n <- construct_f_aIw_n(dat, vlist$AW_grid,
-                                      type=params$g_n_type, delta1=TRUE, k=15)
-  f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_delta1_n)
+  f_aIw_z1_n <- construct_f_aIw_n(dat, vlist$AW_grid,
+                                      type=params$g_n_type, z1=TRUE, k=15)
+  f_a_z1_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_z1_n)
   gamma_n <- construct_gamma_n(dat_orig, dat, type="kernel",
                                vals=vlist$A_grid, omega_n=omega_n,
                                f_aIw_n=f_aIw_n, f_a_n=f_a_n,
-                               f_a_delta1_n=f_a_delta1_n)
+                               f_a_z1_n=f_a_z1_n)
   gamma_n2 <- construct_gamma_n(dat_orig, dat, type="kernel2",
                                vals=vlist$A_grid, omega_n=omega_n,
                                f_aIw_n=f_aIw_n, f_a_n=f_a_n,
-                               f_a_delta1_n=f_a_delta1_n)
+                               f_a_z1_n=f_a_z1_n)
   
   # Plot true curves against estimated curve
   grid <- round(seq(0,1,0.05),2)
@@ -475,8 +475,8 @@
     dat_orig <- dat_orig[indices,]
     
     # Construct component functions
-    n_orig <- length(dat_orig$delta)
-    dat <- ss(dat_orig, which(dat_orig$delta==1))
+    n_orig <- length(dat_orig$z)
+    dat <- ss(dat_orig, which(dat_orig$z==1))
     weights <- dat$weights
     G_n <- construct_Phi_n(dat, type=params$ecdf_type)
     f_aIw_n <- construct_f_aIw_n(dat, type=params$g_n_type, k=15)
@@ -519,8 +519,8 @@
   {
     
     # Construct component functions
-    n_orig <- length(dat_orig$delta)
-    dat <- ss(dat_orig, which(dat_orig$delta==1))
+    n_orig <- length(dat_orig$z)
+    dat <- ss(dat_orig, which(dat_orig$z==1))
     weights <- dat$weights
     G_n <- construct_Phi_n(dat, type=params$ecdf_type)
     f_aIw_n <- construct_f_aIw_n(dat, type=params$g_n_type, k=15)
@@ -569,7 +569,7 @@
     
     # Estimate variance and SD
     var_hat <- mean((
-      infl_fn_Gamma(x=0.5,dat$w,dat$y_star,dat$delta_star,dat$delta,dat$a)
+      infl_fn_Gamma(x=0.5,dat$w,dat$y,dat$delta,dat$z,dat$a)
     )^2)
     sd_hat <- sqrt(var_hat/length(dat$a))
     
@@ -612,8 +612,8 @@
     # dat_orig <- ss(dat_orig, indices)
     
     # Prep
-    n_orig <- length(dat_orig$delta)
-    dat <- ss(dat_orig, which(dat_orig$delta==1))
+    n_orig <- length(dat_orig$z)
+    dat <- ss(dat_orig, which(dat_orig$z==1))
     weights <- dat$weights
     
     # Construct dataframes of values to pre-compute functions on
@@ -656,7 +656,7 @@
                               surv_true="Cox PH", sc_params=L$sc_params,
                               sampling="two-phase (72%)", dir=L$dir) # "iid" "two-phase (72%)"
     
-    beta_n <- test_stat(dat_orig, c(1:length(dat_orig$delta)))
+    beta_n <- test_stat(dat_orig, c(1:length(dat_orig$z)))
     betas <- c(betas, beta_n)
     
     print(paste("i:",i))
@@ -836,7 +836,7 @@
     # !!!!! START !!!!!
     dat_orig <- generate_data(L$n, L$alpha_3, L$distr_S, L$edge, L$surv_true, # !!!!!
                               L$sc_params, L$sampling, L$dir) # !!!!!
-    dat <- ss(dat_orig, which(dat_orig$delta==1)) # !!!!!
+    dat <- ss(dat_orig, which(dat_orig$z==1)) # !!!!!
     vlist <- create_val_list(dat_orig) # !!!!!
     # !!!!! END !!!!!
     
@@ -922,7 +922,7 @@
   
   # What is causing the shape of the curve on [0,0.14] ?????
   
-  # piece_1 <- omega_n(dat$w,dat$a,dat$y_star,dat$delta_star) /
+  # piece_1 <- omega_n(dat$w,dat$a,dat$y,dat$delta) /
   #   f_aIw_n(dat$a,dat$w)
   # fnc <- function(x) {
   #   (1/n_orig) * sum(weights_i * (

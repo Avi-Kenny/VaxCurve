@@ -802,9 +802,9 @@
   
   # Create data structures for analysis
   if (is.na(cfg2$v$ph2)) {
-    df_delta <- rep(1, nrow(df_analysis))
+    df_z <- rep(1, nrow(df_analysis))
   } else {
-    df_delta <- as.integer(df_analysis[[cfg2$v$ph2]])
+    df_z <- as.integer(df_analysis[[cfg2$v$ph2]])
   }
   if (is.na(cfg2$v$wt)) {
     df_weights <- rep(1, nrow(df_analysis))
@@ -813,14 +813,14 @@
   }
   dat_orig <- list(
     "id" = df_analysis[[cfg2$v$id]],
-    "y_star" = df_analysis[[cfg2$v$time]],
-    "delta_star" = df_analysis[[cfg2$v$event]],
+    "y" = df_analysis[[cfg2$v$time]],
+    "delta" = df_analysis[[cfg2$v$event]],
     "w" = df_w,
     "weights" = df_weights,
     "a" = df_analysis[[cfg2$marker]],
-    "delta" = df_delta
+    "z" = df_z
   )
-  rm(df_w,df_weights,df_delta)
+  rm(df_w,df_weights,df_z)
   
   # Create data structure to hold results
   plot_data_risk <- data.frame(
@@ -834,8 +834,8 @@
   plot_data_cve <- plot_data_risk
   
   # Stabilize weights (rescale to sum to sample size)
-  dat_orig$weights <- ifelse(dat_orig$delta==1, dat_orig$weights, 0)
-  s <- sum(dat_orig$weights) / length(dat_orig$delta)
+  dat_orig$weights <- ifelse(dat_orig$z==1, dat_orig$weights, 0)
+  s <- sum(dat_orig$weights) / length(dat_orig$z)
   dat_orig$weights <- dat_orig$weights / s
   
 }
@@ -985,7 +985,7 @@ if (cfg2$run_analysis && any(unlist(c(cfg2$plot_cve,cfg2$plot_risk))=="Cox")) {
 
 if (cfg2$run_analysis && cfg2$plot_risk$overall=="KM") {
   
-  srv_ov <- survfit(Surv(dat_orig$y_star,dat_orig$delta_star)~1)
+  srv_ov <- survfit(Surv(dat_orig$y,dat_orig$delta)~1)
   risk_ov <- 1 - srv_ov$surv[which.min(abs(srv_ov$time-C$t_0))]
   ci_lo_ov <- 1 - srv_ov$upper[which.min(abs(srv_ov$time-C$t_0))]
   ci_hi_ov <- 1 - srv_ov$lower[which.min(abs(srv_ov$time-C$t_0))]
@@ -1736,8 +1736,8 @@ if (F) {
       if (i %in% c(3,7,11)) { df_analysis %<>% dplyr::filter(tx=="T2") }
       if (i %in% c(4,8,12)) { df_analysis %<>% dplyr::filter(tx_pool=="T1+T2") }
       dat_orig <- list(
-        y_star = df_analysis[["hiv1survday"]],
-        delta_star = df_analysis[["hiv1event"]],
+        y = df_analysis[["hiv1survday"]],
+        delta = df_analysis[["hiv1event"]],
         weights = rep(1, nrow(df_analysis)),
         a = df_analysis[["bweight"]]
       )
@@ -1758,7 +1758,7 @@ if (F) {
       saveRDS(hst, paste0(cfg2$analysis, " plots/hist_", i, ".rds"))
       
       # Generate KM object
-      srv_ov <- survfit(Surv(dat_orig$y_star,dat_orig$delta_star)~1)
+      srv_ov <- survfit(Surv(dat_orig$y,dat_orig$delta)~1)
       risk_ov <- 1 - srv_ov$surv[which.min(abs(srv_ov$time-C$t_0))]
       ci_lo_ov <- 1 - srv_ov$upper[which.min(abs(srv_ov$time-C$t_0))]
       ci_hi_ov <- 1 - srv_ov$lower[which.min(abs(srv_ov$time-C$t_0))]
@@ -1857,7 +1857,7 @@ if (cfg2$run_debug$objs) {
   # grid <- round(seq(0,1,0.01),2)
   # gcm <- approxfun(x=ests$gcm$x.knots, y=ests$gcm$y.knots, ties="ordered")
   # omega_n <- Vectorize(function(a) {
-  #   ests$omega_n(w=c(0,0),a,y_star=100,delta_star=0)
+  #   ests$omega_n(w=c(0,0),a,y=100,delta=0)
   # })
   # etastar_n <- Vectorize(function(a) {
   #   ests$etastar_n(a,w=c(0,0))

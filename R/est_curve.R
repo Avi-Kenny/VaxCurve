@@ -80,7 +80,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     points <- points[-c((length(points)-na_tail+1):length(points))]
   }
   
-  dat <- ss(dat_orig, which(dat_orig$delta==1))
+  dat <- ss(dat_orig, which(dat_orig$z==1))
   
   if (estimator=="Grenander") {
     
@@ -98,7 +98,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       # omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n, type=p$omega_n_type)
       system.time({
         for (a in seq(0,1,0.01)) {
-          ooo <- omega_n(dat$w,rep(a,length(dat$a)),dat$y_star,dat$delta_star)
+          ooo <- omega_n(dat$w,rep(a,length(dat$a)),dat$y,dat$delta)
         }
       })
 
@@ -115,7 +115,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       dat2 <- ss(dat, which(dat$a!=0))
       Phi_n <- construct_Phi_n(dat2, type=p$ecdf_type)
       print(paste("Check 4:", Sys.time()))
-      n_orig <- length(dat_orig$delta)
+      n_orig <- length(dat_orig$z)
       z_n <- (1/n_orig) * sum(dat$weights * as.integer(dat$a!=0))
       g_n_star <- construct_g_n_star(f_aIw_n, f_a_n, z_n)
       print(paste("Check 5:", Sys.time()))
@@ -197,13 +197,13 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       q_n <- construct_q_n(type="new", dat, dat_orig, omega_n=omega_n, g_n=g_n,
                            z_n=z_n, gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
                            Q_n=Q_n, Qc_n=Qc_n)
-      # q_n(dat_orig$w[1,],dat_orig$y_star[1],dat_orig$delta_star[1],x=0.5)
-      q_n(dat_orig$w[1:3,],dat_orig$y_star[1:3],dat_orig$delta_star[1:3],x=0.5)
-      q_n(dat_orig$w[4:6,],dat_orig$y_star[4:6],dat_orig$delta_star[4:6],x=0.5)
+      # q_n(dat_orig$w[1,],dat_orig$y[1],dat_orig$delta[1],x=0.5)
+      q_n(dat_orig$w[1:3,],dat_orig$y[1:3],dat_orig$delta[1:3],x=0.5)
+      q_n(dat_orig$w[4:6,],dat_orig$y[4:6],dat_orig$delta[4:6],x=0.5)
       
       
-      # q_n(dat_orig$w[1:99,],dat_orig$y_star[1:99],dat_orig$delta_star[1:99],x=0.5)
-      # q_n(dat_orig$w,dat_orig$y_star,dat_orig$delta_star,x=0.5)
+      # q_n(dat_orig$w[1:99,],dat_orig$y[1:99],dat_orig$delta[1:99],x=0.5)
+      # q_n(dat_orig$w,dat_orig$y,dat_orig$delta,x=0.5)
       # Gamma_os_n_star(0.1)
     }
     
@@ -295,20 +295,20 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     # Compute variance component functions
     print(paste("Check 15:", Sys.time()))
-    f_aIw_delta1_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=p$g_n_type,
-                                        k=p$f_aIw_n_bins, delta1=TRUE)
-    f_a_delta1_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_delta1_n)
+    f_aIw_z1_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=p$g_n_type,
+                                        k=p$f_aIw_n_bins, z1=TRUE)
+    f_a_z1_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_z1_n)
     print(paste("Check 16:", Sys.time()))
     gamma_n <- construct_gamma_n(dat_orig, dat, type=p$gamma_type,
                                  vals=vlist$A_grid, omega_n=omega_n,
                                  f_aIw_n=f_aIw_n, f_a_n=f_a_n,
-                                 f_a_delta1_n=f_a_delta1_n)
+                                 f_a_z1_n=f_a_z1_n)
     if (F) {
       gamma_n <- function(w,a) { Q_n(C$t_0,w,a)*(1-Q_n(C$t_0,w,a)) }
     } # DEBUG: alternate gamma_n estimator when there is no censoring
     print(paste("Check 17:", Sys.time()))
     pi_star_n <- construct_pi_star_n(dat_orig, vals=NA, type="Super Learner",
-                                     f_aIw_n, f_aIw_delta1_n)
+                                     f_aIw_n, f_aIw_z1_n)
     print(paste("Check 18:", Sys.time()))
     
     # Edge correction
@@ -380,7 +380,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       # The 0.975 quantile of the Chernoff distribution occurs at roughly 1.00
       # The Normal approximation would use qnorm(0.975, sd=0.52) instead
       qnt <- 1.00
-      n_orig <- length(dat_orig$delta)
+      n_orig <- length(dat_orig$z)
       if (p$ci_type=="regular") {
         ci_lo <- ests - (qnt*tau_ns)/(n_orig^(1/3))
         ci_hi <- ests + (qnt*tau_ns)/(n_orig^(1/3))
@@ -468,7 +468,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     })
     
     # Construct CIs
-    n_orig <- length(dat_orig$delta)
+    n_orig <- length(dat_orig$z)
     ci_lo <- ests - 1.96*sqrt(sigma2s/n_orig)
     ci_hi <- ests + 1.96*sqrt(sigma2s/n_orig)
     
@@ -477,7 +477,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   if (estimator=="Cox gcomp") {
     
     # Setup
-    dat <- ss(dat_orig, which(dat_orig$delta==1))
+    dat <- ss(dat_orig, which(dat_orig$z==1))
     vlist <- create_val_list(dat_orig)
     
     # Fit Cox model and compute variance
@@ -498,7 +498,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   if (estimator=="Cox GAM") {
     
     # Setup
-    dat <- ss(dat_orig, which(dat_orig$delta==1))
+    dat <- ss(dat_orig, which(dat_orig$z==1))
     
     # Generate spline basis (4 degrees of freedom)
     qnt <- as.numeric(quantile(dat$a, seq(0,1,0.25)))
@@ -511,11 +511,11 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     ns_basis <- ns(dat$a, knots=spl$K, Boundary.knots=spl$B)
     
     # Fit Cox model
-    fml <- "Surv(y_star,delta_star)~b1"
+    fml <- "Surv(y,delta)~b1"
     for (i in 2:spl$L) { fml <- paste0(fml, "+b",i) }
     for (i in 1:length(dat$w)) { fml <- paste0(fml, "+w",i) }
     fml <- formula(fml)
-    df <- cbind("y_star"=dat$y_star, "delta_star"=dat$delta_star,
+    df <- cbind("y"=dat$y, "delta"=dat$delta,
                 dat$w, "weights"=dat$weights)
     for (i in 1:spl$L) { df[paste0("b",i)] <- ns_basis[,i] }
     model4 <- coxph(fml, data=df, weights=dat$weights)

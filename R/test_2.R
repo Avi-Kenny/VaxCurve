@@ -44,8 +44,8 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
   if (p$var=="asymptotic") {
     
     # Prep
-    n_orig <- length(dat_orig$delta)
-    dat <- ss(dat_orig, which(dat_orig$delta==1))
+    n_orig <- length(dat_orig$z)
+    dat <- ss(dat_orig, which(dat_orig$z==1))
     weights <- dat$weights
     
     # Construct dataframes of values to pre-compute functions on
@@ -69,7 +69,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
       # Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, Q_n, g_n)
       
       # !!!!! New functions
-      n_orig <- length(dat_orig$delta)
+      n_orig <- length(dat_orig$z)
       z_n <- (1/n_orig) * sum(dat$weights * as.integer(dat$a!=0))
       g_n_star <- construct_g_n_star(f_aIw_n, f_a_n, z_n)
       eta_ss_n <- construct_eta_ss_n(dat, Q_n, z_n, vals=NA)
@@ -142,8 +142,8 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
   if (p$var=="monte carlo") {
     
     # Setup
-    n_orig <- length(dat_orig$delta)
-    dat <- ss(dat_orig, which(dat_orig$delta==1))
+    n_orig <- length(dat_orig$z)
+    dat <- ss(dat_orig, which(dat_orig$z==1))
     vlist <- create_val_list(dat_orig)
     
     # Construct component functions
@@ -172,14 +172,14 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     var_n <- 0
     for (i in c(1:n_orig)) {
       a_m <- rep(dat_orig$a[i],m)
-      y_star_m <- rep(dat_orig$y_star[i],m)
-      delta_star_m <- rep(dat_orig$delta_star[i],m)
+      y_m <- rep(dat_orig$y[i],m)
+      delta_m <- rep(dat_orig$delta[i],m)
       weight_m <- rep(dat_orig$weight[i],m)
       w_m <- as.data.frame(
         matrix(rep(dat_orig$w[i,],m), ncol=length(dat_orig$w[i,]), byrow=T)
       )
       var_n <- var_n + (sum(
-        infl_fn_Theta(x=u_mc, w_m, y_star_m, delta_star_m, a_m, weight_m) *
+        infl_fn_Theta(x=u_mc, w_m, y_m, delta_m, a_m, weight_m) *
           (lambda_2*u_mc^2-lambda_3*u_mc)
       ))^2
     }
@@ -202,8 +202,8 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
       # Calculate components on bootstrapped dataset
       {
         # Prep
-        n_orig <- length(dat_orig_b$delta)
-        dat <- ss(dat_orig_b, which(dat_orig_b$delta==1))
+        n_orig <- length(dat_orig_b$z)
+        dat <- ss(dat_orig_b, which(dat_orig_b$z==1))
         weights <- dat$weights
         
         # Construct dataframes of values to pre-compute functions on
@@ -265,7 +265,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     })
     
     # Calculate beta_n, SD, variance
-    stats <- bootstat(dat_orig, c(1:length(dat_orig$delta)))
+    stats <- bootstat(dat_orig, c(1:length(dat_orig$z)))
     beta_n <- stats$beta_n
     sd_n <- sd(as.numeric(boot_results["beta_n",]))
     var_n <- var(as.numeric(boot_results["beta_n",]))
@@ -296,8 +296,8 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     # # Pre-calculate non-bootstrapped pieces
     # {
     #   dat_0_orig <- dat
-    #   n_orig <- length(dat_0_orig$delta)
-    #   dat_0 <- ss(dat_0_orig, which(dat_0_orig$delta==1))
+    #   n_orig <- length(dat_0_orig$z)
+    #   dat_0 <- ss(dat_0_orig, which(dat_0_orig$z==1))
     #   n_0 <- length(dat_0$a)
     #   weights_0 <- wts(dat_0)
     #   
@@ -332,7 +332,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     # bootstat <- function(dat_orig,indices) {
     #   
     #   dat_b_orig <- dat_orig[indices,]
-    #   dat_b <- ss(dat_b_orig, which(dat_b_orig$delta==1))
+    #   dat_b <- ss(dat_b_orig, which(dat_b_orig$z==1))
     #   n_b <- length(dat_b$a)
     #   weights_b <- wts(dat_b)
     #   Phi_n <- construct_Phi_n(dat_b, type=p$ecdf_type)

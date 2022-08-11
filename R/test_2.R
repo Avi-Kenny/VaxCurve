@@ -78,9 +78,9 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
       # Gamma_os_n <- construct_Gamma_os_n_star(dat, omega_n, g_n_star,
       #                                              eta_ss_n, z_n, gcomp_n,
       #                                              alpha_star_n, vals=NA)
-      q_n <- construct_q_n(type="new", dat, dat_orig, omega_n=omega_n,
-                           g_n_star=g_n_star, z_n=z_n, gcomp_n=gcomp_n,
-                           alpha_star_n=alpha_star_n)
+      q_n <- construct_q_n(which="q_n", type="GAM", dat, dat_orig, # !!!!! Super Learner
+                           omega_n=omega_n, g_n_star=g_n_star, z_n=z_n,
+                           gcomp_n=gcomp_n, alpha_star_n=alpha_star_n)
       Gamma_os_n <- construct_Gamma_os_n_star2(dat, dat_orig, omega_n, g_n_star,
                                                eta_ss_n, z_n, q_n, gcomp_n,
                                                alpha_star_n, vals=NA)
@@ -147,28 +147,28 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     vlist <- create_val_list(dat_orig)
     
     # Construct component functions
-    # f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=p$g_n_type,
-    #                              k=p$f_aIw_n_bins)
-    # srvSL <- construct_S_n(dat, vlist$S_n, type=p$S_n_type)
-    # S_n <- srvSL$srv
-    # Sc_n <- srvSL$cens
-    # omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n, type=p$omega_n_type)
-    # etastar_n <- construct_etastar_n(S_n)
-    # q_star_n <- construct_q_n(which="q_star_n", type="Super Learner", dat, # ?????
-    #                           dat_orig, omega_n=omega_n, f_aIw_n=f_aIw_n) # ?????
+    f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=p$g_n_type,
+                                 k=p$f_aIw_n_bins)
+    srvSL <- construct_S_n(dat, vlist$S_n, type=p$S_n_type)
+    S_n <- srvSL$srv
+    Sc_n <- srvSL$cens
+    omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n, type=p$omega_n_type)
+    etastar_n <- construct_etastar_n(S_n)
+    q_star_n <- construct_q_n(which="q_star_n", type="Super Learner", dat,
+                              dat_orig, omega_n=omega_n, f_aIw_n=f_aIw_n)
     Theta_os_n <- construct_Theta_os_n2(dat, dat_orig, omega_n, f_aIw_n,
                                         q_star_n, etastar_n, vals=NA)
-    # infl_fn_Theta <- construct_infl_fn_Theta(omega_n, f_aIw_n, q_star_n,
-    #                                          etastar_n, Theta_os_n)
+    infl_fn_Theta <- construct_infl_fn_Theta(omega_n, f_aIw_n, q_star_n,
+                                             etastar_n, Theta_os_n)
     
     # Construct pieces needed for hypothesis test
-    u_mc <- round(seq(C$appx$a,1,C$appx$a),-log10(C$appx$a))
-    m <- length(u_mc)
-    lambda_2 <- mean((u_mc)^2) # ~1/3
-    lambda_3 <- mean((u_mc)^3) # ~1/4
+    x_mc <- round(seq(0,1,C$appx$a),-log10(C$appx$a))
+    m <- length(x_mc)
+    lambda_2 <- mean((x_mc)^2) # ~1/3
+    lambda_3 <- mean((x_mc)^3) # ~1/4
     
     # Compute test statistic and variance estimate
-    beta_n <- mean((lambda_2*u_mc^2-lambda_3*u_mc)*Theta_os_n(u_mc))
+    beta_n <- mean((lambda_2*x_mc^2-lambda_3*x_mc)*Theta_os_n(x_mc))
     var_n <- 0
     for (i in c(1:n_orig)) {
       a_m <- rep(dat_orig$a[i],m)
@@ -179,8 +179,8 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
         matrix(rep(dat_orig$w[i,],m), ncol=length(dat_orig$w[i,]), byrow=T)
       )
       var_n <- var_n + (sum(
-        infl_fn_Theta(x=u_mc, w_m, y_star_m, delta_star_m, a_m, weight_m) *
-          (lambda_2*u_mc^2-lambda_3*u_mc)
+        infl_fn_Theta(x=x_mc, w_m, y_star_m, delta_star_m, a_m, weight_m) *
+          (lambda_2*x_mc^2-lambda_3*x_mc)
       ))^2
     }
     var_n <- var_n/(n_orig^2*m^2)

@@ -13,7 +13,7 @@ if (cfg$which_sim=="estimation") {
     
     # Generate dataset
     dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
-                              L$sc_params, L$sampling, L$dir, L$wts_type)
+                              L$sc_params, L$sampling, L$dir)
     
     # Obtain estimates
     ests <- est_curve(
@@ -21,8 +21,8 @@ if (cfg$which_sim=="estimation") {
       estimator = L$estimator$est,
       params = L$estimator$params,
       points = C$points,
-      dir = L$dir
-      # return_extra = "deriv_theta_n" # "Theta_os_n"
+      dir = L$dir,
+      return_extra = "deriv_theta_n" # "Theta_os_n"
     )
 
     # Return results
@@ -30,7 +30,7 @@ if (cfg$which_sim=="estimation") {
     Gamma_true <- attr(dat_orig, "Gamma_true")
     res_list <- list()
     for (i in 1:length(C$points)) {
-      m <- format(C$points[i], nsmall=2)
+      m <- format(C$points[i], nsmall=1)
       res_list[paste0("theta_",m)] <- theta_true[i]
       res_list[paste0("est_",m)] <- ests$est[i]
       res_list[paste0("ci_lo_",m)] <- ests$ci_lo[i]
@@ -38,9 +38,7 @@ if (cfg$which_sim=="estimation") {
       if (F) {
         res_list[paste0("Gamma_",m)] <- Gamma_true[i]
         res_list[paste0("estG_",m)] <- ests$ests_Gamma[i]
-        res_list[paste0("Phi_",m)] <- C$points[i] # Only works for Unif(0,1)
-        res_list[paste0("estP_",m)] <- ests$ests_Phi[i]
-      } # DEBUG: return Gamma/Phi estimates
+      } # DEBUG: return Gamma estimates
     }
     
     if (F) {
@@ -77,7 +75,7 @@ if (cfg$which_sim=="testing") {
     
     # Generate dataset
     dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
-                              L$sc_params, L$sampling, L$dir, L$wts_type)
+                              L$sc_params, L$sampling, L$dir)
     
     msg <- "Direction of monotonicity does not align with test type"
     if (L$dir=="incr" && L$test$alt_type=="decr") { stop(msg) }
@@ -150,7 +148,7 @@ if (cfg$which_sim=="edge") {
     
     # Generate dataset
     dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
-                              L$sc_params, L$sampling, L$dir, L$wts_type)
+                              L$sc_params, L$sampling, L$dir)
     
     # Prep
     n_orig <- length(dat_orig$delta)
@@ -285,110 +283,6 @@ if (cfg$which_sim=="Cox") {
     }
     
     return(sim_res)
-    
-  }
-  
-}
-
-
-
-#####################.
-##### Debugging #####
-#####################.
-
-if (cfg$which_sim=="debugging") {
-  
-  #' Run a single simulation (estimation)
-  #'
-  #' @return A list with the estimates and CI limits of the causal dose-response
-  #'     curve evaluated at the midpoint and the endpoint of the domain
-  
-  one_simulation <- function() {
-    
-    # Generate dataset
-    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
-                              L$sc_params, L$sampling, L$dir, L$wts_type)
-    
-    points <- C$points
-    params <- L$estimator$params
-    
-    # Obtain estimates (Phi_n only)
-    {
-      # Set default params
-      .default_params <- list(
-        S_n_type="Super Learner", g_n_type="binning", deriv_type="linear",
-        ecdf_type="linear (mid)", gamma_type="Super Learner",
-        omega_n_type="estimated", boot_reps=1000, ci_type="trunc", cf_folds=1, m=5,
-        edge_corr="none", marg="Gamma_star2", lod_shift="none", n_bins=5,
-        convex_type="GCM", f_aIw_n_bins=15
-      )
-      for (i in c(1:length(.default_params))) {
-        if (is.null(params[[names(.default_params)[i]]])) {
-          params[[names(.default_params)[i]]] <- .default_params[[i]]
-        }
-      }
-      p <- params
-      
-      # Rescale A to lie in [0,1] and round values
-      a_min <- min(dat_orig$a,na.rm=T)
-      a_max <- max(dat_orig$a,na.rm=T)
-      a_shift <- -1 * a_min
-      a_scale <- 1/(a_max-a_min)
-      dat_orig$a <- (dat_orig$a+a_shift)*a_scale
-      dat_orig <- round_dat(dat_orig)
-      
-      # Obtain minimum value (excluding edge point mass)
-      if (p$edge_corr=="min") { a_min2 <- min(dat_orig$a[dat_orig$a!=0],na.rm=T) }
-      
-      # Rescale points and remove points outside the range of A
-      points_orig <- points
-      na_head <- sum(round(points,-log10(C$appx$a))<round(a_min,-log10(C$appx$a)))
-      points <- round((points+a_shift)*a_scale, -log10(C$appx$a))
-      na_tail <- sum(points>1)
-      if (na_head>0) {
-        points <- points[-c(1:na_head)]
-      }
-      if (na_tail>0) {
-        points <- points[-c((length(points)-na_tail+1):length(points))]
-      }
-      
-      dat <- ss(dat_orig, which(dat_orig$delta==1))
-      dat2 <- ss(dat, which(dat$a!=0))
-      Phi_n <- construct_Phi_n(dat2, type=p$ecdf_type)
-      ests_Phi <- Phi_n(points)
-      
-    }
-    
-    # Construct new estimator #2 (manual summation calc)
-    n_orig <- sum(dat2$weights)
-    Phi_n2 <- Vectorize(function(x) {
-      (1/n_orig) * sum(dat2$weights*as.integer(dat2$a<=x))
-    })
-    ests_Phi2 <- Phi_n2(points)
-    
-    # Construct new estimator #3 (manual summation calc with original n-value)
-    n_orig <- sum(dat$weights)
-    Phi_n3 <- Vectorize(function(x) {
-      (1/n_orig) * sum(dat2$weights*as.integer(dat2$a<=x))
-    })
-    ests_Phi3 <- Phi_n3(points)
-    
-    # Construct new estimator #4 (not excluding edge points)
-    Phi_n4 <- construct_Phi_n(dat, type=p$ecdf_type)
-    ests_Phi4 <- Phi_n4(points)
-    
-    # Return results
-    res_list <- list()
-    for (i in 1:length(C$points)) {
-      m <- format(C$points[i], nsmall=1)
-      res_list[paste0("Phi_",m)] <- C$points[i] # Only works for Unif(0,1)
-      res_list[paste0("estP_",m)] <- ests_Phi[i]
-      res_list[paste0("estP2_",m)] <- ests_Phi2[i]
-      res_list[paste0("estP3_",m)] <- ests_Phi3[i]
-      res_list[paste0("estP4_",m)] <- ests_Phi4[i]
-    }
-    
-    return(res_list)
     
   }
   

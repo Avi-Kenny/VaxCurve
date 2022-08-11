@@ -24,7 +24,7 @@ cfg <- list(
                      "data.table", "latex2exp"),
   parallel = "none",
   stop_at_error = F,
-  appx = list(t_e=1, w_tol=25, a=0.01) # !!!!! t_e=1, a=0.001
+  appx = list(t_0=1, w_tol=25, a=0.01) # !!!!! t_0=1, a=0.001
 )
 
 # Set cluster config
@@ -90,8 +90,8 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     # sc_params = list("no cens"=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5)),
     # sc_params = list("exp"=list(lmbd=1e-3, v=1.5, lmbd2=5e-4, v2=1.5)),
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_A = c("Unif(0,1)", "N(0.5,0.04)"),
-    # distr_A = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4w2,0.04)"),
+    distr_S = c("Unif(0,1)", "N(0.5,0.04)"),
+    # distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.04)"),
     edge = c("none"), # "expit 0.4"
     # surv_true = c("Complex"),
     surv_true = c("Cox PH"), # "Cox PH" "Complex" "exp"
@@ -101,7 +101,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     estimator = list(
       "Grenander (Cox)" = list(
         est = "Grenander",
-        params = list(marg="Gamma_star2", S_n_type="Cox PH", # marg="Gamma_star", S_n_type="Random Forest", S_n_type="true"
+        params = list(marg="Gamma_star2", Q_n_type="Cox PH", # marg="Gamma_star", Q_n_type="Random Forest", Q_n_type="true"
                       convex_type="GCM", ecdf_type="linear (mid)", # convex_type="LS"
                       edge_corr="none", # edge_corr="min"
                       deriv_type="m-spline", g_n_type="parametric") # g_n_type="binning", g_n_type="true"
@@ -109,7 +109,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       # "Cox PH" = list(est="Cox gcomp")
       # "Qbins (true)" = list(
       #   est = "Qbins",
-      #   params = list(n_bins=8, S_n_type="Cox PH")
+      #   params = list(n_bins=8, Q_n_type="Cox PH")
       # )
     )
   )
@@ -120,16 +120,16 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     alpha_3 = -4,
     dir = c("incr", "decr"),
     sc_params = list("sc_params"=list(lmbd=3e-5, v=1.5, lmbd2=3e-5, v2=1.5)),
-    distr_A = c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"),
+    distr_S = c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"),
     edge = "none",
     surv_true = "Cox PH",
     sampling = "two-phase (6%)",
     wts_type = "estimated",
     estimator = list(
-      "Qbins (5)" = list(est="Qbins", params=list(n_bins=8, S_n_type="Cox PH")),
+      "Qbins (5)" = list(est="Qbins", params=list(n_bins=8, Q_n_type="Cox PH")),
       "Grenander" = list(
         est = "Grenander",
-        params = list(marg="Gamma_star2", S_n_type="Cox PH")
+        params = list(marg="Gamma_star2", Q_n_type="Cox PH")
       )
     )
   )
@@ -143,7 +143,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     alpha_3 = c(0,-0.25,-0.5),
     dir = "decr",
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_A = c("Unif(0,1)", "N(0.5,0.04)"), # "N(0.5,0.01)"
+    distr_S = c("Unif(0,1)", "N(0.5,0.04)"), # "N(0.5,0.01)"
     edge = c("none", "expit 0.5"),
     surv_true = "Cox PH",
     sampling = c("iid", "two-phase (72%)"),
@@ -155,7 +155,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       "Slope (two-tailed, MC)" = list(
         type = "test_2",
         alt_type = "two-tailed", # decr
-        params = list(g_n_type="binning", S_n_type="Cox PH",
+        params = list(g_n_type="binning", Q_n_type="Cox PH",
                       omega_n_type="estimated"),
         test_stat_only = F
       )
@@ -163,7 +163,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       #   type = "test_2",
       #   alt_type = "two-tailed", # decr
       #   test_stat_only = F,
-      #   params = list(g_n_type="binning", S_n_type="Cox PH",
+      #   params = list(g_n_type="binning", Q_n_type="Cox PH",
       #                 omega_n_type="estimated", var="boot", boot_reps=100)
       # )
     )
@@ -176,8 +176,8 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     dir = "decr",
     # wts_type = "estimated",
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_A = c("Unif(0,1)"),
-    # distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
+    distr_S = c("Unif(0,1)"),
+    # distr_S = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
     edge = "none",
     sampling = "two-phase (50%)",
     wts_type = c("true", "estimated")
@@ -213,7 +213,7 @@ if (cfg$main_task=="run") {
     points = round(seq(0,1,0.02),2),
     alpha_1 = 0.5,
     alpha_2 = 0.7,
-    t_e = 200,
+    t_0 = 200,
     appx = cfg$appx
   )
   
@@ -335,7 +335,7 @@ if (F) {
   
   p_data <- pivot_longer(
     data = summ,
-    cols = -c(level_id,n,alpha_3,sc_params,distr_A,edge,
+    cols = -c(level_id,n,alpha_3,sc_params,distr_S,edge,
               surv_true,sampling,Estimator,dir,wts_type),
     names_to = c("stat","point"),
     names_sep = "_"
@@ -345,14 +345,14 @@ if (F) {
   # cb_colors <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442",
   #                "#0072B2", "#D55E00", "#CC79A7", "#999999")
   # m_colors <- c(cb_colors[2], cb_colors[5], cb_colors[6]
-    # `Grenander (Est S_n/g_n)` = cb_colors[2],
+    # `Grenander (Est Q_n/g_n)` = cb_colors[2],
   # )
   
   # PLot Y-axis limits
   plot_lims <- list(b=c(-0.25,0.25), c=c(0,1), m=c(0,0.02), v=c(0,0.01)) # c=c(0.7,1)
   
   # Set faceting vectors
-  distr_As <- c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4w2,0.04)")
+  distr_Ss <- c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.04)")
   surv_trues <- c("Cox PH", "Complex")
   
   # Orange 10/90 quantile lines
@@ -363,41 +363,41 @@ if (F) {
   df_vlines <- data.frame(
     # x = c(qnorm(0.1,0.5,0.1),qnorm(0.1,0.5,0.2),qunif(0.1,0,1),
     #       qnorm(0.9,0.5,0.1),qnorm(0.9,0.5,0.2),qunif(0.9,0,1)),
-    # distr_A = rep(c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"),2)
+    # distr_S = rep(c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"),2)
     x = c(qunif(0.1,0,1), qtruncnorm(0.1, a=0, b=1, mean=0.5, sd=0.2), q3[1],
           qunif(0.9,0,1), qtruncnorm(0.9, a=0, b=1, mean=0.5, sd=0.2), q3[2]),
-    distr_A = rep(distr_As,2)
+    distr_S = rep(distr_Ss,2)
   )
   
   # Grey background densities
-  df_distr_A <- data.frame(
+  df_distr_S <- data.frame(
     x = rep(seq(0,1,0.01),3),
     # ymax = c(dnorm(seq(0,1,0.01), mean=0.5, sd=0.1),
     #          dnorm(seq(0,1,0.01), mean=0.5, sd=0.2),
     #          rep(1,101)),
-    # distr_A = rep(c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"), each=101),
+    # distr_S = rep(c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"), each=101),
     ymax = c(rep(1,101),
              dtruncnorm(seq(0,1,0.01), a=0, b=1, mean=0.5, sd=0.2),
              0.5*dtruncnorm(seq(0,1,0.01), a=0, b=1, mean=0.3, sd=0.2) +
              0.5*dtruncnorm(seq(0,1,0.01), a=0, b=1, mean=0.7, sd=0.2)),
-    distr_A = rep(distr_As, each=101),
+    distr_S = rep(distr_Ss, each=101),
     value = 0
   )
   if (sim$levels$edge!="none") {
     mass <- as.numeric(strsplit(sim$levels$edge," ",fixed=T)[[1]][2])
     height <- 10 * mass
-    df_distr_A %<>% mutate(
-      ymax = ifelse(x<0.1, 10*mass, (1-mass)*df_distr_A$ymax)
+    df_distr_S %<>% mutate(
+      ymax = ifelse(x<0.1, 10*mass, (1-mass)*df_distr_S$ymax)
     )
     df_vlines <- df_vlines[4:6,]
   }
-  df_distr_b <- mutate(df_distr_A, ymin=plot_lims$b[1],
+  df_distr_b <- mutate(df_distr_S, ymin=plot_lims$b[1],
                        ymax=((ymax*diff(plot_lims$b))/6+plot_lims$b[1]))
-  df_distr_c <- mutate(df_distr_A, ymin=plot_lims$c[1],
+  df_distr_c <- mutate(df_distr_S, ymin=plot_lims$c[1],
                        ymax=((ymax*diff(plot_lims$c))/6+plot_lims$c[1]))
-  df_distr_m <- mutate(df_distr_A, ymin=plot_lims$m[1],
+  df_distr_m <- mutate(df_distr_S, ymin=plot_lims$m[1],
                        ymax=((ymax*diff(plot_lims$m))/6+plot_lims$m[1]))
-  df_distr_v <- mutate(df_distr_A, ymin=plot_lims$v[1],
+  df_distr_v <- mutate(df_distr_S, ymin=plot_lims$v[1],
                        ymax=((ymax*diff(plot_lims$v))/6+plot_lims$v[1]))
   
   # Bias plot
@@ -413,7 +413,7 @@ if (F) {
                linetype="dashed") +
     geom_line() +
     facet_grid(rows = dplyr::vars(factor(surv_true, levels=surv_trues)),
-               cols = dplyr::vars(factor(distr_A, levels=distr_As))) +
+               cols = dplyr::vars(factor(distr_S, levels=distr_Ss))) +
     scale_y_continuous(limits=plot_lims$b) + # labels=percent
     # scale_color_manual(values=m_colors) +
     theme(legend.position="bottom") +
@@ -432,7 +432,7 @@ if (F) {
     geom_hline(aes(yintercept=0.95), linetype="longdash", color="grey") +
     geom_line() +
     facet_grid(rows = dplyr::vars(factor(surv_true, levels=surv_trues)),
-               cols = dplyr::vars(factor(distr_A, levels=distr_As))) +
+               cols = dplyr::vars(factor(distr_S, levels=distr_Ss))) +
     scale_y_continuous(labels=percent, limits=plot_lims$c) +
     # scale_color_manual(values=m_colors) +
     theme(legend.position="bottom") +
@@ -450,7 +450,7 @@ if (F) {
                linetype="dashed") +
     geom_line() +
     facet_grid(rows = dplyr::vars(factor(surv_true, levels=surv_trues)),
-               cols = dplyr::vars(factor(distr_A, levels=distr_As))) +
+               cols = dplyr::vars(factor(distr_S, levels=distr_Ss))) +
     scale_y_continuous(limits=plot_lims$v) +
     # scale_color_manual(values=m_colors) +
     theme(legend.position="bottom") +
@@ -468,7 +468,7 @@ if (F) {
   #              linetype="dashed") +
   #   geom_line() +
   #   facet_grid(rows = dplyr::vars(factor(surv_true, levels=surv_trues)),
-  #              cols = dplyr::vars(factor(distr_A, levels=distr_As))) +
+  #              cols = dplyr::vars(factor(distr_S, levels=distr_Ss))) +
   #   scale_y_continuous(limits=plot_lims$m) +
   #   # scale_color_manual(values=m_colors) +
   #   theme(legend.position="bottom") +
@@ -507,15 +507,15 @@ if (F) {
   )
   
   # Export: 7" x 4.5"
-  # distr_A_ <- "Unif(0,1)"
+  # distr_S_ <- "Unif(0,1)"
   ggplot(
     summ,
     aes(x=alpha_3, y=Power, color=factor(n))
   ) +
     geom_point() +
     geom_line() +
-    facet_grid(cols=dplyr::vars(test), rows=dplyr::vars(distr_A)) +
-    # facet_grid(cols=dplyr::vars(surv_true), rows=dplyr::vars(distr_A)) +
+    facet_grid(cols=dplyr::vars(test), rows=dplyr::vars(distr_S)) +
+    # facet_grid(cols=dplyr::vars(surv_true), rows=dplyr::vars(distr_S)) +
     scale_y_continuous(labels=percent) +
     theme(legend.position="bottom") +
     scale_color_manual(values=m_colors) +

@@ -9,7 +9,7 @@
   
   # 2. Set global constants
   params <- list(
-    S_n_type="Cox PH", g_n_type="parametric", ci_type="regular", cf_folds=1,
+    Q_n_type="Cox PH", g_n_type="parametric", ci_type="regular", cf_folds=1,
     edge_corr="none", ecdf_type="linear (mid)", deriv_type="linear",
     gamma_type="Super Learner", omega_n_type="estimated",
     marg="Gamma_star2" # Gamma_star
@@ -19,16 +19,16 @@
   L <- list(
     n=500, alpha_3=-2, dir="decr",
     sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5), # sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5), # Uncomment this for (almost) no censoring
-    distr_A="Unif(0,1)", edge="none", surv_true="Cox PH", # "N(0.3+0.4w2,0.04)"
+    distr_S="Unif(0,1)", edge="none", surv_true="Cox PH", # "N(0.3+0.4x2,0.04)"
     sampling="two-phase (50%)", estimator=list(est="Grenander",params=params) # two-phase (72%)
     # n=15000, alpha_3=-4, dir="decr",
     # sc_params=list(lmbd=3e-5, v=1.5, lmbd2=3e-5, v2=1.5), # sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5), # Uncomment this for (almost) no censoring
-    # distr_A="N(0.5,0.04)", edge="none", surv_true="Cox PH",
+    # distr_S="N(0.5,0.04)", edge="none", surv_true="Cox PH",
     # sampling="two-phase (6%)", estimator=list(est="Grenander",params=params)
   )
   
   # 3. Generate dataset
-  dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+  dat_orig <- generate_data(L$n, L$alpha_3, L$distr_S, L$edge, L$surv_true,
                             L$sc_params, L$sampling, L$dir) # wts_type="estimated"
   dat <- ss(dat_orig, which(dat_orig$delta==1))
   vlist <- create_val_list(dat_orig)
@@ -57,7 +57,7 @@
   for (i in 1:n_reps) {
     
     # Generate dataset
-    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_S, L$edge, L$surv_true,
                               L$sc_params, L$sampling, L$dir)
     
     # Calculate summary stats
@@ -101,7 +101,7 @@
   n_reps <- 100
   for (i in c(1:n_reps)) {
     print(paste("rep:",i))
-    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_S, L$edge, L$surv_true,
                               L$sc_params, L$sampling, L$dir)
     dat <- ss(dat_orig, which(dat_orig$delta==1))
     Phi_n1 <- construct_Phi_n(dat, type="step")
@@ -127,7 +127,7 @@
     facet_wrap(~grp, ncol=2)
   
   # !!!!!
-  dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+  dat_orig <- generate_data(L$n, L$alpha_3, L$distr_S, L$edge, L$surv_true,
                             L$sc_params, "iid", L$dir) # L$sampling
   dat <- ss(dat_orig, which(dat_orig$delta==1))
   vlist <- create_val_list(dat_orig)
@@ -251,21 +251,21 @@
   for (i in 1:n_samples) {
     
     # Construct dat_orig and vlist
-    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_S, L$edge, L$surv_true,
                               L$sc_params, L$sampling, L$dir)
     vlist <- create_val_list(dat_orig)
     
     # Construct component functions
     Phi_n <- construct_Phi_n(dat, type=params$ecdf_type)
     Phi_n_inv <- construct_Phi_n(dat, which="inverse", type=params$ecdf_type)
-    srvSL <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
-    S_n <- srvSL$srv
-    Sc_n <- srvSL$cens
+    srvSL <- construct_Q_n(dat, vlist$Q_n, type=params$Q_n_type)
+    Q_n <- srvSL$srv
+    Qc_n <- srvSL$cens
     f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=params$g_n_type, k=15)
     f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
     g_n <- construct_g_n(f_aIw_n, f_a_n)
-    omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
-    Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n)
+    omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n)
+    Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, Q_n, g_n)
     
     # Construct additional component functions
     Psi_n <- Vectorize(function(x) {
@@ -328,7 +328,7 @@
   vlist <- create_val_list(dat_orig)
   
   # True omega_0
-  srvSL <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
+  srvSL <- construct_Q_n(dat, vlist$Q_n, type=params$Q_n_type)
   S_0 <- srvSL$srv
   Sc_0 <- srvSL$cens
   omega_0 <- Vectorize(function(w1,w2,a,y_star,delta_star) {
@@ -365,11 +365,11 @@
   })
   
   # Construct omega_n
-  # S_n <- S_0
-  # Sc_n <- Sc_0
-  # S_n <- construct_S_n(dat, vlist$S_n, type="Random Forest")
-  # Sc_n <- construct_S_n(dat, vlist$S_n, type="Random Forest", csf=TRUE)
-  omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
+  # Q_n <- S_0
+  # Qc_n <- Sc_0
+  # Q_n <- construct_Q_n(dat, vlist$Q_n, type="Random Forest")
+  # Qc_n <- construct_Q_n(dat, vlist$Q_n, type="Random Forest", csf=TRUE)
+  omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n)
   
   omegas_est <- c()
   omegas_true <- c()
@@ -399,7 +399,7 @@
   # Approximate true gamma_0
   construct_gamma_0 <- function() {
     epsilon <- 0.02
-    dat_mc <- generate_data(n=50000, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+    dat_mc <- generate_data(n=50000, L$alpha_3, L$distr_S, L$edge, L$surv_true,
                             L$sc_params, sampling="iid", L$dir)
     
     f_aIw_0 <- construct_f_aIw_n(dat, vlist$AW_grid, type="true", k=15)
@@ -461,7 +461,7 @@
   dat <- generate_data(
     n = 400, # 5000
     alpha_3 = 0,
-    distr_A = "Unif(0,1)",
+    distr_S = "Unif(0,1)",
     edge = "none",
     surv_true = "Cox PH",
     sc_params = L$sc_params,
@@ -482,11 +482,11 @@
     f_aIw_n <- construct_f_aIw_n(dat, type=params$g_n_type, k=15)
     f_a_n <- construct_f_a_n(dat_orig, f_aIw_n)
     g_n <- construct_g_n(f_aIw_n, f_a_n)
-    srvSL <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
-    S_n <- srvSL$srv
-    Sc_n <- srvSL$cens
-    omega_n <- construct_omega_n(S_n, Sc_n)
-    Gamma_os_n <- construct_Gamma_os_n(dat, omega_n, S_n, g_n)
+    srvSL <- construct_Q_n(dat, vlist$Q_n, type=params$Q_n_type)
+    Q_n <- srvSL$srv
+    Qc_n <- srvSL$cens
+    omega_n <- construct_omega_n(Q_n, Qc_n)
+    Gamma_os_n <- construct_Gamma_os_n(dat, omega_n, Q_n, g_n)
     
     # Return the value of Gamma_os_n(0.5)
     return (Gamma_os_n(0.5))
@@ -503,7 +503,7 @@
     dat <- generate_data(
       n = 400, # 5000
       alpha_3 = 0,
-      distr_A = "Unif(0,1)",
+      distr_S = "Unif(0,1)",
       edge = "none",
       surv_true = "Cox PH",
       sc_params = L$sc_params,
@@ -526,13 +526,13 @@
     f_aIw_n <- construct_f_aIw_n(dat, type=params$g_n_type, k=15)
     f_a_n <- construct_f_a_n(dat_orig, f_aIw_n)
     g_n <- construct_g_n(f_aIw_n, f_a_n)
-    srvSL <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
-    S_n <- srvSL$srv
-    Sc_n <- srvSL$cens
-    omega_n <- construct_omega_n(S_n, Sc_n)
-    gcomp_n <- construct_gcomp_n(dat_orig, vals_A_grid, S_n)
-    eta_n <- construct_eta_n(dat, vals_AW_grid, S_n)
-    Gamma_os_n <- construct_Gamma_os_n(dat, omega_n, S_n, g_n)
+    srvSL <- construct_Q_n(dat, vlist$Q_n, type=params$Q_n_type)
+    Q_n <- srvSL$srv
+    Qc_n <- srvSL$cens
+    omega_n <- construct_omega_n(Q_n, Qc_n)
+    gcomp_n <- construct_gcomp_n(dat_orig, vals_A_grid, Q_n)
+    eta_n <- construct_eta_n(dat, vals_AW_grid, Q_n)
+    Gamma_os_n <- construct_Gamma_os_n(dat, omega_n, Q_n, g_n)
     
     if (F) {
       
@@ -601,7 +601,7 @@
 {
   
   # Generate data
-  dat_orig <- generate_data(n=400, alpha_3=0, distr_A="Unif(0,1)", edge="none",
+  dat_orig <- generate_data(n=400, alpha_3=0, distr_S="Unif(0,1)", edge="none",
                             surv_true="Cox PH", sc_params=L$sc_params,
                             sampling="two-phase (72%)", dir=L$dir)
   
@@ -628,11 +628,11 @@
     f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=params$g_n_type, k=15)
     f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
     g_n <- construct_g_n(f_aIw_n, f_a_n)
-    srvSL <- construct_S_n(dat, vlist$S_n, type=params$S_n_type)
-    S_n <- srvSL$srv
-    Sc_n <- srvSL$cens
-    omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
-    Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n)
+    srvSL <- construct_Q_n(dat, vlist$Q_n, type=params$Q_n_type)
+    Q_n <- srvSL$srv
+    Qc_n <- srvSL$cens
+    omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n)
+    Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, Q_n, g_n)
     
     # Compute the test statistic
     beta_n <- (1/n_orig) * sum(
@@ -652,7 +652,7 @@
   betas <- c()
   for (i in 1:50) {
     
-    dat_orig <- generate_data(n=400, alpha_3=0, distr_A="Unif(0,1)", edge="none",
+    dat_orig <- generate_data(n=400, alpha_3=0, distr_S="Unif(0,1)", edge="none",
                               surv_true="Cox PH", sc_params=L$sc_params,
                               sampling="two-phase (72%)", dir=L$dir) # "iid" "two-phase (72%)"
     
@@ -672,7 +672,7 @@
     alt_type = "incr",
     params = list(
       var = "asymptotic",
-      S_n_type = params$S_n_type,
+      Q_n_type = params$Q_n_type,
       g_n_type = params$g_n_type,
       est_known_nuis = FALSE,
       cf_folds = 1
@@ -711,10 +711,10 @@
 
 {
   # Set C$appx$t_e to 10 in "Setup" section
-  S_0 <- (construct_S_n(dat, vlist$S_n, type="true"))$srv
-  S_CoxPH <- (construct_S_n(dat, vlist$S_n, type="Cox PH"))$srv
-  # S_SL <- (construct_S_n(dat, vlist$S_n, type="Super Learner"))$srv
-  S_SL <- (construct_S_n(dat, vlist$S_n, type="Random Forest"))$srv
+  S_0 <- (construct_Q_n(dat, vlist$Q_n, type="true"))$srv
+  S_CoxPH <- (construct_Q_n(dat, vlist$Q_n, type="Cox PH"))$srv
+  # S_SL <- (construct_Q_n(dat, vlist$Q_n, type="Super Learner"))$srv
+  S_SL <- (construct_Q_n(dat, vlist$Q_n, type="Random Forest"))$srv
   
   # Plot true curve against estimated curve (as function of T)
   times <- round(seq(0,200,10))
@@ -776,7 +776,7 @@
   dat_orig <- generate_data(
     n = 3000,
     alpha_3 = L$alpha_3,
-    distr_A = L$distr_A,
+    distr_S = L$distr_S,
     edge = L$edge,
     surv_true = L$surv_true,
     sc_params = L$sc_params,
@@ -785,9 +785,9 @@
   )
   vlist <- create_val_list(dat_orig)
   
-  Sc_0 <- (construct_S_n(dat, vlist$S_n, type="true"))$cens
-  Sc_n_Cox <- (construct_S_n(dat, vlist$S_n, type="Cox PH"))$cens
-  Sc_n_SL <- (construct_S_n(dat, vlist$S_n, type="Super Learner"))$cens
+  Sc_0 <- (construct_Q_n(dat, vlist$Q_n, type="true"))$cens
+  Qc_n_Cox <- (construct_Q_n(dat, vlist$Q_n, type="Cox PH"))$cens
+  Qc_n_SL <- (construct_Q_n(dat, vlist$Q_n, type="Super Learner"))$cens
   
   # Plot true curve against estimated curve
   times <- round(seq(0,200,10))
@@ -797,14 +797,14 @@
   df <- data.frame(
     time = rep(times, 12),
     survival = c(
-      Sc_n_Cox(t=times, w_02, a=rep(0.2,n)),
-      Sc_n_Cox(t=times, w_05, a=rep(0.2,n)),
-      Sc_n_Cox(t=times, w_02, a=rep(0.8,n)),
-      Sc_n_Cox(t=times, w_05, a=rep(0.8,n)),
-      Sc_n_SL(t=times, w_02, a=rep(0.2,n)),
-      Sc_n_SL(t=times, w_05, a=rep(0.2,n)),
-      Sc_n_SL(t=times, w_02, a=rep(0.8,n)),
-      Sc_n_SL(t=times, w_05, a=rep(0.8,n)),
+      Qc_n_Cox(t=times, w_02, a=rep(0.2,n)),
+      Qc_n_Cox(t=times, w_05, a=rep(0.2,n)),
+      Qc_n_Cox(t=times, w_02, a=rep(0.8,n)),
+      Qc_n_Cox(t=times, w_05, a=rep(0.8,n)),
+      Qc_n_SL(t=times, w_02, a=rep(0.2,n)),
+      Qc_n_SL(t=times, w_05, a=rep(0.2,n)),
+      Qc_n_SL(t=times, w_02, a=rep(0.8,n)),
+      Qc_n_SL(t=times, w_05, a=rep(0.8,n)),
       Sc_0(t=times, w_02, a=rep(0.2,n)),
       Sc_0(t=times, w_05, a=rep(0.2,n)),
       Sc_0(t=times, w_02, a=rep(0.8,n)),
@@ -834,7 +834,7 @@
   for (i in c(1:10)) {
     
     # !!!!! START !!!!!
-    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true, # !!!!!
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_S, L$edge, L$surv_true, # !!!!!
                               L$sc_params, L$sampling, L$dir) # !!!!!
     dat <- ss(dat_orig, which(dat_orig$delta==1)) # !!!!!
     vlist <- create_val_list(dat_orig) # !!!!!
@@ -848,7 +848,7 @@
       points = C$points,
       dir = L$dir,
       return_extra = c("Phi_n_inv", "deriv_r_Mn", "f_a_n", "gamma_n", "Psi_n",
-                       "omega_n", "f_aIw_n", "S_n", "gcm", "dGCM", "etastar_n")
+                       "omega_n", "f_aIw_n", "Q_n", "gcm", "dGCM", "etastar_n")
     )
     
     assign(paste0("ests",i), ests)
@@ -899,13 +899,13 @@
       labs(title=paste("ests",i)) +
       theme(legend.position="bottom") + ylim(c(-0.55,0.1))
     
-    # # omega_n, etastar_n, and S_n all look fine
+    # # omega_n, etastar_n, and Q_n all look fine
     # ggplot(data.frame(x=grid, y=omega_n(grid)), aes(x=x, y=y)) +
     #   geom_line()+theme(legend.position="bottom")+labs(title="omega_n (ests 7)")
     # ggplot(data.frame(x=grid, y=etastar_n(grid)), aes(x=x, y=y)) +
     #   geom_line()+theme(legend.position="bottom")+labs(title="etastar_n (ests 7)")
-    # ggplot(data.frame(x=grid, y=S_n(grid)), aes(x=x, y=y)) +
-    #   geom_line()+theme(legend.position="bottom")+labs(title="S_n (ests 7)")
+    # ggplot(data.frame(x=grid, y=Q_n(grid)), aes(x=x, y=y)) +
+    #   geom_line()+theme(legend.position="bottom")+labs(title="Q_n (ests 7)")
     
   }
   
@@ -1020,7 +1020,7 @@
   dat_orig <- generate_data(
     n = n,
     alpha_3 = -4,
-    distr_A = "N(0.5,0.04)",
+    distr_S = "N(0.5,0.04)",
     edge = edge,
     surv_true = "Cox PH",
     sampling = L$sampling,

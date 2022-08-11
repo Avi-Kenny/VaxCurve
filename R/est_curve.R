@@ -3,8 +3,8 @@
 #' @param dat_orig Data returned by generate_data(); FULL data
 #' @param estimator Which estimator to use; currently only "Grenander"
 #' @param params A list, containing the following:
-#'   - `S_n_type` Type of survival function estimator; corresponds to
-#'     construct_S_n()
+#'   - `Q_n_type` Type of survival function estimator; corresponds to
+#'     construct_Q_n()
 #'   - `g_n_type` Type of conditional density ratio estimator; corresponds to
 #'     construct_f_aIw_n()
 #'   - `ecdf_type` Type of CDF estimator; corresponds to construct_Phi_n()
@@ -26,7 +26,7 @@
 #'     leftmost point. "min" adjusts both the leftmost point and the rest of the
 #'     curve.
 #'   - `marg` One of c("Gamma", "Theta"); whether or not to transform by the
-#'     marginal distribution of A
+#'     marginal distribution of S
 #'   - `convex_type` One of c("GCM", "LS"); whether to fit the GCM to the
 #'     primitive or the least squares line
 #' @param points A vector representing the points at which estimates and CIs
@@ -40,7 +40,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   
   # Set default params
   .default_params <- list(
-    S_n_type="Super Learner", g_n_type="binning", deriv_type="linear",
+    Q_n_type="Super Learner", g_n_type="binning", deriv_type="linear",
     ecdf_type="linear (mid)", gamma_type="Super Learner", q_n_type="new",
     omega_n_type="estimated", boot_reps=1000, ci_type="trunc", cf_folds=1, m=5,
     edge_corr="none", marg="Gamma_star2", lod_shift="none", n_bins=5,
@@ -86,16 +86,16 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     print(paste("Check 0:", Sys.time()))
     vlist <- create_val_list(dat_orig)
-    srvSL <- construct_S_n(dat, vlist$S_n, type=p$S_n_type, print_coeffs=T)
-    S_n <- srvSL$srv
-    Sc_n <- srvSL$cens
+    srvSL <- construct_Q_n(dat, vlist$Q_n, type=p$Q_n_type, print_coeffs=T)
+    Q_n <- srvSL$srv
+    Qc_n <- srvSL$cens
     print(paste("Check 1:", Sys.time()))
-    omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n, type=p$omega_n_type)
+    omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n, type=p$omega_n_type)
     
     # !!!!!
     if (F) {
       
-      # omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n, type=p$omega_n_type)
+      # omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n, type=p$omega_n_type)
       system.time({
         for (a in seq(0,1,0.01)) {
           ooo <- omega_n(dat$w,rep(a,length(dat$a)),dat$y_star,dat$delta_star)
@@ -119,21 +119,21 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       z_n <- (1/n_orig) * sum(dat$weights * as.integer(dat$a!=0))
       g_n_star <- construct_g_n_star(f_aIw_n, f_a_n, z_n)
       print(paste("Check 5:", Sys.time()))
-      eta_ss_n <- construct_eta_ss_n(dat, S_n, z_n, vals=NA)
+      eta_ss_n <- construct_eta_ss_n(dat, Q_n, z_n, vals=NA)
       print(paste("Check 6:", Sys.time()))
-      gcomp_n <- construct_gcomp_n(dat_orig, vals=vlist$A_grid, S_n)
+      gcomp_n <- construct_gcomp_n(dat_orig, vals=vlist$A_grid, Q_n)
       print(paste("Check 7:", Sys.time()))
       alpha_star_n <- construct_alpha_star_n(dat, gcomp_n, z_n, vals=NA)
       print(paste("Check 8:", Sys.time()))
     }
     
     if (p$marg=="Theta") {
-      etastar_n <- construct_etastar_n(S_n)
+      etastar_n <- construct_etastar_n(Q_n)
       Theta_os_n <- construct_Theta_os_n(dat, vlist$A_grid, omega_n, f_aIw_n,
                                          etastar_n)
     } else if (p$marg=="Gamma") {
       Phi_n <- construct_Phi_n(dat, type=p$ecdf_type)
-      Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n)
+      Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, Q_n, g_n)
     } else if (p$marg=="Gamma_star") {
       Gamma_os_n_star <- construct_Gamma_os_n_star(dat, omega_n, g_n_star,
                                                    eta_ss_n, z_n, gcomp_n,
@@ -143,7 +143,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       print(paste("Check 9:", Sys.time()))
       q_n <- construct_q_n(type=p$q_n_type, dat, dat_orig, omega_n=omega_n, g_n=g_n,
                            z_n=z_n, gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
-                           S_n=S_n, Sc_n=Sc_n)
+                           Q_n=Q_n, Qc_n=Qc_n)
       print(paste("Check 10:", Sys.time()))
       Gamma_os_n_star <- construct_Gamma_os_n_star2(dat, dat_orig, omega_n,
                                                     g_n, eta_ss_n, z_n, # g_n_star
@@ -160,17 +160,17 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       
       if (F) {
         m <- 10^5
-        if (L$distr_A=="Unif(0,1)") {
+        if (L$distr_S=="Unif(0,1)") {
           a <- runif(m)
-        } else if (L$distr_A=="Unif(0.3,0.7)") {
+        } else if (L$distr_S=="Unif(0.3,0.7)") {
           a <- runif(m, min=0.3, max=0.7)
-        } else if (L$distr_A=="N(0.5,0.01)") {
+        } else if (L$distr_S=="N(0.5,0.01)") {
           a <- rtruncnorm(m, a=0, b=1, mean=0.5, sd=0.1)
-        } else if (L$distr_A=="N(0.5,0.04)") {
+        } else if (L$distr_S=="N(0.5,0.04)") {
           a <- rtruncnorm(m, a=0, b=1, mean=0.5, sd=0.2)
-        } else if (L$distr_A=="Tri UP") {
+        } else if (L$distr_S=="Tri UP") {
           a <- sqrt(runif(m))
-        } else if (L$distr_A=="Tri DN") {
+        } else if (L$distr_S=="Tri DN") {
           a <- 1 - sqrt(runif(m))
         }
         a <- (a+a_shift)*a_scale
@@ -188,15 +188,15 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     # Construct one-step edge estimator
     if (p$edge_corr!="none") {
       pi_n <- construct_pi_n(dat, vlist$W_grid, type="logistic")
-      r_Mn_edge_est <- r_Mn_edge(dat, pi_n, S_n, omega_n)
-      sigma2_edge_est <- sigma2_edge(dat, pi_n, S_n, omega_n, r_Mn_edge_est)
+      r_Mn_edge_est <- r_Mn_edge(dat, pi_n, Q_n, omega_n)
+      sigma2_edge_est <- sigma2_edge(dat, pi_n, Q_n, omega_n, r_Mn_edge_est)
     }
     
     # !!!!!
     if (F) {
       q_n <- construct_q_n(type="new", dat, dat_orig, omega_n=omega_n, g_n=g_n,
                            z_n=z_n, gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
-                           S_n=S_n, Sc_n=Sc_n)
+                           Q_n=Q_n, Qc_n=Qc_n)
       # q_n(dat_orig$w[1,],dat_orig$y_star[1],dat_orig$delta_star[1],x=0.5)
       q_n(dat_orig$w[1:3,],dat_orig$y_star[1:3],dat_orig$delta_star[1:3],x=0.5)
       q_n(dat_orig$w[4:6,],dat_orig$y_star[4:6],dat_orig$delta_star[4:6],x=0.5)
@@ -304,7 +304,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
                                  f_aIw_n=f_aIw_n, f_a_n=f_a_n,
                                  f_a_delta1_n=f_a_delta1_n)
     if (F) {
-      gamma_n <- function(w,a) { S_n(C$t_e,w,a)*(1-S_n(C$t_e,w,a)) }
+      gamma_n <- function(w,a) { Q_n(C$t_e,w,a)*(1-Q_n(C$t_e,w,a)) }
     } # DEBUG: alternate gamma_n estimator when there is no censoring
     print(paste("Check 17:", Sys.time()))
     pi_star_n <- construct_pi_star_n(dat_orig, vals=NA, type="Super Learner",
@@ -449,22 +449,22 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     # Transform A values
     dat$a <- transform_a(dat$a)
     
-    # Note: S_n and Sc_n will not work with type="true"
-    srvSL <- construct_S_n(dat, vlist$S_n, type=p$S_n_type, print_coeffs=T)
-    S_n <- srvSL$srv
-    Sc_n <- srvSL$cens
-    omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n, type=p$omega_n_type)
+    # Note: Q_n and Qc_n will not work with type="true"
+    srvSL <- construct_Q_n(dat, vlist$Q_n, type=p$Q_n_type, print_coeffs=T)
+    Q_n <- srvSL$srv
+    Qc_n <- srvSL$cens
+    omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n, type=p$omega_n_type)
     pi_n <- construct_pi_n(dat, vlist$W_grid, type="generalized",
                            f_aIw_n=f_aIw_n, cutoffs=cutoffs)
     
     # Generate estimates and standard deviations for each point
     ests <- sapply(c(1:length(points)), function(i) {
       a_binned <- transform_a(points[i])
-      return(r_Mn_edge(dat, pi_n, S_n, omega_n, val=a_binned))
+      return(r_Mn_edge(dat, pi_n, Q_n, omega_n, val=a_binned))
     })
     sigma2s <- sapply(c(1:length(points)), function(i) {
       a_binned <- transform_a(points[i])
-      return(sigma2_edge(dat, pi_n, S_n, omega_n, ests[i], val=a_binned))
+      return(sigma2_edge(dat, pi_n, Q_n, omega_n, ests[i], val=a_binned))
     })
     
     # Construct CIs
@@ -527,7 +527,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     est_bshz4 <- bh4$hazard[index4]
     
     # Construct conditional survival function
-    S_n4 <- function(w,a) {
+    Q_n4 <- function(w,a) {
       lin <- c(as.numeric(ns(a, knots=spl$K, Boundary.knots=spl$B)),w)
       exp(-1*est_bshz4*exp(sum(as.numeric(beta_n4)*lin)))
     }
@@ -535,7 +535,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     # Construct marginalized survival function
     r_M4 <- Vectorize(function(a) {
       1 - mean(sapply(c(1:length(dat_orig$a)), function(i) {
-        S_n4(as.numeric(dat_orig$w[i,]),a)
+        Q_n4(as.numeric(dat_orig$w[i,]),a)
       }))
     })
     
@@ -576,11 +576,11 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   } # DEBUG: return additional estimates
   
   if ("gcomp" %in% return_extra) {
-    S_n2 <- (construct_S_n(dat, vlist$S_n, type="Cox PH"))$srv
-    res$gcomp <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n=S_n2)
+    Q_n2 <- (construct_Q_n(dat, vlist$Q_n, type="Cox PH"))$srv
+    res$gcomp <- construct_gcomp_n(dat_orig, vlist$A_grid, Q_n=Q_n2)
   }
   fns_extra <- c("f_a_n", "gamma_n", "deriv_r_Mn", "Phi_n_inv", "Theta_os_n",
-                 "Phi_n", "omega_n", "f_aIw_n", "etastar_n", "S_n", "gcm",
+                 "Phi_n", "omega_n", "f_aIw_n", "etastar_n", "Q_n", "gcm",
                  "dGCM", "grid", "Gamma_os_n_star",
                  "r_Mn_Gr")
   for (fn in fns_extra) {

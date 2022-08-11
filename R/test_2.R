@@ -4,7 +4,7 @@
 #' @param alt_type Type of alternative hypothesis; either "incr", "decr", or
 #'     "two-tailed"; currently unused and defaults to "two-tailed".
 #' @param params A list, containing the following:
-#'   - `S_n_type` S_n_type Type of survival function estimator; currently only
+#'   - `Q_n_type` Q_n_type Type of survival function estimator; currently only
 #'     c("Cox PH")
 #'   - `g_n_type` Type of conditional density ratio estimator; one of
 #'     c("parametric", "binning")
@@ -19,7 +19,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
   # Set default params
   .default_params <- list(
     var="monte carlo", ecdf_type="step", g_n_type="binning", boot_reps=200,
-    S_n_type="Super Learner", omega_n_type="estimated", cf_folds=1,
+    Q_n_type="Super Learner", omega_n_type="estimated", cf_folds=1,
     f_aIw_n_bins=15
   )
   for (i in c(1:length(.default_params))) {
@@ -59,21 +59,21 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
                                  k=p$f_aIw_n_bins)
     f_a_n <- construct_f_a_n(dat_orig, vlist$A_grid, f_aIw_n)
     g_n <- construct_g_n(f_aIw_n, f_a_n)
-    srvSL <- construct_S_n(dat, vlist$S_n, type=p$S_n_type)
-    S_n <- srvSL$srv
-    Sc_n <- srvSL$cens
-    omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n, type=p$omega_n_type)
+    srvSL <- construct_Q_n(dat, vlist$Q_n, type=p$Q_n_type)
+    Q_n <- srvSL$srv
+    Qc_n <- srvSL$cens
+    omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n, type=p$omega_n_type)
     
     # Construct regular Gamma_0 estimator
     if (p$cf_folds==1) {
-      # Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n)
+      # Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, Q_n, g_n)
       
       # !!!!! New functions
       n_orig <- length(dat_orig$delta)
       z_n <- (1/n_orig) * sum(dat$weights * as.integer(dat$a!=0))
       g_n_star <- construct_g_n_star(f_aIw_n, f_a_n, z_n)
-      eta_ss_n <- construct_eta_ss_n(dat, S_n, z_n, vals=NA)
-      gcomp_n <- construct_gcomp_n(dat_orig, vlist$A_grid, S_n)
+      eta_ss_n <- construct_eta_ss_n(dat, Q_n, z_n, vals=NA)
+      gcomp_n <- construct_gcomp_n(dat_orig, vlist$A_grid, Q_n)
       alpha_star_n <- construct_alpha_star_n(dat, gcomp_n, z_n, vals=NA)
       # Gamma_os_n <- construct_Gamma_os_n_star(dat, omega_n, g_n_star,
       #                                              eta_ss_n, z_n, gcomp_n,
@@ -105,7 +105,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     } else {
       
       # Construct influence functions
-      # eta_n <- construct_eta_n(dat, vlist$AW_grid, S_n)
+      # eta_n <- construct_eta_n(dat, vlist$AW_grid, Q_n)
       infl_fn_1 <- construct_infl_fn_1(dat, Gamma_os_n, Phi_n, lambda_2,
                                        lambda_3)
       # infl_fn_Gamma <- construct_infl_fn_Gamma(omega_n, g_n, gcomp_n,
@@ -149,11 +149,11 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     # Construct component functions
     # f_aIw_n <- construct_f_aIw_n(dat, vlist$AW_grid, type=p$g_n_type,
     #                              k=p$f_aIw_n_bins)
-    # srvSL <- construct_S_n(dat, vlist$S_n, type=p$S_n_type)
-    # S_n <- srvSL$srv
-    # Sc_n <- srvSL$cens
-    # omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n, type=p$omega_n_type)
-    # etastar_n <- construct_etastar_n(S_n)
+    # srvSL <- construct_Q_n(dat, vlist$Q_n, type=p$Q_n_type)
+    # Q_n <- srvSL$srv
+    # Qc_n <- srvSL$cens
+    # omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n, type=p$omega_n_type)
+    # etastar_n <- construct_etastar_n(Q_n)
     # q_star_n <- construct_q_n(which="q_star_n", type="Super Learner", dat, # ?????
     #                           dat_orig, omega_n=omega_n, f_aIw_n=f_aIw_n) # ?????
     Theta_os_n <- construct_Theta_os_n2(dat, dat_orig, omega_n, f_aIw_n,
@@ -217,12 +217,12 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
                                      k=p$f_aIw_n_bins)
         f_a_n <- construct_f_a_n(dat_orig_b, vlist$A_grid, f_aIw_n)
         g_n <- construct_g_n(f_aIw_n, f_a_n)
-        srvSL <- construct_S_n(dat, vlist$S_n, type=p$S_n_type)
-        S_n <- srvSL$srv
-        Sc_n <- srvSL$cens
-        omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n,
+        srvSL <- construct_Q_n(dat, vlist$Q_n, type=p$Q_n_type)
+        Q_n <- srvSL$srv
+        Qc_n <- srvSL$cens
+        omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n,
                                      type=p$omega_n_type)
-        Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, S_n, g_n)
+        Gamma_os_n <- construct_Gamma_os_n(dat, vlist$A_grid, omega_n, Q_n, g_n)
         
       }
       
@@ -302,7 +302,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     #   weights_0 <- wts(dat_0)
     #   
     #   G_0 <- construct_Phi_n(dat_0, type=p$ecdf_type)
-    #   srvSL <- construct_S_n(dat, vlist$S_n, type=p$S_n_type)
+    #   srvSL <- construct_Q_n(dat, vlist$Q_n, type=p$Q_n_type)
     #   S_0 <- srvSL$srv
     #   Sc_0 <- srvSL$cens
     #   omega_0 <- construct_omega_n(S_0, Sc_0)

@@ -12,7 +12,7 @@ if (cfg$which_sim=="estimation") {
   one_simulation <- function() {
     
     # Generate dataset
-    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_S, L$edge, L$surv_true,
                               L$sc_params, L$sampling, L$dir, L$wts_type)
     
     # Obtain estimates
@@ -76,7 +76,7 @@ if (cfg$which_sim=="testing") {
   one_simulation <- function() {
     
     # Generate dataset
-    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_S, L$edge, L$surv_true,
                               L$sc_params, L$sampling, L$dir, L$wts_type)
     
     msg <- "Direction of monotonicity does not align with test type"
@@ -149,7 +149,7 @@ if (cfg$which_sim=="edge") {
   one_simulation <- function() {
     
     # Generate dataset
-    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_S, L$edge, L$surv_true,
                               L$sc_params, L$sampling, L$dir, L$wts_type)
     
     # Prep
@@ -160,14 +160,14 @@ if (cfg$which_sim=="edge") {
     vlist <- create_val_list(dat_orig)
     
     # Construct component functions
-    srvSL <- construct_S_n(dat, vlist$S_n, type=L$estimator$params$S_n_type)
-    S_n <- srvSL$srv
-    Sc_n <- srvSL$cens
-    omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n,
+    srvSL <- construct_Q_n(dat, vlist$Q_n, type=L$estimator$params$Q_n_type)
+    Q_n <- srvSL$srv
+    Qc_n <- srvSL$cens
+    omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n,
                                  type=params$omega_n_type)
     pi_n <- construct_pi_n(dat, vlist$W_grid, type="logistic")
-    r_Mn_edge_est <- r_Mn_edge(dat, pi_n, S_n, omega_n)
-    sigma2_edge_est <- sigma2_edge(dat, pi_n, S_n, omega_n, r_Mn_edge_est)
+    r_Mn_edge_est <- r_Mn_edge(dat, pi_n, Q_n, omega_n)
+    sigma2_edge_est <- sigma2_edge(dat, pi_n, Q_n, omega_n, r_Mn_edge_est)
     
     # Return results
     return(list(
@@ -202,7 +202,7 @@ if (cfg$which_sim=="Cox") {
     
     # Generate dataset
     dat_orig <- generate_data(
-      L$n, L$alpha_3, L$distr_A, L$edge, surv_true="Cox PH",
+      L$n, L$alpha_3, L$distr_S, L$edge, surv_true="Cox PH",
       L$sc_params, L$sampling, L$dir, L$wts_type
     )
     
@@ -214,12 +214,12 @@ if (cfg$which_sim=="Cox") {
     
     # Calculate variance estimates
     a <- 0.5
-    res_cox <- cox_var(dat_orig=dat_orig, dat=dat, t=C$t_e, points=a,
+    res_cox <- cox_var(dat_orig=dat_orig, dat=dat, t=C$t_0, points=a,
                        se_beta=T, se_bshz=T, se_surv=T, se_marg=T)
     
-    res_cox <- cox_var(dat_orig=dat_orig, dat=dat, t=C$t_e, points=0.5, se_marg=T, verbose=T)
-    res_cox <- cox_var(dat_orig=dat_orig, dat=dat, t=C$t_e, points=c(0.2,0.5,0.8), se_marg=T, verbose=T)
-    res_cox <- cox_var(dat_orig=dat_orig, dat=dat, t=C$t_e, points=seq(0.1,0.9,0.1), se_marg=T, verbose=T)
+    res_cox <- cox_var(dat_orig=dat_orig, dat=dat, t=C$t_0, points=0.5, se_marg=T, verbose=T)
+    res_cox <- cox_var(dat_orig=dat_orig, dat=dat, t=C$t_0, points=c(0.2,0.5,0.8), se_marg=T, verbose=T)
+    res_cox <- cox_var(dat_orig=dat_orig, dat=dat, t=C$t_0, points=seq(0.1,0.9,0.1), se_marg=T, verbose=T)
     
     # Calculate certain true values
     if (F) {
@@ -228,7 +228,7 @@ if (cfg$which_sim=="Cox") {
         L$sc_params$lmbd*exp(-1.7) * t^L$sc_params$v
       }
       true_lp <- sum(c(C$alpha_1,C$alpha_2,L$alpha_3)*z_0)
-      true_surv <- exp(-1*exp(true_lp)*H_0_true(C$t_e))
+      true_surv <- exp(-1*exp(true_lp)*H_0_true(C$t_0))
       true_marg <- 1-attr(dat_orig, "r_M0")[26] # Corresponds to A=0.5
     } # DEBUG: intermediate objects
     
@@ -244,7 +244,7 @@ if (cfg$which_sim=="Cox") {
       true_a = L$alpha_3,
       est_a = res_cox$beta_n[3],
       se_a = sqrt(res_cox$var_est_beta[3]),
-      true_bshz = H_0_true(C$t_e),
+      true_bshz = H_0_true(C$t_0),
       est_bshz = res_cox$est_bshz,
       se_est_bshz = sqrt(res_cox$var_est_bshz),
       true_surv = true_surv,
@@ -262,13 +262,13 @@ if (cfg$which_sim=="Cox") {
       # z_0 <- c(0.3,1,0.5) # c(W1,W2,A)
       # 
       # # Calculate the cumulative hazard via predict()
-      # newdata <- data.frame(y_star=C$t_e, delta_star=1, w1=z_0[1],
+      # newdata <- data.frame(y_star=C$t_0, delta_star=1, w1=z_0[1],
       #                       w2=z_0[2], a=z_0[3])
       # pred <- predict(res_cox$model, newdata=newdata, type="expected", se.fit=T)
       
       
       # Add additional results
-      # sim_res$true_cmhz = exp(true_lp) * H_0_true(C$t_e) # Should roughly equal pred$se.fit
+      # sim_res$true_cmhz = exp(true_lp) * H_0_true(C$t_0) # Should roughly equal pred$se.fit
       # sim_res$est_cmhz = exp(sum(res_cox$beta_n*z_0))*est_bshz # Should equal pred$fit
       # sim_res$est_surv = exp(-1*exp(sum(res_cox$beta_n*z_0))*est_bshz)
       # sim_res$se_cmhz_MC = sqrt(res_cox$var_cmhz_est)
@@ -306,7 +306,7 @@ if (cfg$which_sim=="debugging") {
   one_simulation <- function() {
     
     # Generate dataset
-    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_A, L$edge, L$surv_true,
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_S, L$edge, L$surv_true,
                               L$sc_params, L$sampling, L$dir, L$wts_type)
     
     points <- C$points
@@ -316,7 +316,7 @@ if (cfg$which_sim=="debugging") {
     {
       # Set default params
       .default_params <- list(
-        S_n_type="Super Learner", g_n_type="binning", deriv_type="linear",
+        Q_n_type="Super Learner", g_n_type="binning", deriv_type="linear",
         ecdf_type="linear (mid)", gamma_type="Super Learner",
         omega_n_type="estimated", boot_reps=1000, ci_type="trunc", cf_folds=1, m=5,
         edge_corr="none", marg="Gamma_star2", lod_shift="none", n_bins=5,

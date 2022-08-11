@@ -121,7 +121,7 @@
     cfg2$map2 <- data.frame(
       tid = c(1:4),
       map_row = c(1:4),
-      S_n_type = rep("Super Learner",4),
+      Q_n_type = rep("Super Learner",4),
       marg = rep("Gamma_star2",4)
     )
     
@@ -229,7 +229,7 @@
     cfg2$map2 <- data.frame(
       tid = c(1:10),
       map_row = c(1:10),
-      S_n_type = rep("Super Learner",10),
+      Q_n_type = rep("Super Learner",10),
       marg = rep("Gamma_star", 10)
     )
     
@@ -314,7 +314,7 @@
     cfg2$map2 <- data.frame(
       tid = c(1:12),
       map_row = c(1:12),
-      S_n_type = rep("Super Learner",12),
+      Q_n_type = rep("Super Learner",12),
       marg = rep("Gamma_star2", 12)
     )
     
@@ -411,7 +411,7 @@
     cfg2$map2 <- data.frame(
       tid = c(1:6),
       map_row = c(1:6),
-      S_n_type = rep("Super Learner",6),
+      Q_n_type = rep("Super Learner",6),
       marg = rep("Gamma_star",6)
     )
     
@@ -589,7 +589,7 @@
     cfg2$map2 <- data.frame(
       tid = c(1:39), # c(1:41)
       map_row = c(1:39), # c(1:41)
-      S_n_type = rep("Super Learner",39), # 41
+      Q_n_type = rep("Super Learner",39), # 41
       marg = rep("Gamma_star",39) # 41
     )
     
@@ -678,7 +678,7 @@
     cfg2$map2 <- data.frame(
       tid = c(1:4),
       map_row = c(1:4),
-      S_n_type = rep("Super Learner",4),
+      Q_n_type = rep("Super Learner",4),
       marg = rep("Gamma_star2",4)
     )
     
@@ -710,7 +710,7 @@
   }
   cfg2$params$edge_corr <- cfg2$edge_corr[cfg2$map[i,"edge_corr"]]
   cfg2$v$covariates <- formula(cfg2$v$covariates)
-  cfg2$params$S_n_type <- cfg2$map2[cfg2$tid,"S_n_type"]
+  cfg2$params$Q_n_type <- cfg2$map2[cfg2$tid,"Q_n_type"]
   cfg2$params$marg <- cfg2$map2[cfg2$tid,"marg"]
   C$t_e <- cfg2$t_e
   if ((i %in% c(5,7,9)) && cfg2$analysis=="Moderna") {
@@ -1242,7 +1242,7 @@ if (cfg2$run_analysis &&
   # Obtain estimates
   return_extra <- c()
   if (cfg2$run_debug$objs) {
-    return_extra <- c(return_extra, "omega_n", "f_aIw_n", "S_n", "grid",
+    return_extra <- c(return_extra, "omega_n", "f_aIw_n", "Q_n", "grid",
                       "Phi_n", "Gamma_os_n_star", "gcm", "dGCM", "r_Mn_Gr")
   }
   if (cfg2$run_debug$gren_var) {
@@ -1862,8 +1862,8 @@ if (cfg2$run_debug$objs) {
   # etastar_n <- Vectorize(function(a) {
   #   ests$etastar_n(a,w=c(0,0))
   # })
-  # S_n <- Vectorize(function(a) {
-  #   ests$S_n(t=C$t_e, w=c(0,0), a)
+  # Q_n <- Vectorize(function(a) {
+  #   ests$Q_n(t=C$t_e, w=c(0,0), a)
   # })
   # 
   # int_data <- data.frame(
@@ -1882,12 +1882,12 @@ if (cfg2$run_debug$objs) {
   
   if (F) {
     
-    # S_n: conditional survival function (as a function of A)
+    # Q_n: conditional survival function (as a function of A)
     # !!!!! Continue
     # as.data.frame(cbind(w1=rep(0.2,n), w2=rep(1,n)))
     int_data2 <- data.frame(
       x = grid,
-      y = S_n(grid)
+      y = Q_n(grid)
       # which = rep(c("",""),each=101)
     )
     ggplot(int_data2, aes(x=x, y=y)) + # color=which

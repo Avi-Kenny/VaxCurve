@@ -385,22 +385,22 @@ construct_Phi_n <- function (dat, which="ecdf", type="step") {
     
   } else if (type=="true") {
     
-    if (L$distr_A=="Unif(0,1)") {
+    if (L$distr_S=="Unif(0,1)") {
       return(function(a) {a})
-    } else if (L$distr_A=="N(0.5,0.01)") {
+    } else if (L$distr_S=="N(0.5,0.01)") {
       if (which=="ecdf") {
         return(function(a) { ptruncnorm(a, a=0, b=1, mean=0.5, sd=0.1) })
       } else {
         return(function(a) { qtruncnorm(a, a=0, b=1, mean=0.5, sd=0.1) })
       }
-    } else if (L$distr_A=="N(0.5,0.04)") {
+    } else if (L$distr_S=="N(0.5,0.04)") {
       if (which=="ecdf") {
         return(function(a) { ptruncnorm(a, a=0, b=1, mean=0.5, sd=0.2) })
       } else {
         return(function(a) { qtruncnorm(a, a=0, b=1, mean=0.5, sd=0.2) })
       }
-    } else if (L$distr_A=="N(0.3+0.4w2,0.04)") {
-      stop("ecdf not programmed for N(0.3+0.4w2,0.04)")
+    } else if (L$distr_S=="N(0.3+0.4x2,0.04)") {
+      stop("ecdf not programmed for N(0.3+0.4x2,0.04)")
     }
     
   }
@@ -409,7 +409,7 @@ construct_Phi_n <- function (dat, which="ecdf", type="step") {
 
 
 
-#' Construct conditional survival estimator S_n
+#' Construct conditional survival estimator Q_n
 #' 
 #' @param dat Subsample of dataset returned by ss() for which delta==1
 #' @param vals List of values to pre-compute function on; passed to
@@ -421,7 +421,7 @@ construct_Phi_n <- function (dat, which="ecdf", type="step") {
 #'     the conditional survival and censoring functions (applicable only if
 #'     type=="Super Learner")
 #' @return Conditional density estimator function
-construct_S_n <- function(dat, vals, type, return_model=F, print_coeffs=F) {
+construct_Q_n <- function(dat, vals, type, return_model=F, print_coeffs=F) {
   
   if (type %in% c("Cox PH", "Super Learner")) {
     if (type=="Cox PH") {
@@ -481,11 +481,11 @@ construct_S_n <- function(dat, vals, type, return_model=F, print_coeffs=F) {
       row <- Reduce(intersect, r)
       col <- which.min(abs(t-new.times))
       if (length(row)!=1) {
-        stop(paste0("Error in construct_S_n (B); ", "t=",t,",w=(",
+        stop(paste0("Error in construct_Q_n (B); ", "t=",t,",w=(",
                     paste(w,collapse=","),"),a=",a,""))
       }
       if (length(col)!=1) {
-        stop(paste0("Error in construct_S_n (C); ", "t=",t,",w=(",
+        stop(paste0("Error in construct_Q_n (C); ", "t=",t,",w=(",
                     paste(w,collapse=","),"),a=",a,""))
       }
       return(srv_pred[row,col])
@@ -504,11 +504,11 @@ construct_S_n <- function(dat, vals, type, return_model=F, print_coeffs=F) {
       row <- Reduce(intersect, r)
       col <- which.min(abs(t-new.times))
       if (length(row)!=1) {
-        stop(paste0("Error in construct_S_n (B); ", "t=",t,",w=(",
+        stop(paste0("Error in construct_Q_n (B); ", "t=",t,",w=(",
                     paste(w,collapse=","),"),a=",a,""))
       }
       if (length(col)!=1) {
-        stop(paste0("Error in construct_S_n (C); ", "t=",t,",w=(",
+        stop(paste0("Error in construct_Q_n (C); ", "t=",t,",w=(",
                     paste(w,collapse=","),"),a=",a,""))
       }
       return(cens_pred[row,col])
@@ -599,8 +599,8 @@ construct_S_n <- function(dat, vals, type, return_model=F, print_coeffs=F) {
       r[[length(w)+1]] <- which(abs(a-newX[["a"]])<1e-8)
       row <- Reduce(intersect, r)
       col <- which.min(abs(t-pred_srv$time.interest))
-      if (length(row)!=1) { stop("Error in construct_S_n (B)") }
-      if (length(col)!=1) { stop("Error in construct_S_n (C)") }
+      if (length(row)!=1) { stop("Error in construct_Q_n (B)") }
+      if (length(col)!=1) { stop("Error in construct_Q_n (C)") }
       return(pred_srv$survival[row,col])
     }
     
@@ -618,8 +618,8 @@ construct_S_n <- function(dat, vals, type, return_model=F, print_coeffs=F) {
       r[[length(w)+1]] <- which(abs(a-newX[["a"]])<1e-8)
       row <- Reduce(intersect, r)
       col <- which.min(abs(t-pred_cens$time.interest))
-      if (length(row)!=1) { stop("Error in construct_S_n (B)") }
-      if (length(col)!=1) { stop("Error in construct_S_n (C)") }
+      if (length(row)!=1) { stop("Error in construct_Q_n (B)") }
+      if (length(col)!=1) { stop("Error in construct_Q_n (C)") }
       return(pred_cens$survival[row,col])
     }
     
@@ -640,12 +640,12 @@ construct_S_n <- function(dat, vals, type, return_model=F, print_coeffs=F) {
 #' @param dat_orig Dataset returned by generate_data()
 #' @param vals List of values to pre-compute function on; passed to
 #'     construct_superfunc()
-#' @param S_n Conditional survival function estimator returned by construct_S_n
+#' @param Q_n Conditional survival function estimator returned by construct_Q_n
 #' @return G-computation estimator of theta_0
-construct_gcomp_n <- function(dat_orig, vals=NA, S_n) {
+construct_gcomp_n <- function(dat_orig, vals=NA, Q_n) {
   
   fnc <- function(a) {
-    1 - mean(S_n(
+    1 - mean(Q_n(
       rep(C$t_e, nrow(dat_orig$w)),
       dat_orig$w,
       rep(a, nrow(dat_orig$w))
@@ -852,19 +852,19 @@ construct_tau_n <- function(deriv_r_Mn, gamma_n, f_a_n,
 #' 
 #' @param vals List of values to pre-compute function on; passed to
 #'     construct_superfunc()
-#' @param S_n Conditional survival function estimator returned by construct_S_n
-#' @param Sc_n Conditional censoring survival function estimator returned by
-#'     construct_S_n
+#' @param Q_n Conditional survival function estimator returned by construct_Q_n
+#' @param Qc_n Conditional censoring survival function estimator returned by
+#'     construct_Q_n
 #' @param type Defaults to "estimated". Override with "true" for debugging. Note
 #'     that type="true" only works for surv_true="Cox PH" and assumes that S_0
 #'     and Sc_0 (i.e. the true functions) are passed in.
 #' @return Estimator function of nuisance omega_0
-construct_omega_n <- function(vals=NA, S_n, Sc_n, type="estimated") {
+construct_omega_n <- function(vals=NA, Q_n, Qc_n, type="estimated") {
   
   if (type=="estimated") {
     
     # Construct cumulative hazard estimator
-    H_n <- function(t,w,a) { -1 * log(S_n(t,w,a)) }
+    H_n <- function(t,w,a) { -1 * log(Q_n(t,w,a)) }
     
     # Construct memoised integral function
     omega_integral <- function(k,w,a) {
@@ -879,8 +879,8 @@ construct_omega_n <- function(vals=NA, S_n, Sc_n, type="estimated") {
         a_long <- rep(a,length(i))
         integral <- 0.5 * sum(
           ( H_n(i,w_long,a_long) - H_n(i-incr,w_long,a_long) ) * (
-            ( S_n(i,w_long,a_long) * Sc_n(i,w_long,a_long) )^-1 +
-              ( S_n(i-incr,w_long,a_long) * Sc_n(i-incr,w_long,a_long))^-1
+            ( Q_n(i,w_long,a_long) * Qc_n(i,w_long,a_long) )^-1 +
+              ( Q_n(i-incr,w_long,a_long) * Qc_n(i-incr,w_long,a_long))^-1
           )
         )
       }
@@ -896,8 +896,8 @@ construct_omega_n <- function(vals=NA, S_n, Sc_n, type="estimated") {
         return (0)
       } # DEBUG
       
-      return(S_n(C$t_e,w,a) * (
-        (delta_star * In(y_star<=C$t_e)) / (S_n(k,w,a) * Sc_n(k,w,a)) -
+      return(Q_n(C$t_e,w,a) * (
+        (delta_star * In(y_star<=C$t_e)) / (Q_n(k,w,a) * Qc_n(k,w,a)) -
           omega_integral(k,w,a)
       ))
       
@@ -1044,12 +1044,12 @@ construct_gamma_n <- function(dat_orig, dat, type="Super Learner", vals=NA,
 #' !!!!! Eventually phase out type="Super Learner"
 construct_q_n <- function(type="Super Learner", dat, dat_orig,
                           omega_n=NA, g_n=NA, z_n=NA, gcomp_n=NA, # g_n_star=NA
-                          alpha_star_n=NA, f_aIw_n=NA, S_n=NA, Sc_n=NA,
+                          alpha_star_n=NA, f_aIw_n=NA, Q_n=NA, Qc_n=NA,
                           vals=NA) {
   
   if (type=="new") {
     
-    surv_deriv <- function(S_n) {
+    surv_deriv <- function(Q_n) {
 
       fnc <- function(t, w, a) {
 
@@ -1060,7 +1060,7 @@ construct_q_n <- function(type="Super Learner", dat, dat_orig,
         if (t2>C$t_e) { t1<-C$t_e-width; t2<-C$t_e; }
         t1 <- round(t1,-log10(C$appx$t_e))
         t2 <- round(t2,-log10(C$appx$t_e))
-        ch_y <- S_n(t2,w,a) - S_n(t1,w,a)
+        ch_y <- Q_n(t2,w,a) - Q_n(t1,w,a)
 
         return(ch_y/width)
 
@@ -1070,8 +1070,8 @@ construct_q_n <- function(type="Super Learner", dat, dat_orig,
 
     }
     
-    S_n_deriv <- surv_deriv(S_n)
-    Sc_n_deriv <- surv_deriv(Sc_n)
+    Q_n_deriv <- surv_deriv(Q_n)
+    Qc_n_deriv <- surv_deriv(Qc_n)
     
     q_n_star_inner <- function(y_star, delta_star, w, a) {
       In(a!=0)*omega_n(w,a,y_star,delta_star)/g_n(a,w) + gcomp_n(a)
@@ -1086,9 +1086,9 @@ construct_q_n <- function(type="Super Learner", dat, dat_orig,
     
     f_n_srv <- function(y_star, delta_star, w, a) {
       if (delta_star==1) {
-        return(-1*Sc_n(y_star,w,a)*S_n_deriv(y_star,w,a))
+        return(-1*Qc_n(y_star,w,a)*Q_n_deriv(y_star,w,a))
       } else {
-        return(-1*S_n(y_star,w,a)*Sc_n_deriv(y_star,w,a))
+        return(-1*Q_n(y_star,w,a)*Qc_n_deriv(y_star,w,a))
       }
     }
     f_n_srv <- construct_superfunc(f_n_srv, aux=NA, vec=c(1,1,2,1), vals=NA)
@@ -1161,21 +1161,21 @@ construct_f_aIw_n <- function(dat, vals=NA, type, k=0, delta1=F,
     
     # Note: this is not accurate if edge!="none"
     
-    if (L$distr_A=="Unif(0,1)") {
+    if (L$distr_S=="Unif(0,1)") {
       fnc <- function(a, w) { 1 }
-    } else if (L$distr_A=="Unif(0.3,0.7)") {
+    } else if (L$distr_S=="Unif(0.3,0.7)") {
       fnc <- function(a, w) { 2.5 * In(a>=0.3 & a<=0.7) }
-    } else if (L$distr_A=="N(0.5,0.01)") {
+    } else if (L$distr_S=="N(0.5,0.01)") {
       fnc <- function(a, w) { dtruncnorm(a, a=0, b=1, mean=0.5, sd=0.1) }
-    } else if (L$distr_A=="N(0.5,0.04)") {
+    } else if (L$distr_S=="N(0.5,0.04)") {
       fnc <- function(a, w) { dtruncnorm(a, a=0, b=1, mean=0.5, sd=0.2) }
-    } else if (L$distr_A=="N(0.3+0.4w2,0.04)") {
+    } else if (L$distr_S=="N(0.3+0.4x2,0.04)") {
       fnc <- function(a, w) {
         dtruncnorm(a, a=0, b=1, mean=0.3+0.4*w[2], sd=0.2)
       }
-    } else if (L$distr_A=="Tri UP") {
+    } else if (L$distr_S=="Tri UP") {
       fnc <- function(a, w) { 2*a }
-    } else if (L$distr_A=="Tri DN") {
+    } else if (L$distr_S=="Tri DN") {
       fnc <- function(a, w) { 2-2*a }
     }
     
@@ -1363,9 +1363,9 @@ construct_g_n <- function(f_aIw_n, f_a_n, vals=NA) {
 #' @param dat Subsample of dataset returned by ss() for which delta==1
 #' @param vals List of values to pre-compute function on; passed to
 #'     construct_superfunc()
-#' @param S_n Conditional survival function estimator returned by construct_S_n
+#' @param Q_n Conditional survival function estimator returned by construct_Q_n
 #' @return Estimator function of nuisance eta_0
-construct_eta_n <- function(dat, vals=NA, S_n) {
+construct_eta_n <- function(dat, vals=NA, Q_n) {
   
   n_orig <- sum(dat$weights)
   
@@ -1378,7 +1378,7 @@ construct_eta_n <- function(dat, vals=NA, S_n) {
     return(
       (1/n_orig) * sum(
         dat$weights * In(dat$a<=x) *
-          (1-S_n(rep(C$t_e,length(dat$a)),w_long,dat$a))
+          (1-Q_n(rep(C$t_e,length(dat$a)),w_long,dat$a))
       )
     )
   }
@@ -1392,11 +1392,11 @@ construct_eta_n <- function(dat, vals=NA, S_n) {
 
 #' Construct nuisance estimator eta*_n
 #' 
-#' @param S_n Conditional survival function estimator returned by construct_S_n
+#' @param Q_n Conditional survival function estimator returned by construct_Q_n
 #' @param vals List of values to pre-compute function on; passed to
 #'     construct_superfunc()
 #' @return Estimator function of nuisance eta*_0
-construct_etastar_n <- function(S_n, vals=NA) {
+construct_etastar_n <- function(Q_n, vals=NA) {
   
   fnc <- function(x,w) {
     x <- round(x,-log10(C$appx$a))
@@ -1404,7 +1404,7 @@ construct_etastar_n <- function(S_n, vals=NA) {
       integral <- 0
     } else {
       integral <- sum(sapply(seq(C$appx$a,x,C$appx$a), function(a) {
-        C$appx$a * S_n(C$t_e, w, round(a,-log10(C$appx$a)))
+        C$appx$a * Q_n(C$t_e, w, round(a,-log10(C$appx$a)))
       }))
     }
     return(x-integral)
@@ -1475,13 +1475,13 @@ construct_Theta_os_n <- function(dat, vals=NA, omega_n, f_aIw_n, etastar_n) {
 #' @param vals List of values to pre-compute function on; passed to
 #'     construct_superfunc()
 #' @param omega_n A nuisance influence function returned by construct_omega_n()
-#' @param S_n A conditional survival function returned by construct_S_n()
+#' @param Q_n A conditional survival function returned by construct_Q_n()
 #' @param g_n A density ratio estimator function returned by construct_g_n()
 #' @param type One of c("one-step", "plug-in")
 #' @return Gamma_os_n estimator
 #' @notes This is a generalization of the one-step estimator from Westling &
 #'     Carone 2020
-construct_Gamma_os_n <- function(dat, vals=NA, omega_n, S_n, g_n,
+construct_Gamma_os_n <- function(dat, vals=NA, omega_n, Q_n, g_n,
                                  type="one-step") {
   
   n_orig <- sum(dat$weights)
@@ -1503,10 +1503,10 @@ construct_Gamma_os_n <- function(dat, vals=NA, omega_n, S_n, g_n,
         g_n(dat$a,dat$w)
     ) )
     subpiece_2a <- (weights_i_long*weights_j_long) *
-      S_n(rep(C$t_e, length(a_i_long)),w_j_long,a_i_long)
+      Q_n(rep(C$t_e, length(a_i_long)),w_j_long,a_i_long)
     
     # Remove large intermediate objects
-    rm(dat,delta_star_i_long,delta_star_j_long,i_long,j_long,omega_n,S_n,
+    rm(dat,delta_star_i_long,delta_star_j_long,i_long,j_long,omega_n,Q_n,
        w_i_long,w_j_long,weights_i_long,weights_j_long)
     
     fnc <- function(a) {
@@ -1528,10 +1528,10 @@ construct_Gamma_os_n <- function(dat, vals=NA, omega_n, S_n, g_n,
   if (type=="plug-in") {
     
     piece <- weights_i_long*weights_j_long *
-      (1 - S_n(rep(C$t_e, length(a_i_long)),w_j_long,a_i_long))
+      (1 - Q_n(rep(C$t_e, length(a_i_long)),w_j_long,a_i_long))
     
     # Remove large intermediate objects
-    rm(dat,delta_star_i_long,delta_star_j_long,i_long,j_long,omega_n,S_n,
+    rm(dat,delta_star_i_long,delta_star_j_long,i_long,j_long,omega_n,Q_n,
        w_i_long,w_j_long,weights_i_long,weights_j_long)
     
     fnc <- function(a) {
@@ -1774,7 +1774,7 @@ beta_n_var_hat <- function(dat, dat_orig, infl_fn_1, infl_fn_2) {
 #' 
 #' @param dat_orig Dataset returned by generate_data()
 #' @param factor_A If true, factor_A is used instead of seq(0,1,C$appx$a) for the
-#'     S_n component only
+#'     Q_n component only
 #' @return A list of lists
 create_val_list <- function(dat_orig, factor_A=NA) {
   
@@ -1786,12 +1786,12 @@ create_val_list <- function(dat_orig, factor_A=NA) {
   } else {
     a <- factor_A
   }
-  S_n_pre <- expand.grid(
+  Q_n_pre <- expand.grid(
     t = round(seq(0,C$t_e,C$appx$t_e),-log10(C$appx$t_e)),
     w_index = W_reduced$w_index,
     a = a
   )
-  S_n_pre <- inner_join(S_n_pre, W_reduced, by="w_index")
+  Q_n_pre <- inner_join(Q_n_pre, W_reduced, by="w_index")
   
   return(list(
     A = NA, # list(a=dat$a),
@@ -1799,10 +1799,10 @@ create_val_list <- function(dat_orig, factor_A=NA) {
     A_grid = NA, # list(a=round(seq(0,1,C$appx$a),-log10(C$appx$a)),
     W_grid = NA,
     AW_grid = NA,
-    S_n = list(
-      t = S_n_pre$t,
-      w = subset(S_n_pre, select=-c(t,w_index,a)),
-      a = S_n_pre$a
+    Q_n = list(
+      t = Q_n_pre$t,
+      w = subset(Q_n_pre, select=-c(t,w_index,a)),
+      a = Q_n_pre$a
     ),
     omega = NA # list(w=rbind(dat$w,dat$w), a=c(dat$a, rep(0, length(dat$a))), y_star=rep(dat$y_star,2), delta_star=rep(dat$delta_star,2))
   ))
@@ -1857,7 +1857,7 @@ construct_Gamma_cf_k <- function(dat_train, dat_test, vals=NA, omega_n, g_n,
 #' 
 #' @param dat_orig Dataset returned by generate_data()
 #' @param params The same params object passed to est_curve
-#' @param vlist A list of dataframes returned by create_val_list(); S_n REQUIRED
+#' @param vlist A list of dataframes returned by create_val_list(); Q_n REQUIRED
 #'     but others can be NA
 #' @return A cross-fitted Gamma_0 estimator
 construct_Gamma_cf <- function(dat_orig, params, vlist) {
@@ -1881,16 +1881,16 @@ construct_Gamma_cf <- function(dat_orig, params, vlist) {
     Phi_n <- construct_Phi_n(dat_train, type=params$ecdf_type)
     Phi_n_inv <- construct_Phi_n(dat_train, which="inverse",
                                  type=params$ecdf_type)
-    srvSL <- construct_S_n(dat_train, vlist$S_n, type=params$S_n_type)
-    S_n <- srvSL$srv
-    Sc_n <- srvSL$cens
-    gcomp_n <- construct_gcomp_n(dat_orig_train, vlist$A_grid, S_n)
-    eta_n <- construct_eta_n(dat_train, vlist$AW_grid, S_n)
+    srvSL <- construct_Q_n(dat_train, vlist$Q_n, type=params$Q_n_type)
+    Q_n <- srvSL$srv
+    Qc_n <- srvSL$cens
+    gcomp_n <- construct_gcomp_n(dat_orig_train, vlist$A_grid, Q_n)
+    eta_n <- construct_eta_n(dat_train, vlist$AW_grid, Q_n)
     f_aIw_n <- construct_f_aIw_n(dat_train, vlist$AW_grid, type=params$g_n_type,
                                  k=15)
     f_a_n <- construct_f_a_n(dat_orig_train, vlist$A_grid, f_aIw_n)
     g_n <- construct_g_n(f_aIw_n, f_a_n)
-    omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n,
+    omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n,
                                  type=params$omega_n_type)
     
     # Construct K functions
@@ -1899,7 +1899,7 @@ construct_Gamma_cf <- function(dat_orig, params, vlist) {
     )
     
     # Remove objects
-    rm(Phi_n,Phi_n_inv,S_n,Sc_n,gcomp_n,eta_n,f_aIw_n,f_a_n,g_n,omega_n)
+    rm(Phi_n,Phi_n_inv,Q_n,Qc_n,gcomp_n,eta_n,f_aIw_n,f_a_n,g_n,omega_n)
     
   }
   
@@ -2100,18 +2100,18 @@ construct_pi_star_n <- function(dat_orig, vals=NA, type="Super Learner",
 #' 
 #' @param dat Subsample of dataset returned by ss() for which delta==1
 #' @param pi_n Propensity score estimator returned by construct_pi_n()
-#' @param S_n Conditional survival function estimator returned by construct_S_n
+#' @param Q_n Conditional survival function estimator returned by construct_Q_n
 #' @param omega_n A nuisance influence function returned by construct_omega_n()
 #' @param val Value of A
 #' @return Value of one-step estiamtor
-r_Mn_edge <- function(dat, pi_n, S_n, omega_n, val=0) {
+r_Mn_edge <- function(dat, pi_n, Q_n, omega_n, val=0) {
   
   n_orig <- sum(dat$weights)
   n_dat <- nrow(dat$w)
   
   return(
     1 - (1/n_orig) * sum(dat$weights * (
-      S_n(rep(C$t_e,n_dat),dat$w,a=rep(val,n_dat)) - (
+      Q_n(rep(C$t_e,n_dat),dat$w,a=rep(val,n_dat)) - (
         (In(dat$a==val)/pi_n(dat$w, rep(val,n_dat))) *
           omega_n(dat$w,a=rep(val,n_dat),dat$y_star,dat$delta_star)
       )
@@ -2126,19 +2126,19 @@ r_Mn_edge <- function(dat, pi_n, S_n, omega_n, val=0) {
 #' 
 #' @param dat Subsample of dataset returned by ss() for which delta==1
 #' @param pi_n Propensity score estimator returned by construct_pi_n()
-#' @param S_n Conditional survival function estimator returned by construct_S_n
+#' @param Q_n Conditional survival function estimator returned by construct_Q_n
 #' @param omega_n A nuisance influence function returned by construct_omega_n()
 #' @param r_Mn_edge_est Estimate returned by one-step estimator r_Mn_edge()
 #' @param val Value of A
 #' @return Asymptotic variance estimate
-sigma2_edge <- function(dat, pi_n, S_n, omega_n, r_Mn_edge_est, val=0) {
+sigma2_edge <- function(dat, pi_n, Q_n, omega_n, r_Mn_edge_est, val=0) {
   
   n_orig <- sum(dat$weights)
   n_dat <- nrow(dat$w)
   
   return(
     (1/n_orig) * sum((dat$weights * (
-      S_n(rep(C$t_e,n_dat),dat$w,a=rep(val,n_dat)) - (
+      Q_n(rep(C$t_e,n_dat),dat$w,a=rep(val,n_dat)) - (
         (In(dat$a==val)/pi_n(dat$w, rep(val,n_dat))) *
           omega_n(dat$w,a=rep(val,n_dat),dat$y_star,dat$delta_star)
       ) -
@@ -2192,11 +2192,11 @@ construct_alpha_star_n <- function(dat, gcomp_n, z_n, vals=NA) {
 #' Construct nuisance estimator eta_ss_n
 #' 
 #' @param dat !!!!!
-#' @param S_n !!!!!
+#' @param Q_n !!!!!
 #' @param z_n !!!!!
 #' @param vals !!!!!
 #' @return Nuisance estimator function
-construct_eta_ss_n <- function(dat, S_n, z_n, vals=NA) {
+construct_eta_ss_n <- function(dat, Q_n, z_n, vals=NA) {
   
   n_orig <- sum(dat$weights)
   piece_1 <- dat$weights * In(dat$a!=0)
@@ -2207,7 +2207,7 @@ construct_eta_ss_n <- function(dat, S_n, z_n, vals=NA) {
     )
     (1/(n_orig*z_n)) * sum(
       piece_1 * In(dat$a<=x) *
-        (1-S_n(rep(C$t_e,length(dat$a)),w_long,dat$a))
+        (1-Q_n(rep(C$t_e,length(dat$a)),w_long,dat$a))
     )
   }
   
@@ -2617,7 +2617,7 @@ cox_var <- function(dat_orig, dat, t, points, se_beta=F, se_bshz=F,
   })())
   
   # Survival estimator (at a point)
-  S_n <- (function() {
+  Q_n <- (function() {
     .cache <- new.env()
     function(z) {
       key <- paste(z, collapse=" ")
@@ -2675,7 +2675,7 @@ cox_var <- function(dat_orig, dat, t, points, se_beta=F, se_bshz=F,
           piece_1 <- Lambda_n(t) * explin *
             (t(z)%*%lstar_tilde(z_i,d_i,ds_i,t_i,wt_i,st_i))[1]
           piece_2 <- explin * infl_fn_Bres(z_i,d_i,ds_i,t_i,wt_i,st_i)
-          return(-1*S_n(z)*(piece_1+piece_2))
+          return(-1*Q_n(z)*(piece_1+piece_2))
         })(z_i,d_i,ds_i,t_i,wt_i,st_i,z)
         .cache[[key]] <- val
       }
@@ -2692,11 +2692,11 @@ cox_var <- function(dat_orig, dat, t, points, se_beta=F, se_bshz=F,
       val <- .cache[[key]]
       if (is.null(val)) {
         val <- (function(w_i,a_i,d_i,ds_i,t_i,wt_i,st_i,a) {
-          piece_1 <- S_n(c(w_i,a))
+          piece_1 <- Q_n(c(w_i,a))
           piece_2 <- (1/N) * sum(unlist(lapply(c(1:N), function(j) {
             w_j <- w_[[j]]
             omgn <- omega_n(c(w_i,a_i),d_i,ds_i,t_i,wt_i,st_i,c(w_j,a))
-            return(omgn-S_n(c(w_j,a)))
+            return(omgn-Q_n(c(w_j,a)))
           })))
           return(piece_1+piece_2)
         })(w_i,a_i,d_i,ds_i,t_i,wt_i,st_i,a)
@@ -2756,7 +2756,7 @@ cox_var <- function(dat_orig, dat, t, points, se_beta=F, se_bshz=F,
     
     z_0 <- c(0.3,1,0.5)
     
-    res$est_surv <- S_n(z_0)
+    res$est_surv <- Q_n(z_0)
     
     if (verbose) { print(paste("Check 3c (var est START: surv):", Sys.time())) }
     res$var_est_surv <- (1/N^2) * sum(unlist(pblapply(c(1:N), function(i) {

@@ -8,7 +8,7 @@
 
 {
   # Choose analysis
-  which_analysis <- "Janssen" # "Janssen" "Moderna" "AMP" "AZD1222"
+  which_analysis <- "AZD1222" # "Janssen" "Moderna" "AMP" "AZD1222"
                               # "HVTN 705 (primary)" "HVTN 705 (all)"
   
   # # Uncomment this code to run multiple analyses (e.g. 1=10=Moderna, 11-14=Janssen)
@@ -592,19 +592,24 @@
     
     cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox"))
     cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Cox"))
-    cfg2$marker <- c("Day29pseudoneutid50", "Day57pseudoneutid50")
+    cfg2$marker <- c("Day29pseudoneutid50", "Day57pseudoneutid50",
+                     "Day29bindSpike", "Day57bindSpike")
     cfg2$lab_title <- c(
       "PsV Neutralization 50% Titer: Day 29",
-      "PsV Neutralization 50% Titer: Day 57"
+      "PsV Neutralization 50% Titer: Day 57",
+      "Binding Antibody to Spike: Day 29",
+      "Binding Antibody to Spike: Day 57"
     )
-    cfg2$lab_x <- c("Pseudovirus-nAb ID50 (IU50/ml) (=s)")
+    cfg2$lab_x <- c("Pseudovirus-nAb ID50 (IU50/ml) (=s)",
+                    "Anti Spike IgG (BAU/ml) (=s)")
     cfg2$endpoint <- "COVID"
     cfg2$t_e <- c(117,92)
-    cfg2$dataset <- c("azd1222_data_processed_with_riskscore.csv")
+    cfg2$dataset <- c("azd1222_data_processed_with_riskscore.csv",
+                      "azd1222_bAb_data_processed_with_riskscore.csv")
     cfg2$txct <- T
-    cfg2$cr2_trial <- c("azd1222")
+    cfg2$cr2_trial <- c("azd1222", "azd1222_bAb")
     cfg2$cr2_COR <- c("D29", "D57")
-    cfg2$cr2_marker <- c(1)
+    cfg2$cr2_marker <- c(1,2)
     cfg2$edge_corr <- c("none", "min")
     cfg2$v <- list(
       id = c("Ptid"),
@@ -613,11 +618,11 @@
       wt = c("wt.D29", "wt.D57"),
       ph1 = c("ph1.D29", "ph1.D57"),
       ph2 = c("ph2.D29", "ph2.D57"),
-      covariates = c("~. + risk_score")
+      covariates = c("~. + Age + risk_score")
     )
     cfg2$qnt <- list(
-      "Risk, nonparametric" = c(0.05,0.95),
-      "CVE, nonparametric" = c(0.05,0.95),
+      "Risk, nonparametric" = c(0.1,0.9),
+      "CVE, nonparametric" = c(0.1,0.9),
       "Risk, Qbins" = c(0,1),
       "CVE, Qbins" = c(0,1),
       "Risk, Cox GAM" = c(0.025,0.975),
@@ -626,7 +631,7 @@
       "CVE, Cox model" = c(0.025,0.975)
     )
     cfg2$zoom_x <- NA
-    cfg2$zoom_y_cve <- "zoomed"
+    cfg2$zoom_y_cve <- NA
     cfg2$zoom_y_risk <- "zoomed (risk)"
     cfg2$folder_local <- "AZD1222 data/"
     cfg2$folder_cluster <- paste0("Z:/covpn/p3002/analysis/correlates/Part_A_Blinded_Phase_Data/adata/")
@@ -640,41 +645,41 @@
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
-      marker = c(1,2),
-      lab_x = c(1,1),
-      lab_title = c(1,2),
-      t_e = c(1,2),
-      dataset = c(1,1),
-      cr2_trial = c(1,1),
-      cr2_COR = c(1,2),
-      cr2_marker = c(1,1),
-      edge_corr = c(2,1),
-      v_id = c(1,1),
-      v_time = c(1,2),
-      v_event = c(1,2),
-      v_wt = c(1,2),
-      v_ph1 = c(1,2),
-      v_ph2 = c(1,2),
-      v_covariates = c(1,1),
-      zoom_x = c(1,1),
-      zoom_y_cve = c(1,1),
-      zoom_y_risk = c(1,1)
+      marker = c(1,2,3,4),
+      lab_x = c(1,1,2,2),
+      lab_title = c(1,2,3,4),
+      t_e = c(1,2,1,2),
+      dataset = c(1,1,2,2),
+      cr2_trial = c(1,1,2,2),
+      cr2_COR = c(1,2,1,2),
+      cr2_marker = c(1,1,1,1),
+      edge_corr = c(2,1,1,1),
+      v_id = c(1,1,1,1),
+      v_time = c(1,2,1,2),
+      v_event = c(1,2,1,2),
+      v_wt = c(1,2,1,2),
+      v_ph1 = c(1,2,1,2),
+      v_ph2 = c(1,2,1,2),
+      v_covariates = c(1,1,1,1),
+      zoom_x = c(1,1,1,1),
+      zoom_y_cve = c(1,1,1,1),
+      zoom_y_risk = c(1,1,1,1)
     )
     
     # Secondary map for variations within a graph; map_row corresponds to which
     #     row of cfg2$map to use
     cfg2$map2 <- data.frame(
-      tid = c(1:2),
-      map_row = c(1:2),
-      S_n_type = rep("Super Learner",2),
-      marg = rep("Gamma_star",2)
+      tid = c(1:4),
+      map_row = c(1:4),
+      S_n_type = rep("Super Learner",4),
+      marg = rep("Gamma_star2",4)
     )
     
   }
   
   # Set config based on local vs. cluster
   if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
-    cfg2$tid <- 1
+    cfg2$tid <- 4
     cfg2$dataset <- paste0(cfg2$folder_cluster,cfg2$dataset)
   } else {
     cfg2$tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))

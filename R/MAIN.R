@@ -24,7 +24,7 @@ cfg <- list(
                      "data.table", "latex2exp"),
   parallel = "none",
   stop_at_error = F,
-  appx = list(t_0=1, w_tol=25, a=0.01) # !!!!! t_0=1, a=0.001
+  appx = list(t_0=1, x_tol=25, s=0.01) # !!!!! t_0=1, a=0.001
 )
 
 # Set cluster config
@@ -147,8 +147,8 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     edge = c("none", "expit 0.5"),
     surv_true = "Cox PH",
     sampling = c("iid", "two-phase (72%)"),
-    # sampling = c("iid", "w1", "w2", "two-phase (50%)", "two-phase (50% random)"),
-    # sampling = c("w1", "w2", "two-phase (50%)"),
+    # sampling = c("iid", "x1", "x2", "two-phase (50%)", "two-phase (50% random)"),
+    # sampling = c("x1", "x2", "two-phase (50%)"),
     # sampling = c("iid", "cycle", "two-phase (72%)", "two-phase (70% random)"),
     wts_type = "true",
     test = list(
@@ -356,9 +356,9 @@ if (F) {
   surv_trues <- c("Cox PH", "Complex")
   
   # Orange 10/90 quantile lines
-  w2 <- rbinom(10^5, size=1, prob=0.5)
+  x2 <- rbinom(10^5, size=1, prob=0.5)
   q3 <- as.numeric(quantile(
-    rtruncnorm(10^5, a=0, b=1, mean=0.3+0.4*w2, sd=0.2), c(0.1,0.9)
+    rtruncnorm(10^5, a=0, b=1, mean=0.3+0.4*x2, sd=0.2), c(0.1,0.9)
   ))
   df_vlines <- data.frame(
     # x = c(qnorm(0.1,0.5,0.1),qnorm(0.1,0.5,0.2),qunif(0.1,0,1),
@@ -651,25 +651,25 @@ if (F) {
   sim %>% SimEngine::summarize(
     mean = list(
       list(name="mean_runtime", x="runtime"),
-      list(name="se_w1", x="se_w1"),
-      list(name="se_w2", x="se_w2"),
-      list(name="se_a", x="se_a"),
+      list(name="se_x1", x="se_x1"),
+      list(name="se_x2", x="se_x2"),
+      list(name="se_s", x="se_s"),
       list(name="se_est_bshz", x="se_est_bshz"),
       list(name="se_est_surv", x="se_est_surv"),
       list(name="se_est_marg", x="se_est_marg")
     ),
     sd = list(
-      list(name="se_w1_empr", x="est_w1"),
-      list(name="se_w2_empr", x="est_w2"),
-      list(name="se_a_empr", x="est_a"),
+      list(name="se_x1_empr", x="est_x1"),
+      list(name="se_x2_empr", x="est_x2"),
+      list(name="se_s_empr", x="est_s"),
       list(name="se_bshz_empr", x="est_bshz"),
       list(name="se_surv_empr", x="est_surv"),
       list(name="se_marg_empr", x="est_marg")
     ),
     coverage = list(
-      list(name="cov_w1", truth="true_w1", estimate="est_w1", se="se_w1"),
-      list(name="cov_w2", truth="true_w2", estimate="est_w2", se="se_w2"),
-      list(name="cov_a", truth="true_a", estimate="est_a", se="se_a"),
+      list(name="cov_x1", truth="true_x1", estimate="est_x1", se="se_x1"),
+      list(name="cov_x2", truth="true_x2", estimate="est_x2", se="se_x2"),
+      list(name="cov_s", truth="true_s", estimate="est_s", se="se_s"),
       list(name="cov_bshz", truth="true_bshz", estimate="est_bshz", se="se_est_bshz"),
       list(name="cov_surv", truth="true_surv", estimate="est_surv", se="se_est_surv"),
       list(name="cov_marg", truth="true_marg", estimate="est_marg", se="se_est_marg")

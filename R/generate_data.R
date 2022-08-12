@@ -179,8 +179,8 @@ generate_data <- function(n, alpha_3, distr_S, edge, surv_true, sc_params,
         s <- 1 - sqrt(runif(m))
       }
       
-      Gamma_true_f <- Vectorize(function(x) {
-        mean( as.integer(s<=x) * (1-Q_0(C$t_0,x1,x2,s)) )
+      Gamma_true_f <- Vectorize(function(u) {
+        mean( as.integer(s<=u) * (1-Q_0(C$t_0,x1,x2,s)) )
       })
       attr(dat_orig, "Gamma_true") <- Gamma_true_f(C$points)
       

@@ -207,14 +207,14 @@ if (cfg$which_sim=="Cox") {
     )
     
     # Round data values and construct dat
-    dat_orig$a <- round(dat_orig$a,2)
+    dat_orig$s <- round(dat_orig$s,2)
     dat_orig$weights <- round(dat_orig$weights,3)
     dat_orig$y <- round(dat_orig$y,0)
     dat <- ss(dat_orig, which(dat_orig$z==1))
     
     # Calculate variance estimates
-    a <- 0.5
-    res_cox <- cox_var(dat_orig=dat_orig, dat=dat, t=C$t_0, points=a,
+    s <- 0.5
+    res_cox <- cox_var(dat_orig=dat_orig, dat=dat, t=C$t_0, points=s,
                        se_beta=T, se_bshz=T, se_surv=T, se_marg=T)
     
     res_cox <- cox_var(dat_orig=dat_orig, dat=dat, t=C$t_0, points=0.5, se_marg=T, verbose=T)
@@ -235,15 +235,15 @@ if (cfg$which_sim=="Cox") {
     # Construct simulation results object
     # This needs to line up with res_cox based on the se_* flags
     sim_res <- list(
-      true_w1 = C$alpha_1,
-      est_w1 = res_cox$beta_n[1],
-      se_w1 = sqrt(res_cox$var_est_beta[1]),
-      true_w2 = C$alpha_2,
-      est_w2 = res_cox$beta_n[2],
-      se_w2 = sqrt(res_cox$var_est_beta[2]),
-      true_a = L$alpha_3,
-      est_a = res_cox$beta_n[3],
-      se_a = sqrt(res_cox$var_est_beta[3]),
+      true_x1 = C$alpha_1,
+      est_x1 = res_cox$beta_n[1],
+      se_x1 = sqrt(res_cox$var_est_beta[1]),
+      true_x2 = C$alpha_2,
+      est_x2 = res_cox$beta_n[2],
+      se_x2 = sqrt(res_cox$var_est_beta[2]),
+      true_s = L$alpha_3,
+      est_s = res_cox$beta_n[3],
+      se_s = sqrt(res_cox$var_est_beta[3]),
       true_bshz = H_0_true(C$t_0),
       est_bshz = res_cox$est_bshz,
       se_est_bshz = sqrt(res_cox$var_est_bshz),
@@ -262,8 +262,8 @@ if (cfg$which_sim=="Cox") {
       # z_0 <- c(0.3,1,0.5) # c(W1,W2,A)
       # 
       # # Calculate the cumulative hazard via predict()
-      # newdata <- data.frame(y=C$t_0, delta=1, w1=z_0[1],
-      #                       w2=z_0[2], a=z_0[3])
+      # newdata <- data.frame(y=C$t_0, delta=1, x1=z_0[1],
+      #                       x2=z_0[2], s=z_0[3])
       # pred <- predict(res_cox$model, newdata=newdata, type="expected", se.fit=T)
       
       
@@ -279,8 +279,8 @@ if (cfg$which_sim=="Cox") {
       # sim_res$se_bshz_MC = sqrt(res_cox$var_bshz_est)
       # sim_res$se_bshz_MC2 = sqrt(res_cox$var_bshz_est2) # New derivation
       
-      # sim_res$se_w1_Cox = as.numeric(sqrt(diag(vcov(res_cox$model)))[1])
-      # sim_res$se_w1_alt = as.numeric(sqrt(diag(res_cox$I_tilde_inv)/L$n)[1])
+      # sim_res$se_x1_Cox = as.numeric(sqrt(diag(vcov(res_cox$model)))[1])
+      # sim_res$se_x1_alt = as.numeric(sqrt(diag(res_cox$I_tilde_inv)/L$n)[1])
       
     }
     
@@ -320,7 +320,7 @@ if (cfg$which_sim=="debugging") {
         ecdf_type="linear (mid)", gamma_type="Super Learner",
         omega_n_type="estimated", boot_reps=1000, ci_type="trunc", cf_folds=1, m=5,
         edge_corr="none", marg="Gamma_star2", lod_shift="none", n_bins=5,
-        convex_type="GCM", f_aIw_n_bins=15
+        convex_type="GCM", f_sIx_n_bins=15
       )
       for (i in c(1:length(.default_params))) {
         if (is.null(params[[names(.default_params)[i]]])) {
@@ -329,21 +329,21 @@ if (cfg$which_sim=="debugging") {
       }
       p <- params
       
-      # Rescale A to lie in [0,1] and round values
-      a_min <- min(dat_orig$a,na.rm=T)
-      a_max <- max(dat_orig$a,na.rm=T)
-      a_shift <- -1 * a_min
-      a_scale <- 1/(a_max-a_min)
-      dat_orig$a <- (dat_orig$a+a_shift)*a_scale
+      # Rescale S to lie in [0,1] and round values
+      s_min <- min(dat_orig$s,na.rm=T)
+      s_max <- max(dat_orig$s,na.rm=T)
+      s_shift <- -1 * s_min
+      s_scale <- 1/(s_max-s_min)
+      dat_orig$s <- (dat_orig$s+s_shift)*s_scale
       dat_orig <- round_dat(dat_orig)
       
       # Obtain minimum value (excluding edge point mass)
-      if (p$edge_corr=="min") { a_min2 <- min(dat_orig$a[dat_orig$a!=0],na.rm=T) }
+      if (p$edge_corr=="min") { a_min2 <- min(dat_orig$s[dat_orig$s!=0],na.rm=T) }
       
-      # Rescale points and remove points outside the range of A
+      # Rescale points and remove points outside the range of S
       points_orig <- points
-      na_head <- sum(round(points,-log10(C$appx$a))<round(a_min,-log10(C$appx$a)))
-      points <- round((points+a_shift)*a_scale, -log10(C$appx$a))
+      na_head <- sum(round(points,-log10(C$appx$s))<round(s_min,-log10(C$appx$s)))
+      points <- round((points+s_shift)*s_scale, -log10(C$appx$s))
       na_tail <- sum(points>1)
       if (na_head>0) {
         points <- points[-c(1:na_head)]
@@ -353,7 +353,7 @@ if (cfg$which_sim=="debugging") {
       }
       
       dat <- ss(dat_orig, which(dat_orig$z==1))
-      dat2 <- ss(dat, which(dat$a!=0))
+      dat2 <- ss(dat, which(dat$s!=0))
       Phi_n <- construct_Phi_n(dat2, type=p$ecdf_type)
       ests_Phi <- Phi_n(points)
       
@@ -362,14 +362,14 @@ if (cfg$which_sim=="debugging") {
     # Construct new estimator #2 (manual summation calc)
     n_orig <- sum(dat2$weights)
     Phi_n2 <- Vectorize(function(x) {
-      (1/n_orig) * sum(dat2$weights*as.integer(dat2$a<=x))
+      (1/n_orig) * sum(dat2$weights*as.integer(dat2$s<=x))
     })
     ests_Phi2 <- Phi_n2(points)
     
     # Construct new estimator #3 (manual summation calc with original n-value)
     n_orig <- sum(dat$weights)
     Phi_n3 <- Vectorize(function(x) {
-      (1/n_orig) * sum(dat2$weights*as.integer(dat2$a<=x))
+      (1/n_orig) * sum(dat2$weights*as.integer(dat2$s<=x))
     })
     ests_Phi3 <- Phi_n3(points)
     

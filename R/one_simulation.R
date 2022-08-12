@@ -32,7 +32,7 @@ if (cfg$which_sim=="estimation") {
     for (i in 1:length(C$points)) {
       m <- format(C$points[i], nsmall=2)
       res_list[paste0("r_M0_",m)] <- r_M0[i]
-      res_list[paste0("r_Mn_",m)] <- ests$r_Mn[i]
+      res_list[paste0("r_Mn_",m)] <- ests$ests[i]
       res_list[paste0("ci_lo_",m)] <- ests$ci_lo[i]
       res_list[paste0("ci_hi_",m)] <- ests$ci_hi[i]
       if (F) {

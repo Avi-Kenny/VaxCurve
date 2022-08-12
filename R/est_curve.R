@@ -188,14 +188,13 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       sigma2_edge_est <- sigma2_edge(dat, pi_n, Q_n, omega_n, r_Mn_edge_est)
     }
     
-    # !!!!!
     if (F) {
       q_n <- construct_q_n(type="new", dat, dat_orig, omega_n=omega_n, g_n=g_n,
                            z_n=z_n, gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
                            Q_n=Q_n, Qc_n=Qc_n)
       q_n(dat_orig$x[1:3,],dat_orig$y[1:3],dat_orig$delta[1:3],u=0.5)
       q_n(dat_orig$x[4:6,],dat_orig$y[4:6],dat_orig$delta[4:6],u=0.5)
-    }
+    } # DEBUG
     
     # Compute GCM (or least squares line) and extract its derivative
     print(paste("Check 12:", Sys.time()))

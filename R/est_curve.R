@@ -112,14 +112,14 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       Phi_n <- construct_Phi_n(dat2, type=p$ecdf_type)
       print(paste("Check 4:", Sys.time()))
       n_orig <- length(dat_orig$z)
-      z_n <- (1/n_orig) * sum(dat$weights * as.integer(dat$s!=0))
-      g_n_star <- construct_g_n_star(f_sIx_n, f_s_n, z_n)
+      p_n <- (1/n_orig) * sum(dat$weights * as.integer(dat$s!=0))
+      g_n_star <- construct_g_n_star(f_sIx_n, f_s_n, p_n)
       print(paste("Check 5:", Sys.time()))
-      eta_ss_n <- construct_eta_ss_n(dat, Q_n, z_n, vals=NA)
+      eta_ss_n <- construct_eta_ss_n(dat, Q_n, p_n, vals=NA)
       print(paste("Check 6:", Sys.time()))
       gcomp_n <- construct_gcomp_n(dat_orig, vals=vlist$S_grid, Q_n)
       print(paste("Check 7:", Sys.time()))
-      alpha_star_n <- construct_alpha_star_n(dat, gcomp_n, z_n, vals=NA)
+      alpha_star_n <- construct_alpha_star_n(dat, gcomp_n, p_n, vals=NA)
       print(paste("Check 8:", Sys.time()))
     }
     
@@ -132,17 +132,17 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       Gamma_os_n <- construct_Gamma_os_n(dat, vlist$S_grid, omega_n, Q_n, g_n)
     } else if (p$marg=="Gamma_star") {
       Gamma_os_n_star <- construct_Gamma_os_n_star(dat, omega_n, g_n_star,
-                                                   eta_ss_n, z_n, gcomp_n,
+                                                   eta_ss_n, p_n, gcomp_n,
                                                    alpha_star_n,
                                                    vals=vlist$S_grid)
     } else if (p$marg=="Gamma_star2") {
       print(paste("Check 9:", Sys.time()))
       q_n <- construct_q_n(type=p$q_n_type, dat, dat_orig, omega_n=omega_n, g_n=g_n,
-                           z_n=z_n, gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
+                           p_n=p_n, gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
                            Q_n=Q_n, Qc_n=Qc_n)
       print(paste("Check 10:", Sys.time()))
       Gamma_os_n_star <- construct_Gamma_os_n_star2(dat, dat_orig, omega_n,
-                                                    g_n, eta_ss_n, z_n, # g_n_star
+                                                    g_n, eta_ss_n, p_n, # g_n_star
                                                     q_n, gcomp_n, alpha_star_n,
                                                     vals=vlist$S_grid)
       
@@ -190,7 +190,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     if (F) {
       q_n <- construct_q_n(type="new", dat, dat_orig, omega_n=omega_n, g_n=g_n,
-                           z_n=z_n, gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
+                           p_n=p_n, gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
                            Q_n=Q_n, Qc_n=Qc_n)
       q_n(dat_orig$x[1:3,],dat_orig$y[1:3],dat_orig$delta[1:3],u=0.5)
       q_n(dat_orig$x[4:6,],dat_orig$y[4:6],dat_orig$delta[4:6],u=0.5)

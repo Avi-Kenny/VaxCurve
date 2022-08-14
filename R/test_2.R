@@ -70,19 +70,19 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
       
       # !!!!! New functions
       n_orig <- length(dat_orig$z)
-      z_n <- (1/n_orig) * sum(dat$weights * as.integer(dat$s!=0))
-      g_n_star <- construct_g_n_star(f_sIx_n, f_s_n, z_n)
-      eta_ss_n <- construct_eta_ss_n(dat, Q_n, z_n, vals=NA)
+      p_n <- (1/n_orig) * sum(dat$weights * as.integer(dat$s!=0))
+      g_n_star <- construct_g_n_star(f_sIx_n, f_s_n, p_n)
+      eta_ss_n <- construct_eta_ss_n(dat, Q_n, p_n, vals=NA)
       gcomp_n <- construct_gcomp_n(dat_orig, vlist$S_grid, Q_n)
-      alpha_star_n <- construct_alpha_star_n(dat, gcomp_n, z_n, vals=NA)
+      alpha_star_n <- construct_alpha_star_n(dat, gcomp_n, p_n, vals=NA)
       # Gamma_os_n <- construct_Gamma_os_n_star(dat, omega_n, g_n_star,
-      #                                              eta_ss_n, z_n, gcomp_n,
+      #                                              eta_ss_n, p_n, gcomp_n,
       #                                              alpha_star_n, vals=NA)
       q_n <- construct_q_n(type="new", dat, dat_orig, omega_n=omega_n,
-                           g_n_star=g_n_star, z_n=z_n, gcomp_n=gcomp_n,
+                           g_n_star=g_n_star, p_n=p_n, gcomp_n=gcomp_n,
                            alpha_star_n=alpha_star_n)
       Gamma_os_n <- construct_Gamma_os_n_star2(dat, dat_orig, omega_n, g_n_star,
-                                               eta_ss_n, z_n, q_n, gcomp_n,
+                                               eta_ss_n, p_n, q_n, gcomp_n,
                                                alpha_star_n, vals=NA)
     }
     
@@ -110,7 +110,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
                                        lambda_3)
       # infl_fn_Gamma <- construct_infl_fn_Gamma(omega_n, g_n, gcomp_n,
       #                                          eta_n, Gamma_os_n)
-      infl_fn_Gamma <- construct_infl_fn_Gamma2(omega_n, g_n_star, gcomp_n, z_n,
+      infl_fn_Gamma <- construct_infl_fn_Gamma2(omega_n, g_n_star, gcomp_n, p_n,
                                                 alpha_star_n, q_n, eta_ss_n,
                                                 Gamma_os_n_star=Gamma_os_n)
       infl_fn_2 <- construct_infl_fn_2(dat, Phi_n, infl_fn_Gamma, lambda_2,

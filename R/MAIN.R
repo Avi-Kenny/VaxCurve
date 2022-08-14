@@ -15,7 +15,7 @@ cfg <- list(
   which_sim = "estimation", # "estimation" "edge" "testing" "Cox" "debugging"
   level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
   # keep = c(1:3,7:9,16:18,22:24),
-  num_sim = 250,
+  num_sim = 500,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm", "tidyr",
@@ -90,18 +90,16 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     # sc_params = list("no cens"=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5)),
     # sc_params = list("exp"=list(lmbd=1e-3, v=1.5, lmbd2=5e-4, v2=1.5)),
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_S = c("Unif(0,1)", "N(0.5,0.04)"),
-    # distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.04)"),
+    distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.04)"),
     edge = c("none"), # "expit 0.4"
     # surv_true = c("Complex"),
-    surv_true = c("Cox PH"), # "Cox PH" "Complex" "exp"
-    # surv_true = c("Cox PH", "Complex"), # "Cox PH" "Complex" "exp"
+    surv_true = c("Cox PH", "Complex"), # "Cox PH" "Complex" "exp"
     sampling = c("two-phase (50%)"), # "iid"
     wts_type = c("estimated"), # c("true", "estimated")
     estimator = list(
       "Grenander (Cox)" = list(
         est = "Grenander",
-        params = list(marg="Gamma_star2", Q_n_type="Cox PH", # marg="Gamma_star", Q_n_type="Random Forest", Q_n_type="true"
+        params = list(marg="Gamma_star", Q_n_type="Cox PH", # marg="Gamma_star2", Q_n_type="Random Forest", Q_n_type="true"
                       convex_type="GCM", ecdf_type="linear (mid)", # convex_type="LS"
                       edge_corr="none", # edge_corr="min"
                       deriv_type="m-spline", g_n_type="parametric") # g_n_type="binning", g_n_type="true"

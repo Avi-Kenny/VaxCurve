@@ -401,9 +401,9 @@ if (F) {
   }))
   
   # Check 3
-  (1/n_orig) * sum((1-weights_f)*eta_ss_n(0.7,w_f))
+  (1/n_orig) * sum((1-weights_f)*eta_n(0.7,w_f))
   (1/n_orig) * sum(sapply(c(1:n_orig), function(i) {
-    (1-weights_f[i])*eta_ss_n(0.7,as.numeric(w_f[i,]))
+    (1-weights_f[i])*eta_n(0.7,as.numeric(w_f[i,]))
   }))
   
   # Check 4
@@ -1361,22 +1361,22 @@ if (F) {
     return(construct_superfunc(fnc, aux=NA, vec=c(2,1,1,1), vals=vals))
   }
 
-  # !!!!! New constructor: eta_n
-  construct_eta_n <- function(dat, vals=NA, S_n) {
-    n_orig <- sum(dat$weights)
-    fnc <- function(x,w) {
-      w_long <- as.data.frame(matrix(rep(w,length(dat$a)), ncol=length(w), byrow=T))
-      return(
-        (1/n_orig) * sum(
-          dat$weights * as.integer(dat$a<=x)*(1-S_n(rep(C$t_e,length(dat$a)),w_long,dat$a))
-        )
-      )
-    }
-    return(construct_superfunc(fnc, aux=NA, vec=c(1,2), vals=vals))
-  }
+  # # !!!!! New constructor: eta_n
+  # construct_eta_n <- function(dat, vals=NA, S_n) {
+  #   n_orig <- sum(dat$weights)
+  #   fnc <- function(x,w) {
+  #     w_long <- as.data.frame(matrix(rep(w,length(dat$a)), ncol=length(w), byrow=T))
+  #     return(
+  #       (1/n_orig) * sum(
+  #         dat$weights * as.integer(dat$a<=x)*(1-S_n(rep(C$t_e,length(dat$a)),w_long,dat$a))
+  #       )
+  #     )
+  #   }
+  #   return(construct_superfunc(fnc, aux=NA, vec=c(1,2), vals=vals))
+  # }
   
   # !!!!! New constructor calls
-  eta_n <- construct_eta_n(dat, vlist$AW_grid, S_n)
+  # eta_n <- construct_eta_n(dat, vlist$AW_grid, S_n)
   omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n,
                                type=params$omega_n_type)
   

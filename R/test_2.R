@@ -72,17 +72,17 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
       n_orig <- length(dat_orig$z)
       p_n <- (1/n_orig) * sum(dat$weights * as.integer(dat$s!=0))
       g_n_star <- construct_g_n_star(f_sIx_n, f_s_n, p_n)
-      eta_ss_n <- construct_eta_ss_n(dat, Q_n, p_n, vals=NA)
+      eta_n <- construct_eta_n(dat, Q_n, p_n, vals=NA)
       gcomp_n <- construct_gcomp_n(dat_orig, vlist$S_grid, Q_n)
       alpha_star_n <- construct_alpha_star_n(dat, gcomp_n, p_n, vals=NA)
       # Gamma_os_n <- construct_Gamma_os_n_star(dat, omega_n, g_n_star,
-      #                                              eta_ss_n, p_n, gcomp_n,
+      #                                              eta_n, p_n, gcomp_n,
       #                                              alpha_star_n, vals=NA)
       q_n <- construct_q_n(type="new", dat, dat_orig, omega_n=omega_n,
                            g_n_star=g_n_star, p_n=p_n, gcomp_n=gcomp_n,
                            alpha_star_n=alpha_star_n)
       Gamma_os_n <- construct_Gamma_os_n_star2(dat, dat_orig, omega_n, g_n_star,
-                                               eta_ss_n, p_n, q_n, gcomp_n,
+                                               eta_n, p_n, q_n, gcomp_n,
                                                alpha_star_n, vals=NA)
     }
     
@@ -105,13 +105,12 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     } else {
       
       # Construct influence functions
-      # eta_n <- construct_eta_n(dat, vlist$SX_grid, Q_n)
       infl_fn_1 <- construct_infl_fn_1(dat, Gamma_os_n, Phi_n, lambda_2,
                                        lambda_3)
       # infl_fn_Gamma <- construct_infl_fn_Gamma(omega_n, g_n, gcomp_n,
       #                                          eta_n, Gamma_os_n)
       infl_fn_Gamma <- construct_infl_fn_Gamma2(omega_n, g_n_star, gcomp_n, p_n,
-                                                alpha_star_n, q_n, eta_ss_n,
+                                                alpha_star_n, q_n, eta_n,
                                                 Gamma_os_n_star=Gamma_os_n)
       infl_fn_2 <- construct_infl_fn_2(dat, Phi_n, infl_fn_Gamma, lambda_2,
                                        lambda_3)
@@ -312,7 +311,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     #   Gamma_0 <- construct_Gamma_os_n(dat_0, vlist$S_grid, omega_0, Qc_0, g_0)
     #   lambda_2 <- lambda(dat_0_orig, k=2, G_0)
     #   lambda_3 <- lambda(dat_0_orig, k=3, G_0)
-    #   eta_0 <- construct_eta_n(dat_0, vlist$SX_grid, Qc_0)
+    #   # eta_0 <- construct_eta_n(dat_0, vlist$SX_grid, Qc_0) # ARCHIVED
     #   gcomp_0 <- construct_gcomp_n(dat_0_orig, vlist$S_grid, Qc_0)
     # 
     #   beta_0 <- (1/n_orig) * sum(

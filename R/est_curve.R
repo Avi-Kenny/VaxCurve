@@ -115,7 +115,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       p_n <- (1/n_orig) * sum(dat$weights * as.integer(dat$s!=0))
       g_n_star <- construct_g_n_star(f_sIx_n, f_s_n, p_n)
       print(paste("Check 5:", Sys.time()))
-      eta_ss_n <- construct_eta_ss_n(dat, Q_n, p_n, vals=NA)
+      eta_n <- construct_eta_n(dat, Q_n, p_n, vals=NA)
       print(paste("Check 6:", Sys.time()))
       gcomp_n <- construct_gcomp_n(dat_orig, vals=vlist$S_grid, Q_n)
       print(paste("Check 7:", Sys.time()))
@@ -132,7 +132,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       Gamma_os_n <- construct_Gamma_os_n(dat, vlist$S_grid, omega_n, Q_n, g_n)
     } else if (p$marg=="Gamma_star") {
       Gamma_os_n_star <- construct_Gamma_os_n_star(dat, omega_n, g_n_star,
-                                                   eta_ss_n, p_n, gcomp_n,
+                                                   eta_n, p_n, gcomp_n,
                                                    alpha_star_n,
                                                    vals=vlist$S_grid)
     } else if (p$marg=="Gamma_star2") {
@@ -142,7 +142,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
                            Q_n=Q_n, Qc_n=Qc_n)
       print(paste("Check 10:", Sys.time()))
       Gamma_os_n_star <- construct_Gamma_os_n_star2(dat, dat_orig, omega_n,
-                                                    g_n, eta_ss_n, p_n, # g_n_star
+                                                    g_n, eta_n, p_n, # g_n_star
                                                     q_n, gcomp_n, alpha_star_n,
                                                     vals=vlist$S_grid)
       
@@ -554,8 +554,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     p3 <- round((0.3+s_shift)*s_scale, -log10(C$appx$s))
     p5 <- round((0.5+s_shift)*s_scale, -log10(C$appx$s))
     res$g_n_star <- g_n_star(0.5,c(0,0))
-    res$eta_ss_n3 <- eta_ss_n(p3,c(0,0))
-    res$eta_ss_n5 <- eta_ss_n(p5,c(0,0))
+    res$eta_n3 <- eta_n(p3,c(0,0))
+    res$eta_n5 <- eta_n(p5,c(0,0))
     res$alpha_star_n3 <- alpha_star_n(p3)
     res$alpha_star_n5 <- alpha_star_n(p5)
     res$gcomp_n <- gcomp_n(0.9)

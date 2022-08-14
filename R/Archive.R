@@ -1,4 +1,38 @@
 
+# construct_eta_n
+if (F) {
+  
+  #' Construct nuisance estimator eta_n
+  #' 
+  #' @param dat Subsample of dataset returned by ss() for which z==1
+  #' @param vals List of values to pre-compute function on; passed to
+  #'     construct_superfunc()
+  #' @param Q_n Conditional survival function estimator returned by construct_Q_n
+  #' @return Estimator function of nuisance eta_0
+  construct_eta_n <- function(dat, vals=NA, Q_n) {
+    
+    n_orig <- sum(dat$weights)
+    
+    fnc <- function(u,x) {
+      
+      x_long <- as.data.frame(
+        matrix(rep(x,length(dat$s)), ncol=length(x), byrow=T)
+      )
+      
+      return(
+        (1/n_orig) * sum(
+          dat$weights * In(dat$s<=u) *
+            (1-Q_n(rep(C$t_0,length(dat$s)),x_long,dat$s))
+        )
+      )
+    }
+    
+    return(construct_superfunc(fnc, aux=NA, vec=c(1,2), vals=vals))
+    
+  }
+  
+}
+
 # construct_q_n(type=="SuperLearner")
 if (F) {
   

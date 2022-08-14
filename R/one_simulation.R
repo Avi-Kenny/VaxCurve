@@ -45,8 +45,8 @@ if (cfg$which_sim=="estimation") {
     
     if (F) {
       res_list$g_n_star <- ests$g_n_star
-      res_list$eta_ss_n3 <- ests$eta_ss_n3
-      res_list$eta_ss_n5 <- ests$eta_ss_n5
+      res_list$eta_n3 <- ests$eta_n3
+      res_list$eta_n5 <- ests$eta_n5
       res_list$alpha_star_n3 <- ests$alpha_star_n3
       res_list$alpha_star_n5 <- ests$alpha_star_n5
       res_list$gcomp_n <- ests$gcomp_n

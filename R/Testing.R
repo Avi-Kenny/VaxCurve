@@ -532,7 +532,7 @@
     Qc_n <- srvSL$cens
     omega_n <- construct_omega_n(Q_n, Qc_n)
     gcomp_n <- construct_gcomp_n(dat_orig, vals_S_grid, Q_n)
-    eta_n <- construct_eta_n(dat, vals_SX_grid, Q_n)
+    # eta_n <- construct_eta_n(dat, vals_SX_grid, Q_n) # ARCHIVED
     Gamma_os_n <- construct_Gamma_os_n(dat, omega_n, Q_n, g_n)
     
     if (F) {

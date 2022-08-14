@@ -1352,37 +1352,6 @@ construct_g_n <- function(f_sIx_n, f_s_n, vals=NA) {
 
 
 
-#' Construct nuisance estimator eta_n
-#' 
-#' @param dat Subsample of dataset returned by ss() for which z==1
-#' @param vals List of values to pre-compute function on; passed to
-#'     construct_superfunc()
-#' @param Q_n Conditional survival function estimator returned by construct_Q_n
-#' @return Estimator function of nuisance eta_0
-construct_eta_n <- function(dat, vals=NA, Q_n) {
-  
-  n_orig <- sum(dat$weights)
-  
-  fnc <- function(u,x) {
-    
-    x_long <- as.data.frame(
-      matrix(rep(x,length(dat$s)), ncol=length(x), byrow=T)
-    )
-
-    return(
-      (1/n_orig) * sum(
-        dat$weights * In(dat$s<=u) *
-          (1-Q_n(rep(C$t_0,length(dat$s)),x_long,dat$s))
-      )
-    )
-  }
-  
-  return(construct_superfunc(fnc, aux=NA, vec=c(1,2), vals=vals))
-  
-}
-
-
-
 #' Construct nuisance estimator eta*_n
 #' 
 #' @param Q_n Conditional survival function estimator returned by construct_Q_n
@@ -1646,7 +1615,7 @@ construct_infl_fn_Gamma <- function(omega_n, g_n, gcomp_n, eta_n,
 #' @param x x
 #' @return x
 construct_infl_fn_Gamma2 <- function(omega_n, g_n_star, gcomp_n, p_n,
-                                     alpha_star_n, q_n, eta_ss_n,
+                                     alpha_star_n, q_n, eta_n,
                                      Gamma_os_n_star) {
   
   fnc <- function(u,x,y,delta,s,wt) {
@@ -1661,7 +1630,7 @@ construct_infl_fn_Gamma2 <- function(omega_n, g_n_star, gcomp_n, p_n,
     }
     wt*(piece_1*piece_2-piece_3/p_n) +
       (1-wt)*q_n(x,y,delta,u) +
-      eta_ss_n(u,x) -
+      eta_n(u,x) -
       Gamma_os_n_star(round(u,-log10(C$appx$s)))
   }
   
@@ -1846,6 +1815,8 @@ construct_Gamma_cf_k <- function(dat_train, dat_test, vals=NA, omega_n, g_n,
 #' @return A cross-fitted Gamma_0 estimator
 construct_Gamma_cf <- function(dat_orig, params, vlist) {
   
+  # !!!!! Update this
+  
   # Prep for cross-fitting
   Gamma_cf_k <- list()
   n_orig <- length(dat_orig$z)
@@ -1869,7 +1840,7 @@ construct_Gamma_cf <- function(dat_orig, params, vlist) {
     Q_n <- srvSL$srv
     Qc_n <- srvSL$cens
     gcomp_n <- construct_gcomp_n(dat_orig_train, vlist$S_grid, Q_n)
-    eta_n <- construct_eta_n(dat_train, vlist$SX_grid, Q_n)
+    # eta_n <- construct_eta_n(dat_train, vlist$SX_grid, Q_n) # ARCHIVED
     f_sIx_n <- construct_f_sIx_n(dat_train, vlist$SX_grid, type=params$g_n_type,
                                  k=15)
     f_s_n <- construct_f_s_n(dat_orig_train, vlist$S_grid, f_sIx_n)
@@ -2171,14 +2142,14 @@ construct_alpha_star_n <- function(dat, gcomp_n, p_n, vals=NA) {
 
 
 
-#' Construct nuisance estimator eta_ss_n
+#' Construct nuisance estimator eta_n
 #' 
 #' @param dat !!!!!
 #' @param Q_n !!!!!
 #' @param p_n !!!!!
 #' @param vals !!!!!
 #' @return Nuisance estimator function
-construct_eta_ss_n <- function(dat, Q_n, p_n, vals=NA) {
+construct_eta_n <- function(dat, Q_n, p_n, vals=NA) {
   
   n_orig <- sum(dat$weights)
   piece_1 <- dat$weights * In(dat$s!=0)
@@ -2202,7 +2173,7 @@ construct_eta_ss_n <- function(dat, Q_n, p_n, vals=NA) {
 #' Construct Gamma_os_n_star primitive one-step estimator
 #'
 #' @param x !!!!!
-construct_Gamma_os_n_star <- function(dat, omega_n, g_n_star, eta_ss_n, p_n,
+construct_Gamma_os_n_star <- function(dat, omega_n, g_n_star, eta_n, p_n,
                                       gcomp_n, alpha_star_n, vals=NA) {
 
   weights_i <- dat$weights
@@ -2220,7 +2191,7 @@ construct_Gamma_os_n_star <- function(dat, omega_n, g_n_star, eta_ss_n, p_n,
   fnc <- function(u) {
     (1/n_orig) * sum(weights_i * (
       piece_2*In(s_i<=u)*piece_1 +
-        eta_ss_n(rep(u,nrow(x_i)),x_i) +
+        eta_n(rep(u,nrow(x_i)),x_i) +
         (piece_2/p_n)*(In(s_i<=u)*piece_3-alpha_star_n(u))
     ))
   }
@@ -2235,7 +2206,7 @@ construct_Gamma_os_n_star <- function(dat, omega_n, g_n_star, eta_ss_n, p_n,
 #' 
 #' @param x !!!!!
 construct_Gamma_os_n_star2 <- function(dat, dat_orig, omega_n, g_n, # g_n_star
-                                       eta_ss_n, p_n, q_n, gcomp_n,
+                                       eta_n, p_n, q_n, gcomp_n,
                                        alpha_star_n, vals=NA) {
   
   n_orig <- round(sum(dat$weights))
@@ -2250,10 +2221,10 @@ construct_Gamma_os_n_star2 <- function(dat, dat_orig, omega_n, g_n, # g_n_star
   fnc <- function(u) {
     
     if (F) {
-      eta_ss_n(u,c(0,0))
+      eta_n(u,c(0,0))
       return(
         (1/n_orig) * sum(
-          eta_ss_n(rep(u,n_orig),dat_orig$x)
+          eta_n(rep(u,n_orig),dat_orig$x)
         )
       )
     } # DEBUG
@@ -2265,7 +2236,7 @@ construct_Gamma_os_n_star2 <- function(dat, dat_orig, omega_n, g_n, # g_n_star
         piece_3 * (
           q_n(dat_orig$x,dat_orig$y,dat_orig$delta,u)/p_n
         ) +
-          eta_ss_n(rep(u,n_orig),dat_orig$x)
+          eta_n(rep(u,n_orig),dat_orig$x)
       )
     
   }
@@ -2280,7 +2251,7 @@ construct_Gamma_os_n_star2 <- function(dat, dat_orig, omega_n, g_n, # g_n_star
 #' 
 #' @param x !!!!!
 construct_Theta_os_n2 <- function(dat, dat_orig, omega_n, f_sIx_n, q_star_n,
-                                  etastar_n, vals=NA) { # eta_ss_n, p_n, q_n, gcomp_n, alpha_star_n
+                                  etastar_n, vals=NA) { # eta_n, p_n, q_n, gcomp_n, alpha_star_n
   
   # n_orig <- round(sum(dat$weights))
   # piece_1 <- In(dat$s!=0)
@@ -2299,7 +2270,7 @@ construct_Theta_os_n2 <- function(dat, dat_orig, omega_n, f_sIx_n, q_star_n,
   #       piece_3 * (
   #         q_n(dat_orig$x,dat_orig$y,dat_orig$delta,u)/p_n
   #       ) +
-  #         eta_ss_n(rep(u,n_orig),dat_orig$x)
+  #         eta_n(rep(u,n_orig),dat_orig$x)
   #     )
   # }
   

@@ -112,15 +112,15 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     q_n <- construct_q_n(type=p$q_n_type, dat, dat_orig, omega_n=omega_n, g_n=g_n,
                          p_n=p_n, gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
                          Q_n=Q_n, Qc_n=Qc_n, f_n_srv=f_n_srv)
-    Gamma_os_n_star <- construct_Gamma_os_n_star2(dat, dat_orig, omega_n,
+    Gamma_os_n <- construct_Gamma_os_n(dat, dat_orig, omega_n,
                                                   g_n, eta_n, p_n,
                                                   q_n, gcomp_n, alpha_star_n,
                                                   vals=vlist$S_grid)
     
     if (F) {
-      Gamma_os_n_star(0.5) # Don't profile this line
-      Gamma_os_n_star(0.6)
-      Gamma_os_n_star(0.7)
+      Gamma_os_n(0.5) # Don't profile this line
+      Gamma_os_n(0.6)
+      Gamma_os_n(0.7)
     } # DEBUG
     
     if (F) {
@@ -139,11 +139,11 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
         s <- 1 - sqrt(runif(m))
       }
       s <- (s+s_shift)*s_scale
-      Gamma_os_n_star <- Vectorize(function(u) {
+      Gamma_os_n <- Vectorize(function(u) {
         u <- (u+s_shift)*s_scale # u <- round((u+s_shift)*s_scale, -log10(C$appx$s))
         mean( as.integer(s<=u) * (1-exp(-1*L$sc_params$lmbd*C$t_0)) )
       })
-    } # DEBUG: True Gamma_os_n_star
+    } # DEBUG: True Gamma_os_n
     
     # Construct one-step edge estimator
     if (p$edge_corr!="none") {
@@ -166,18 +166,9 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     indices_to_keep <- !base::duplicated(x_vals)
     x_vals <- x_vals[indices_to_keep]
     if (dir=="incr") {
-      y_vals <- Gamma_os_n_star(grid[indices_to_keep])
+      y_vals <- Gamma_os_n(grid[indices_to_keep])
     } else {
-      if (F) {
-        for (aa in grid[indices_to_keep]) {
-          print("SPECIAL CHECK")
-          print(Sys.time())
-          print(paste("aa:",aa))
-          bb <- Gamma_os_n_star(aa)
-          print(paste("bb:",bb))
-        }
-      } # DEBUG
-      y_vals <- -1 * Gamma_os_n_star(grid[indices_to_keep])
+      y_vals <- -1 * Gamma_os_n(grid[indices_to_keep])
     }
     if (!any(x_vals==0)) {
       x_vals <- c(0, x_vals)
@@ -269,7 +260,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     # Generate estimates for each point
     ests <- r_Mn(points)
     if (F) {
-      ests_Gamma <- Gamma_os_n_star(points)
+      ests_Gamma <- Gamma_os_n(points)
       ests_Phi <- Phi_n(points)
     } # DEBUG: return Gamma/Phi estimates
     
@@ -494,9 +485,9 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     Q_n2 <- (construct_Q_n(dat, vlist$Q_n, type="Cox PH"))$srv
     res$gcomp <- construct_gcomp_n(dat_orig, vlist$S_grid, Q_n=Q_n2)
   }
-  fns_extra <- c("f_s_n", "gamma_n", "deriv_r_Mn", "Phi_n_inv", "Theta_os_n",
-                 "Phi_n", "omega_n", "f_sIx_n", "Q_n", "gcm", "dGCM",
-                 "grid", "Gamma_os_n_star", "r_Mn_Gr")
+  fns_extra <- c("f_s_n", "gamma_n", "deriv_r_Mn", "Phi_n_inv", "Phi_n",
+                 "omega_n", "f_sIx_n", "Q_n", "gcm", "dGCM", "grid",
+                 "Gamma_os_n", "r_Mn_Gr")
   for (fn in fns_extra) {
     if (fn %in% return_extra) { res[[fn]] <- eval(as.name(fn)) }
   }

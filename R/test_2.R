@@ -75,16 +75,12 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
       eta_n <- construct_eta_n(dat, Q_n, p_n, vals=NA)
       gcomp_n <- construct_gcomp_n(dat_orig, vlist$S_grid, Q_n)
       alpha_star_n <- construct_alpha_star_n(dat, gcomp_n, p_n, vals=NA)
-      # Gamma_os_n <- construct_Gamma_os_n_star(dat, omega_n, g_n_star,
-      #                                              eta_n, p_n, gcomp_n,
-      #                                              alpha_star_n, vals=NA)
       f_n_srv <- construct_f_n_srv(Q_n=Q_n, Qc_n=Qc_n)
       q_n <- construct_q_n(type=p$q_n_type, dat, dat_orig, omega_n=omega_n, g_n=g_n,
                            p_n=p_n, gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
                            Q_n=Q_n, Qc_n=Qc_n, f_n_srv=f_n_srv)
-      Gamma_os_n <- construct_Gamma_os_n_star2(dat, dat_orig, omega_n, g_n_star,
-                                               eta_n, p_n, q_n, gcomp_n,
-                                               alpha_star_n, vals=NA)
+      Gamma_os_n <- construct_Gamma_os_n(dat, dat_orig, omega_n, g_n_star,
+                                         eta_n, p_n, q_n, gcomp_n, alpha_star_n)
     }
     
     # Construct cross-fitted Gamma_0 estimator

@@ -1,4 +1,119 @@
 
+# construct_Gamma_os_n_star
+if (F) {
+  
+  #' Construct Gamma_os_n_star primitive one-step estimator
+  #'
+  #' @param x !!!!!
+  construct_Gamma_os_n_star <- function(dat, omega_n, g_n_star, eta_n, p_n,
+                                        gcomp_n, alpha_star_n, vals=NA) {
+    
+    weights_i <- dat$weights
+    n_orig <- sum(weights_i)
+    s_i <- dat$s
+    x_i <- dat$x
+    piece_1 <- omega_n(dat$x,dat$s,dat$y,dat$delta) /
+      g_n_star(dat$s,dat$x)
+    piece_2 <- In(s_i!=0)
+    piece_3 <- gcomp_n(s_i)
+    
+    # Remove large intermediate objects
+    rm(dat,omega_n,g_n_star,gcomp_n)
+    
+    fnc <- function(u) {
+      (1/n_orig) * sum(weights_i * (
+        piece_2*In(s_i<=u)*piece_1 +
+          eta_n(rep(u,nrow(x_i)),x_i) +
+          (piece_2/p_n)*(In(s_i<=u)*piece_3-alpha_star_n(u))
+      ))
+    }
+    
+    return(construct_superfunc(fnc, aux=NA, vec=T, vals=vals))
+    
+  }
+  
+}
+
+# construct_Gamma_os_n
+if (F) {
+  
+  #' Construct Gamma_os_n primitive one-step estimator
+  #' 
+  #' @param dat Subsample of dataset returned by ss() for which z==1
+  #' @param vals List of values to pre-compute function on; passed to
+  #'     construct_superfunc()
+  #' @param omega_n A nuisance influence function returned by construct_omega_n()
+  #' @param Q_n A conditional survival function returned by construct_Q_n()
+  #' @param g_n A density ratio estimator function returned by construct_g_n()
+  #' @param type One of c("one-step", "plug-in")
+  #' @return Gamma_os_n estimator
+  #' @notes This is a generalization of the one-step estimator from Westling &
+  #'     Carone 2020
+  construct_Gamma_os_n <- function(dat, vals=NA, omega_n, Q_n, g_n,
+                                   type="one-step") {
+    
+    n_orig <- sum(dat$weights)
+    n <- length(dat$s)
+    i_long <- rep(c(1:n), each=n)
+    j_long <- rep(c(1:n), times=n)
+    s_i_short <- dat$s
+    s_i_long <- dat$s[i_long]
+    x_j_long <- dat$x[j_long,]
+    delta_i_long <- dat$delta[i_long]
+    delta_j_long <- dat$delta[j_long]
+    weights_i_long <- dat$weights[i_long]
+    weights_j_long <- dat$weights[j_long]
+    
+    if (type=="one-step") {
+      
+      subpiece_1a <- dat$weights * ( 1 + (
+        omega_n(dat$x,dat$s,dat$y,dat$delta) /
+          g_n(dat$s,dat$x)
+      ) )
+      subpiece_2a <- (weights_i_long*weights_j_long) *
+        Q_n(rep(C$t_0, length(s_i_long)),x_j_long,s_i_long)
+      
+      # Remove large intermediate objects
+      rm(dat,delta_i_long,delta_j_long,i_long,j_long,omega_n,Q_n,x_j_long,
+         weights_i_long,weights_j_long)
+      
+      fnc <- function(s) {
+        
+        subpiece_1b <- In(round(s_i_short,-log10(C$appx$s))<=
+                            round(s,-log10(C$appx$s)))
+        piece_1 <- (1/n_orig) * sum(subpiece_1a*subpiece_1b)
+        
+        subpiece_2b <- In(round(s_i_long,-log10(C$appx$s))<=
+                            round(s,-log10(C$appx$s)))
+        piece_2 <- (1/(n_orig^2)) * sum(subpiece_2a*subpiece_2b)
+        
+        return(piece_1-piece_2)
+        
+      }
+      
+    }
+    
+    if (type=="plug-in") {
+      
+      piece <- weights_i_long*weights_j_long *
+        (1 - Q_n(rep(C$t_0, length(s_i_long)),x_j_long,s_i_long))
+      
+      # Remove large intermediate objects
+      rm(dat,delta_i_long,delta_j_long,i_long,j_long,omega_n,Q_n,
+         x_i_long,x_j_long,weights_i_long,weights_j_long)
+      
+      fnc <- function(s) {
+        (1/n_orig^2) * sum(piece * In(s_i_long<=s))
+      }
+      
+    }
+    
+    return(construct_superfunc(fnc, aux=NA, vec=T, vals=vals))
+    
+  }
+  
+}
+
 # construct_eta_n
 if (F) {
   

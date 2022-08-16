@@ -1248,7 +1248,6 @@ if (cfg2$run_analysis &&
   if (cfg2$run_debug$gren_var) {
     return_extra <- c(return_extra, "deriv_r_Mn", "f_s_n", "gamma_n")
   }
-  if (cfg2$params$marg=="Theta") { return_extra <- c(return_extra,"etastar_n") }
   s_orig <- dat_orig$s[!is.na(dat_orig$s)]
   s_grid <- seq(from=min(s_orig), to=max(s_orig), length.out=101)
   ests <- est_curve(
@@ -1904,16 +1903,16 @@ if (cfg2$run_debug$objs) {
     #   geom_line() +
     #   theme(legend.position="bottom")
     
-    # etastar_n
-    int_data4 <- data.frame(
-      x = grid,
-      y = etastar_n(grid)
-      # which = rep(c("",""),each=101)
-    )
-    ggplot(int_data4, aes(x=x, y=y)) + # color=which
-      geom_line() +
-      theme(legend.position="bottom") +
-      labs(title="etastar_n")
+    # # etastar_n
+    # int_data4 <- data.frame(
+    #   x = grid,
+    #   y = etastar_n(grid)
+    #   # which = rep(c("",""),each=101)
+    # )
+    # ggplot(int_data4, aes(x=x, y=y)) + # color=which
+    #   geom_line() +
+    #   theme(legend.position="bottom") +
+    #   labs(title="etastar_n")
     
   }
   

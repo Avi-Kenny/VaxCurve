@@ -1034,41 +1034,58 @@ construct_gamma_n <- function(dat_orig, dat, type="Super Learner", vals=NA,
 
 
 
+#' Construct nuisance estimator of conditional density f(Y,Delta|X,S)
+#' 
+#' @param Q_n xxx
+#' @param Qc_n xxx
+#' @param width xxx
+#' @param vals xxx
+#' @return nuisance estimator function
+construct_f_n_srv <- function(Q_n=NA, Qc_n=NA, width=40, vals=NA) {
+  
+  # Helper function to calculate derivatives
+  surv_deriv <- function(Q_n) {
+    fnc <- function(t, x, s) {
+      t1 <- t - width/2
+      t2 <- t + width/2
+      if (t1<0) { t2<-width; t1<-0; }
+      if (t2>C$t_0) { t1<-C$t_0-width; t2<-C$t_0; }
+      t1 <- round(t1,-log10(C$appx$t_0))
+      t2 <- round(t2,-log10(C$appx$t_0))
+      ch_y <- Q_n(t2,x,s) - Q_n(t1,x,s)
+      return(ch_y/width)
+    }
+    return(construct_superfunc(fnc, aux=NA, vec=c(1,2,1), vals=NA))
+  }
+  
+  # Calculate derivative estimators
+  Q_n_deriv <- surv_deriv(Q_n)
+  Qc_n_deriv <- surv_deriv(Qc_n)
+  
+  fnc <- function(y, delta, x, s) {
+    if (delta==1) {
+      return(-1*Qc_n(y,x,s)*Q_n_deriv(y,x,s))
+    } else {
+      return(-1*Q_n(y,x,s)*Qc_n_deriv(y,x,s))
+    }
+  }
+  
+  return(construct_superfunc(fnc, aux=NA, vec=c(1,1,2,1), vals=vals))
+  
+}
+
+
+
 #' Construct q_n nuisance estimator function
 #' 
 #' @param type One of c("new", "zero")
 #' @return q_n nuisance estimator function
-#' !!!!! Eventually phase out type="Super Learner"
-construct_q_n <- function(type="Super Learner", dat, dat_orig,
+construct_q_n <- function(type="new", dat, dat_orig,
                           omega_n=NA, g_n=NA, p_n=NA, gcomp_n=NA, # g_n_star=NA
                           alpha_star_n=NA, f_sIx_n=NA, Q_n=NA, Qc_n=NA,
-                          vals=NA) {
+                          f_n_srv=NA, vals=NA) {
   
   if (type=="new") {
-    
-    surv_deriv <- function(Q_n) {
-
-      fnc <- function(t, x, s) {
-        
-        width <- 40
-        t1 <- t - width/2
-        t2 <- t + width/2
-        if (t1<0) { t2<-width; t1<-0; }
-        if (t2>C$t_0) { t1<-C$t_0-width; t2<-C$t_0; }
-        t1 <- round(t1,-log10(C$appx$t_0))
-        t2 <- round(t2,-log10(C$appx$t_0))
-        ch_y <- Q_n(t2,x,s) - Q_n(t1,x,s)
-        
-        return(ch_y/width)
-        
-      }
-      
-      return(construct_superfunc(fnc, aux=NA, vec=c(1,2,1), vals=NA))
-
-    }
-    
-    Q_n_deriv <- surv_deriv(Q_n)
-    Qc_n_deriv <- surv_deriv(Qc_n)
     
     q_n_star_inner <- function(y, delta, x, s) {
       In(s!=0)*omega_n(x,s,y,delta)/g_n(s,x) + gcomp_n(s)
@@ -1080,15 +1097,6 @@ construct_q_n <- function(type="Super Learner", dat, dat_orig,
         In(s!=0)*alpha_star_n(u)
     }
     q_n_star <- construct_superfunc(q_n_star, aux=NA, vec=c(1,1,2,1,1), vals=NA)
-    
-    f_n_srv <- function(y, delta, x, s) {
-      if (delta==1) {
-        return(-1*Qc_n(y,x,s)*Q_n_deriv(y,x,s))
-      } else {
-        return(-1*Q_n(y,x,s)*Qc_n_deriv(y,x,s))
-      }
-    }
-    f_n_srv <- construct_superfunc(f_n_srv, aux=NA, vec=c(1,1,2,1), vals=NA)
     
     n <- length(dat$s)
     
@@ -1107,6 +1115,49 @@ construct_q_n <- function(type="Super Learner", dat, dat_orig,
         return (0)
       } else {
         num <- sum(dat$weights*q_n_star_*f_n_srv_*g_n_)
+        return(num/denom)
+      }
+      
+    }
+    
+  }
+  
+  if (type=="zero") {
+    
+    fnc <- function(x, y, delta, u) { 0 }
+    
+  }
+  
+  return(construct_superfunc(fnc, aux=NA, vec=c(2,1,1,0), vals=vals))
+  
+}
+
+
+
+#' Construct q_tilde_n nuisance estimator function
+#' 
+#' @param x x
+#' @return q_tilde_n nuisance estimator function
+construct_q_tilde_n <- function(type="new", f_n_srv=NA, f_sIx_n=NA,
+                                omega_n=NA, vals=NA) {
+  
+  if (type=="new") {
+    
+    seq_01 <- round(seq(C$appx$s,1,C$appx$s),-log10(C$appx$s))
+    seq_0u <- round(seq(C$appx$s,u,C$appx$s),-log10(C$appx$s))
+    
+    fnc <- function(x, y, delta, u) {
+      
+      denom <- C$appx$s * sum(sapply(seq_01, function(s) {
+        f_n_srv(y, delta, x, s) * f_sIx_n(s,x)
+      }))
+      
+      if (denom==0) {
+        return (0)
+      } else {
+        num <- C$appx$s * sum(sapply(seq_0u, function(s) {
+          omega_n(x,s,y,delta) * f_n_srv(y, delta, x, s)
+        }))
         return(num/denom)
       }
       
@@ -1365,8 +1416,9 @@ construct_etastar_n <- function(Q_n, vals=NA) {
     if (u==0) {
       integral <- 0
     } else {
-      integral <- sum(sapply(seq(C$appx$s,u,C$appx$s), function(s) {
-        C$appx$s * Q_n(C$t_0, x, round(s,-log10(C$appx$s)))
+      s_seq <- round(seq(C$appx$s,u,C$appx$s),-log10(C$appx$s))
+      integral <- C$appx$s * sum(sapply(s_seq, function(s) {
+        Q_n(C$t_0, x, s)
       }))
     }
     return(u-integral)
@@ -1405,22 +1457,23 @@ lambda <- function(dat, k, G) {
 #' @return Gamma_os_n estimator
 #' @notes This is a generalization of the one-step estimator from Westling &
 #'     Carone 2020
-construct_Theta_os_n <- function(dat, vals=NA, omega_n, f_sIx_n, etastar_n) {
+construct_Theta_os_n <- function(dat, dat_orig, omega_n=NA, f_sIx_n=NA,
+                                 q_tilde_n=NA, etastar_n=NA, vals=NA) {
   
-  weights_i <- dat$weights
-  n_orig <- sum(weights_i)
-  s_i <- dat$s
-  x_i <- dat$x
-  piece_1 <- omega_n(dat$x,dat$s,dat$y,dat$delta) /
+  n_orig <- length(dat_orig$z)
+  piece_1 <- (dat$weights*omega_n(dat$x,dat$s,dat$y,dat$delta)) /
     f_sIx_n(dat$s,dat$x)
+  piece_2 <- (1-dat_orig$weights)
   
   # Remove large intermediate objects
-  rm(dat,omega_n,f_sIx_n)
+  rm(omega_n,f_sIx_n)
   
   fnc <- function(u) {
-    (1/n_orig) * sum(weights_i * (
-      In(s_i<=u) * piece_1 + etastar_n(rep(u,nrow(x_i)),x_i)
-    ))
+    (1/(n_orig)) * sum(piece_1*In(dat$s<=u)) +
+      (1/n_orig) * sum(
+        piece_2 * q_tilde_n(dat_orig$x, dat_orig$y, dat_orig$delta, u) +
+          etastar_n(rep(u,length(dat_orig$z)),dat_orig$x)
+      )
   }
   
   return(construct_superfunc(fnc, aux=NA, vec=T, vals=vals))
@@ -1644,7 +1697,7 @@ construct_infl_fn_Gamma2 <- function(omega_n, g_n_star, gcomp_n, p_n,
 #' 
 #' @param x x
 #' @return x
-construct_infl_fn_Theta <- function(omega_n, f_sIx_n, q_star_n, etastar_n,
+construct_infl_fn_Theta <- function(omega_n, f_sIx_n, q_tilde_n, etastar_n,
                                     Theta_os_n) {
   
   fnc <- function(u,x,y,delta,s,wt) {
@@ -1656,7 +1709,7 @@ construct_infl_fn_Theta <- function(omega_n, f_sIx_n, q_star_n, etastar_n,
       piece_2 <- omega_n(x,s,y,delta)/f_sIx_n(s,x)
     }
     wt*piece_1*piece_2 +
-      (1-wt) * q_star_n(x,y,delta,u) +
+      (1-wt) * q_tilde_n(x,y,delta,u) +
       etastar_n(u,x) -
       Theta_os_n(round(u,-log10(C$appx$s)))
   }
@@ -2209,7 +2262,7 @@ construct_Gamma_os_n_star2 <- function(dat, dat_orig, omega_n, g_n, # g_n_star
                                        eta_n, p_n, q_n, gcomp_n,
                                        alpha_star_n, vals=NA) {
   
-  n_orig <- round(sum(dat$weights))
+  n_orig <- length(dat_orig$z)
   piece_1 <- In(dat$s!=0)
   piece_2 <- (omega_n(dat$x,dat$s,dat$y,dat$delta) /
                 g_n(dat$s,dat$x)) + gcomp_n(dat$s)
@@ -2244,56 +2297,6 @@ construct_Gamma_os_n_star2 <- function(dat, dat_orig, omega_n, g_n, # g_n_star
   return(construct_superfunc(fnc, aux=NA, vec=T, vals=vals))
   
 }
-
-
-
-#' Construct Theta_os_n primitive one-step estimator (based on EIF)
-#' 
-#' @param x !!!!!
-construct_Theta_os_n2 <- function(dat, dat_orig, omega_n, f_sIx_n, q_star_n,
-                                  etastar_n, vals=NA) { # eta_n, p_n, q_n, gcomp_n, alpha_star_n
-  
-  # n_orig <- round(sum(dat$weights))
-  # piece_1 <- In(dat$s!=0)
-  # piece_2 <- (omega_n(dat$x,dat$s,dat$y,dat$delta) /
-                # g_n(dat$s,dat$x)) + gcomp_n(dat$s)
-  # piece_3 <- (1-dat_orig$weights)
-  
-  # Remove large intermediate objects
-  # rm(omega_n,g_n,gcomp_n)
-  
-  # fnc <- function(u) {
-  #   (1/(n_orig*p_n)) * sum(dat$weights * (
-  #     piece_1*In(dat$s<=u)*piece_2 - piece_1*alpha_star_n(u)
-  #   )) +
-  #     (1/n_orig) * sum(
-  #       piece_3 * (
-  #         q_n(dat_orig$x,dat_orig$y,dat_orig$delta,u)/p_n
-  #       ) +
-  #         eta_n(rep(u,n_orig),dat_orig$x)
-  #     )
-  # }
-  
-  # n_orig <- round(sum(dat$weights))
-  # piece_2 <- omega_n(dat$x,dat$s,dat$y,dat$delta)/f_sIx_n(dat$s,dat$x)
-  # piece_3 <- (1-dat_orig$weights)
-  
-  # Remove large intermediate objects
-  # rm(omega_n,f_sIx_n)
-  
-  # fnc <- function(u) {
-  #   (1/n_orig) * sum(dat$weights * In(dat$s<=u) * piece_2) +
-  #     (1/n_orig) * sum(
-  #       piece_3 * q_star_n(dat_orig$x,dat_orig$y,dat_orig$delta,u) +
-  #         etastar_n(rep(u,n_orig),dat_orig$x)
-  #     )
-  # }
-  
-  # return(construct_superfunc(fnc, aux=NA, vec=T, vals=vals))
-  
-}
-
-
 
 
 

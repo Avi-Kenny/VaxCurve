@@ -123,11 +123,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       print(paste("Check 8:", Sys.time()))
     }
     
-    if (p$marg=="Theta") {
-      etastar_n <- construct_etastar_n(Q_n)
-      Theta_os_n <- construct_Theta_os_n(dat, vlist$S_grid, omega_n, f_sIx_n,
-                                         etastar_n)
-    } else if (p$marg=="Gamma") {
+    if (p$marg=="Gamma") {
       Phi_n <- construct_Phi_n(dat, type=p$ecdf_type)
       Gamma_os_n <- construct_Gamma_os_n(dat, vlist$S_grid, omega_n, Q_n, g_n)
     } else if (p$marg=="Gamma_star") {
@@ -137,9 +133,10 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
                                                    vals=vlist$S_grid)
     } else if (p$marg=="Gamma_star2") {
       print(paste("Check 9:", Sys.time()))
+      f_n_srv <- construct_f_n_srv(Q_n=Q_n, Qc_n=Qc_n)
       q_n <- construct_q_n(type=p$q_n_type, dat, dat_orig, omega_n=omega_n, g_n=g_n,
                            p_n=p_n, gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
-                           Q_n=Q_n, Qc_n=Qc_n)
+                           Q_n=Q_n, Qc_n=Qc_n, f_n_srv=f_n_srv)
       print(paste("Check 10:", Sys.time()))
       Gamma_os_n_star <- construct_Gamma_os_n_star2(dat, dat_orig, omega_n,
                                                     g_n, eta_n, p_n, # g_n_star
@@ -191,7 +188,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     if (F) {
       q_n <- construct_q_n(type="new", dat, dat_orig, omega_n=omega_n, g_n=g_n,
                            p_n=p_n, gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
-                           Q_n=Q_n, Qc_n=Qc_n)
+                           Q_n=Q_n, Qc_n=Qc_n, f_n_srv=f_n_srv)
       q_n(dat_orig$x[1:3,],dat_orig$y[1:3],dat_orig$delta[1:3],u=0.5)
       q_n(dat_orig$x[4:6,],dat_orig$y[4:6],dat_orig$delta[4:6],u=0.5)
     } # DEBUG
@@ -566,9 +563,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     res$gcomp <- construct_gcomp_n(dat_orig, vlist$S_grid, Q_n=Q_n2)
   }
   fns_extra <- c("f_s_n", "gamma_n", "deriv_r_Mn", "Phi_n_inv", "Theta_os_n",
-                 "Phi_n", "omega_n", "f_sIx_n", "etastar_n", "Q_n", "gcm",
-                 "dGCM", "grid", "Gamma_os_n_star",
-                 "r_Mn_Gr")
+                 "Phi_n", "omega_n", "f_sIx_n", "Q_n", "gcm", "dGCM",
+                 "grid", "Gamma_os_n_star", "r_Mn_Gr")
   for (fn in fns_extra) {
     if (fn %in% return_extra) { res[[fn]] <- eval(as.name(fn)) }
   }

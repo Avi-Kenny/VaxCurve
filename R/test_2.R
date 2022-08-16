@@ -78,9 +78,10 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
       # Gamma_os_n <- construct_Gamma_os_n_star(dat, omega_n, g_n_star,
       #                                              eta_n, p_n, gcomp_n,
       #                                              alpha_star_n, vals=NA)
-      q_n <- construct_q_n(type="new", dat, dat_orig, omega_n=omega_n,
-                           g_n_star=g_n_star, p_n=p_n, gcomp_n=gcomp_n,
-                           alpha_star_n=alpha_star_n)
+      f_n_srv <- construct_f_n_srv(Q_n=Q_n, Qc_n=Qc_n)
+      q_n <- construct_q_n(type=p$q_n_type, dat, dat_orig, omega_n=omega_n, g_n=g_n,
+                           p_n=p_n, gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
+                           Q_n=Q_n, Qc_n=Qc_n, f_n_srv=f_n_srv)
       Gamma_os_n <- construct_Gamma_os_n_star2(dat, dat_orig, omega_n, g_n_star,
                                                eta_n, p_n, q_n, gcomp_n,
                                                alpha_star_n, vals=NA)
@@ -155,10 +156,12 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     # etastar_n <- construct_etastar_n(Q_n)
     # q_star_n <- construct_q_n(which="q_star_n", type="Super Learner", dat, # ?????
     #                           dat_orig, omega_n=omega_n, f_sIx_n=f_sIx_n) # ?????
-    Theta_os_n <- construct_Theta_os_n2(dat, dat_orig, omega_n, f_sIx_n,
-                                        q_star_n, etastar_n, vals=NA)
-    # infl_fn_Theta <- construct_infl_fn_Theta(omega_n, f_sIx_n, q_star_n,
-    #                                          etastar_n, Theta_os_n)
+    Theta_os_n <- construct_Theta_os_n(dat, dat_orig, omega_n, f_sIx_n,
+                                       q_tilde_n, etastar_n)
+    # Theta_os_n <- construct_Theta_os_n2(dat, dat_orig, omega_n, f_sIx_n,
+    #                                     q_star_n, etastar_n, vals=NA)
+    infl_fn_Theta <- construct_infl_fn_Theta(omega_n, f_sIx_n, q_tilde_n,
+                                             etastar_n, Theta_os_n)
     
     # Construct pieces needed for hypothesis test
     u_mc <- round(seq(C$appx$s,1,C$appx$s),-log10(C$appx$s))

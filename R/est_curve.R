@@ -104,7 +104,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     Phi_n <- construct_Phi_n(dat2, type=p$ecdf_type)
     n_orig <- length(dat_orig$z)
     p_n <- (1/n_orig) * sum(dat$weights * as.integer(dat$s!=0))
-    g_n_star <- construct_g_n_star(f_sIx_n, f_s_n, p_n)
     eta_n <- construct_eta_n(dat, Q_n, p_n, vals=NA)
     gcomp_n <- construct_gcomp_n(dat_orig, vals=vlist$S_grid, Q_n)
     alpha_star_n <- construct_alpha_star_n(dat, gcomp_n, p_n, vals=NA)
@@ -112,10 +111,9 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     q_n <- construct_q_n(type=p$q_n_type, dat, dat_orig, omega_n=omega_n, g_n=g_n,
                          p_n=p_n, gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
                          Q_n=Q_n, Qc_n=Qc_n, f_n_srv=f_n_srv)
-    Gamma_os_n <- construct_Gamma_os_n(dat, dat_orig, omega_n,
-                                                  g_n, eta_n, p_n,
-                                                  q_n, gcomp_n, alpha_star_n,
-                                                  vals=vlist$S_grid)
+    Gamma_os_n <- construct_Gamma_os_n(dat, dat_orig, omega_n, g_n, eta_n, p_n,
+                                       q_n, gcomp_n, alpha_star_n,
+                                       vals=vlist$S_grid)
     
     if (F) {
       Gamma_os_n(0.5) # Don't profile this line
@@ -473,7 +471,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   if (F) {
     p3 <- round((0.3+s_shift)*s_scale, -log10(C$appx$s))
     p5 <- round((0.5+s_shift)*s_scale, -log10(C$appx$s))
-    res$g_n_star <- g_n_star(0.5,c(0,0))
     res$eta_n3 <- eta_n(p3,c(0,0))
     res$eta_n5 <- eta_n(p5,c(0,0))
     res$alpha_star_n3 <- alpha_star_n(p3)

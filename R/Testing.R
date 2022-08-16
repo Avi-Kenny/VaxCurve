@@ -266,7 +266,8 @@
     f_s_n <- construct_f_s_n(dat_orig, vlist$S_grid, f_sIx_n)
     g_n <- construct_g_n(f_sIx_n, f_s_n)
     omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n)
-    Gamma_os_n <- construct_Gamma_os_n(dat, vlist$S_grid, omega_n, Q_n, g_n)
+    Gamma_os_n <- construct_Gamma_os_n(dat, dat_orig, omega_n, g_n, eta_n, p_n,
+                                       q_n, gcomp_n, alpha_star_n)
     
     # Construct additional component functions
     Psi_n <- Vectorize(function(u) {
@@ -487,7 +488,8 @@
     Q_n <- srvSL$srv
     Qc_n <- srvSL$cens
     omega_n <- construct_omega_n(Q_n, Qc_n)
-    Gamma_os_n <- construct_Gamma_os_n(dat, omega_n, Q_n, g_n)
+    Gamma_os_n <- construct_Gamma_os_n(dat, dat_orig, omega_n, g_n, eta_n, p_n,
+                                       q_n, gcomp_n, alpha_star_n)
     
     # Return the value of Gamma_os_n(0.5)
     return (Gamma_os_n(0.5))
@@ -533,7 +535,8 @@
     omega_n <- construct_omega_n(Q_n, Qc_n)
     gcomp_n <- construct_gcomp_n(dat_orig, vals_S_grid, Q_n)
     # eta_n <- construct_eta_n(dat, vals_SX_grid, Q_n) # ARCHIVED
-    Gamma_os_n <- construct_Gamma_os_n(dat, omega_n, Q_n, g_n)
+    Gamma_os_n <- construct_Gamma_os_n(dat, dat_orig, omega_n, g_n, eta_n, p_n,
+                                       q_n, gcomp_n, alpha_star_n)
     
     if (F) {
       
@@ -633,7 +636,8 @@
     Q_n <- srvSL$srv
     Qc_n <- srvSL$cens
     omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n)
-    Gamma_os_n <- construct_Gamma_os_n(dat, vlist$S_grid, omega_n, Q_n, g_n)
+    Gamma_os_n <- construct_Gamma_os_n(dat, dat_orig, omega_n, g_n, eta_n, p_n,
+                                       q_n, gcomp_n, alpha_star_n)
     
     # Compute the test statistic
     beta_n <- (1/n_orig) * sum(

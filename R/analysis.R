@@ -1243,7 +1243,7 @@ if (cfg2$run_analysis &&
   return_extra <- c()
   if (cfg2$run_debug$objs) {
     return_extra <- c(return_extra, "omega_n", "f_sIx_n", "Q_n", "grid",
-                      "Phi_n", "Gamma_os_n_star", "gcm", "dGCM", "r_Mn_Gr")
+                      "Phi_n", "Gamma_os_n", "gcm", "dGCM", "r_Mn_Gr")
   }
   if (cfg2$run_debug$gren_var) {
     return_extra <- c(return_extra, "deriv_r_Mn", "f_s_n", "gamma_n")
@@ -1834,7 +1834,7 @@ if (cfg2$run_debug$objs) {
   x_vals <- ests$Phi_n(ests$grid)
   inds <- !base::duplicated(x_vals)
   x_vals <- x_vals[inds]
-  y_vals <- -1 * ests$Gamma_os_n_star(ests$grid[inds])
+  y_vals <- -1 * ests$Gamma_os_n(ests$grid[inds])
   GCM_f <- approxfun(x=ests$gcm$x.knots, y=ests$gcm$y.knots,
                      method="linear", rule=1)
   df_A <- data.frame(x=x_vals, y=y_vals, y2=GCM_f(x_vals))

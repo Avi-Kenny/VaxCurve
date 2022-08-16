@@ -66,12 +66,11 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     
     # Construct regular Gamma_0 estimator
     if (p$cf_folds==1) {
-      # Gamma_os_n <- construct_Gamma_os_n(dat, vlist$S_grid, omega_n, Q_n, g_n)
+      # Gamma_os_n <- construct_Gamma_os_n(dat, dat_orig, omega_n, g_n, eta_n, p_n, q_n, gcomp_n, alpha_star_n)
       
       # !!!!! New functions
       n_orig <- length(dat_orig$z)
       p_n <- (1/n_orig) * sum(dat$weights * as.integer(dat$s!=0))
-      g_n_star <- construct_g_n_star(f_sIx_n, f_s_n, p_n)
       eta_n <- construct_eta_n(dat, Q_n, p_n, vals=NA)
       gcomp_n <- construct_gcomp_n(dat_orig, vlist$S_grid, Q_n)
       alpha_star_n <- construct_alpha_star_n(dat, gcomp_n, p_n, vals=NA)
@@ -79,8 +78,8 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
       q_n <- construct_q_n(type=p$q_n_type, dat, dat_orig, omega_n=omega_n, g_n=g_n,
                            p_n=p_n, gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
                            Q_n=Q_n, Qc_n=Qc_n, f_n_srv=f_n_srv)
-      Gamma_os_n <- construct_Gamma_os_n(dat, dat_orig, omega_n, g_n_star,
-                                         eta_n, p_n, q_n, gcomp_n, alpha_star_n)
+      Gamma_os_n <- construct_Gamma_os_n(dat, dat_orig, omega_n, g_n, eta_n,
+                                         p_n, q_n, gcomp_n, alpha_star_n)
     }
     
     # Construct cross-fitted Gamma_0 estimator
@@ -104,11 +103,9 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
       # Construct influence functions
       infl_fn_1 <- construct_infl_fn_1(dat, Gamma_os_n, Phi_n, lambda_2,
                                        lambda_3)
-      # infl_fn_Gamma <- construct_infl_fn_Gamma(omega_n, g_n, gcomp_n,
-      #                                          eta_n, Gamma_os_n)
-      infl_fn_Gamma <- construct_infl_fn_Gamma2(omega_n, g_n_star, gcomp_n, p_n,
-                                                alpha_star_n, q_n, eta_n,
-                                                Gamma_os_n_star=Gamma_os_n)
+      infl_fn_Gamma <- construct_infl_fn_Gamma(omega_n, g_n, gcomp_n, p_n,
+                                               alpha_star_n, q_n, eta_n,
+                                               Gamma_os_n)
       infl_fn_2 <- construct_infl_fn_2(dat, Phi_n, infl_fn_Gamma, lambda_2,
                                        lambda_3)
       
@@ -154,8 +151,6 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     #                           dat_orig, omega_n=omega_n, f_sIx_n=f_sIx_n) # ?????
     Theta_os_n <- construct_Theta_os_n(dat, dat_orig, omega_n, f_sIx_n,
                                        q_tilde_n, etastar_n)
-    # Theta_os_n <- construct_Theta_os_n2(dat, dat_orig, omega_n, f_sIx_n,
-    #                                     q_star_n, etastar_n, vals=NA)
     infl_fn_Theta <- construct_infl_fn_Theta(omega_n, f_sIx_n, q_tilde_n,
                                              etastar_n, Theta_os_n)
     
@@ -220,7 +215,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     #     Qc_n <- srvSL$cens
     #     omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n,
     #                                  type=p$omega_n_type)
-    #     Gamma_os_n <- construct_Gamma_os_n(dat, vlist$S_grid, omega_n, Q_n, g_n)
+    #     Gamma_os_n <- construct_Gamma_os_n(dat, dat_orig, omega_n, g_n, eta_n, p_n, q_n, gcomp_n, alpha_star_n)
     #     
     #   }
     #   

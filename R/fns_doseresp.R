@@ -1088,7 +1088,7 @@ construct_f_n_srv <- function(Q_n=NA, Qc_n=NA, width=40, vals=NA) {
 #' @param type One of c("new", "zero")
 #' @return q_n nuisance estimator function
 construct_q_n <- function(type="new", dat, dat_orig,
-                          omega_n=NA, g_n=NA, p_n=NA, gcomp_n=NA, # g_n_star=NA
+                          omega_n=NA, g_n=NA, p_n=NA, gcomp_n=NA,
                           alpha_star_n=NA, f_sIx_n=NA, Q_n=NA, Qc_n=NA,
                           f_n_srv=NA, vals=NA) {
   
@@ -1578,28 +1578,8 @@ construct_infl_fn_1 <- function(dat, Gamma_os_n, Phi_n, lambda_2,
 #' 
 #' @param x x
 #' @return x
-construct_infl_fn_Gamma <- function(omega_n, g_n, gcomp_n, eta_n,
-                                    Gamma_os_n) {
-  
-  fnc <- function(u,x,y,delta,s) {
-    In(s<=u)*((omega_n(x,s,y,delta)/g_n(s,x)) + gcomp_n(s)) +
-      eta_n(u,x) -
-      2*Gamma_os_n(round(u,-log10(C$appx$s)))
-  }
-  
-  return(construct_superfunc(fnc, vec=c(1,2,1,1,1)))
-  
-}
-
-
-
-#' !!!!! document
-#' 
-#' @param x x
-#' @return x
-construct_infl_fn_Gamma2 <- function(omega_n, g_n_star, gcomp_n, p_n,
-                                     alpha_star_n, q_n, eta_n,
-                                     Gamma_os_n_star) {
+construct_infl_fn_Gamma <- function(omega_n, g_n, gcomp_n, p_n, alpha_star_n,
+                                    q_n, eta_n, Gamma_os_n) {
   
   fnc <- function(u,x,y,delta,s,wt) {
     if (wt==0) {
@@ -1608,13 +1588,13 @@ construct_infl_fn_Gamma2 <- function(omega_n, g_n_star, gcomp_n, p_n,
       piece_3 <- 0
     } else {
       piece_1 <- In(s!=0 & s<=u)
-      piece_2 <- omega_n(x,s,y,delta)/g_n_star(s,x) + gcomp_n(s)/p_n
+      piece_2 <- omega_n(x,s,y,delta)/(p_n*g_n(s,x)) + gcomp_n(s)/p_n
       piece_3 <- In(s!=0)*alpha_star_n(u)
     }
     wt*(piece_1*piece_2-piece_3/p_n) +
       (1-wt)*q_n(x,y,delta,u) +
       eta_n(u,x) -
-      Gamma_os_n_star(round(u,-log10(C$appx$s)))
+      Gamma_os_n(round(u,-log10(C$appx$s)))
   }
   
   return(construct_superfunc(fnc, vec=c(1,2,1,1,1,1)))
@@ -2086,23 +2066,6 @@ sigma2_edge <- function(dat, pi_n, Q_n, omega_n, r_Mn_edge_est, val=0) {
 
 
 
-#' Construct density ratio estimator g*_n
-#' 
-#' @param f_sIx_n Conditional density estimator returned by construct_f_sIx_n
-#' @param f_s_n Marginal density estimator returned by construct_f_s_n
-#' @return Density ratio estimator function
-#' @notes The indicator functions are for computational conveniene; the actual
-#'     function is technically undefined there
-construct_g_n_star <- function(f_sIx_n, f_s_n, p_n) {
-  
-  function(s,x) {
-    In(s==0) + In(s!=0) * (p_n*(f_sIx_n(s,x)/f_s_n(s)))
-  }
-  
-}
-
-
-
 #' Construct nuisance estimator alpha*_n
 #' 
 #' @param dat !!!!!
@@ -2153,7 +2116,7 @@ construct_eta_n <- function(dat, Q_n, p_n, vals=NA) {
 
 
 
-#' Construct Gamma_os_n_star primitive one-step estimator (based on EIF)
+#' Construct Gamma_os_n primitive one-step estimator (based on EIF)
 #' 
 #' @param x !!!!!
 construct_Gamma_os_n <- function(dat, dat_orig, omega_n, g_n, eta_n, p_n, q_n,

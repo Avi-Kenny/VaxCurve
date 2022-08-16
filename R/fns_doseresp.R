@@ -40,6 +40,13 @@ deriv_logit <- function(u) { 1 / (u-u^2) }
 
 
 
+#' Helper function for debugging; prints timestamps
+#' 
+#' @param num Number
+chk <- function(num) { print(paste0("Check ", num, ": ", Sys.time())) }
+
+
+
 #' Given a function, return a "superfunction" that is:
 #'     (1) memoised,
 #'     (2) vectorized for both scalar and vector base function inputs,

@@ -122,7 +122,7 @@
       tid = c(1:4),
       map_row = c(1:4),
       Q_n_type = rep("Super Learner",4),
-      marg = rep("Gamma_star2",4)
+      q_n_type = rep("new",4)
     )
     
   }
@@ -230,7 +230,7 @@
       tid = c(1:10),
       map_row = c(1:10),
       Q_n_type = rep("Super Learner",10),
-      marg = rep("Gamma_star", 10)
+      q_n_type = rep("zero", 10)
     )
     
   }
@@ -315,7 +315,7 @@
       tid = c(1:12),
       map_row = c(1:12),
       Q_n_type = rep("Super Learner",12),
-      marg = rep("Gamma_star2", 12)
+      q_n_type = rep("new", 12)
     )
     
   }
@@ -412,7 +412,7 @@
       tid = c(1:6),
       map_row = c(1:6),
       Q_n_type = rep("Super Learner",6),
-      marg = rep("Gamma_star",6)
+      q_n_type = rep("zero",6)
     )
     
   }
@@ -590,7 +590,7 @@
       tid = c(1:39), # c(1:41)
       map_row = c(1:39), # c(1:41)
       Q_n_type = rep("Super Learner",39), # 41
-      marg = rep("Gamma_star",39) # 41
+      q_n_type = rep("zero",39) # 41
     )
     
   }
@@ -679,7 +679,7 @@
       tid = c(1:4),
       map_row = c(1:4),
       Q_n_type = rep("Super Learner",4),
-      marg = rep("Gamma_star2",4)
+      q_n_type = rep("new",4)
     )
     
   }
@@ -711,7 +711,7 @@
   cfg2$params$edge_corr <- cfg2$edge_corr[cfg2$map[i,"edge_corr"]]
   cfg2$v$covariates <- formula(cfg2$v$covariates)
   cfg2$params$Q_n_type <- cfg2$map2[cfg2$tid,"Q_n_type"]
-  cfg2$params$marg <- cfg2$map2[cfg2$tid,"marg"]
+  cfg2$params$q_n_type <- cfg2$map2[cfg2$tid,"q_n_type"]
   C$t_0 <- cfg2$t_0
   if ((i %in% c(5,7,9)) && cfg2$analysis=="Moderna") {
     cfg2$qnt <- lapply(cfg2$qnt, function(x) { c(0,x[2]) }) # !!!!! temp hack

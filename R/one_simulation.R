@@ -319,7 +319,7 @@ if (cfg$which_sim=="debugging") {
         Q_n_type="Super Learner", g_n_type="binning", deriv_type="linear",
         ecdf_type="linear (mid)", gamma_type="Super Learner",
         omega_n_type="estimated", boot_reps=1000, ci_type="trunc", cf_folds=1, m=5,
-        edge_corr="none", marg="Gamma_star2", lod_shift="none", n_bins=5,
+        edge_corr="none", q_n_type="new", lod_shift="none", n_bins=5,
         convex_type="GCM", f_sIx_n_bins=15
       )
       for (i in c(1:length(.default_params))) {

@@ -25,8 +25,6 @@
 #'     root-n estimator to replace the Grenander-based estimator only at the
 #'     leftmost point. "min" adjusts both the leftmost point and the rest of the
 #'     curve.
-#'   - `marg` One of c("Gamma", "Theta"); whether or not to transform by the
-#'     marginal distribution of S
 #'   - `convex_type` One of c("GCM", "LS"); whether to fit the greatest convex
 #'     minorant (GCM) to the primitive or the least squares (LS) line
 #' @param points A vector representing the points at which estimates and CIs
@@ -42,7 +40,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     Q_n_type="Super Learner", g_n_type="binning", deriv_type="linear",
     ecdf_type="linear (mid)", gamma_type="Super Learner", q_n_type="new",
     omega_n_type="estimated", boot_reps=1000, ci_type="trunc", cf_folds=1, m=5,
-    edge_corr="none", marg="Gamma_star2", lod_shift="none", n_bins=5,
+    edge_corr="none", lod_shift="none", n_bins=5,
     convex_type="GCM", f_sIx_n_bins=15
   )
   for (i in c(1:length(.default_params))) {
@@ -83,12 +81,10 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   
   if (estimator=="Grenander") {
     
-    print(paste("Check 0:", Sys.time()))
     vlist <- create_val_list(dat_orig)
     srvSL <- construct_Q_n(dat, vlist$Q_n, type=p$Q_n_type, print_coeffs=T)
     Q_n <- srvSL$srv
     Qc_n <- srvSL$cens
-    print(paste("Check 1:", Sys.time()))
     omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n, type=p$omega_n_type)
     
     if (F) {
@@ -100,83 +96,54 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       })
     } # DEBUG
     
-    print(paste("Check 2:", Sys.time()))
     f_sIx_n <- construct_f_sIx_n(dat, vlist$SX_grid, type=p$g_n_type,
                                  k=p$f_sIx_n_bins, edge_corr=p$edge_corr)
     f_s_n <- construct_f_s_n(dat_orig, vlist$S_grid, f_sIx_n)
     g_n <- construct_g_n(f_sIx_n, f_s_n)
-    print(paste("Check 3:", Sys.time()))
+    dat2 <- ss(dat, which(dat$s!=0))
+    Phi_n <- construct_Phi_n(dat2, type=p$ecdf_type)
+    n_orig <- length(dat_orig$z)
+    p_n <- (1/n_orig) * sum(dat$weights * as.integer(dat$s!=0))
+    g_n_star <- construct_g_n_star(f_sIx_n, f_s_n, p_n)
+    eta_n <- construct_eta_n(dat, Q_n, p_n, vals=NA)
+    gcomp_n <- construct_gcomp_n(dat_orig, vals=vlist$S_grid, Q_n)
+    alpha_star_n <- construct_alpha_star_n(dat, gcomp_n, p_n, vals=NA)
+    f_n_srv <- construct_f_n_srv(Q_n=Q_n, Qc_n=Qc_n)
+    q_n <- construct_q_n(type=p$q_n_type, dat, dat_orig, omega_n=omega_n, g_n=g_n,
+                         p_n=p_n, gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
+                         Q_n=Q_n, Qc_n=Qc_n, f_n_srv=f_n_srv)
+    Gamma_os_n_star <- construct_Gamma_os_n_star2(dat, dat_orig, omega_n,
+                                                  g_n, eta_n, p_n,
+                                                  q_n, gcomp_n, alpha_star_n,
+                                                  vals=vlist$S_grid)
     
-    if (p$marg %in% c("Gamma_star", "Gamma_star2")) {
-      dat2 <- ss(dat, which(dat$s!=0))
-      Phi_n <- construct_Phi_n(dat2, type=p$ecdf_type)
-      print(paste("Check 4:", Sys.time()))
-      n_orig <- length(dat_orig$z)
-      p_n <- (1/n_orig) * sum(dat$weights * as.integer(dat$s!=0))
-      g_n_star <- construct_g_n_star(f_sIx_n, f_s_n, p_n)
-      print(paste("Check 5:", Sys.time()))
-      eta_n <- construct_eta_n(dat, Q_n, p_n, vals=NA)
-      print(paste("Check 6:", Sys.time()))
-      gcomp_n <- construct_gcomp_n(dat_orig, vals=vlist$S_grid, Q_n)
-      print(paste("Check 7:", Sys.time()))
-      alpha_star_n <- construct_alpha_star_n(dat, gcomp_n, p_n, vals=NA)
-      print(paste("Check 8:", Sys.time()))
-    }
+    if (F) {
+      Gamma_os_n_star(0.5) # Don't profile this line
+      Gamma_os_n_star(0.6)
+      Gamma_os_n_star(0.7)
+    } # DEBUG
     
-    if (p$marg=="Gamma") {
-      Phi_n <- construct_Phi_n(dat, type=p$ecdf_type)
-      Gamma_os_n <- construct_Gamma_os_n(dat, vlist$S_grid, omega_n, Q_n, g_n)
-    } else if (p$marg=="Gamma_star") {
-      Gamma_os_n_star <- construct_Gamma_os_n_star(dat, omega_n, g_n_star,
-                                                   eta_n, p_n, gcomp_n,
-                                                   alpha_star_n,
-                                                   vals=vlist$S_grid)
-    } else if (p$marg=="Gamma_star2") {
-      print(paste("Check 9:", Sys.time()))
-      f_n_srv <- construct_f_n_srv(Q_n=Q_n, Qc_n=Qc_n)
-      q_n <- construct_q_n(type=p$q_n_type, dat, dat_orig, omega_n=omega_n, g_n=g_n,
-                           p_n=p_n, gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
-                           Q_n=Q_n, Qc_n=Qc_n, f_n_srv=f_n_srv)
-      print(paste("Check 10:", Sys.time()))
-      Gamma_os_n_star <- construct_Gamma_os_n_star2(dat, dat_orig, omega_n,
-                                                    g_n, eta_n, p_n, # g_n_star
-                                                    q_n, gcomp_n, alpha_star_n,
-                                                    vals=vlist$S_grid)
-      
-      if (F) {
-        Gamma_os_n_star(0.5) # Don't profile this line
-        Gamma_os_n_star(0.6)
-        Gamma_os_n_star(0.7)
-      } # DEBUG
-      
-      print(paste("Check 11:", Sys.time()))
-      
-      if (F) {
-        m <- 10^5
-        if (L$distr_S=="Unif(0,1)") {
-          s <- runif(m)
-        } else if (L$distr_S=="Unif(0.3,0.7)") {
-          s <- runif(m, min=0.3, max=0.7)
-        } else if (L$distr_S=="N(0.5,0.01)") {
-          s <- rtruncnorm(m, a=0, b=1, mean=0.5, sd=0.1)
-        } else if (L$distr_S=="N(0.5,0.04)") {
-          s <- rtruncnorm(m, a=0, b=1, mean=0.5, sd=0.2)
-        } else if (L$distr_S=="Tri UP") {
-          s <- sqrt(runif(m))
-        } else if (L$distr_S=="Tri DN") {
-          s <- 1 - sqrt(runif(m))
-        }
-        s <- (s+s_shift)*s_scale
-        Gamma_os_n_star <- Vectorize(function(u) {
-          u <- (u+s_shift)*s_scale # u <- round((u+s_shift)*s_scale, -log10(C$appx$s))
-          mean( as.integer(s<=u) * (1-exp(-1*L$sc_params$lmbd*C$t_0)) )
-        })
-      } # DEBUG: True Gamma_os_n_star
-      
-    } else {
-      stop(paste0("`params$marg` must be one of c('Theta', 'Gamma', 'Gamma_s",
-                  "tar', 'Gamma_star2'"))
-    }
+    if (F) {
+      m <- 10^5
+      if (L$distr_S=="Unif(0,1)") {
+        s <- runif(m)
+      } else if (L$distr_S=="Unif(0.3,0.7)") {
+        s <- runif(m, min=0.3, max=0.7)
+      } else if (L$distr_S=="N(0.5,0.01)") {
+        s <- rtruncnorm(m, a=0, b=1, mean=0.5, sd=0.1)
+      } else if (L$distr_S=="N(0.5,0.04)") {
+        s <- rtruncnorm(m, a=0, b=1, mean=0.5, sd=0.2)
+      } else if (L$distr_S=="Tri UP") {
+        s <- sqrt(runif(m))
+      } else if (L$distr_S=="Tri DN") {
+        s <- 1 - sqrt(runif(m))
+      }
+      s <- (s+s_shift)*s_scale
+      Gamma_os_n_star <- Vectorize(function(u) {
+        u <- (u+s_shift)*s_scale # u <- round((u+s_shift)*s_scale, -log10(C$appx$s))
+        mean( as.integer(s<=u) * (1-exp(-1*L$sc_params$lmbd*C$t_0)) )
+      })
+    } # DEBUG: True Gamma_os_n_star
     
     # Construct one-step edge estimator
     if (p$edge_corr!="none") {
@@ -194,34 +161,24 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     } # DEBUG
     
     # Compute GCM (or least squares line) and extract its derivative
-    print(paste("Check 12:", Sys.time()))
     grid <- sort(unique(dat$s))
     x_vals <- Phi_n(grid)
     indices_to_keep <- !base::duplicated(x_vals)
     x_vals <- x_vals[indices_to_keep]
     if (dir=="incr") {
-      if (p$marg=="Gamma") {
-        y_vals <- Gamma_os_n(grid[indices_to_keep])
-      } else {
-        y_vals <- Gamma_os_n_star(grid[indices_to_keep])
-      }
+      y_vals <- Gamma_os_n_star(grid[indices_to_keep])
     } else {
-      if (p$marg=="Gamma") {
-        y_vals <- -1 * Gamma_os_n(grid[indices_to_keep])
-      } else {
-        if (F) {
-          for (aa in grid[indices_to_keep]) {
-            print("SPECIAL CHECK")
-            print(Sys.time())
-            print(paste("aa:",aa))
-            bb <- Gamma_os_n_star(aa)
-            print(paste("bb:",bb))
-          }
-        } # DEBUG
-        y_vals <- -1 * Gamma_os_n_star(grid[indices_to_keep])
-      }
+      if (F) {
+        for (aa in grid[indices_to_keep]) {
+          print("SPECIAL CHECK")
+          print(Sys.time())
+          print(paste("aa:",aa))
+          bb <- Gamma_os_n_star(aa)
+          print(paste("bb:",bb))
+        }
+      } # DEBUG
+      y_vals <- -1 * Gamma_os_n_star(grid[indices_to_keep])
     }
-    print(paste("Check 13:", Sys.time()))
     if (!any(x_vals==0)) {
       x_vals <- c(0, x_vals)
       y_vals <- c(0, y_vals)
@@ -251,37 +208,18 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
         return((y2-y1)/width)
       })
     }
-    print(paste("Check 14:", Sys.time()))
     
     # Construct Grenander-based r_Mn
-    if (p$marg=="Theta") {
-      if (dir=="incr") {
-        r_Mn_Gr <- Vectorize(function(u) {
-          min(max(dGCM(u),0),1) # dGCM(u)
-        })
-      } else {
-        r_Mn_Gr <- Vectorize(function(u) {
-          min(max(-1*dGCM(u),0),1) # -1*dGCM(u)
-        })
-      }
-    } else if (p$marg %in% c("Gamma", "Gamma_star", "Gamma_star2")) {
-      if (dir=="incr") {
-        r_Mn_Gr <- Vectorize(function(u) {
-          min(max(dGCM(Phi_n(u)),0),1) # dGCM(Phi_n(u))
-        })
-      } else {
-        r_Mn_Gr <- Vectorize(function(u) {
-          min(max(-1*dGCM(Phi_n(u)),0),1) # -1 * dGCM(Phi_n(u))
-        })
-      }
+    if (dir=="incr") {
+      r_Mn_Gr <- Vectorize(function(u) { min(max(dGCM(Phi_n(u)),0),1) })
+    } else {
+      r_Mn_Gr <- Vectorize(function(u) { min(max(-1*dGCM(Phi_n(u)),0),1) })
     }
     
     # Compute variance component functions
-    print(paste("Check 15:", Sys.time()))
     f_sIx_z1_n <- construct_f_sIx_n(dat, vlist$SX_grid, type=p$g_n_type,
                                         k=p$f_sIx_n_bins, z1=TRUE)
     f_s_z1_n <- construct_f_s_n(dat_orig, vlist$S_grid, f_sIx_z1_n)
-    print(paste("Check 16:", Sys.time()))
     gamma_n <- construct_gamma_n(dat_orig, dat, type=p$gamma_type,
                                  vals=vlist$S_grid, omega_n=omega_n,
                                  f_sIx_n=f_sIx_n, f_s_n=f_s_n,
@@ -289,10 +227,9 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     if (F) {
       gamma_n <- function(x,s) { Q_n(C$t_0,x,s)*(1-Q_n(C$t_0,x,s)) }
     } # DEBUG: alternate gamma_n estimator when there is no censoring
-    print(paste("Check 17:", Sys.time()))
+    
     pi_star_n <- construct_pi_star_n(dat_orig, vals=NA, type="Super Learner",
                                      f_sIx_n, f_sIx_z1_n)
-    print(paste("Check 18:", Sys.time()))
     
     # Edge correction
     if (p$edge_corr=="none") {
@@ -330,22 +267,18 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     }
     
     # Generate estimates for each point
-    print(paste("Check 19:", Sys.time()))
     ests <- r_Mn(points)
     if (F) {
       ests_Gamma <- Gamma_os_n_star(points)
       ests_Phi <- Phi_n(points)
     } # DEBUG: return Gamma/Phi estimates
-    print(paste("Check 20:", Sys.time()))
     
     # Construct variance scale factor
     deriv_r_Mn <- construct_deriv_r_Mn(r_Mn, type=p$deriv_type,
                                              dir=dir)
     
-    print(paste("Check 21:", Sys.time()))
     tau_n <- construct_tau_n(deriv_r_Mn, gamma_n, f_s_n, pi_star_n, g_n,
                              dat_orig)
-    print(paste("Check 22:", Sys.time()))
     
     # Generate confidence limits
     if (p$ci_type=="none") {
@@ -357,7 +290,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       
       # Generate variance scale factor for each point
       tau_ns <- tau_n(points)
-      print(paste("Check 23:", Sys.time()))
       
       # Construct CIs
       # The 0.975 quantile of the Chernoff distribution occurs at roughly 1.00

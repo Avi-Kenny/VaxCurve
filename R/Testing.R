@@ -12,7 +12,7 @@
     Q_n_type="Cox PH", g_n_type="parametric", ci_type="regular", cf_folds=1,
     edge_corr="none", ecdf_type="linear (mid)", deriv_type="linear",
     gamma_type="Super Learner", omega_n_type="estimated",
-    marg="Gamma_star2" # Gamma_star
+    q_n_type="new" # Gamma_star
   )
   C <- list(points=round(seq(0,1,0.02),2), alpha_1=0.5, alpha_2=0.7, t_0=200,
             appx=list(t_0=10, x_tol=25, s=0.01))

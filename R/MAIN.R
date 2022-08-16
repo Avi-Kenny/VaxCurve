@@ -99,7 +99,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     estimator = list(
       "Grenander (Cox)" = list(
         est = "Grenander",
-        params = list(marg="Gamma_star", Q_n_type="Cox PH", # marg="Gamma_star2", Q_n_type="Random Forest", Q_n_type="true"
+        params = list(q_n_type="zero", Q_n_type="Cox PH", # Q_n_type="Random Forest", Q_n_type="true"
                       convex_type="GCM", ecdf_type="linear (mid)", # convex_type="LS"
                       edge_corr="none", # edge_corr="min"
                       deriv_type="m-spline", g_n_type="parametric") # g_n_type="binning", g_n_type="true"
@@ -127,7 +127,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       "Qbins (5)" = list(est="Qbins", params=list(n_bins=8, Q_n_type="Cox PH")),
       "Grenander" = list(
         est = "Grenander",
-        params = list(marg="Gamma_star2", Q_n_type="Cox PH")
+        params = list(q_n_type="new", Q_n_type="Cox PH")
       )
     )
   )

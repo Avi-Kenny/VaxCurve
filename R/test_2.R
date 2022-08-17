@@ -18,9 +18,9 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
   
   # Set default params
   .default_params <- list(
-    var="monte carlo", ecdf_type="step", g_n_type="binning", boot_reps=200,
-    Q_n_type="Super Learner", omega_n_type="estimated", cf_folds=1,
-    f_sIx_n_bins=15
+    type="simple", ecdf_type="step", g_n_type="binning", boot_reps=200,
+    Q_n_type="Super Learner", omega_n_type="estimated", q_n_type="new",
+    cf_folds=1, f_sIx_n_bins=15
   )
   for (i in c(1:length(.default_params))) {
     if (is.null(params[[names(.default_params)[i]]])) {
@@ -41,7 +41,120 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
   dat_orig$s <- (dat_orig$s+s_shift)*s_scale
   dat_orig <- round_dat(dat_orig)
   
-  if (p$var=="asymptotic") {
+  if (p$type=="simple") {
+    
+    # Setup
+    n_orig <- length(dat_orig$z)
+    dat <- ss(dat_orig, which(dat_orig$z==1))
+    vlist <- create_val_list(dat_orig)
+    
+    # Construct component functions
+    srvSL <- construct_Q_n(dat, vlist$Q_n, type=p$Q_n_type, print_coeffs=T)
+    Q_n <- srvSL$srv
+    Qc_n <- srvSL$cens
+    omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n, type=p$omega_n_type)
+    etastar_n <- construct_etastar_n(Q_n, vals=NA)
+    f_sIx_n <- construct_f_sIx_n(dat, vlist$SX_grid, type=p$g_n_type,
+                                 k=p$f_sIx_n_bins, edge_corr="none")
+    f_n_srv <- construct_f_n_srv(Q_n=Q_n, Qc_n=Qc_n)
+    q_tilde_n <- construct_q_tilde_n(type=p$q_n_type, f_n_srv, f_sIx_n,
+                                     omega_n)
+    Theta_os_n <- construct_Theta_os_n(dat, dat_orig, omega_n, f_sIx_n,
+                                       q_tilde_n, etastar_n)
+    infl_fn_Theta <- construct_infl_fn_Theta(omega_n, f_sIx_n, q_tilde_n,
+                                             etastar_n, Theta_os_n)
+    
+    # Construct pieces needed for hypothesis test
+    u_mc <- round(seq(C$appx$s,1,C$appx$s),-log10(C$appx$s))
+    m <- length(u_mc)
+    lambda_2 <- mean((u_mc)^2) # ~1/3
+    lambda_3 <- mean((u_mc)^3) # ~1/4
+    
+    # Compute test statistic and variance estimate
+    beta_n <- mean((lambda_2*u_mc^2-lambda_3*u_mc)*Theta_os_n(u_mc))
+    var_n <- 0
+    for (i in c(1:n_orig)) {
+      s_m <- rep(dat_orig$s[i],m)
+      y_m <- rep(dat_orig$y[i],m)
+      delta_m <- rep(dat_orig$delta[i],m)
+      weight_m <- rep(dat_orig$weight[i],m)
+      x_m <- as.data.frame(
+        matrix(rep(dat_orig$x[i,],m), ncol=length(dat_orig$x[i,]), byrow=T)
+      )
+      var_n <- var_n + (sum(
+        infl_fn_Theta(u=u_mc, x_m, y_m, delta_m, s_m, weight_m) *
+          (lambda_2*u_mc^2-lambda_3*u_mc)
+      ))^2
+    }
+    var_n <- var_n/(n_orig^2*m^2)
+    sd_n <- sqrt(var_n)
+    
+    # Compute P-value
+    test_stat_chisq <- beta_n^2/var_n
+    p_val <- pchisq(test_stat_chisq, df=1, lower.tail=FALSE)
+    
+  }
+  
+  if (p$type=="complex") {
+    
+    # Setup
+    n_orig <- length(dat_orig$z)
+    dat <- ss(dat_orig, which(dat_orig$z==1))
+    vlist <- create_val_list(dat_orig)
+    
+    # Construct component functions
+    srvSL <- construct_Q_n(dat, vlist$Q_n, type=p$Q_n_type, print_coeffs=T)
+    Q_n <- srvSL$srv
+    Qc_n <- srvSL$cens
+    omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n, type=p$omega_n_type)
+    etastar_n <- construct_etastar_n(Q_n, vals=NA)
+    f_sIx_n <- construct_f_sIx_n(dat, vlist$SX_grid, type=p$g_n_type,
+                                 k=p$f_sIx_n_bins, edge_corr="none")
+    f_n_srv <- construct_f_n_srv(Q_n=Q_n, Qc_n=Qc_n)
+    q_tilde_n <- construct_q_tilde_n(type=p$q_n_type, f_n_srv, f_sIx_n,
+                                     omega_n)
+    Theta_os_n <- construct_Theta_os_n(dat, dat_orig, omega_n, f_sIx_n,
+                                       q_tilde_n, etastar_n)
+    infl_fn_Theta <- construct_infl_fn_Theta(omega_n, f_sIx_n, q_tilde_n,
+                                             etastar_n, Theta_os_n)
+    
+    # Construct pieces needed for hypothesis test
+    # u_mc <- round(seq(C$appx$s,1,C$appx$s),-log10(C$appx$s))
+    # m <- length(u_mc)
+    # lambda_2 <- mean((u_mc)^2) # ~1/3
+    # lambda_3 <- mean((u_mc)^3) # ~1/4
+    
+    # Compute test statistic and variance estimate
+    lambda_2n <- (1/n_orig) * sum(dat$weights*dat$s^2)
+    lambda_3n <- (1/n_orig) * sum(dat$weights*dat$s^3)
+    beta_n <- (1/n_orig) * sum(dat$weights*(
+      (lambda_2n*dat$s^2-lambda_3n*dat$s) * Theta_os_n(dat$s)
+    ))
+    # beta_n <- mean((lambda_2*u_mc^2-lambda_3*u_mc)*Theta_os_n(u_mc))
+    # var_n <- 0
+    # for (i in c(1:n_orig)) {
+    #   s_m <- rep(dat_orig$s[i],m)
+    #   y_m <- rep(dat_orig$y[i],m)
+    #   delta_m <- rep(dat_orig$delta[i],m)
+    #   weight_m <- rep(dat_orig$weight[i],m)
+    #   x_m <- as.data.frame(
+    #     matrix(rep(dat_orig$x[i,],m), ncol=length(dat_orig$x[i,]), byrow=T)
+    #   )
+    #   var_n <- var_n + (sum(
+    #     infl_fn_Theta(u=u_mc, x_m, y_m, delta_m, s_m, weight_m) *
+    #       (lambda_2*u_mc^2-lambda_3*u_mc)
+    #   ))^2
+    # }
+    # var_n <- var_n/(n_orig^2*m^2)
+    # sd_n <- sqrt(var_n)
+    
+    # Compute P-value
+    # test_stat_chisq <- beta_n^2/var_n
+    # p_val <- pchisq(test_stat_chisq, df=1, lower.tail=FALSE)
+    
+  }
+  
+  if (p$type=="asymptotic") {
     
     # Prep
     n_orig <- length(dat_orig$z)
@@ -132,60 +245,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     
   }
   
-  if (p$var=="monte carlo") {
-    
-    # Setup
-    n_orig <- length(dat_orig$z)
-    dat <- ss(dat_orig, which(dat_orig$z==1))
-    vlist <- create_val_list(dat_orig)
-    
-    # Construct component functions
-    # f_sIx_n <- construct_f_sIx_n(dat, vlist$SX_grid, type=p$g_n_type,
-    #                              k=p$f_sIx_n_bins)
-    # srvSL <- construct_Q_n(dat, vlist$Q_n, type=p$Q_n_type)
-    # Q_n <- srvSL$srv
-    # Qc_n <- srvSL$cens
-    # omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n, type=p$omega_n_type)
-    # etastar_n <- construct_etastar_n(Q_n)
-    # q_star_n <- construct_q_n(which="q_star_n", type="Super Learner", dat, # ?????
-    #                           dat_orig, omega_n=omega_n, f_sIx_n=f_sIx_n) # ?????
-    Theta_os_n <- construct_Theta_os_n(dat, dat_orig, omega_n, f_sIx_n,
-                                       q_tilde_n, etastar_n)
-    infl_fn_Theta <- construct_infl_fn_Theta(omega_n, f_sIx_n, q_tilde_n,
-                                             etastar_n, Theta_os_n)
-    
-    # Construct pieces needed for hypothesis test
-    u_mc <- round(seq(C$appx$s,1,C$appx$s),-log10(C$appx$s))
-    m <- length(u_mc)
-    lambda_2 <- mean((u_mc)^2) # ~1/3
-    lambda_3 <- mean((u_mc)^3) # ~1/4
-    
-    # Compute test statistic and variance estimate
-    beta_n <- mean((lambda_2*u_mc^2-lambda_3*u_mc)*Theta_os_n(u_mc))
-    var_n <- 0
-    for (i in c(1:n_orig)) {
-      s_m <- rep(dat_orig$s[i],m)
-      y_m <- rep(dat_orig$y[i],m)
-      delta_m <- rep(dat_orig$delta[i],m)
-      weight_m <- rep(dat_orig$weight[i],m)
-      x_m <- as.data.frame(
-        matrix(rep(dat_orig$x[i,],m), ncol=length(dat_orig$x[i,]), byrow=T)
-      )
-      var_n <- var_n + (sum(
-        infl_fn_Theta(u=u_mc, x_m, y_m, delta_m, s_m, weight_m) *
-          (lambda_2*u_mc^2-lambda_3*u_mc)
-      ))^2
-    }
-    var_n <- var_n/(n_orig^2*m^2)
-    sd_n <- sqrt(var_n)
-    
-    # Compute P-value
-    test_stat_chisq <- beta_n^2/var_n
-    p_val <- pchisq(test_stat_chisq, df=1, lower.tail=FALSE)
-    
-  }
-  
-  if (p$var=="boot") {
+  if (p$type=="boot") {
     
     # # Define the statistic to bootstrap
     # bootstat <- function(dat_orig,indices) {
@@ -282,7 +342,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     
   }
   
-  if (p$var=="mixed boot") {
+  if (p$type=="mixed boot") {
     
     # # !!!!! Update all of this if needed
     # 

@@ -12,8 +12,8 @@
 #                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
   main_task = "run", # run update analysis.R
-  which_sim = "estimation", # "estimation" "edge" "testing" "Cox" "debugging"
-  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
+  which_sim = "testing", # "estimation" "edge" "testing" "Cox" "debugging"
+  level_set_which = "level_set_testing_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
   # keep = c(1:3,7:9,16:18,22:24),
   num_sim = 500,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
@@ -90,10 +90,11 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     # sc_params = list("no cens"=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5)),
     # sc_params = list("exp"=list(lmbd=1e-3, v=1.5, lmbd2=5e-4, v2=1.5)),
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.04)"),
+    distr_S = c("N(0.5,0.04)"),
+    # distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.04)"),
     edge = c("none"), # "expit 0.4"
-    # surv_true = c("Complex"),
-    surv_true = c("Cox PH", "Complex"), # "Cox PH" "Complex" "exp"
+    surv_true = c("Complex"),
+    # surv_true = c("Cox PH", "Complex"), # "Cox PH" "Complex" "exp"
     sampling = c("two-phase (50%)"), # "iid"
     wts_type = c("estimated"), # c("true", "estimated")
     estimator = list(
@@ -134,17 +135,18 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Testing: compare all methods
   level_set_testing_1 <- list(
-    n = 1000,
+    n = 500,
     # n = c(100,200,400,800), # 1000
     # n = c(1000,2000),
     # alpha_3 = 0,
     alpha_3 = c(0,-0.25,-0.5),
     dir = "decr",
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_S = c("Unif(0,1)", "N(0.5,0.04)"), # "N(0.5,0.01)"
-    edge = c("none", "expit 0.5"),
+    # distr_S = c("N(0.5,0.04)"),
+    distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.04)"),
+    edge = "none",
     surv_true = "Cox PH",
-    sampling = c("iid", "two-phase (72%)"),
+    sampling = c("two-phase (50%)"),
     # sampling = c("iid", "x1", "x2", "two-phase (50%)", "two-phase (50% random)"),
     # sampling = c("x1", "x2", "two-phase (50%)"),
     # sampling = c("iid", "cycle", "two-phase (72%)", "two-phase (70% random)"),
@@ -153,8 +155,8 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       "Slope (two-tailed, MC)" = list(
         type = "test_2",
         alt_type = "two-tailed", # decr
-        params = list(g_n_type="binning", Q_n_type="Cox PH",
-                      omega_n_type="estimated"),
+        params = list(type="simple", q_n_type="zero", g_n_type="binning",
+                      Q_n_type="Cox PH"),
         test_stat_only = F
       )
       # "Slope (two-tailed, boot)" = list(
@@ -207,8 +209,7 @@ if (cfg$main_task=="run") {
   
   # Set global constants
   C <- list(
-    # points = round(seq(0,1,0.1),2), # !!!!!
-    points = round(seq(0,1,0.02),2),
+    points = round(seq(0,1,0.02),2), # round(seq(0,1,0.1),2)
     alpha_1 = 0.5,
     alpha_2 = 0.7,
     t_0 = 200,

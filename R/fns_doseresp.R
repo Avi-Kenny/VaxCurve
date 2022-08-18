@@ -267,16 +267,16 @@ wts <- function(dat_orig, scale="stabilized", type="true", return_strata=F) {
     
   } else if (type=="estimated") {
     
-    Pi_n_vals <- c()
+    Pi_vals <- c()
     for (i in c(1:max(strata1))) {
-      Pi_n_vals[i] <- sum(In(strata1==i)*dat_orig$z) / sum(In(strata1==i))
-      if (Pi_n_vals[i]==0) {
+      Pi_vals[i] <- sum(In(strata1==i)*dat_orig$z) / sum(In(strata1==i))
+      if (Pi_vals[i]==0) {
         # Hack to avoid NA values in small sample sizes
         warning(paste0("stratum ", i, " had no one sampled."))
-        Pi_n_vals[i] <- 1
+        Pi_vals[i] <- 1
       }
     }
-    weights <- dat_orig$z / Pi_n_vals[strata1]
+    weights <- dat_orig$z / Pi_vals[strata1]
     
   }
   
@@ -839,14 +839,14 @@ construct_deriv_r_Mn <- function(r_Mn, type, dir="incr") {
 #' @param f_s_n Density estimator returned by construct_f_s_n()
 #' @return Chernoff scale factor estimator function
 construct_tau_n <- function(deriv_r_Mn, gamma_n, f_s_n,
-                            pi_star_n=NA, g_n=NA, dat_orig=NA) {
+                            g_zn=NA, g_n=NA, dat_orig=NA) {
   
   n_orig <- length(dat_orig$s)
   x <- dat_orig$x
   return(Vectorize(function(u) {
     abs(
       ((4*deriv_r_Mn(u))/(n_orig*f_s_n(u))) *
-        sum((gamma_n(x,u)*pi_star_n(x,u))/g_n(u,x))
+        sum((gamma_n(x,u)*g_zn(x,u))/g_n(u,x))
     )^(1/3)
   }))
   
@@ -1832,7 +1832,7 @@ construct_Gamma_cf <- function(dat_orig, params, vlist) {
 
 
 
-#' Construct propensity score estimator of pi_0 = P(S=0|X=x)
+#' Construct propensity score estimator of g_s0 = P(S=0|X=x)
 #' 
 #' @param dat Subsample of dataset returned by ss() for which z==1
 #' @param vals List of values to pre-compute function on; passed to
@@ -1840,11 +1840,11 @@ construct_Gamma_cf <- function(dat_orig, params, vlist) {
 #' @param type One of c("true", "logistic", "Super Learner", "generalized"). If
 #'     type=="true", the only valid value is zero. If type=="generalized", the
 #'     arguments `f_sIx_n` and `cutoffs` must also be supplied.
-#' @return Propensity score estimator of pi_0
+#' @return Propensity score estimator of g_s0
 #' @notes For all types except for "generalized", this function constructs the
 #'     probability P(S=0|X=x). The type "generalized" constructs the probability
 #'     P(S=s|X=x) for a generic value a that has positive mass.
-construct_pi_n <- function(dat, vals=NA, type, f_sIx_n=NA, cutoffs=NA) {
+construct_g_sn <- function(dat, vals=NA, type, f_sIx_n=NA, cutoffs=NA) {
   
   # Construct indicator I{S=0}
   ind_S0 <- In(dat$s==0)
@@ -1937,10 +1937,10 @@ construct_pi_n <- function(dat, vals=NA, type, f_sIx_n=NA, cutoffs=NA) {
 
 
 
-#' Construct estimator of pi*_0 = P(Z=0|X=x,S=s)
+#' Construct estimator of g_z0(x,s) = P(Z=1|X=x,S=s)
 #' 
 #' @param x !!!!!
-construct_pi_star_n <- function(dat_orig, vals=NA, type="Super Learner",
+construct_g_zn <- function(dat_orig, vals=NA, type="Super Learner",
                                 f_sIx_n=NA, f_sIx_z1_n=NA) {
   
   # Set library
@@ -1973,7 +1973,7 @@ construct_pi_star_n <- function(dat_orig, vals=NA, type="Super Learner",
     }
     index <- (dplyr::filter(newX, eval(parse(text=cond))))$index
     if (length(index)!=1) {
-      stop(paste0("Error in construct_pi_star_n; ",
+      stop(paste0("Error in construct_g_zn; ",
                   "x=(", paste(x,collapse=","), ")"))
     }
     
@@ -2015,12 +2015,12 @@ construct_pi_star_n <- function(dat_orig, vals=NA, type="Super Learner",
 #' Compute one-step estimator of counterfactual survival at S=0
 #' 
 #' @param dat Subsample of dataset returned by ss() for which z==1
-#' @param pi_n Propensity score estimator returned by construct_pi_n()
+#' @param g_sn Propensity score estimator returned by construct_g_sn()
 #' @param Q_n Conditional survival function estimator returned by construct_Q_n
 #' @param omega_n A nuisance influence function returned by construct_omega_n()
 #' @param val Value of S
 #' @return Value of one-step estiamtor
-r_Mn_edge <- function(dat, pi_n, Q_n, omega_n, val=0) {
+r_Mn_edge <- function(dat, g_sn, Q_n, omega_n, val=0) {
   
   n_orig <- sum(dat$weights)
   n_dat <- nrow(dat$x)
@@ -2028,7 +2028,7 @@ r_Mn_edge <- function(dat, pi_n, Q_n, omega_n, val=0) {
   return(
     1 - (1/n_orig) * sum(dat$weights * (
       Q_n(rep(C$t_0,n_dat),dat$x,s=rep(val,n_dat)) - (
-        (In(dat$s==val)/pi_n(dat$x, rep(val,n_dat))) *
+        (In(dat$s==val)/g_sn(dat$x, rep(val,n_dat))) *
           omega_n(dat$x,s=rep(val,n_dat),dat$y,dat$delta)
       )
     ))
@@ -2041,13 +2041,13 @@ r_Mn_edge <- function(dat, pi_n, Q_n, omega_n, val=0) {
 #' Compute asymptotic variance of one-step estimator r_Mn_edge
 #' 
 #' @param dat Subsample of dataset returned by ss() for which z==1
-#' @param pi_n Propensity score estimator returned by construct_pi_n()
+#' @param g_sn Propensity score estimator returned by construct_g_sn()
 #' @param Q_n Conditional survival function estimator returned by construct_Q_n
 #' @param omega_n A nuisance influence function returned by construct_omega_n()
 #' @param r_Mn_edge_est Estimate returned by one-step estimator r_Mn_edge()
 #' @param val Value of S
 #' @return Asymptotic variance estimate
-sigma2_edge <- function(dat, pi_n, Q_n, omega_n, r_Mn_edge_est, val=0) {
+sigma2_edge <- function(dat, g_sn, Q_n, omega_n, r_Mn_edge_est, val=0) {
   
   n_orig <- sum(dat$weights)
   n_dat <- nrow(dat$x)
@@ -2055,7 +2055,7 @@ sigma2_edge <- function(dat, pi_n, Q_n, omega_n, r_Mn_edge_est, val=0) {
   return(
     (1/n_orig) * sum((dat$weights * (
       Q_n(rep(C$t_0,n_dat),dat$x,s=rep(val,n_dat)) - (
-        (In(dat$s==val)/pi_n(dat$x, rep(val,n_dat))) *
+        (In(dat$s==val)/g_sn(dat$x, rep(val,n_dat))) *
           omega_n(dat$x,s=rep(val,n_dat),dat$y,dat$delta)
       ) -
         (1-r_Mn_edge_est)

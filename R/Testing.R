@@ -1033,7 +1033,7 @@
   )
   
   # True propensity score function
-  pi_0 <- construct_superfunc(
+  g_s0 <- construct_superfunc(
     function(x) {
       if (edge=="expit") {
         return(expit(x[1]+x[2]-3.3))
@@ -1046,18 +1046,18 @@
   
   # Construct estimators
   vlist <- create_val_list(dat_orig)
-  pi_n_logistic <- construct_pi_n(dat, vlist$X_grid, type="logistic")
-  pi_n_SL <- construct_pi_n(dat, vlist$X_grid, type="SL")
+  g_sn_logistic <- construct_g_sn(dat, vlist$X_grid, type="logistic")
+  g_sn_SL <- construct_g_sn(dat, vlist$X_grid, type="SL")
   
   # Curve 1: X2=0
-  pi_n_log_0 <- function(x1) { pi_n_logistic(x1,x2=0) }
-  pi_n_SL_0 <- function(x1) { pi_n_SL(x1,x2=0) }
-  pi_0_0 <- function(x1) { pi_0(x1,x2=0) }
+  g_sn_log_0 <- function(x1) { g_sn_logistic(x1,x2=0) }
+  g_sn_SL_0 <- function(x1) { g_sn_SL(x1,x2=0) }
+  g_s0_0 <- function(x1) { g_s0(x1,x2=0) }
   
   # Curve 2: X2=1
-  pi_n_log_1 <- function(x1) { pi_n_logistic(x1,x2=1) }
-  pi_n_SL_1 <- function(x1) { pi_n_SL(x1,x2=1) }
-  pi_0_1 <- function(x1) { pi_0(x1,x2=1) }
+  g_sn_log_1 <- function(x1) { g_sn_logistic(x1,x2=1) }
+  g_sn_SL_1 <- function(x1) { g_sn_SL(x1,x2=1) }
+  g_s0_1 <- function(x1) { g_s0(x1,x2=1) }
   
   # Plot true curves against estimated curve
   grid <- round(seq(0,1,0.01),2)
@@ -1069,12 +1069,12 @@
   df <- data.frame(
     x = rep(grid, n_curves*n_estimators),
     y = c(
-      pi_n_log_0(grid),
-      pi_n_SL_0(grid),
-      pi_0_0(grid),
-      pi_n_log_1(grid),
-      pi_n_SL_1(grid),
-      pi_0_1(grid)
+      g_sn_log_0(grid),
+      g_sn_SL_0(grid),
+      g_s0_0(grid),
+      g_sn_log_1(grid),
+      g_sn_SL_1(grid),
+      g_s0_1(grid)
     ),
     curve = rep(rep(curves, each=n_estimators*len)),
     which = rep(rep(estimators, each=len), n_curves)

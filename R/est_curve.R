@@ -145,9 +145,9 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     # Construct one-step edge estimator
     if (p$edge_corr!="none") {
-      pi_n <- construct_pi_n(dat, vlist$X_grid, type="logistic")
-      r_Mn_edge_est <- r_Mn_edge(dat, pi_n, Q_n, omega_n)
-      sigma2_edge_est <- sigma2_edge(dat, pi_n, Q_n, omega_n, r_Mn_edge_est)
+      g_sn <- construct_g_sn(dat, vlist$X_grid, type="logistic")
+      r_Mn_edge_est <- r_Mn_edge(dat, g_sn, Q_n, omega_n)
+      sigma2_edge_est <- sigma2_edge(dat, g_sn, Q_n, omega_n, r_Mn_edge_est)
     }
     
     if (F) {
@@ -217,8 +217,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       gamma_n <- function(x,s) { Q_n(C$t_0,x,s)*(1-Q_n(C$t_0,x,s)) }
     } # DEBUG: alternate gamma_n estimator when there is no censoring
     
-    pi_star_n <- construct_pi_star_n(dat_orig, vals=NA, type="Super Learner",
-                                     f_sIx_n, f_sIx_z1_n)
+    g_zn <- construct_g_zn(dat_orig, vals=NA, type="Super Learner", f_sIx_n,
+                           f_sIx_z1_n)
     
     # Edge correction
     if (p$edge_corr=="none") {
@@ -266,7 +266,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     deriv_r_Mn <- construct_deriv_r_Mn(r_Mn, type=p$deriv_type,
                                              dir=dir)
     
-    tau_n <- construct_tau_n(deriv_r_Mn, gamma_n, f_s_n, pi_star_n, g_n,
+    tau_n <- construct_tau_n(deriv_r_Mn, gamma_n, f_s_n, g_zn, g_n,
                              dat_orig)
     
     # Generate confidence limits
@@ -358,17 +358,17 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     Q_n <- srvSL$srv
     Qc_n <- srvSL$cens
     omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n, type=p$omega_n_type)
-    pi_n <- construct_pi_n(dat, vlist$X_grid, type="generalized",
+    g_sn <- construct_g_sn(dat, vlist$X_grid, type="generalized",
                            f_sIx_n=f_sIx_n, cutoffs=cutoffs)
     
     # Generate estimates and standard deviations for each point
     ests <- sapply(c(1:length(points)), function(i) {
       s_binned <- transform_s(points[i])
-      return(r_Mn_edge(dat, pi_n, Q_n, omega_n, val=s_binned))
+      return(r_Mn_edge(dat, g_sn, Q_n, omega_n, val=s_binned))
     })
     sigma2s <- sapply(c(1:length(points)), function(i) {
       a_binned <- transform_s(points[i])
-      return(sigma2_edge(dat, pi_n, Q_n, omega_n, ests[i], val=s_binned))
+      return(sigma2_edge(dat, g_sn, Q_n, omega_n, ests[i], val=s_binned))
     })
     
     # Construct CIs

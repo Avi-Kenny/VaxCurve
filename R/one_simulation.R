@@ -165,9 +165,9 @@ if (cfg$which_sim=="edge") {
     Qc_n <- srvSL$cens
     omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n,
                                  type=params$omega_n_type)
-    pi_n <- construct_pi_n(dat, vlist$W_grid, type="logistic")
-    r_Mn_edge_est <- r_Mn_edge(dat, pi_n, Q_n, omega_n)
-    sigma2_edge_est <- sigma2_edge(dat, pi_n, Q_n, omega_n, r_Mn_edge_est)
+    g_sn <- construct_g_sn(dat, vlist$W_grid, type="logistic")
+    r_Mn_edge_est <- r_Mn_edge(dat, g_sn, Q_n, omega_n)
+    sigma2_edge_est <- sigma2_edge(dat, g_sn, Q_n, omega_n, r_Mn_edge_est)
     
     # Return results
     return(list(

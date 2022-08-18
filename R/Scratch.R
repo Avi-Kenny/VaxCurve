@@ -2334,9 +2334,9 @@ if (F) {
     Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type,
                           csf=TRUE)
     omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
-    pi_n <- construct_pi_n(dat, vlist$W_grid, type="logistic")
-    theta_os_n_est <- theta_os_n(dat, pi_n, S_n, omega_n)
-    sigma2_os_n_est <- sigma2_os_n(dat, pi_n, S_n, omega_n, theta_os_n_est)
+    g_sn <- construct_g_sn(dat, vlist$W_grid, type="logistic")
+    theta_os_n_est <- theta_os_n(dat, g_sn, S_n, omega_n)
+    sigma2_os_n_est <- sigma2_os_n(dat, g_sn, S_n, omega_n, theta_os_n_est)
     
     ests <- c(ests, theta_os_n_est)
     sigma2s <- c(sigma2s, sigma2_os_n_est/n_orig)
@@ -2374,9 +2374,9 @@ if (F) {
     Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type,
                           csf=TRUE)
     omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
-    pi_n <- construct_pi_n(dat, vlist$W_grid, type="logistic")
-    theta_os_n_est <- theta_os_n(dat, pi_n, S_n, omega_n)
-    sigma2_os_n_est <- sigma2_os_n(dat, pi_n, S_n, omega_n, theta_os_n_est)
+    g_sn <- construct_g_sn(dat, vlist$W_grid, type="logistic")
+    theta_os_n_est <- theta_os_n(dat, g_sn, S_n, omega_n)
+    sigma2_os_n_est <- sigma2_os_n(dat, g_sn, S_n, omega_n, theta_os_n_est)
     
     ests <- c(ests, theta_os_n_est)
     sigma2s <- c(sigma2s, sigma2_os_n_est/n_orig)

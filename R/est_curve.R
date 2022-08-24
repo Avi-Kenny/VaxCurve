@@ -39,7 +39,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   .default_params <- list(
     Q_n_type="Super Learner", g_n_type="binning", deriv_type="linear",
     ecdf_type="linear (mid)", gamma_type="Super Learner", q_n_type="new",
-    omega_n_type="estimated", boot_reps=1000, ci_type="trunc", cf_folds=1, m=5,
+    omega_n_type="estimated", boot_reps=1000, ci_type="logit", cf_folds=1, m=5,
     edge_corr="none", lod_shift="none", n_bins=5,
     convex_type="GCM", f_sIx_n_bins=15
   )
@@ -62,20 +62,20 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   dat_orig$s <- (dat_orig$s+s_shift)*s_scale
   dat_orig <- round_dat(dat_orig)
   
+  }
+  
   # Obtain minimum value (excluding edge point mass)
   if (p$edge_corr=="min") { s_min2 <- min(dat_orig$s[dat_orig$s!=0],na.rm=T) }
   
   # Rescale points and remove points outside the range of A
   points_orig <- points
-  na_head <- sum(round(points,-log10(C$appx$s))<round(s_min,-log10(C$appx$s)))
+  # na_head <- sum(round(points,-log10(C$appx$s))<round(s_min,-log10(C$appx$s))) # !!!!! For some sim reps, s=-0.01 was kept
   points <- round((points+s_shift)*s_scale, -log10(C$appx$s))
+  na_head <- sum(points<0) # !!!!! New
   na_tail <- sum(points>1)
-  if (na_head>0) {
-    points <- points[-c(1:na_head)]
-  }
-  if (na_tail>0) {
-    points <- points[-c((length(points)-na_tail+1):length(points))]
-  }
+  len_p <- length(points)
+  if (na_head>0) { points <- points[-c(1:na_head)] }
+  if (na_tail>0) { points <- points[-c((len_p-na_tail+1):len_p)] }
   
   dat <- ss(dat_orig, which(dat_orig$z==1))
   

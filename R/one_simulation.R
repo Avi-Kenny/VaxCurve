@@ -98,6 +98,16 @@ if (cfg$which_sim=="testing") {
       "sd_n" = test_results$sd_n,
       "var_n" = test_results$var_n
     )
+    # res <- list( # !!!!!
+    #   "reject_simple" = test_results$reject_simple, # !!!!!
+    #   "reject_complex" = test_results$reject_complex, # !!!!!
+    #   "p_val_simple" = test_results$p_val_simple, # !!!!!
+    #   "p_val_complex" = test_results$p_val_complex # !!!!!
+    #   # "beta_n_simple" = test_results$beta_n_simple, # !!!!!
+    #   # "beta_n_complex" = test_results$beta_n_complex, # !!!!!
+    #   # "sd_n_simple" = test_results$sd_n_simple, # !!!!!
+    #   # "sd_n_complex" = test_results$sd_n_complex # !!!!!
+    # ) # !!!!!
     
     # Debugging
     if (F) {

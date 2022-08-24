@@ -8,7 +8,7 @@
 
 {
   # Choose analysis
-  which_analysis <- "HVTN 705 (all)" # "Janssen" "Moderna" "AMP" "AZD1222"
+  which_analysis <- "Janssen" # "Janssen" "Moderna" "AMP" "AZD1222"
                               # "HVTN 705 (primary)" "HVTN 705 (all)"
   
   # # Uncomment this code to run multiple analyses (e.g. 1=10=Moderna, 11-14=Janssen)
@@ -86,7 +86,9 @@
     cfg2$folder_cluster <- paste0("Z:/covpn/p3003/analysis/correlates/Part_A_B",
                                   "linded_Phase_Data/adata/")
     cfg2$params = list(
-      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="linear",
+      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="m-spline",
+      # g_n_type="binning", ecdf_type="linear (mid)", deriv_type="linear",
+      # gamma_type="Super Learner", ci_type="logit", q_n_type="zero",
       gamma_type="Super Learner", ci_type="regular", q_n_type="zero",
       omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
       f_sIx_n_bins=15
@@ -122,7 +124,7 @@
       tid = c(1:4),
       map_row = c(1:4),
       Q_n_type = rep("Super Learner",4),
-      q_n_type = rep("new",4)
+      q_n_type = rep("zero",4) # "new"
     )
     
   }
@@ -197,7 +199,7 @@
       omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
       f_sIx_n_bins=15
     )
-    C <- list(appx=list(t_0=1,x_tol=25,s=0.001))
+    C <- list(appx=list(t_0=1,x_tol=25,s=0.01)) # !!!!!
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
@@ -686,7 +688,7 @@
   
   # Set config based on local vs. cluster
   if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
-    cfg2$tid <- 4
+    cfg2$tid <- 6
     cfg2$dataset <- paste0(cfg2$folder_cluster,cfg2$dataset)
   } else {
     cfg2$tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
@@ -1382,11 +1384,21 @@ if (cfg2$run_hyptest) {
   res <- test_2(
     dat_orig = dat_orig,
     alt_type = "two-tailed", # decr
-    params = list(),
+    # params = list(),
+    # params = list(type="both", q_n_type="zero", Q_n_type="Super Learner"), # !!!!!
+    params = list(type="simple (with constant)", q_n_type="zero", Q_n_type="Cox PH"), # !!!!!
     return_extras = T # !!!!!
   )
   res_df <- data.frame(reject=res$reject, p_val=res$p_val, beta_n=res$beta_n,
                        sd_n=res$sd_n, var_n=res$var_n)
+  # res_df <- data.frame(reject_simple=res$reject_simple, # !!!!!
+  #                      reject_complex=res$reject_complex, # !!!!!
+  #                      p_val_simple=res$p_val_simple, # !!!!!
+  #                      p_val_complex=res$p_val_complex, # !!!!!
+  #                      beta_n_simple=res$beta_n_simple, # !!!!!
+  #                      beta_n_complex=res$beta_n_complex, # !!!!!
+  #                      sd_n_simple=res$sd_n_simple, # !!!!!
+  #                      sd_n_complex=res$sd_n_complex) # !!!!!
   write.table(
     res_df,
     file = paste0(cfg2$analysis," plots/hyptest_",cfg2$tid,".csv"),
@@ -1397,6 +1409,18 @@ if (cfg2$run_hyptest) {
     res$Theta_os_n,
     paste0(cfg2$analysis," plots/Theta_os_n_",cfg2$tid,".rds")
   )
+  
+  # test_results <- use_method(L$test$type, list(
+  #   dat_orig = dat_orig,
+  #   alt_type = L$test$alt_type,
+  #   params = L$test$params,
+  #   test_stat_only = L$test$test_stat_only
+  # ))
+  # # "reject_simple" = test_results$reject_simple, # !!!!!
+  # # "reject_complex" = test_results$reject_complex, # !!!!!
+  # # "p_val_simple" = test_results$p_val_simple, # !!!!!
+  # # "p_val_complex" = test_results$p_val_complex # !!!!!
+  
   
 }
 

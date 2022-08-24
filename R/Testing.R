@@ -17,9 +17,9 @@
   C <- list(points=round(seq(0,1,0.02),2), alpha_1=0.5, alpha_2=0.7, t_0=200,
             appx=list(t_0=10, x_tol=25, s=0.01))
   L <- list(
-    n=500, alpha_3=-2, dir="decr",
-    sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5), # sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5), # Uncomment this for (almost) no censoring
-    distr_S="Unif(0,1)", edge="none", surv_true="Cox PH", # "N(0.3+0.4x2,0.04)"
+    n=1000, alpha_3=-2, dir="decr",
+    sc_params=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5), # sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5), # Uncomment this for (almost) no censoring
+    distr_S="N(0.3+0.4x2,0.09)", edge="none", surv_true="Cox PH", # "N(0.3+0.4x2,0.04)"
     sampling="two-phase (50%)", estimator=list(est="Grenander",params=params) # two-phase (72%)
     # n=15000, alpha_3=-4, dir="decr",
     # sc_params=list(lmbd=3e-5, v=1.5, lmbd2=3e-5, v2=1.5), # sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5), # Uncomment this for (almost) no censoring
@@ -218,17 +218,15 @@
       lin <- function(x1,x2,s) {
         if (L$surv_true=="Cox PH") {
           if (L$dir=="decr") {
-            C$alpha_1*x1 + C$alpha_2*x2 + alpha_3*s - 1.7
+            C$alpha_1*x1 + C$alpha_2*x2 + alpha_3*s
           } else {
-            C$alpha_1*x1 + C$alpha_2*x2 + alpha_3*(1-s) - 1.7
+            C$alpha_1*x1 + C$alpha_2*x2 + alpha_3*(1-s)
           }
         } else if (L$surv_true=="Complex") {
           if (L$dir=="decr") {
-            C$alpha_1*pmax(0,2-8*abs(x1-0.5)) + 2.5*alpha_3*x2*s +
-              0.7*alpha_3*(1-x2)*s - 1.3
+            C$alpha_3*expit(20*s-10) + C$alpha_2*x1*x2
           } else {
-            C$alpha_1*pmax(0,2-8*abs(x1-0.5)) + 2.5*alpha_3*x2*(1-s) +
-              0.7*alpha_3*(1-x2)*(1-s) - 1.3
+            C$alpha_3*expit(20*(1-s)-10) + C$alpha_2*x1*x2
           }
         }
       }
@@ -344,11 +342,11 @@
     
     # Construct linear predictors
     if (L$dir=="decr") {
-      lin <- C$alpha_1*x1 + C$alpha_2*x2 + alpha_3*s - 1.7
+      lin <- C$alpha_1*x1 + C$alpha_2*x2 + alpha_3*s
     } else {
-      lin <- C$alpha_1*x1 + C$alpha_2*x2 + alpha_3*(1-s) - 1.7
+      lin <- C$alpha_1*x1 + C$alpha_2*x2 + alpha_3*(1-s)
     }
-    lin2 <- C$alpha_1*x1 + C$alpha_2*x2 - 1
+    lin2 <- C$alpha_1*x1 + C$alpha_2*x2
     
     # Compute omega_0
     piece_1 <- exp(-1*lmbd*(C$t_0^v)*exp(lin))

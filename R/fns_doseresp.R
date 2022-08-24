@@ -406,8 +406,8 @@ construct_Phi_n <- function (dat, which="ecdf", type="step") {
       } else {
         return(function(s) { qtruncnorm(s, a=0, b=1, mean=0.5, sd=0.2) })
       }
-    } else if (L$distr_S=="N(0.3+0.4x2,0.04)") {
-      stop("ecdf not programmed for N(0.3+0.4x2,0.04)")
+    } else if (L$distr_S=="N(0.3+0.4x2,0.09)") {
+      stop("ecdf not programmed for N(0.3+0.4x2,0.09)")
     }
     
   }
@@ -538,25 +538,19 @@ construct_Q_n <- function(dat, vals, type, return_model=F, print_coeffs=F) {
     
     fnc_srv <- function(t, x, s) {
       if (L$surv_true=="Non PH") {
-        if (L$dir=="decr") {
-          # lin <- C$alpha_1*log(t)*x[1]/3 + C$alpha_2*log(t)*x[2]/3 +
-          #   log(t)*alpha_3*s/2 - 2
-        } else {
-          # lin <- C$alpha_1*log(t)*x[1]/3 + C$alpha_2*log(t)*x[2]/3 +
-          #   log(t)*alpha_3*(1-s)/2 - 2
-        }
+        # !!!!! Blank for now
       } else {
         if (L$surv_true=="Cox PH") {
           if (L$dir=="decr") {
-            lin <- C$alpha_1*x[1] + C$alpha_2*x[2] + alpha_3*s - 1.7
+            lin <- C$alpha_1*x[1] + C$alpha_2*x[2] + alpha_3*s
           } else {
-            lin <- C$alpha_1*x[1] + C$alpha_2*x[2] + alpha_3*(1-s) - 1.7
+            lin <- C$alpha_1*x[1] + C$alpha_2*x[2] + alpha_3*(1-s)
           }
         } else if (L$surv_true=="Complex") {
           if (L$dir=="decr") {
-            lin <- alpha_3*expit(10*(2*s-1)) - 0.5
+            lin <- alpha_3*expit(20*s-10)
           } else {
-            lin <- alpha_3*expit(10*(2*(1-s)-1)) - 0.5
+            lin <- alpha_3*expit(20*(1-s)-10)
           }
         } else if (L$surv_true=="exp") {
           lin <- 0
@@ -567,7 +561,7 @@ construct_Q_n <- function(dat, vals, type, return_model=F, print_coeffs=F) {
     
     fnc_cens <- function(t, x, s) {
       if (L$surv_true %in% c("Cox PH", "Complex", "Non PH")) {
-        lin <- C$alpha_1*x[1] + C$alpha_2*x[2] - 1
+        lin <- C$alpha_1*x[1] + C$alpha_2*x[2]
       } else if (L$surv_true=="exp") {
         lin <- 0
       }
@@ -922,11 +916,11 @@ construct_omega_n <- function(vals=NA, Q_n, Qc_n, type="estimated") {
       
       # Construct linear predictors
       if (L$dir=="decr") {
-        lin <- C$alpha_1*x[1] + C$alpha_2*x[2] + alpha_3*s - 1.7
+        lin <- C$alpha_1*x[1] + C$alpha_2*x[2] + alpha_3*s
       } else {
-        lin <- C$alpha_1*x[1] + C$alpha_2*x[2] + alpha_3*(1-s) - 1.7
+        lin <- C$alpha_1*x[1] + C$alpha_2*x[2] + alpha_3*(1-s)
       }
-      lin2 <- C$alpha_1*x[1] + C$alpha_2*x[2] - 1
+      lin2 <- C$alpha_1*x[1] + C$alpha_2*x[2]
       
       # Compute omega_0
       piece_1 <- exp(-1*lmbd*(C$t_0^v)*exp(lin))
@@ -1214,7 +1208,8 @@ construct_f_sIx_n <- function(dat, vals=NA, type, k=0, z1=F,
   
   if (type=="true") {
     
-    # Note: this is not accurate if edge!="none"
+    # Note: this is not accurate if edge!="none". It also may be affected by the
+    #       scaling of the S variable.
     
     if (L$distr_S=="Unif(0,1)") {
       fnc <- function(s, x) { 1 }
@@ -1224,9 +1219,9 @@ construct_f_sIx_n <- function(dat, vals=NA, type, k=0, z1=F,
       fnc <- function(s, x) { dtruncnorm(s, a=0, b=1, mean=0.5, sd=0.1) }
     } else if (L$distr_S=="N(0.5,0.04)") {
       fnc <- function(s, x) { dtruncnorm(s, a=0, b=1, mean=0.5, sd=0.2) }
-    } else if (L$distr_S=="N(0.3+0.4x2,0.04)") {
+    } else if (L$distr_S=="N(0.3+0.4x2,0.09)") {
       fnc <- function(s, x) {
-        dtruncnorm(s, a=0, b=1, mean=0.3+0.4*x[2], sd=0.2)
+        dtruncnorm(s, a=0, b=1, mean=0.3+0.4*x[2], sd=0.3)
       }
     } else if (L$distr_S=="Tri UP") {
       fnc <- function(s, x) { 2*s }
@@ -1241,7 +1236,6 @@ construct_f_sIx_n <- function(dat, vals=NA, type, k=0, z1=F,
       mu <- sum( c(1,x) * c(expit(prm[1]),prm[2:(length(x)+1)]) )
       sigma <- 10*expit(prm[length(prm)])
       return( dtruncnorm(s, a=0, b=1, mean=mu, sd=sigma) )
-      # return( dnorm(a, mean=mu, sd=sigma) )
     }
     
     # Set up weighted likelihood
@@ -1421,14 +1415,14 @@ construct_etastar_n <- function(Q_n, vals=NA) {
   fnc <- function(u,x) {
     u <- round(u,-log10(C$appx$s))
     if (u==0) {
-      integral <- 0
+      return(0)
     } else {
       s_seq <- round(seq(C$appx$s,u,C$appx$s),-log10(C$appx$s))
       integral <- C$appx$s * sum(sapply(s_seq, function(s) {
         Q_n(C$t_0, x, s)
       }))
+      return(u-integral)
     }
-    return(u-integral)
   }
   
   return(construct_superfunc(fnc, aux=NA, vec=c(1,2), vals=vals))
@@ -1481,6 +1475,35 @@ construct_Theta_os_n <- function(dat, dat_orig, omega_n=NA, f_sIx_n=NA,
         piece_2 * q_tilde_n(dat_orig$x, dat_orig$y, dat_orig$delta, u) +
           etastar_n(rep(u,length(dat_orig$z)),dat_orig$x)
       )
+  }
+  
+  # !!!!! DEBUG
+  if (F) {
+    
+    pc1 <- c()
+    pc2 <- c()
+    sm <- c()
+    for (u in round(seq(0,1,0.1),2)) {
+      pc1_ <- (1/(n_orig)) * sum(piece_1*In(dat$s<=u))
+      pc2_ <- (1/n_orig) * sum(
+        piece_2 * q_tilde_n(dat_orig$x, dat_orig$y, dat_orig$delta, u) +
+          etastar_n(rep(u,length(dat_orig$z)),dat_orig$x)
+      )
+      pc1 <- c(pc1, pc1_)
+      pc2 <- c(pc2, pc2_)
+      sm <- c(sm, pc1_+pc2_)
+    }
+    
+    grid <- round(seq(0,1,0.1),2)
+    df_plot <- data.frame(
+      x = rep(grid, 3),
+      y = c(pc1,pc2,sm),
+      which = rep(c("omega piece", "etastar piece", "Theta_n (sum)"), each=11)
+    )
+    ggplot(df_plot, aes(x=x, y=y, color=factor(which))) +
+      geom_line() +
+      labs(color="Piece")
+    
   }
   
   return(construct_superfunc(fnc, aux=NA, vec=T, vals=vals))

@@ -5,7 +5,7 @@
 #'     zero or negative.
 #' @param distr_S Distribution of S, possibly dependent on covariates; one of
 #'     c("Unif(0,1)", "Unif(0.3,0.7)", "N(0.5,0.01)", "N(0.5,0.04)",
-#'     "N(0.3+0.4x2,0.04)"). The Normals are truncated to lie in [0,1].
+#'     "N(0.3+0.4x2,0.09)"). The Normals are truncated to lie in [0,1].
 #' @param edge Propensity mechanism for point mass at edge. The distribution of
 #'     S will be (1-pi(x))*distr_S. One of the following: "none" (no point mass
 #'     at the edge), "expit 0.2" (expit propensity model, prob=0.2), "expit 0.5"
@@ -39,8 +39,8 @@ generate_data <- function(n, alpha_3, distr_S, edge, surv_true, sc_params,
     s <- rtruncnorm(n, a=0, b=1, mean=0.5, sd=0.1)
   } else if (distr_S=="N(0.5,0.04)") {
     s <- rtruncnorm(n, a=0, b=1, mean=0.5, sd=0.2)
-  } else if (distr_S=="N(0.3+0.4x2,0.04)") {
-    s <- rtruncnorm(n, a=0, b=1, mean=0.3+0.4*x$x2, sd=0.2)
+  } else if (distr_S=="N(0.3+0.4x2,0.09)") {
+    s <- rtruncnorm(n, a=0, b=1, mean=0.3+0.4*x$x2, sd=0.3)
   } else if (distr_S=="Tri UP") {
     s <- sqrt(runif(n))
   } else if (distr_S=="Tri DN") {
@@ -69,35 +69,35 @@ generate_data <- function(n, alpha_3, distr_S, edge, surv_true, sc_params,
     H_0_inv <- function(t) { ((1/sc_params$lmbd)*t)^(1/sc_params$v) }
     if (surv_true=="Cox PH") {
       if (dir=="decr") {
-        lin <- C$alpha_1*x$x1 + C$alpha_2*x$x2 + alpha_3*s - 1.7
+        lin <- C$alpha_1*x$x1 + C$alpha_2*x$x2 + alpha_3*s
       } else {
-        lin <- C$alpha_1*x$x1 + C$alpha_2*x$x2 + alpha_3*(1-s) - 1.7
+        lin <- C$alpha_1*x$x1 + C$alpha_2*x$x2 + alpha_3*(1-s)
       }
     } else if (surv_true=="Complex") {
       if (dir=="decr") {
-        lin <- alpha_3*expit(10*(2*s-1)) - 0.5
+        lin <- alpha_3*expit(20*s-10) + C$alpha_2*x$x1*x$x2
       } else {
-        lin <- alpha_3*expit(10*(2*(1-s)-1)) - 0.5
+        lin <- alpha_3*expit(20*(1-s)-10) + C$alpha_2*x$x1*x$x2
       }
     } else if (surv_true=="exp") {
       H_0_inv <- function(t) { ((1/sc_params$lmbd)*t) }
       lin <- 0
     }
-    if (surv_true=="Non PH") {
-      if (dir=="decr") {
-        t <- -1 * (1.1*expit(10-50*s))^-1 * log(U) - 1
-      } else {
-        # !!!!!
-      }
-    } else {
+    # if (surv_true=="Non PH") {
+    #   if (dir=="decr") {
+    #     t <- -1 * (1.1*expit(10-50*s))^-1 * log(U) - 1
+    #   } else {
+    #     # !!!!!
+    #   }
+    # } else {
       t <- H_0_inv(-1*log(U)*exp(-1*lin))
-    }
+    # }
     
     # Censoring times (Weibull)
     U <- runif(n)
     H_0_inv2 <- function(t) { ((1/sc_params$lmbd2)*t)^(1/sc_params$v2) }
     if (surv_true %in% c("Cox PH", "Complex", "Non PH")) {
-      lin <- C$alpha_1*x$x1 + C$alpha_2*x$x2 - 1
+      lin <- C$alpha_1*x$x1 + C$alpha_2*x$x2
     } else if (surv_true=="exp") {
       H_0_inv2 <- function(t) { ((1/sc_params$lmbd2)*t) }
       lin <- 0
@@ -128,15 +128,15 @@ generate_data <- function(n, alpha_3, distr_S, edge, surv_true, sc_params,
     lin <- function(x1,x2,s) {
       if (surv_true=="Cox PH") {
         if (dir=="decr") {
-          C$alpha_1*x1 + C$alpha_2*x2 + alpha_3*s - 1.7
+          C$alpha_1*x1 + C$alpha_2*x2 + alpha_3*s
         } else {
-          C$alpha_1*x1 + C$alpha_2*x2 + alpha_3*(1-s) - 1.7
+          C$alpha_1*x1 + C$alpha_2*x2 + alpha_3*(1-s)
         }
       } else if (surv_true=="Complex") {
         if (dir=="decr") {
-          alpha_3*expit(10*(2*s-1)) - 0.5
+          alpha_3*expit(20*s-10) + C$alpha_2*x1*x2
         } else {
-          alpha_3*expit(10*(2*(1-s)-1)) - 0.5
+          alpha_3*expit(20*(1-s)-10) + C$alpha_2*x1*x2
         }
       }
     }
@@ -146,13 +146,13 @@ generate_data <- function(n, alpha_3, distr_S, edge, surv_true, sc_params,
         exp( -1 * sc_params$lmbd * (t^sc_params$v) * exp(lin(x1,x2,s)) )
       }
     } else if (surv_true=="Non PH") {
-      Q_0 <- function(t, x1, x2, s) {
-        if (dir=="decr") {
-          exp(-1*1.1*(t+1)*expit(10-50*s))
-        } else {
-          # !!!!!
-        }
-      }
+      # Q_0 <- function(t, x1, x2, s) {
+      #   if (dir=="decr") {
+      #     exp(-1*1.1*(t+1)*expit(10-50*s))
+      #   } else {
+      #     # !!!!!
+      #   }
+      # }
     } else if (surv_true=="exp") {
       Q_0 <- function(t, x1, x2, s) { exp(-1*sc_params$lmbd*t) }
     }
@@ -171,8 +171,8 @@ generate_data <- function(n, alpha_3, distr_S, edge, surv_true, sc_params,
         s <- rtruncnorm(m, a=0, b=1, mean=0.5, sd=0.1)
       } else if (distr_S=="N(0.5,0.04)") {
         s <- rtruncnorm(m, a=0, b=1, mean=0.5, sd=0.2)
-      } else if (distr_S=="N(0.3+0.4x2,0.04)") {
-        s <- rtruncnorm(m, a=0, b=1, mean=0.3+0.4*x2, sd=0.2)
+      } else if (distr_S=="N(0.3+0.4x2,0.09)") {
+        s <- rtruncnorm(m, a=0, b=1, mean=0.3+0.4*x2, sd=0.3)
       } else if (distr_S=="Tri UP") {
         s <- sqrt(runif(m))
       } else if (distr_S=="Tri DN") {

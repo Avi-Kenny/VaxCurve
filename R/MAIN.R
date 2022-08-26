@@ -24,7 +24,7 @@ cfg <- list(
                      "data.table", "latex2exp"),
   parallel = "none",
   stop_at_error = F,
-  appx = list(t_0=1, x_tol=25, s=0.01) # !!!!! t_0=1, a=0.001
+  appx = list(t_0=1, x_tol=25, s=0.01) # !!!!! t_0=1, S=0.001
 )
 
 # Set cluster config

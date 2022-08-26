@@ -62,8 +62,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   dat_orig$s <- (dat_orig$s+s_shift)*s_scale
   dat_orig <- round_dat(dat_orig)
   
-  }
-  
   # Obtain minimum value (excluding edge point mass)
   if (p$edge_corr=="min") { s_min2 <- min(dat_orig$s[dat_orig$s!=0],na.rm=T) }
   
@@ -73,8 +71,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   points <- round((points+s_shift)*s_scale, -log10(C$appx$s))
   na_head <- sum(points<0) # !!!!! New
   na_tail <- sum(points>1)
-  len_p <- length(points)
   if (na_head>0) { points <- points[-c(1:na_head)] }
+  len_p <- length(points)
   if (na_tail>0) { points <- points[-c((len_p-na_tail+1):len_p)] }
   
   dat <- ss(dat_orig, which(dat_orig$z==1))

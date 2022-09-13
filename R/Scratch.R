@@ -1,40 +1,160 @@
 
-# Cox model for interaction figure
+# Basic simulation of hypothesis test
 if (F) {
   
-  df_raw
+  sim <- new_sim()
+  
+  create_data <- function(n, mu_x, mu_y, sigma_x, sigma_y, rho) {
+    mu <- c(mu_x,mu_y)
+    Sigma <- rbind(
+      c(sigma_x^2,rho*sigma_x*sigma_y),
+      c(rho*sigma_x*sigma_y,sigma_y^2)
+    )
+    xy <- mvrnorm(n=n, mu=mu, Sigma=Sigma)
+    return(list(x=xy[,1], y=xy[,2]))
+  }
+  
+  sim %<>% set_levels(
+    n = c(500), # 100
+    mu_x = c(0,1),
+    mu_y = c(0,1),
+    sigma_x = 8,
+    sigma_y = 20,
+    rho = c(0.1,0.5,0.9)
+  )
+  
+  sim %<>% set_config(num_sim=10000)
+  
+  sim %<>% set_script(function() {
+    
+    dat <- create_data(n=L$n, mu_x=L$mu_x, mu_y=L$mu_y, sigma_x=L$sigma_x,
+                       sigma_y=L$sigma_y, rho=L$rho)
+    x <- dat$x
+    y <- dat$y
+    rho_n <- cor(x,y)
+    
+    stat_x <- (sqrt(L$n)*mean(x))/sd(x)
+    stat_y <- (sqrt(L$n)*mean(y))/sd(y)
+    stat_xy_unscaled <- ( sqrt(L$n)*(mean(x)+mean(y)) ) /
+      sqrt( var(x) + 2*cov(x,y) + var(y) )
+    stat_xy_scaled <- sqrt(L$n/(2+2*rho_n)) * (mean(x)/sd(x) + mean(y)/sd(y))
+    
+    stat_xy_l2norm <- L$n*(mean(x)/sd(x))^2 +
+      L$n*((sd(x)*mean(y)-rho_n*sd(y)*mean(x))/(sd(x)*sd(y)*sqrt(1-rho_n^2)))^2
+    
+    p_x <- pchisq(stat_x^2, df=1, lower.tail=FALSE)
+    p_y <- pchisq(stat_y^2, df=1, lower.tail=FALSE)
+    p_xy_unscaled <- pchisq(stat_xy_unscaled^2, df=1, lower.tail=FALSE)
+    p_xy_scaled <- pchisq(stat_xy_scaled^2, df=1, lower.tail=FALSE)
+    p_xy_l2norm <- pchisq(stat_xy_l2norm, df=2, lower.tail=FALSE)
+    
+    return (list(
+      "rej_x" = ifelse(p_x<0.05,1,0),
+      "rej_y" = ifelse(p_y<0.05,1,0),
+      "rej_xy_unscaled" = ifelse(p_xy_unscaled<0.05,1,0),
+      "rej_xy_scaled" = ifelse(p_xy_scaled<0.05,1,0),
+      "rej_xy_l2norm" = ifelse(p_xy_l2norm<0.05,1,0),
+      "rej_bonf" = ifelse(p_x<0.025||p_y<0.025,1,0),
+      "rej_holm" = ifelse(min(p_x,p_y)<0.025||max(p_x,p_y)<0.05,1,0)
+    ))
+    
+  })
+  
+  sim %<>% run()
+  
+  SimEngine::summarize(sim) %>% dplyr::rename(
+    "rej_x" = mean_rej_x,
+    "rej_y" = mean_rej_y,
+    "rej_xy_unscaled" = mean_rej_xy_unscaled,
+    "rej_xy_scaled" = mean_rej_xy_scaled,
+    "rej_xy_l2norm" = mean_rej_xy_l2norm,
+    "rej_bonf" = mean_rej_bonf,
+    "rej_holm" = mean_rej_holm
+  )
+  
+  # ggplot(data.frame(x=test_stat), aes(x=x)) + geom_histogram(bins=100)
+  # mean(test_stat)
+  # var(test_stat)
   
 }
 
-# 
+# Hyp test generalized primitive
 if (F) {
   
-  library(SimEngine)
-  run_on_cluster(
-    
-    first = {
-      sim <- new_sim()
-      create_data <- function(n) { rnorm(n) }
-      sim %<>% set_script(function() {
-        data <- create_data(L$n)
-        return(list("mean"=mean(data)))
-      })
-      sim %<>% set_levels(n=c(100,1000))
-      sim %<>% set_config(num_sim=10)
-    },
-    
-    main = {
-      sim %<>% run()
-    },
-    
-    last = {
-      sim %>% SimEngine::summarize()
-    },
-    
-    cluster_config = list(js="ge")
-    
-  )  
+  In <- as.integer
+  grid <- seq(0,1,0.001)
+  theta_0 <- Vectorize(function(x) {
+    q <- 100
+    In(x<=(1/q))*(q*x) + In(x>(1/q))
+  })
+  k <- 100
+  G_0 <- function(x) {
+    k_x <- 0.5/k
+    m <- (0.5*k)/(k-0.5)
+    In(x<=k_x)*(k*x) + In(x>k_x)*(m*x+(1-m))
+  }
+  G_0_inv <- function(x) {
+    m <- (k-0.5)/(0.5*k)
+    In(x<=0.5)*(x/k) + In(x>0.5)*(m*x+(1-m))
+  }
+  g_0 <- function(x) { grad(G_0,x) }
+  Theta_0 <- Vectorize(function(x) {
+    integrate(theta_0, lower=0, upper=x)$value
+  })
+  Gamma_0 <- Vectorize(function(x) {
+    integrate(function(y) {
+      theta_0(y) * g_0(y)
+    }, lower=0, upper=x)$value
+  })
+  Gamma_0s <- Vectorize(function(x) { Gamma_0(G_0_inv(x)) })
+  fns <- c("theta_0", "G_0", "G_0_inv", "g_0", "Gamma_0", "Gamma_0s", "Theta_0")
   
+  df_plot <- data.frame(
+    x = rep(grid, 7),
+    y = c(theta_0(grid), G_0(grid), G_0_inv(grid),
+          g_0(grid), Gamma_0(grid), Gamma_0s(grid),
+          Theta_0(grid)),
+    which = rep(factor(fns, levels=fns), each=length(grid))
+  )
+  ggplot(df_plot, aes(x=x, y=y, color=which)) +
+    geom_line() +
+    facet_wrap(~which, ncol=3, scales="free") +
+    theme(legend.position="none")
+  
+}
+
+# Linear spline
+if (F) {
+  
+  # !!!!!
+  grid <- seq(0,1,0.001)
+  m <- 0.25
+  f <- function(x) {
+    In()
+  }
+  
+  In <- as.integer
+  a <- c(-1,1,2,3)
+  f1 <- function(x) {
+    a1 <- a[1]; a2 <- a[2]; a3 <- a[3]; a4 <- a[4];
+    a1 + In(x<=a3)*a2*x + In(x>a3)*(a3*(a2-a4)+a4*x)
+  }
+  f2 <- function(x) {
+    a1 <- a[1]; a2 <- a[2]; a3 <- a[3]; a4 <- a[4];
+    a1 + a2*x + (a4-a2)*pmax(0,x-a3)
+  }
+  grid <- seq(0,3,0.01)
+  ggplot(
+    data.frame(
+      x = rep(grid,2),
+      y = c(f1(grid),f2(grid)),
+      which = rep(c("f1","f2"), each=length(grid))),
+    aes(x=x, y=y, color=which)
+  ) +
+    geom_line() +
+    facet_wrap(~which)
+    
+
 }
 
 # New superfunc pattern (v2)

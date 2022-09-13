@@ -11,14 +11,14 @@
   which_analysis <- "Janssen" # "Janssen" "Moderna" "AMP" "AZD1222"
                               # "HVTN 705 (primary)" "HVTN 705 (all)"
   
-  # # Uncomment this code to run multiple analyses (e.g. 1=10=Moderna, 11-14=Janssen)
-  # ..tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
-  # if (..tid<=4) {
-  #   which_analysis <- "Janssen"
-  # } else {
-  #   which_analysis <- "Moderna"
-  #   Sys.setenv("SLURM_ARRAY_TASK_ID"=as.character(round(..tid-4)))
-  # }
+  # Uncomment this code to run multiple analyses (e.g. 1=10=Moderna, 11-14=Janssen)
+  ..tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
+  if (..tid<=4) {
+    which_analysis <- "Janssen"
+  } else {
+    which_analysis <- "Moderna"
+    Sys.setenv("SLURM_ARRAY_TASK_ID"=as.character(round(..tid-4)))
+  }
   
   # Set seed
   set.seed(1)
@@ -28,10 +28,18 @@
   # !!!!! In the correlates repo, if t_0=0, it is inferred from the data
   cfg2 <- list(
     analysis = which_analysis,
-    run_analysis = T,
+    run_analysis = F,
     run_dqa = F,
     run_debug = list(gren_var=F, objs=F),
-    run_hyptest = F
+    run_hyptest = T
+  )
+  
+  # Set analysis-specific flags
+  # Note: some flags are set at the end of the "Setup" block because they are
+  #       dependent on cfg2 variables
+  flags <- list(
+    hvtn705_abstract_fig = F,
+    table_of_cve_vals = F
   )
   
   # Set up analysis-specific configuration variables. Each row in the cfg2$map
@@ -87,9 +95,7 @@
                                   "linded_Phase_Data/adata/")
     cfg2$params = list(
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="m-spline",
-      # g_n_type="binning", ecdf_type="linear (mid)", deriv_type="linear",
-      # gamma_type="Super Learner", ci_type="logit", q_n_type="zero",
-      gamma_type="Super Learner", ci_type="regular", q_n_type="zero",
+      gamma_type="Super Learner", ci_type="logit", q_n_type="zero",
       omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
       f_sIx_n_bins=15
     )
@@ -717,6 +723,11 @@
   C$t_0 <- cfg2$t_0
   if ((i %in% c(5,7,9)) && cfg2$analysis=="Moderna") {
     cfg2$qnt <- lapply(cfg2$qnt, function(x) { c(0,x[2]) }) # !!!!! temp hack
+  }
+  
+  # Set additional analysis-specific flags
+  if (cfg2$analysis=="Janssen" && cfg2$marker=="Day29pseudoneutid50") {
+    flags$janssen_id50_lloq <- T
   }
   
 }
@@ -1381,46 +1392,33 @@ if (cfg2$run_analysis &&
 
 if (cfg2$run_hyptest) {
   
-  res <- test_2(
+  return_extras <- F
+  test_results <- test_2(
     dat_orig = dat_orig,
-    alt_type = "two-tailed", # decr
+    alt_type = "decr",
+    # alt_type = "two-tailed", # decr # !!!!! Temporarily commented out
     # params = list(),
     # params = list(type="both", q_n_type="zero", Q_n_type="Super Learner"), # !!!!!
-    params = list(type="simple (with constant)", q_n_type="zero", Q_n_type="Cox PH"), # !!!!!
-    return_extras = T # !!!!!
+    params = list(
+      type = c("simple", "complex", "simple (with constant)"),
+      q_n_type = "zero",
+      Q_n_type = "Super Learner" # "Cox PH"
+    ), # !!!!!
+    return_extras = return_extras
   )
-  res_df <- data.frame(reject=res$reject, p_val=res$p_val, beta_n=res$beta_n,
-                       sd_n=res$sd_n, var_n=res$var_n)
-  # res_df <- data.frame(reject_simple=res$reject_simple, # !!!!!
-  #                      reject_complex=res$reject_complex, # !!!!!
-  #                      p_val_simple=res$p_val_simple, # !!!!!
-  #                      p_val_complex=res$p_val_complex, # !!!!!
-  #                      beta_n_simple=res$beta_n_simple, # !!!!!
-  #                      beta_n_complex=res$beta_n_complex, # !!!!!
-  #                      sd_n_simple=res$sd_n_simple, # !!!!!
-  #                      sd_n_complex=res$sd_n_complex) # !!!!!
+  
   write.table(
-    res_df,
+    do.call(rbind, test_results),
     file = paste0(cfg2$analysis," plots/hyptest_",cfg2$tid,".csv"),
     sep = ",",
     row.names = FALSE
   )
-  saveRDS(
-    res$Theta_os_n,
-    paste0(cfg2$analysis," plots/Theta_os_n_",cfg2$tid,".rds")
-  )
-  
-  # test_results <- use_method(L$test$type, list(
-  #   dat_orig = dat_orig,
-  #   alt_type = L$test$alt_type,
-  #   params = L$test$params,
-  #   test_stat_only = L$test$test_stat_only
-  # ))
-  # # "reject_simple" = test_results$reject_simple, # !!!!!
-  # # "reject_complex" = test_results$reject_complex, # !!!!!
-  # # "p_val_simple" = test_results$p_val_simple, # !!!!!
-  # # "p_val_complex" = test_results$p_val_complex # !!!!!
-  
+  if (return_extras) {
+    saveRDS(
+      res$Theta_os_n,
+      paste0(cfg2$analysis," plots/Theta_os_n_",cfg2$tid,".rds")
+    )
+  }
   
 }
 
@@ -1466,11 +1464,7 @@ if (cfg2$run_hyptest) {
   create_plot <- function(plot_data, which, zoom_x=NA, zoom_y=NA, labs, hst,
                           rr_y_axis=F, log10_x_axis=F) {
     
-    # # !!!!! Add lod/2 ?????
-    # lod12 <- min(dat_orig$s,na.rm=T)
-    
     # Change curve labels to factors and set color scale
-    # goldenrod3, darkseagreen3, darkslategray3, darkorange3, darkgoldenrod3, cyan3
     curves <- c("Placebo overall", "Vaccine overall", "Overall VE",
                 "Risk, Cox model", "CVE, Cox model", "Risk, Qbins",
                 "CVE, Qbins", "Risk, Cox GAM", "CVE, Cox GAM",
@@ -1498,7 +1492,6 @@ if (cfg2$run_hyptest) {
       zoom_x <- c(z_x_L - 0.05*(z_x_R-z_x_L),
                   z_x_R + 0.05*(z_x_R-z_x_L))
     } else if (zoom_x[1]=="zoomed") {
-      # zz <- dplyr::filter(plot_data, tag %in% c("Gren", "Qbins") & !is.na(y))$x
       zz <- dplyr::filter(plot_data, tag %in% c("Gren", "Qbins", "Cox") &
                             !is.na(y))$x
       z_x_L <- min(zz, na.rm=T)
@@ -1594,8 +1587,7 @@ if (cfg2$run_hyptest) {
         x_axis <- draw.x.axis.cor(xlim, cfg2$llox)
       }
       
-      # !!!!! Temp Janssen
-      if (cfg2$analysis=="Janssen" && cfg2$marker=="Day29pseudoneutid50") {
+      if (flags$janssen_id50_lloq) {
         x_axis$ticks[4] <- log10(2.7426)
         x_axis$labels[[4]] <- "LLOQ"
       }
@@ -1604,9 +1596,9 @@ if (cfg2$run_hyptest) {
         labels = do.call(expression,x_axis$labels),
         breaks = x_axis$ticks
       )
+      
     }
     if (which=="Risk") {
-      # x_r <- max(hst$breaks)
       y_plac <- filter(plot_data, curve=="Placebo overall")[1,"y"]
       y_vacc <- filter(plot_data, curve=="Vaccine overall")[1,"y"]
       plot <- plot + annotate("text", label="Placebo overall", x=zoom_x[2],
@@ -1678,7 +1670,7 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
     cfg2$lab_y <- paste0("Controlled VE against ", cfg2$endpoint,
                          " by day ", cfg2$t_0)
     
-    if (F) {
+    if (flags$hvtn705_abstract_fig) {
       cfg2$lab_title <- "IgG3 V1V2 breadth (Weighted avg log10 Net MFI): Month 7"
       draw.x.axis.cor <- function(xlim, llox) { # llox currently unused
         xx <- seq(ceiling(xlim[1]), floor(xlim[2]))
@@ -1700,7 +1692,7 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
         }
         return(x_axis)
       }  
-    } # Special code for 705 abstract figure
+    }
     
     plot <- create_plot(
       plot_data = trim_plot_data(plot_data_cve),
@@ -1717,10 +1709,12 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
       plot=plot, device="pdf", width=6, height=4
     )
     
-    # write.table(trim_plot_data(plot_data_cve),
-    #             file=paste0(cfg2$analysis," plots/cve_",cfg2$tid,".csv"),
-    #             sep=",",
-    #             row.names=FALSE)
+    if (flags$table_of_cve_vals) {
+      write.table(trim_plot_data(plot_data_cve),
+                  file=paste0(cfg2$analysis," plots/cve_",cfg2$tid,".csv"),
+                  sep=",",
+                  row.names=FALSE)
+    }
     
   }
   

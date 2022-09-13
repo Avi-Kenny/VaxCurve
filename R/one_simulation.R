@@ -91,23 +91,16 @@ if (cfg$which_sim=="testing") {
       test_stat_only = L$test$test_stat_only
     ))
     
-    res <- list(
-      "reject" = test_results$reject,
-      "p_val" = test_results$p_val,
-      "beta_n" = test_results$beta_n,
-      "sd_n" = test_results$sd_n,
-      "var_n" = test_results$var_n
-    )
-    # res <- list( # !!!!!
-    #   "reject_simple" = test_results$reject_simple, # !!!!!
-    #   "reject_complex" = test_results$reject_complex, # !!!!!
-    #   "p_val_simple" = test_results$p_val_simple, # !!!!!
-    #   "p_val_complex" = test_results$p_val_complex # !!!!!
-    #   # "beta_n_simple" = test_results$beta_n_simple, # !!!!!
-    #   # "beta_n_complex" = test_results$beta_n_complex, # !!!!!
-    #   # "sd_n_simple" = test_results$sd_n_simple, # !!!!!
-    #   # "sd_n_complex" = test_results$sd_n_complex # !!!!!
-    # ) # !!!!!
+    # Parse results object
+    res <- list()
+    for (i in c(1:length(test_results))) {
+      r <- test_results[[i]]
+      res[[paste0("type_",i)]] <- r$type
+      res[[paste0("reject_",i)]] <- as.integer(r$p_val<0.05)
+      res[[paste0("p_val_",i)]] <- r$p_val
+      res[[paste0("beta_n_",i)]] <- r$beta_n
+      res[[paste0("var_n_",i)]] <- r$var_n
+    }
     
     # Debugging
     if (F) {

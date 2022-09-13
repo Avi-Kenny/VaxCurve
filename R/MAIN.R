@@ -11,11 +11,11 @@
 # GitHub packages: tedwestling/ctsCausal, tedwestling/CFsurvival,
 #                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
-  main_task = "analysis.R", # run update analysis.R
-  which_sim = "estimation", # "estimation" "edge" "testing" "Cox" "debugging"
-  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
+  main_task = "run", # run update analysis.R
+  which_sim = "testing", # "estimation" "edge" "testing" "Cox" "debugging"
+  level_set_which = "level_set_testing_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
   # keep = c(1:3,7:9,16:18,22:24),
-  num_sim = 1000,
+  num_sim = 500,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm", "tidyr",
@@ -24,7 +24,7 @@ cfg <- list(
                      "data.table", "latex2exp"),
   parallel = "none",
   stop_at_error = F,
-  appx = list(t_0=1, x_tol=25, s=0.01) # !!!!! t_0=1, S=0.001
+  appx = list(t_0=1, x_tol=25, s=0.01) # !!!!! S=0.001
 )
 
 # Set cluster config
@@ -138,11 +138,12 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     n = 500,
     # n = c(100,200,400,800), # 1000
     # n = c(1000,2000),
-    alpha_3 = c(0,-1,-2),
+    alpha_3 = c(0),
+    # alpha_3 = c(0,-1,-2),
     # alpha_3 = seq(0,-2,-0.5),
     dir = "decr",
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_S = c("Unif(0,1)", "N(0.5,0.04)"),
+    distr_S = c("Unif(0,1)"),
     # distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
     edge = "none",
     surv_true = "Cox PH",
@@ -155,8 +156,14 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       "Slope (two-tailed, both)" = list(
         type = "test_2",
         alt_type = "two-tailed", # decr
-        params = list(type="simple (with constant)", q_n_type="zero", g_n_type="parametric", # simple, complex, both
-                      Q_n_type="Cox PH"),
+        params = list(
+          type = "simple",
+          # type = c("simple", "simple (with constant)",
+          #          "S-weighted (with constant)"),
+          q_n_type = "zero",
+          g_n_type = "parametric", # simple, complex, both
+          Q_n_type="Cox PH"
+        ),
         test_stat_only = F
       )
     )
@@ -508,8 +515,20 @@ if (F) {
   #   color should be n-value
   #   x-axis should be alpha_3
   
-  # Summarize resuls
-  summ <- summarize(sim)
+  # Summarize results
+  # summ <- summarize(sim)
+  # ntypes <- length(names(sim$results)[substr(names(sim$results), 1, 4)=="type"])
+  # for (i in c(1:ntypes)) {
+  #   
+  # }
+  summ <- sim %>% summarize(
+    mean = list(
+      list(name="reject_1", x="reject_1", na.rm=T),
+      list(name="reject_2", x="reject_2", na.rm=T),
+      list(name="reject_3", x="reject_3", na.rm=T)
+    )
+  )
+  summ
   
   summ %<>% rename("Power"=mean_reject)
   

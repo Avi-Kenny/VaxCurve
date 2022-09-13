@@ -43,7 +43,15 @@ deriv_logit <- function(u) { 1 / (u-u^2) }
 #' Helper function for debugging; prints timestamps
 #' 
 #' @param num Number
-chk <- function(num) { print(paste0("Check ", num, ": ", Sys.time())) }
+#' @param msg Message
+chk <- function(num, msg="") {
+  if (msg=="") {
+    str <- paste0("Check ", num, ": ", Sys.time())
+  } else {
+    str <- paste0("Check ", num, " (", msg, "): ", Sys.time())
+  }
+  print(str)
+}
 
 
 
@@ -1145,7 +1153,6 @@ construct_q_tilde_n <- function(type="new", f_n_srv=NA, f_sIx_n=NA,
   if (type=="new") {
     
     seq_01 <- round(seq(C$appx$s,1,C$appx$s),-log10(C$appx$s))
-    seq_0u <- round(seq(C$appx$s,u,C$appx$s),-log10(C$appx$s))
     
     fnc <- function(x, y, delta, u) {
       
@@ -1156,6 +1163,7 @@ construct_q_tilde_n <- function(type="new", f_n_srv=NA, f_sIx_n=NA,
       if (denom==0) {
         return (0)
       } else {
+        seq_0u <- round(seq(C$appx$s,u,C$appx$s),-log10(C$appx$s))
         num <- C$appx$s * sum(sapply(seq_0u, function(s) {
           omega_n(x,s,y,delta) * f_n_srv(y, delta, x, s)
         }))

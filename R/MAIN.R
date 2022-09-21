@@ -41,7 +41,7 @@ if (Sys.getenv("HOME")=="/home/akenny") {
     dir = paste0("/home/users/avikenny/Desktop/", Sys.getenv("project"))
   )
 } else {
-  cluster_config <- NA
+  cluster_config <- list(js="", dir="")
 }
 
 

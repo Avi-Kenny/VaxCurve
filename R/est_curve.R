@@ -51,6 +51,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   p <- params
   
   # Rescale S to lie in [0,1] and round values
+  chk(0, "Estimation: START")
   s_min <- min(dat_orig$s,na.rm=T)
   s_max <- max(dat_orig$s,na.rm=T)
   s_shift <- -1 * s_min
@@ -79,11 +80,15 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   
   if (estimator=="Grenander") {
     
+    chk(1)
     vlist <- create_val_list(dat_orig)
     srvSL <- construct_Q_n(dat, vlist$Q_n, type=p$Q_n_type, print_coeffs=T)
+    chk(2)
     Q_n <- srvSL$srv
     Qc_n <- srvSL$cens
+    chk(3)
     omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n, type=p$omega_n_type)
+    chk(4)
     
     if (F) {
       # omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n, type=p$omega_n_type)
@@ -95,23 +100,29 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     } # DEBUG
     
     f_sIx_n <- construct_f_sIx_n(dat, vlist$SX_grid, type=p$g_n_type,
-                                 k=p$f_sIx_n_bins, edge_corr=p$edge_corr)
+                                 k=p$f_sIx_n_bins, edge_corr=p$edge_corr,
+                                 s_scale=s_scale, s_shift=s_shift)
     f_s_n <- construct_f_s_n(dat_orig, vlist$S_grid, f_sIx_n)
     g_n <- construct_g_n(f_sIx_n, f_s_n)
+    chk(5)
     dat2 <- ss(dat, which(dat$s!=0))
     Phi_n <- construct_Phi_n(dat2, type=p$ecdf_type)
     n_orig <- length(dat_orig$z)
     p_n <- (1/n_orig) * sum(dat$weights * as.integer(dat$s!=0))
     eta_n <- construct_eta_n(dat, Q_n, p_n, vals=NA)
     gcomp_n <- construct_gcomp_n(dat_orig, vals=vlist$S_grid, Q_n)
+    chk(6)
     alpha_star_n <- construct_alpha_star_n(dat, gcomp_n, p_n, vals=NA)
     f_n_srv <- construct_f_n_srv(Q_n=Q_n, Qc_n=Qc_n)
+    chk(7)
     q_n <- construct_q_n(type=p$q_n_type, dat, dat_orig, omega_n=omega_n, g_n=g_n,
                          p_n=p_n, gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
                          Q_n=Q_n, Qc_n=Qc_n, f_n_srv=f_n_srv)
+    chk(8)
     Gamma_os_n <- construct_Gamma_os_n(dat, dat_orig, omega_n, g_n, eta_n, p_n,
                                        q_n, gcomp_n, alpha_star_n,
                                        vals=vlist$S_grid)
+    chk(9)
     
     if (F) {
       Gamma_os_n(0.5) # Don't profile this line
@@ -143,9 +154,11 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     # Construct one-step edge estimator
     if (p$edge_corr!="none") {
+      chk(10)
       g_sn <- construct_g_sn(dat, vlist$X_grid, type="logistic")
       r_Mn_edge_est <- r_Mn_edge(dat, g_sn, Q_n, omega_n)
       sigma2_edge_est <- sigma2_edge(dat, g_sn, Q_n, omega_n, r_Mn_edge_est)
+      chk(11)
     }
     
     if (F) {
@@ -157,6 +170,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     } # DEBUG
     
     # Compute GCM (or least squares line) and extract its derivative
+    chk(12)
     grid <- sort(unique(dat$s))
     x_vals <- Phi_n(grid)
     indices_to_keep <- !base::duplicated(x_vals)
@@ -166,12 +180,15 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     } else {
       y_vals <- -1 * Gamma_os_n(grid[indices_to_keep])
     }
+    chk(13)
     if (!any(x_vals==0)) {
       x_vals <- c(0, x_vals)
       y_vals <- c(0, y_vals)
     }
     if (p$convex_type=="GCM") {
+      chk(14)
       gcm <- gcmlcm(x=x_vals, y=y_vals, type="gcm")
+      chk(15)
       dGCM <- approxfun(
         x = gcm$x.knots[-length(gcm$x.knots)],
         y = gcm$slope.knots,
@@ -179,6 +196,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
         rule = 2,
         f = 0
       )
+      chk(16)
     } else if (p$convex_type=="LS") {
       gcm <- function(x) { 1 } # Ignored
       fit <- cvx.lse.reg(t=x_vals, z=y_vals)
@@ -197,6 +215,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     }
     
     # Construct Grenander-based r_Mn
+    chk(17)
     if (dir=="incr") {
       r_Mn_Gr <- Vectorize(function(u) { min(max(dGCM(Phi_n(u)),0),1) })
     } else {
@@ -204,13 +223,16 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     }
     
     # Compute variance component functions
+    chk(18)
     f_sIx_z1_n <- construct_f_sIx_n(dat, vlist$SX_grid, type=p$g_n_type,
-                                        k=p$f_sIx_n_bins, z1=TRUE)
+                                    k=p$f_sIx_n_bins, z1=TRUE,
+                                    s_scale=s_scale, s_shift=s_shift)
     f_s_z1_n <- construct_f_s_n(dat_orig, vlist$S_grid, f_sIx_z1_n)
     gamma_n <- construct_gamma_n(dat_orig, dat, type=p$gamma_type,
                                  vals=vlist$S_grid, omega_n=omega_n,
                                  f_sIx_n=f_sIx_n, f_s_n=f_s_n,
                                  f_s_z1_n=f_s_z1_n)
+    chk(19)
     if (F) {
       gamma_n <- function(x,s) { Q_n(C$t_0,x,s)*(1-Q_n(C$t_0,x,s)) }
     } # DEBUG: alternate gamma_n estimator when there is no censoring
@@ -254,7 +276,9 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     }
     
     # Generate estimates for each point
+    chk(20)
     ests <- r_Mn(points)
+    chk(21)
     if (F) {
       ests_Gamma <- Gamma_os_n(points)
       ests_Phi <- Phi_n(points)
@@ -266,6 +290,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     tau_n <- construct_tau_n(deriv_r_Mn, gamma_n, f_s_n, g_zn, g_n,
                              dat_orig)
+    chk(22)
     
     # Generate confidence limits
     if (p$ci_type=="none") {
@@ -346,7 +371,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     # Construct f_sIx_n BEFORE transforming S values
     f_sIx_n <- construct_f_sIx_n(dat, vlist$SX_grid, type=p$g_n_type,
-                                 k=p$f_sIx_n_bins)
+                                 k=p$f_sIx_n_bins, s_scale=s_scale,
+                                 s_shift=s_shift)
     
     # Transform S values
     dat$s <- transform_s(dat$s)

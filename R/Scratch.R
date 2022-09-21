@@ -1,4 +1,81 @@
 
+# DWD
+if (F) {
+  
+  # One
+  r <- sim$results
+  df_plot_1 <- data.frame(
+    x = c(r$Theta_0.0,r$Gamma_0.0,
+          r$Theta_0.2,r$Gamma_0.2,
+          r$Theta_0.5,r$Gamma_0.5,
+          r$Theta_0.7,r$Gamma_0.7,
+          r$Theta_1.0,r$Gamma_1.0),
+    which = rep(c(rep("Theta",500),rep("Gamma",500)),5),
+    point = c(rep("0.0",1000), rep("0.2",1000), rep("0.5",1000),
+              rep("0.7",1000), rep("1.0",1000))
+  )
+  df_plot_2 <- data.frame(
+    x = c(r$Theta_0.0, r$Theta_0.2, r$Theta_0.5, r$Theta_0.7, r$Theta_1.0),
+    point = c(rep("0.0",500), rep("0.2",500), rep("0.5",500),
+              rep("0.7",500), rep("1.0",500))
+  )
+  ggplot(df_plot_2, aes(x=x)) +
+    facet_wrap(~point, scales="free") +
+    geom_histogram(bins=50)
+  
+  # Two
+  r <- sim$results
+  nr <- nrow(r)
+  df_plot <- data.frame(
+    x = c(r$Theta_0.5, r$Theta2_0.5, r$Th_cmp_1,
+          r$Th_cmp_3, r$etastar1, r$etastar2),
+    which = c(rep("Theta (0.5)",nr),
+              rep("Theta2 (0.5)",nr),
+              rep("Theta (cmp 1)",nr),
+              rep("Theta (cmp 3)",nr),
+              rep("etastar1",nr),
+              rep("etastar2",nr))
+  )
+  ggplot(df_plot, aes(x=x)) +
+    facet_wrap(~which, scales="free") +
+    geom_histogram(bins=50)
+    # labs(title=t)
+  
+  # Three
+  r1 <- filter(sim$results, tmp=="old etastar")
+  r2 <- filter(sim$results, tmp=="new etastar")
+  mean(r1$reject_1)
+  mean(r2$reject_1)
+  nr1 <- nrow(r1)
+  nr2 <- nrow(r2)
+  df_plot <- data.frame(
+    x = c(r1$Theta_0.2, r2$Theta_0.2, r1$Theta_0.5, r2$Theta_0.5,
+          r1$etastar_0.2, r2$etastar_0.2, r1$etastar_0.5, r2$etastar_0.5,
+          r1$p_val_1, r2$p_val_1, r1$beta_n_1, r2$beta_n_1,
+          r1$var_n_1, r2$var_n_1, sqrt(r1$var_n_1), sqrt(r2$var_n_1)),
+    which = c(rep("Theta_0.2 (old eta)",nr1),
+              rep("Theta_0.2 (new eta)",nr2),
+              rep("Theta_0.5 (old eta)",nr1),
+              rep("Theta_0.5 (new eta)",nr2),
+              rep("etastar_0.2 (old eta)",nr1),
+              rep("etastar_0.2 (new eta)",nr2),
+              rep("etastar_0.5 (old eta)",nr1),
+              rep("etastar_0.5 (new eta)",nr2),
+              rep("P-val (old eta)",nr1),
+              rep("P-val (new eta)",nr2),
+              rep("beta_n (old eta)",nr1),
+              rep("beta_n (new eta)",nr2),
+              rep("var_n (old eta)",nr1),
+              rep("var_n (new eta)",nr2),
+              rep("sd_n (old eta)",nr1),
+              rep("sd_n (new eta)",nr2))
+  )
+  ggplot(df_plot, aes(x=x)) +
+    facet_wrap(~which, scales="free", ncol=4) +
+    geom_histogram(bins=30)
+  
+}
+
 # Basic simulation of hypothesis test
 if (F) {
   

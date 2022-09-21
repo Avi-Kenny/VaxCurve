@@ -5,21 +5,21 @@
 ##### CONFIG #####
 ##################.
 
-# To run multiple sims/analyses concurrently, ONLY change Slurm commands
+# To run multiple sims/analyses concurrently, ONLY change Slurm/SGE commands
 
 # Set global config
 # GitHub packages: tedwestling/ctsCausal, tedwestling/CFsurvival,
 #                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
-  main_task = "run", # run update analysis.R
-  which_sim = "testing", # "estimation" "edge" "testing" "Cox" "debugging"
-  level_set_which = "level_set_testing_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
+  main_task = "analysis.R", # run update analysis.R
+  which_sim = "estimation", # "estimation" "edge" "testing" "Cox" "debugging"
+  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
   # keep = c(1:3,7:9,16:18,22:24),
   num_sim = 500,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm", "tidyr",
-           "ranger", "xgboost", "survey", "pbapply", "compiler", "simest"),
+           "ranger", "survey", "pbapply", "compiler", "simest"), # "xgboost"
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
                      "data.table", "latex2exp"),
   parallel = "none",
@@ -28,12 +28,21 @@ cfg <- list(
 )
 
 # Set cluster config
-cluster_config <- list(
-  # js = "ge",
-  # dir = paste0("/home/users/avikenny/Desktop/", Sys.getenv("project"))
-  js = "slurm",
-  dir = paste0("/home/akenny/", Sys.getenv("project"))
-)
+if (Sys.getenv("HOME")=="/home/akenny") {
+  # Bionic
+  cluster_config <- list(
+    js = "slurm",
+    dir = paste0("/home/akenny/", Sys.getenv("project"))
+  )
+} else if (Sys.getenv("HOME")=="/home/users/avikenny") {
+  # Bayes
+  cluster_config <- list(
+    js = "ge",
+    dir = paste0("/home/users/avikenny/Desktop/", Sys.getenv("project"))
+  )
+} else {
+  cluster_config <- NA
+}
 
 
 
@@ -92,18 +101,36 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     # sc_params = list("exp"=list(lmbd=1e-3, v=1.5, lmbd2=5e-4, v2=1.5)),
     distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
     edge = c("none"), # "expit 0.4"
-    surv_true = c("Cox PH", "Complex"), # "Cox PH" "Complex" "exp"
+    surv_true = c("Complex"), # "Cox PH" "Complex" "exp"
+    # surv_true = c("Cox PH", "Complex"), # "Cox PH" "Complex" "exp"
     sampling = c("two-phase (50%)"), # "iid"
     wts_type = c("estimated"), # c("true", "estimated")
     estimator = list(
-      "Grenander" = list(
+      "Grenander (true f_sIx, SL)" = list(
         est = "Grenander",
         params = list(q_n_type="zero", Q_n_type="Cox PH", # Q_n_type="Random Forest", Q_n_type="true"
                       convex_type="GCM", ecdf_type="linear (mid)", # convex_type="LS"
                       edge_corr="none", # edge_corr="min"
-                      deriv_type="m-spline", g_n_type="parametric") # g_n_type="binning", g_n_type="true"
+                      deriv_type="m-spline", g_n_type="true") # g_n_type="binning", g_n_type="true"
       ),
-      "Cox PH" = list(est="Cox gcomp")
+      "Grenander (true f_sIx, RF)" = list(
+        est = "Grenander",
+        params = list(q_n_type="zero", Q_n_type="Random Forest", # Q_n_type="Random Forest", Q_n_type="true"
+                      convex_type="GCM", ecdf_type="linear (mid)", # convex_type="LS"
+                      edge_corr="none", # edge_corr="min"
+                      deriv_type="m-spline", g_n_type="true") # g_n_type="binning", g_n_type="true"
+      )
+      
+      
+      
+      # "Grenander" = list(
+      #   est = "Grenander",
+      #   params = list(q_n_type="zero", Q_n_type="Cox PH", # Q_n_type="Random Forest", Q_n_type="true"
+      #                 convex_type="GCM", ecdf_type="linear (mid)", # convex_type="LS"
+      #                 edge_corr="none", # edge_corr="min"
+      #                 deriv_type="m-spline", g_n_type="parametric") # g_n_type="binning", g_n_type="true"
+      # ),
+      # "Cox PH" = list(est="Cox gcomp")
       
       
       # "Qbins (true)" = list(
@@ -135,15 +162,14 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Testing: compare all methods
   level_set_testing_1 <- list(
-    n = 500,
+    n = 1000,
     # n = c(100,200,400,800), # 1000
     # n = c(1000,2000),
     alpha_3 = c(0),
-    # alpha_3 = c(0,-1,-2),
     # alpha_3 = seq(0,-2,-0.5),
     dir = "decr",
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_S = c("Unif(0,1)"),
+    distr_S = c("N(0.3+0.4x2,0.09)"),
     # distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
     edge = "none",
     surv_true = "Cox PH",
@@ -153,19 +179,30 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     # sampling = c("iid", "cycle", "two-phase (72%)", "two-phase (70% random)"),
     wts_type = "true",
     test = list(
-      "Slope (two-tailed, both)" = list(
+      "Slope (q_n zero)" = list(
         type = "test_2",
         alt_type = "two-tailed", # decr
         params = list(
-          type = "simple",
-          # type = c("simple", "simple (with constant)",
-          #          "S-weighted (with constant)"),
+          type = c("simple", "simple (with constant)",
+                   "S-weighted (with constant)"),
           q_n_type = "zero",
-          g_n_type = "parametric", # simple, complex, both
-          Q_n_type="Cox PH"
+          g_n_type = "true", # simple, complex, both
+          Q_n_type = "Cox PH"
         ),
         test_stat_only = F
       )
+      # "Slope (q_n new)" = list(
+      #   type = "test_2",
+      #   alt_type = "two-tailed", # decr
+      #   params = list(
+      #     type = c("simple", "simple (with constant)",
+      #              "S-weighted (with constant)"),
+      #     q_n_type = "new",
+      #     g_n_type = "parametric", # simple, complex, both
+      #     Q_n_type = "Cox PH"
+      #   ),
+      #   test_stat_only = F
+      # )
     )
   )
   
@@ -462,41 +499,45 @@ if (F) {
     theme(legend.position="bottom") +
     labs(y="Standard deviation", x="S", color="Estimator")
   
-  # # Variance plot
-  # # Export: 10" x 6"
-  # ggplot(
-  #   filter(p_data, stat=="var"),
-  #   aes(x=point, y=value, color=factor(Estimator), group=factor(Estimator))
-  # ) +
-  #   geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
-  #               data=df_distr_v, fill="grey", color=NA, alpha=0.4) +
-  #   geom_vline(aes(xintercept=x), data=df_vlines, color="orange",
-  #              linetype="dashed") +
-  #   geom_line() +
-  #   facet_grid(rows = dplyr::vars(factor(surv_true, levels=surv_trues)),
-  #              cols = dplyr::vars(factor(distr_S, levels=distr_Ss))) +
-  #   scale_y_continuous(limits=plot_lims$v) +
-  #   # scale_color_manual(values=m_colors) +
-  #   theme(legend.position="bottom") +
-  #   labs(y="Variance", x="S", color="Estimator")
+  if (F) {
+    # Variance plot
+    # Export: 10" x 6"
+    ggplot(
+      filter(p_data, stat=="var"),
+      aes(x=point, y=value, color=factor(Estimator), group=factor(Estimator))
+    ) +
+      geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
+                  data=df_distr_v, fill="grey", color=NA, alpha=0.4) +
+      geom_vline(aes(xintercept=x), data=df_vlines, color="orange",
+                 linetype="dashed") +
+      geom_line() +
+      facet_grid(rows = dplyr::vars(factor(surv_true, levels=surv_trues)),
+                 cols = dplyr::vars(factor(distr_S, levels=distr_Ss))) +
+      scale_y_continuous(limits=plot_lims$v) +
+      # scale_color_manual(values=m_colors) +
+      theme(legend.position="bottom") +
+      labs(y="Variance", x="S", color="Estimator")
+  } # Variance plot
   
-  # # MSE plot
-  # # Export: 10" x 6"
-  # ggplot(
-  #   filter(p_data, stat=="mse"),
-  #   aes(x=point, y=value, color=factor(Estimator), group=factor(Estimator))
-  # ) +
-  #   geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
-  #               data=df_distr_m, fill="grey", color=NA, alpha=0.4) +
-  #   geom_vline(aes(xintercept=x), data=df_vlines, color="orange",
-  #              linetype="dashed") +
-  #   geom_line() +
-  #   facet_grid(rows = dplyr::vars(factor(surv_true, levels=surv_trues)),
-  #              cols = dplyr::vars(factor(distr_S, levels=distr_Ss))) +
-  #   scale_y_continuous(limits=plot_lims$m) +
-  #   # scale_color_manual(values=m_colors) +
-  #   theme(legend.position="bottom") +
-  #   labs(y="MSE", x="S", color="Estimator")
+  if (F) {
+    # MSE plot
+    # Export: 10" x 6"
+    ggplot(
+      filter(p_data, stat=="mse"),
+      aes(x=point, y=value, color=factor(Estimator), group=factor(Estimator))
+    ) +
+      geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
+                  data=df_distr_m, fill="grey", color=NA, alpha=0.4) +
+      geom_vline(aes(xintercept=x), data=df_vlines, color="orange",
+                 linetype="dashed") +
+      geom_line() +
+      facet_grid(rows = dplyr::vars(factor(surv_true, levels=surv_trues)),
+                 cols = dplyr::vars(factor(distr_S, levels=distr_Ss))) +
+      scale_y_continuous(limits=plot_lims$m) +
+      # scale_color_manual(values=m_colors) +
+      theme(legend.position="bottom") +
+      labs(y="MSE", x="S", color="Estimator")
+  } # MSE plot
   
 }
 

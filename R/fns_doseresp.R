@@ -1163,11 +1163,15 @@ construct_q_tilde_n <- function(type="new", f_n_srv=NA, f_sIx_n=NA,
       if (denom==0) {
         return (0)
       } else {
-        seq_0u <- round(seq(C$appx$s,u,C$appx$s),-log10(C$appx$s))
-        num <- C$appx$s * sum(sapply(seq_0u, function(s) {
-          omega_n(x,s,y,delta) * f_n_srv(y, delta, x, s)
-        }))
-        return(num/denom)
+        if (u==0) {
+          return(0)
+        } else {
+          seq_0u <- round(seq(C$appx$s,u,C$appx$s),-log10(C$appx$s))
+          num <- C$appx$s * sum(sapply(seq_0u, function(s) {
+            omega_n(x,s,y,delta) * f_n_srv(y, delta, x, s)
+          }))
+          return(num/denom)
+        }
       }
       
     }
@@ -1197,16 +1201,19 @@ construct_q_tilde_n <- function(type="new", f_n_srv=NA, f_sIx_n=NA,
 #'     estimator
 #' @param z1 Compute the density conditional on Z=1
 #' @param edge_corr Edge correction (see est_curve)
+#' @param s_scale For simulations only; only used if type=="true"
+#' @param s_shift For simulations only; only used if type=="true"
 #' @return Conditional density estimator function
 #' @notes
 #'   - Assumes support of A is [0,1]
 construct_f_sIx_n <- function(dat, vals=NA, type, k=0, z1=F,
-                              edge_corr="none") {
+                              edge_corr="none", s_scale=1, s_shift=0) {
   
   if (z1) { dat$weights <- rep(1, length(dat$weights)) }
   
   # Create normalization factor (to multiply density by if there is a point mass
   # at the edge)
+  # !!!!! Check whether this is still needed; probably not
   if (edge_corr=="none") {
     norm_factor <- 1
   } else {
@@ -1216,25 +1223,40 @@ construct_f_sIx_n <- function(dat, vals=NA, type, k=0, z1=F,
   
   if (type=="true") {
     
-    # Note: this is not accurate if edge!="none". It also may be affected by the
-    #       scaling of the S variable.
+    # Note: this is not accurate if edge!="none"
     
     if (L$distr_S=="Unif(0,1)") {
       fnc <- function(s, x) { 1 }
     } else if (L$distr_S=="Unif(0.3,0.7)") {
-      fnc <- function(s, x) { 2.5 * In(s>=0.3 & s<=0.7) }
+      fnc <- function(s, x) {
+        s <- (s/s_scale)-s_shift
+        return(2.5 * In(s>=0.3 & s<=0.7))
+      }
     } else if (L$distr_S=="N(0.5,0.01)") {
-      fnc <- function(s, x) { dtruncnorm(s, a=0, b=1, mean=0.5, sd=0.1) }
+      fnc <- function(s, x) {
+        s <- (s/s_scale)-s_shift
+        return(dtruncnorm(s, a=0, b=1, mean=0.5, sd=0.1))
+      }
     } else if (L$distr_S=="N(0.5,0.04)") {
-      fnc <- function(s, x) { dtruncnorm(s, a=0, b=1, mean=0.5, sd=0.2) }
+      fnc <- function(s, x) {
+        s <- (s/s_scale)-s_shift
+        return(dtruncnorm(s, a=0, b=1, mean=0.5, sd=0.2))
+      }
     } else if (L$distr_S=="N(0.3+0.4x2,0.09)") {
       fnc <- function(s, x) {
-        dtruncnorm(s, a=0, b=1, mean=0.3+0.4*x[2], sd=0.3)
+        s <- (s/s_scale)-s_shift
+        return(dtruncnorm(s, a=0, b=1, mean=0.3+0.4*x[2], sd=0.3))
       }
     } else if (L$distr_S=="Tri UP") {
-      fnc <- function(s, x) { 2*s }
+      fnc <- function(s, x) {
+        s <- (s/s_scale)-s_shift
+        return(2*s)
+      }
     } else if (L$distr_S=="Tri DN") {
-      fnc <- function(s, x) { 2-2*s }
+      fnc <- function(s, x) {
+        s <- (s/s_scale)-s_shift
+        return(2-2*s)
+      }
     }
     
   } else if (type=="parametric") {
@@ -1418,7 +1440,7 @@ construct_g_n <- function(f_sIx_n, f_s_n, vals=NA) {
 #' @param vals List of values to pre-compute function on; passed to
 #'     construct_superfunc()
 #' @return Estimator function of nuisance eta*_0
-construct_etastar_n <- function(Q_n, vals=NA) {
+construct_etastar_n <- function(Q_n, vals=NA, tmp) {
   
   fnc <- function(u,x) {
     u <- round(u,-log10(C$appx$s))
@@ -1836,7 +1858,7 @@ construct_Gamma_cf <- function(dat_orig, params, vlist) {
     gcomp_n <- construct_gcomp_n(dat_orig_train, vlist$S_grid, Q_n)
     # eta_n <- construct_eta_n(dat_train, vlist$SX_grid, Q_n) # ARCHIVED
     f_sIx_n <- construct_f_sIx_n(dat_train, vlist$SX_grid, type=params$g_n_type,
-                                 k=15)
+                                 k=15, s_scale=s_scale, s_shift=s_shift)
     f_s_n <- construct_f_s_n(dat_orig_train, vlist$S_grid, f_sIx_n)
     g_n <- construct_g_n(f_sIx_n, f_s_n)
     omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n,

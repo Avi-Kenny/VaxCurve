@@ -17,6 +17,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
                    test_stat_only=F, return_extras=F) {
   
   # Set default params
+  chk(0, "Testing: START")
   .default_params <- list(
     type="simple", ecdf_type="step", g_n_type="binning", boot_reps=200,
     Q_n_type="Super Learner", omega_n_type="estimated", q_n_type="new",
@@ -43,20 +44,28 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
   vlist <- create_val_list(dat_orig)
   
   # Construct component functions
+  chk(1)
   srvSL <- construct_Q_n(dat, vlist$Q_n, type=p$Q_n_type, print_coeffs=T)
   Q_n <- srvSL$srv
   Qc_n <- srvSL$cens
+  chk(2)
   omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n, type=p$omega_n_type)
   etastar_n <- construct_etastar_n(Q_n, vals=NA)
+  chk(3)
   f_sIx_n <- construct_f_sIx_n(dat, vlist$SX_grid, type=p$g_n_type,
-                               k=p$f_sIx_n_bins, edge_corr="none")
+                               k=p$f_sIx_n_bins, edge_corr="none",
+                               s_scale=s_scale, s_shift=s_shift)
   f_n_srv <- construct_f_n_srv(Q_n=Q_n, Qc_n=Qc_n)
+  chk(4)
   q_tilde_n <- construct_q_tilde_n(type=p$q_n_type, f_n_srv, f_sIx_n,
                                    omega_n)
+  chk(5)
   Theta_os_n <- construct_Theta_os_n(dat, dat_orig, omega_n, f_sIx_n,
                                      q_tilde_n, etastar_n)
+  chk(6)
   infl_fn_Theta <- construct_infl_fn_Theta(omega_n, f_sIx_n, q_tilde_n,
                                            etastar_n, Theta_os_n)
+  chk(7)
 
   # Function to compute P values
   compute_p_val <- function(alt_type, beta_n, var_n) {
@@ -73,9 +82,36 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
   # Set up container to hold results
   res <- list()
   
+  if ("debug" %in% p$type) {
+    
+    # Compute test statistic and variance estimate
+    beta_n <- Theta_os_n(0.5) - 0.495
+    var_n <- 0
+    for (i in c(1:n_orig)) {
+      s_i <- dat_orig$s[i]
+      y_i <- dat_orig$y[i]
+      delta_i <- dat_orig$delta[i]
+      weight_i <- dat_orig$weight[i]
+      x_i <- as.numeric(dat_orig$x[i,])
+      var_n <- var_n + (
+        infl_fn_Theta(u=0.5, x_i, y_i, delta_i, s_i, weight_i)
+      )^2
+    }
+    var_n <- var_n/(n_orig^2)
+    
+    res[[length(res)+1]] <- list(
+      type = "debug",
+      p_val = compute_p_val(alt_type, beta_n, var_n),
+      beta_n = beta_n,
+      var_n = var_n
+    )
+    
+  }
+  
   if ("simple" %in% p$type) {
     
     # Construct pieces needed for hypothesis test
+    chk(8, "simple: START")
     u_mc <- round(seq(C$appx$s,1,C$appx$s),-log10(C$appx$s))
     m <- length(u_mc)
     lambda_2 <- mean((u_mc)^2) # ~1/3
@@ -108,12 +144,14 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
       beta_n = beta_n,
       var_n = var_n
     )
-
+    chk(9, "simple: END")
+    
   }
   
   if ("simple (with constant)" %in% p$type) {
     
     # Construct pieces needed for hypothesis test
+    chk(10, "simple (with constant): START")
     u_mc <- round(seq(C$appx$s,1,C$appx$s),-log10(C$appx$s))
     m <- length(u_mc)
     lambda_1 <- mean(u_mc) # ~1/2
@@ -121,12 +159,10 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     lambda_3 <- mean((u_mc)^3) # ~1/4
     
     # Compute test statistic and variance estimate
-    beta_n <- mean(
-      (
-        (lambda_3-lambda_1*lambda_2)*(u_mc-lambda_1) +
+    beta_n <- mean((
+      (lambda_3-lambda_1*lambda_2)*(u_mc-lambda_1) +
         (lambda_1^2-lambda_2)*(u_mc^2-lambda_2)
-      ) * Theta_os_n(u_mc)
-    )
+    ) * Theta_os_n(u_mc))
     var_n <- 0
     for (i in c(1:n_orig)) {
       s_m <- rep(dat_orig$s[i],m)
@@ -151,12 +187,14 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
       beta_n = beta_n,
       var_n = var_n
     )
-
+    chk(11, "simple (with constant): START")
+    
   }
   
   if ("S-weighted (with constant)" %in% p$type) {
     
     # Construct pieces needed for hypothesis test
+    chk(12, "S-weighted (with constant): START")
     s <- dat$s
     lmd_1 <- (1/n_orig) * sum(dat$weights*s)
     lmd_2 <- (1/n_orig) * sum(dat$weights*s^2)
@@ -225,7 +263,8 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
       beta_n = beta_n,
       var_n = var_n
     )
-
+    chk(13, "S-weighted (with constant): END")
+    
   }
   
   if ("edge" %in% p$type) {
@@ -376,32 +415,13 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
   if (return_extras) { res$Theta_os_n <- Theta_os_n }
   
   if (F) {
-    # res$if1_mean <- if1_mean
-    # res$if2_mean <- if2_mean
-    # res$r_1n <- Psi_1_est - if1_mean
-    # res$r_2n <- Psi_2_est - if2_mean
-    # res$Psi_1_var_est <- Psi_1_var_est
-    # res$sum12_est <- Psi_1_est+Psi_2_est
-    # res$sum12_var_est <- sum12_var_est
-    # res$Psi_1_est <- Psi_1_est
-    # res$Psi_2_est <- Psi_2_est
-    # res$Psi_G_est <- Psi_G_est-Gamma_0(xx)
-    # res$Psi_1_var_est <- Psi_1_var_est
-    # res$Psi_2_var_est <- Psi_2_var_est
-    # res$Psi_12_covar <- Psi_12_covar
-    # res$p_val_Psi_1 <- p_val_Psi_1
-    # res$p_val_Psi_2 <- p_val_Psi_2
-    # res$p_val_Psi_G <- p_val_Psi_G
-    # res$p_val_sum12 <- p_val_sum12
-    # res$p_val_sum12b <- p_val_sum12b
-    # res$p_val_alt <- p_val_alt
-    # res$reject_Psi_1 <- as.integer(p_val_Psi_1<0.05)
-    # res$reject_Psi_2 <- as.integer(p_val_Psi_2<0.05)
-    # res$reject_Psi_G <- as.integer(p_val_Psi_G<0.05)
-    # res$reject_sum12 <- as.integer(p_val_sum12<0.05)
-    # res$reject_sum12b <- as.integer(p_val_sum12b<0.05)
-    # res$reject_alt <- as.integer(p_val_alt<0.05)
-  } # DEBUG: return debugging components (var="asymptotic")
+    res$extras <- list(
+      Theta_0.2 = Theta_os_n(0.2),
+      Theta_0.5 = Theta_os_n(0.5),
+      etastar_0.2 = etastar_n(u=0.2, x=c(0,0)),
+      etastar_0.5 = etastar_n(u=0.5, x=c(0,0))
+    )
+  } # DEBUG: return debugging components
   
   return(res)
   

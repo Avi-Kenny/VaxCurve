@@ -93,7 +93,8 @@ if (cfg$which_sim=="testing") {
     
     # Parse results object
     res <- list()
-    for (i in c(1:length(test_results))) {
+    # for (i in c(1:length(test_results))) {
+    for (i in c(1:(length(test_results)-1))) { # !!!!!
       r <- test_results[[i]]
       res[[paste0("type_",i)]] <- r$type
       res[[paste0("reject_",i)]] <- as.integer(r$p_val<0.05)
@@ -102,7 +103,14 @@ if (cfg$which_sim=="testing") {
       res[[paste0("var_n_",i)]] <- r$var_n
     }
     
-    # Debugging
+    # !!!!! Debugging
+    if (T) {
+      res$Theta_0.2 <- test_results$extras$Theta_0.2
+      res$Theta_0.5 <- test_results$extras$Theta_0.5
+      res$etastar_0.2 <- test_results$extras$etastar_0.2
+      res$etastar_0.5 <- test_results$extras$etastar_0.5
+    }
+    
     if (F) {
       res$if1_mean = test_results$if1_mean
       res$if2_mean = test_results$if2_mean
@@ -129,7 +137,7 @@ if (cfg$which_sim=="testing") {
       res$reject_sum12 = test_results$reject_sum12
       res$reject_sum12b = test_results$reject_sum12b
       res$reject_alt = test_results$reject_alt
-    }
+    } # DEBUG
     
     return(res)
     
@@ -301,97 +309,178 @@ if (cfg$which_sim=="Cox") {
 
 if (cfg$which_sim=="debugging") {
   
-  #' Run a single simulation (estimation)
-  #'
-  #' @return A list with the estimates and CI limits of the causal dose-response
-  #'     curve evaluated at the midpoint and the endpoint of the domain
-  
   one_simulation <- function() {
+    
+    # # !!!!!
+    # L <- list(n=500, alpha_3=0, distr_S="Unif(0,1)", edge="none",
+    #           surv_true="Cox PH",
+    #           sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5),
+    #           sampling="two-phase (50%)", dir="decr", wts_type="true")
+    # C <- list(alpha_1=0.5, alpha_2=0.7, t_0=200,
+    #           appx=list(t_0=1, x_tol=25, s=0.01))
     
     # Generate dataset
     dat_orig <- generate_data(L$n, L$alpha_3, L$distr_S, L$edge, L$surv_true,
                               L$sc_params, L$sampling, L$dir, L$wts_type)
     
-    points <- C$points
-    params <- L$estimator$params
+    # Set default params
+    params <- L$test$params
+    .default_params <- list(
+      type="simple", ecdf_type="step", g_n_type="binning", boot_reps=200,
+      Q_n_type="Super Learner", omega_n_type="estimated", q_n_type="new",
+      cf_folds=1, f_sIx_n_bins=15
+    )
+    for (i in c(1:length(.default_params))) {
+      if (is.null(params[[names(.default_params)[i]]])) {
+        params[[names(.default_params)[i]]] <- .default_params[[i]]
+      }
+    }
+    p <- params
     
-    # Obtain estimates (Phi_n only)
-    {
-      # Set default params
-      .default_params <- list(
-        Q_n_type="Super Learner", g_n_type="binning", deriv_type="linear",
-        ecdf_type="linear (mid)", gamma_type="Super Learner",
-        omega_n_type="estimated", boot_reps=1000, ci_type="trunc", cf_folds=1, m=5,
-        edge_corr="none", q_n_type="new", lod_shift="none", n_bins=5,
-        convex_type="GCM", f_sIx_n_bins=15
-      )
-      for (i in c(1:length(.default_params))) {
-        if (is.null(params[[names(.default_params)[i]]])) {
-          params[[names(.default_params)[i]]] <- .default_params[[i]]
+    # Rescale S to lie in [0,1] and round values
+    s_min <- min(dat_orig$s,na.rm=T)
+    s_max <- max(dat_orig$s,na.rm=T)
+    s_shift <- -1 * s_min
+    s_scale <- 1/(s_max-s_min)
+    dat_orig$s <- (dat_orig$s+s_shift)*s_scale
+    dat_orig <- round_dat(dat_orig)
+    
+    # Setup
+    n_orig <- length(dat_orig$z)
+    dat <- ss(dat_orig, which(dat_orig$z==1))
+    vlist <- create_val_list(dat_orig)
+    
+    # Construct component functions
+    srvSL <- construct_Q_n(dat, vlist$Q_n, type=p$Q_n_type, print_coeffs=T)
+    Q_n <- srvSL$srv
+    Qc_n <- srvSL$cens
+    omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n, type=p$omega_n_type)
+    f_sIx_n <- construct_f_sIx_n(dat, vlist$SX_grid, type=p$g_n_type,
+                                 k=p$f_sIx_n_bins, edge_corr="none",
+                                 s_scale=s_scale, s_shift=s_shift)
+    f_n_srv <- construct_f_n_srv(Q_n=Q_n, Qc_n=Qc_n)
+    q_tilde_n <- construct_q_tilde_n(type=p$q_n_type, f_n_srv, f_sIx_n,
+                                     omega_n)
+    
+    # Old etastar
+    etastar_n <- construct_etastar_n(Q_n, vals=NA, tmp="old etastar")
+    Theta_os_n <- construct_Theta_os_n(dat, dat_orig, omega_n, f_sIx_n,
+                                       q_tilde_n, etastar_n)
+    
+    # New etastar
+    etastar_n2 <- construct_etastar_n(Q_n, vals=NA, tmp="new etastar")
+    Theta_os_n2 <- construct_Theta_os_n(dat, dat_orig, omega_n, f_sIx_n,
+                                       q_tilde_n, etastar_n2)
+    
+    if (F) {
+      
+      construct_etastar_n2 <- function(Q_n, vals=NA) {
+        fnc <- function(u,x) {
+          u <- round(u,-log10(C$appx$s))
+          if (u==0) {
+            return(0)
+          } else {
+            smp <- round(runif(10^4),2)
+            res <- mean(sapply(smp, function(s) {
+              In(s<=u) * (1 - Q_n(C$t_0, x, s))
+            }))
+            return(res)
+            # s_seq <- round(seq(C$appx$s,u,C$appx$s),-log10(C$appx$s))
+            # integral <- C$appx$s * sum(sapply(s_seq, function(s) {
+            #   Q_n(C$t_0, x, s)
+            # }))
+            # return(u-integral)
+          }
         }
+        return(construct_superfunc(fnc, aux=NA, vec=c(1,2), vals=vals))
       }
-      p <- params
+      etastar_n2 <- construct_etastar_n2(Q_n, vals=NA)
       
-      # Rescale S to lie in [0,1] and round values
-      s_min <- min(dat_orig$s,na.rm=T)
-      s_max <- max(dat_orig$s,na.rm=T)
-      s_shift <- -1 * s_min
-      s_scale <- 1/(s_max-s_min)
-      dat_orig$s <- (dat_orig$s+s_shift)*s_scale
-      dat_orig <- round_dat(dat_orig)
-      
-      # Obtain minimum value (excluding edge point mass)
-      if (p$edge_corr=="min") { a_min2 <- min(dat_orig$s[dat_orig$s!=0],na.rm=T) }
-      
-      # Rescale points and remove points outside the range of S
-      points_orig <- points
-      na_head <- sum(round(points,-log10(C$appx$s))<round(s_min,-log10(C$appx$s)))
-      points <- round((points+s_shift)*s_scale, -log10(C$appx$s))
-      na_tail <- sum(points>1)
-      if (na_head>0) {
-        points <- points[-c(1:na_head)]
+      construct_etastar_n3 <- function(Q_n, vals=NA) {
+        fnc <- function(u,x) {
+          u <- round(u,-log10(C$appx$s))
+          if (u==0) {
+            return(0)
+          } else {
+            smp <- round(seq(0,1,C$appx$s),2)
+            res <- mean(sapply(smp, function(s) {
+              In(s<=u) * (1 - Q_n(C$t_0, x, s))
+            }))
+            return(res)
+            # s_seq <- round(seq(C$appx$s,u,C$appx$s),-log10(C$appx$s))
+            # integral <- C$appx$s * sum(sapply(s_seq, function(s) {
+            #   Q_n(C$t_0, x, s)
+            # }))
+            # return(u-integral)
+          }
+        }
+        return(construct_superfunc(fnc, aux=NA, vec=c(1,2), vals=vals))
       }
-      if (na_tail>0) {
-        points <- points[-c((length(points)-na_tail+1):length(points))]
-      }
-      
-      dat <- ss(dat_orig, which(dat_orig$z==1))
-      dat2 <- ss(dat, which(dat$s!=0))
-      Phi_n <- construct_Phi_n(dat2, type=p$ecdf_type)
-      ests_Phi <- Phi_n(points)
+      etastar_n3 <- construct_etastar_n3(Q_n, vals=NA)
       
     }
     
-    # Construct new estimator #2 (manual summation calc)
-    n_orig <- sum(dat2$weights)
-    Phi_n2 <- Vectorize(function(x) {
-      (1/n_orig) * sum(dat2$weights*as.integer(dat2$s<=x))
-    })
-    ests_Phi2 <- Phi_n2(points)
+    # Decompose Theta_n
+    piece_1 <- (dat$weights*omega_n(dat$x,dat$s,dat$y,dat$delta)) /
+      f_sIx_n(dat$s,dat$x)
+    piece_2 <- (1-dat_orig$weights)
     
-    # Construct new estimator #3 (manual summation calc with original n-value)
-    n_orig <- sum(dat$weights)
-    Phi_n3 <- Vectorize(function(x) {
-      (1/n_orig) * sum(dat2$weights*as.integer(dat2$s<=x))
-    })
-    ests_Phi3 <- Phi_n3(points)
+    u <- 0.5
+    Th_cmp_1 <- (1/(n_orig)) * sum(piece_1*In(dat$s<=u))
+    Th_cmp_2 <- (1/n_orig) * sum(
+      piece_2 * q_tilde_n(dat_orig$x, dat_orig$y, dat_orig$delta, u)
+    )
+    Th_cmp_3 <- (1/n_orig) * sum( etastar_n(rep(u,length(dat_orig$z)),dat_orig$x) )
+    Theta_manual <- Th_cmp_1 + Th_cmp_2 + Th_cmp_3
     
-    # Construct new estimator #4 (not excluding edge points)
-    Phi_n4 <- construct_Phi_n(dat, type=p$ecdf_type)
-    ests_Phi4 <- Phi_n4(points)
+    # Compare to eta_n
+    p_n <- (1/n_orig) * sum(dat$weights * as.integer(dat$s!=0))
+    eta_n <- construct_eta_n(dat, Q_n, p_n, vals=NA)
+    Th_cmp_3c <- (1/n_orig) * sum( etastar_n2(rep(u,length(dat_orig$z)),dat_orig$x) )
     
-    # Return results
-    res_list <- list()
-    for (i in 1:length(C$points)) {
-      m <- format(C$points[i], nsmall=1)
-      res_list[paste0("Phi_",m)] <- C$points[i] # Only works for Unif(0,1)
-      res_list[paste0("estP_",m)] <- ests_Phi[i]
-      res_list[paste0("estP2_",m)] <- ests_Phi2[i]
-      res_list[paste0("estP3_",m)] <- ests_Phi3[i]
-      res_list[paste0("estP4_",m)] <- ests_Phi4[i]
-    }
+    if (F) {
+      # # From est_curve.R
+      # f_s_n <- construct_f_s_n(dat_orig, vlist$S_grid, f_sIx_n)
+      # g_n <- construct_g_n(f_sIx_n, f_s_n)
+      # p_n <- (1/n_orig) * sum(dat$weights * as.integer(dat$s!=0))
+      # eta_n <- construct_eta_n(dat, Q_n, p_n, vals=NA)
+      # gcomp_n <- construct_gcomp_n(dat_orig, vals=vlist$S_grid, Q_n)
+      # alpha_star_n <- construct_alpha_star_n(dat, gcomp_n, p_n, vals=NA)
+      # f_n_srv <- construct_f_n_srv(Q_n=Q_n, Qc_n=Qc_n)
+      # q_n <- construct_q_n(type=p$q_n_type, dat, dat_orig, omega_n=omega_n, g_n=g_n,
+      #                      p_n=p_n, gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
+      #                      Q_n=Q_n, Qc_n=Qc_n, f_n_srv=f_n_srv)
+      # Gamma_os_n <- construct_Gamma_os_n(dat, dat_orig, omega_n, g_n, eta_n, p_n,
+      #                                    q_n, gcomp_n, alpha_star_n,
+      #                                    vals=vlist$S_grid)
+    } # DEBUG
     
-    return(res_list)
+    return(list(
+      Theta_0.5 = Theta_os_n(0.5),
+      Theta2_0.5 = Theta_os_n2(0.5),
+      Theta_manual = Theta_manual,
+      Th_cmp_1 = Th_cmp_1,
+      Th_cmp_2 = Th_cmp_2,
+      Th_cmp_3 = Th_cmp_3,
+      Th_cmp_3c = Th_cmp_3c,
+      etastar1 = etastar_n(u=0.5, x=c(0,0)),
+      etastar2 = etastar_n2(u=0.5, x=c(0,0))
+    ))
+    
+    if (F) {
+      # return(list(
+      #   Theta_0.0 = Theta_os_n(0),
+      #   Gamma_0.0 = Gamma_os_n(0),
+      #   Theta_0.2 = Theta_os_n(0.2),
+      #   Gamma_0.2 = Gamma_os_n(0.2),
+      #   Theta_0.5 = Theta_os_n(0.5),
+      #   Gamma_0.5 = Gamma_os_n(0.5),
+      #   Theta_0.7 = Theta_os_n(0.7),
+      #   Gamma_0.7 = Gamma_os_n(0.7),
+      #   Theta_1.0 = Theta_os_n(1),
+      #   Gamma_1.0 = Gamma_os_n(1)
+      # ))
+    } # DEBUG
     
   }
   

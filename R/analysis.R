@@ -8,17 +8,30 @@
 
 {
   # Choose analysis
-  which_analysis <- "Janssen" # "Janssen" "Moderna" "AMP" "AZD1222"
+  which_analysis <- "HVTN 705 (new)" # "Janssen" "Moderna" "AMP" "AZD1222"
                               # "HVTN 705 (primary)" "HVTN 705 (all)"
   
-  # Uncomment this code to run multiple analyses (e.g. 1=10=Moderna, 11-14=Janssen)
-  ..tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
-  if (..tid<=4) {
-    which_analysis <- "Janssen"
+  # Set proper task ID variable
+  if (is.na(cluster_config)) {
+    .tid_var <- NA
+  } else if (cluster_config$js=="slurm") {
+    .tid_var <- "SLURM_ARRAY_TASK_ID"
+  } else if (cluster_config$js=="ge") {
+    .tid_var <- "SGE_TASK_ID"
   } else {
-    which_analysis <- "Moderna"
-    Sys.setenv("SLURM_ARRAY_TASK_ID"=as.character(round(..tid-4)))
+    stop("Invalid cluster_config$js")
   }
+  
+  # # Uncomment this code to run multiple analyses (e.g. 1=10=Moderna, 11-14=Janssen)
+  # ..tid <- as.integer(Sys.getenv(.tid_var))
+  # if (..tid<=4) {
+  #   which_analysis <- "Janssen"
+  # } else {
+  #   which_analysis <- "Moderna"
+  #   .tid_lst = list(as.character(round(..tid-4)))
+  #   names(.tid_lst) = .tid_var
+  #   do.call(Sys.setenv, .tid_lst)
+  # }
   
   # Set seed
   set.seed(1)
@@ -28,10 +41,10 @@
   # !!!!! In the correlates repo, if t_0=0, it is inferred from the data
   cfg2 <- list(
     analysis = which_analysis,
-    run_analysis = F,
+    run_analysis = T,
     run_dqa = F,
     run_debug = list(gren_var=F, objs=F),
-    run_hyptest = T
+    run_hyptest = F
   )
   
   # Set analysis-specific flags
@@ -39,7 +52,7 @@
   #       dependent on cfg2 variables
   flags <- list(
     hvtn705_abstract_fig = F,
-    table_of_cve_vals = F
+    table_of_cve_vals = T
   )
   
   # Set up analysis-specific configuration variables. Each row in the cfg2$map
@@ -95,7 +108,8 @@
                                   "linded_Phase_Data/adata/")
     cfg2$params = list(
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="m-spline",
-      gamma_type="Super Learner", ci_type="logit", q_n_type="zero",
+      gamma_type="Super Learner", ci_type="trunc", q_n_type="zero",
+      # gamma_type="Super Learner", ci_type="logit", q_n_type="zero",
       omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
       f_sIx_n_bins=15
     )
@@ -328,103 +342,6 @@
     
   }
   
-  # Note: this can probably be archived
-  if (cfg2$analysis=="HVTN 705 (primary)") {
-    
-    cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox"))
-    cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Cox"))
-    cfg2$marker <- c("Day210ELCZ", "Day210ELISpotPTEEnv",
-                     "Day210ADCPgp140C97ZAfib", "Day210IgG340mdw_V1V2",
-                     "Day210IgG340mdw_gp120_gp140_vm",
-                     "Day210mdw_xassay_overall")
-    cfg2$lab_title <- c(
-      "IgG to VT-C (EU/ml): Day 210",
-      "ELISpot PTE Env (SFC/million PBMC): Day 210",
-      "Average phagocytosis score to gp140 C97ZA: Day 210",
-      "IgG3 V1V2 breadth (Weighted avg log10 Net MFI): Day 210",
-      "IgG3 gp120 + gp140 breadth (Wt avg log10 Net MFI): Day 210",
-      "Expanded Multi-epitope functions: Day 210"
-    )
-    cfg2$lab_x <- c("IgG to VT-C (=s)",
-                    "ELISpot PTE Env (=s)",
-                    "ADCP gp140 C97ZA (=s)",
-                    "IgG3 V1V2 breadth (=s)",
-                    "IgG3 gp120+gp140 breadth (=s)",
-                    "Expanded multi-epitope functions (=s)")
-    cfg2$endpoint <- "HIV"
-    cfg2$t_0 <- c(550)
-    cfg2$dataset <- c("HVTN705_secondcasecontrolprocesseddata.csv")
-    cfg2$txct <- T
-    cfg2$cr2_trial <- c("hvtn705secondprimary")
-    cfg2$cr2_COR <- c("D210")
-    cfg2$cr2_marker <- c(1:6)
-    cfg2$edge_corr <- c("none", "min")
-    cfg2$v <- list(
-      id = c("Subjectid"),
-      time = c("Ttilde.D210"),
-      event = c("Delta.D210"),
-      wt = c("wt.D210"),
-      ph1 = c("Ph1ptids.D210"),
-      ph2 = c("Ph2ptids.D210"),
-      covariates = c("~. + RSA + Age + BMI + Riskscore")
-    )
-    cfg2$qnt <- list(
-      "Risk, nonparametric" = c(0.05,0.95), # c(0.1,0.9)
-      "CVE, nonparametric" = c(0.05,0.95), # c(0.1,0.9)
-      "Risk, Qbins" = c(0,1),
-      "CVE, Qbins" = c(0,1),
-      "Risk, Cox GAM" = c(0.025,0.975),
-      "CVE, Cox GAM" = c(0.025,0.975),
-      "Risk, Cox model" = c(0.025,0.975),
-      "CVE, Cox model" = c(0.025,0.975)
-    )
-    cfg2$zoom_x <- "zoomed" # !!!!! Changed from NA
-    cfg2$zoom_y_cve <- "zoomed"
-    cfg2$zoom_y_risk <- "zoomed (risk)"
-    cfg2$folder_local <- "HVTN 705 (primary) data/"
-    cfg2$folder_cluster <- paste0("Z:/vaccine/p705/analysis/lab/cc/copcor/")
-    cfg2$params = list(
-      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="line", # deriv_type=linear
-      gamma_type="Super Learner", ci_type="regular", q_n_type="zero",
-      omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none",
-      f_sIx_n_bins=15
-    )
-    C <- list(appx=list(t_0=10,x_tol=15,s=0.01)) # !!!!! x_tol=25
-    
-    # Variable map; one row corresponds to one CVE graph
-    cfg2$map <- data.frame(
-      marker = c(1:6),
-      lab_x = c(1:6),
-      lab_title = c(1:6),
-      t_0 = rep(1,6),
-      dataset = rep(1,6),
-      cr2_trial = rep(1,6),
-      cr2_COR = rep(1,6),
-      cr2_marker = c(1:6),
-      edge_corr = c(1,2,1,2,1,1),
-      v_id = rep(1,6),
-      v_time = rep(1,6),
-      v_event = rep(1,6),
-      v_wt = rep(1,6),
-      v_ph1 = rep(1,6),
-      v_ph2 = rep(1,6),
-      v_covariates = rep(1,6),
-      zoom_x = rep(1,6),
-      zoom_y_cve = rep(1,6),
-      zoom_y_risk = rep(1,6)
-    )
-    
-    # Secondary map for variations within a graph; map_row corresponds to which
-    #     row of cfg2$map to use
-    cfg2$map2 <- data.frame(
-      tid = c(1:6),
-      map_row = c(1:6),
-      Q_n_type = rep("Super Learner",6),
-      q_n_type = rep("zero",6)
-    )
-    
-  }
-  
   if (cfg2$analysis=="HVTN 705 (all)") {
     
     cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox"))
@@ -603,6 +520,121 @@
     
   }
   
+  if (cfg2$analysis=="HVTN 705 (new)") {
+    
+    cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox"))
+    cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Cox"))
+    cfg2$marker <- c(
+      "ICS4JMos1gp120IFNg_OR_IL2", "ICS4JMos1gp41IFNg_OR_IL2",
+      "ICS4JMos2GagIFNg_OR_IL2", "ICS4JMos2RNAseIntIFNg_OR_IL2",
+      "ICS4JMos2Sgp120IFNg_OR_IL2", "ICS4JMos2Sgp41IFNg_OR_IL2",
+      "ICS8JMos1gp120IFNg_OR_IL2", "ICS8JMos1gp41IFNg_OR_IL2",
+      "ICS8JMos2GagIFNg_OR_IL2", "ICS8JMos2RNAseIntIFNg_OR_IL2",
+      "ICS8JMos2Sgp120IFNg_OR_IL2", "ICS8JMos2Sgp41IFNg_OR_IL2"
+    )
+    cfg2$lab_title <- c(
+      "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos1 gp120: Day 210",
+      "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos1 gp41: Day 210",
+      "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos2 Gag: Day 210",
+      "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos2 RNAseInt: Day 210",
+      "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos2s gp120: Day 210",
+      "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos2s gp41: Day 210",
+      "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos1 gp120: Day 210",
+      "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos1 gp41: Day 210",
+      "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos2 Gag: Day 210",
+      "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos2 RNAseInt: Day 210",
+      "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos2s gp120: Day 210",
+      "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos2s gp41: Day 210"
+    )
+    cfg2$lab_x <- c(
+      "CD4+ T-cells IFN-g/IL-2 JMos1 gp120 (=s)",
+      "CD4+ T-cells IFN-g/IL-2 JMos1 gp41 (=s)",
+      "CD4+ T-cells IFN-g/IL-2 JMos2 Gag (=s)",
+      "CD4+ T-cells IFN-g/IL-2 JMos2 RNAseInt (=s)",
+      "CD4+ T-cells IFN-g/IL-2 JMos2s gp120 (=s)",
+      "CD4+ T-cells IFN-g/IL-2 JMos2s gp41 (=s)",
+      "CD8+ T-cells IFN-g/IL-2 JMos1 gp120 (=s)",
+      "CD8+ T-cells IFN-g/IL-2 JMos1 gp41 (=s)",
+      "CD8+ T-cells IFN-g/IL-2 JMos2 Gag (=s)",
+      "CD8+ T-cells IFN-g/IL-2 JMos2 RNAseInt (=s)",
+      "CD8+ T-cells IFN-g/IL-2 JMos2s gp120 (=s)",
+      "CD8+ T-cells IFN-g/IL-2 JMos2s gp41 (=s)"
+    )
+    cfg2$endpoint <- "HIV"
+    cfg2$t_0 <- c(550)
+    cfg2$dataset <- paste0("HVTN705_secondcasecontrolprocesseddata_excludeELIS",
+                           "potmarkersaddICSmarkers.csv")
+    cfg2$txct <- T
+    cfg2$cr2_trial <- c("hvtn705second")
+    cfg2$cr2_COR <- c("D210")
+    cfg2$cr2_marker <- c(1:12)
+    cfg2$edge_corr <- c("none", "min")
+    cfg2$v <- list(
+      id = c("Subjectid"),
+      time = c("Ttilde.D210"),
+      event = c("Delta.D210"),
+      wt = c("wt.D210"),
+      ph1 = c("Ph1ptids.D210"),
+      ph2 = c("Ph2ptids.D210"),
+      covariates = c("~. + RSA + Age + BMI + Riskscore")
+    )
+    cfg2$qnt <- list(
+      "Risk, nonparametric" = c(0.05,0.95),
+      "CVE, nonparametric" = c(0.05,0.95),
+      "Risk, Qbins" = c(0,1),
+      "CVE, Qbins" = c(0,1),
+      "Risk, Cox GAM" = c(0.025,0.975),
+      "CVE, Cox GAM" = c(0.025,0.975),
+      "Risk, Cox model" = c(0.025,0.975),
+      "CVE, Cox model" = c(0.025,0.975)
+    )
+    cfg2$zoom_x <- "zoomed"
+    cfg2$zoom_y_cve <- "zoomed"
+    cfg2$zoom_y_risk <- "zoomed (risk)"
+    cfg2$folder_local <- "HVTN 705 (all) data/"
+    cfg2$folder_cluster <- paste0("Z:/vaccine/p705/analysis/lab/cc/copcor/")
+    cfg2$params = list(
+      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="line",
+      gamma_type="Super Learner", ci_type="logit", q_n_type="zero",
+      omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none",
+      f_sIx_n_bins=15
+    )
+    C <- list(appx=list(t_0=10,x_tol=25,s=0.01)) # !!!!! Try x_tol=15 if this gives issues
+    
+    # Variable map; one row corresponds to one CVE graph
+    cfg2$map <- data.frame(
+      marker = c(1:12),
+      lab_x = c(1:12),
+      lab_title = c(1:12),
+      t_0 = rep(1,12),
+      dataset = rep(1,12),
+      cr2_trial = rep(1,12),
+      cr2_COR = rep(1,12),
+      cr2_marker = c(1:12),
+      edge_corr = c(1,1,1,1,1,1,1,1,1,1,1,1), # !!!!! TO DO
+      v_id = rep(1,12),
+      v_time = rep(1,12),
+      v_event = rep(1,12),
+      v_wt = rep(1,12),
+      v_ph1 = rep(1,12),
+      v_ph2 = rep(1,12),
+      v_covariates = rep(1,12),
+      zoom_x = rep(1,12),
+      zoom_y_cve = rep(1,12),
+      zoom_y_risk = rep(1,12)
+    )
+    
+    # Secondary map for variations within a graph; map_row corresponds to which
+    #     row of cfg2$map to use
+    cfg2$map2 <- data.frame(
+      tid = c(1:12),
+      map_row = c(1:12),
+      Q_n_type = rep("Super Learner",12),
+      q_n_type = rep("zero",12)
+    )
+    
+  }
+  
   if (cfg2$analysis=="AZD1222") {
     
     cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox"))
@@ -694,10 +726,10 @@
   
   # Set config based on local vs. cluster
   if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
-    cfg2$tid <- 6
+    cfg2$tid <- 3
     cfg2$dataset <- paste0(cfg2$folder_cluster,cfg2$dataset)
   } else {
-    cfg2$tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
+    cfg2$tid <- as.integer(Sys.getenv(.tid_var))
     cfg2$dataset <- paste0(cfg2$folder_local,cfg2$dataset)
   }
   
@@ -726,9 +758,8 @@
   }
   
   # Set additional analysis-specific flags
-  if (cfg2$analysis=="Janssen" && cfg2$marker=="Day29pseudoneutid50") {
-    flags$janssen_id50_lloq <- T
-  }
+  flags$janssen_id50_lloq <- cfg2$analysis=="Janssen" &&
+    cfg2$marker=="Day29pseudoneutid50"
   
 }
 
@@ -1194,7 +1225,7 @@ if (cfg2$run_dqa) {
     # Compute CVE estimates
     if (run_cve) {
       if (!exists("df_ct")) { stop("df_ct does not exist") }
-      risk_ct <- get.marginalized.risk.no.marker(df_ct, C$t_0)
+      risk_ct <- get.marginalized.risk.no.marker(df_ct, C$t_0) # 0.039665
       cve <- Vectorize(function(x) { 1 - x/risk_ct })
       ests_cve <- cve(ests_risk)
       if (ci_type=="regular") {
@@ -1395,12 +1426,13 @@ if (cfg2$run_hyptest) {
   return_extras <- F
   test_results <- test_2(
     dat_orig = dat_orig,
-    alt_type = "decr",
-    # alt_type = "two-tailed", # decr # !!!!! Temporarily commented out
+    # alt_type = "decr",
+    alt_type = "two-tailed", # decr # !!!!! Temporarily commented out
     # params = list(),
     # params = list(type="both", q_n_type="zero", Q_n_type="Super Learner"), # !!!!!
     params = list(
-      type = c("simple", "complex", "simple (with constant)"),
+      type = c("simple", "simple (with constant)", "S-weighted (with constant)"),
+      # type = c("simple", "complex", "simple (with constant)"),
       q_n_type = "zero",
       Q_n_type = "Super Learner" # "Cox PH"
     ), # !!!!!

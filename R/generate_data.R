@@ -3,11 +3,11 @@
 #' @param n Sample size
 #' @param alpha_3 Dose-response "relationship strength" parameter; should be
 #'     zero or negative.
-#' @param distr_A Distribution of A, possibly dependent on covariates; one of
+#' @param distr_S Distribution of S, possibly dependent on covariates; one of
 #'     c("Unif(0,1)", "Unif(0.3,0.7)", "N(0.5,0.01)", "N(0.5,0.04)",
-#'     "N(0.3+0.4w2,0.04)"). The Normals are truncated to lie in [0,1].
+#'     "N(0.3+0.4x2,0.09)"). The Normals are truncated to lie in [0,1].
 #' @param edge Propensity mechanism for point mass at edge. The distribution of
-#'     A will be (1-pi(w))*distr_A. One of the following: "none" (no point mass
+#'     S will be (1-pi(x))*distr_S. One of the following: "none" (no point mass
 #'     at the edge), "expit 0.2" (expit propensity model, prob=0.2), "expit 0.5"
 #'     (expit propensity model, prob=0.5), "Complex 0.2" (non-logit propensity
 #'     model, prob=0.2).
@@ -21,46 +21,46 @@
 #' @param dir Direction of monotonicity; one of c("incr", "decr")
 #' @param wts_type One of c("true", "estimated")
 #' @return A dataframe representing the study population
-generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
+generate_data <- function(n, alpha_3, distr_S, edge, surv_true, sc_params,
                           sampling, dir, wts_type="true") {
   
   # Sample baseline covariates
-  w <- data.frame(
-    w1 = sample(round(seq(0,1,0.1),1), size=n, replace=T),
-    w2 = rbinom(n, size=1, prob=0.5)
+  x <- data.frame(
+    x1 = sample(round(seq(0,1,0.1),1), size=n, replace=T),
+    x2 = rbinom(n, size=1, prob=0.5)
   )
   
-  # Sample A (before point mass)
-  if (distr_A=="Unif(0,1)") {
-    a <- runif(n)
-  } else if (distr_A=="Unif(0.3,0.7)") {
-    a <- runif(n, min=0.3, max=0.7)
-  } else if (distr_A=="N(0.5,0.01)") {
-    a <- rtruncnorm(n, a=0, b=1, mean=0.5, sd=0.1)
-  } else if (distr_A=="N(0.5,0.04)") {
-    a <- rtruncnorm(n, a=0, b=1, mean=0.5, sd=0.2)
-  } else if (distr_A=="N(0.3+0.4w2,0.04)") {
-    a <- rtruncnorm(n, a=0, b=1, mean=0.3+0.4*w$w2, sd=0.2)
-  } else if (distr_A=="Tri UP") {
-    a <- sqrt(runif(n))
-  } else if (distr_A=="Tri DN") {
-    a <- 1 - sqrt(runif(n))
+  # Sample S (before point mass)
+  if (distr_S=="Unif(0,1)") {
+    s <- runif(n)
+  } else if (distr_S=="Unif(0.3,0.7)") {
+    s <- runif(n, min=0.3, max=0.7)
+  } else if (distr_S=="N(0.5,0.01)") {
+    s <- rtruncnorm(n, a=0, b=1, mean=0.5, sd=0.1)
+  } else if (distr_S=="N(0.5,0.04)") {
+    s <- rtruncnorm(n, a=0, b=1, mean=0.5, sd=0.2)
+  } else if (distr_S=="N(0.3+0.4x2,0.09)") {
+    s <- rtruncnorm(n, a=0, b=1, mean=0.3+0.4*x$x2, sd=0.3)
+  } else if (distr_S=="Tri UP") {
+    s <- sqrt(runif(n))
+  } else if (distr_S=="Tri DN") {
+    s <- 1 - sqrt(runif(n))
   } else {
-    stop("distr_A incorrectly specified")
+    stop("distr_S incorrectly specified")
   }
   
-  # Adjust A for point mass at the edge
+  # Adjust S for point mass at the edge
   if (edge=="expit 0.2") {
-    edge_probs <- expit(w$w1+w$w2-2.5)
+    edge_probs <- expit(x$x1+x$x2-2.5)
   } else if (edge=="expit 0.4") {
-    edge_probs <- expit(w$w1+w$w2-1.4)
+    edge_probs <- expit(x$x1+x$x2-1.4)
   } else if (edge=="Complex 0.2") {
-    edge_probs <- 1.7*w$w2*pmax(0,1-4*abs(w$w1-0.5))
+    edge_probs <- 1.7*x$x2*pmax(0,1-4*abs(x$x1-0.5))
   } else if (edge=="none") {
     edge_probs <- 0
   }
   edge_val <- rbinom(n, size=1, prob=edge_probs)
-  a <- (1-edge_val)*a
+  s <- (1-edge_val)*s
   
   # Generate event times
   {
@@ -69,35 +69,35 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
     H_0_inv <- function(t) { ((1/sc_params$lmbd)*t)^(1/sc_params$v) }
     if (surv_true=="Cox PH") {
       if (dir=="decr") {
-        lin <- C$alpha_1*w$w1 + C$alpha_2*w$w2 + alpha_3*a - 1.7
+        lin <- C$alpha_1*x$x1 + C$alpha_2*x$x2 + alpha_3*s
       } else {
-        lin <- C$alpha_1*w$w1 + C$alpha_2*w$w2 + alpha_3*(1-a) - 1.7
+        lin <- C$alpha_1*x$x1 + C$alpha_2*x$x2 + alpha_3*(1-s)
       }
     } else if (surv_true=="Complex") {
       if (dir=="decr") {
-        lin <- alpha_3*expit(10*(2*a-1)) - 0.5
+        lin <- alpha_3*expit(20*s-10) + C$alpha_2*x$x1*x$x2
       } else {
-        lin <- alpha_3*expit(10*(2*(1-a)-1)) - 0.5
+        lin <- alpha_3*expit(20*(1-s)-10) + C$alpha_2*x$x1*x$x2
       }
     } else if (surv_true=="exp") {
       H_0_inv <- function(t) { ((1/sc_params$lmbd)*t) }
       lin <- 0
     }
-    if (surv_true=="Non PH") {
-      if (dir=="decr") {
-        t <- -1 * (1.1*expit(10-50*a))^-1 * log(U) - 1
-      } else {
-        # !!!!!
-      }
-    } else {
+    # if (surv_true=="Non PH") {
+    #   if (dir=="decr") {
+    #     t <- -1 * (1.1*expit(10-50*s))^-1 * log(U) - 1
+    #   } else {
+    #     # !!!!!
+    #   }
+    # } else {
       t <- H_0_inv(-1*log(U)*exp(-1*lin))
-    }
+    # }
     
     # Censoring times (Weibull)
     U <- runif(n)
     H_0_inv2 <- function(t) { ((1/sc_params$lmbd2)*t)^(1/sc_params$v2) }
     if (surv_true %in% c("Cox PH", "Complex", "Non PH")) {
-      lin <- C$alpha_1*w$w1 + C$alpha_2*w$w2 - 1
+      lin <- C$alpha_1*x$x1 + C$alpha_2*x$x2
     } else if (surv_true=="exp") {
       H_0_inv2 <- function(t) { ((1/sc_params$lmbd2)*t) }
       lin <- 0
@@ -105,84 +105,82 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
     c <- H_0_inv2(-1*log(U)*exp(-1*lin))
     
     # Generate survival variables
-    y_star <- pmin(t,c)
-    delta_star <- as.integer(y_star==t)
+    y <- pmin(t,c)
+    delta <- as.integer(y==t)
     
   }
   
   # Conduct sampling
   if (sampling=="iid") {
-    dat_orig <- list(id=c(1:n), w=w, a=a, delta=rep(1,n),
-                     y_star=y_star, delta_star=delta_star)
+    dat_orig <- list(id=c(1:n), x=x, s=s, z=rep(1,n), y=y, delta=delta)
   } else {
-    delta <- rbinom(n, size=1, prob=Pi(sampling,delta_star,y_star,w))
-    dat_orig <- list(id=c(1:n), w=w, a=ifelse(delta==1,a,NA), delta=delta,
-                     y_star=y_star, delta_star=delta_star)
+    z <- rbinom(n, size=1, prob=Pi(sampling,delta,y,x))
+    dat_orig <- list(id=c(1:n), x=x, s=ifelse(z==1,s,NA), z=z, y=y, delta=delta)
   }
   
-  # Set up function to calculate true regression values over C$points
+  # Set up function to calculate true marginalized risk values over C$points
   # These are Monte Carlo approximations
   {
     m <- 10^5 # 10^6
-    w1 <- sample(round(seq(0,1,0.1),1), size=m, replace=T)
-    w2 <- rbinom(m, size=1, prob=0.5)
+    x1 <- sample(round(seq(0,1,0.1),1), size=m, replace=T)
+    x2 <- rbinom(m, size=1, prob=0.5)
     
-    lin <- function(w1,w2,a) {
+    lin <- function(x1,x2,s) {
       if (surv_true=="Cox PH") {
         if (dir=="decr") {
-          C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*a - 1.7
+          C$alpha_1*x1 + C$alpha_2*x2 + alpha_3*s
         } else {
-          C$alpha_1*w1 + C$alpha_2*w2 + alpha_3*(1-a) - 1.7
+          C$alpha_1*x1 + C$alpha_2*x2 + alpha_3*(1-s)
         }
       } else if (surv_true=="Complex") {
         if (dir=="decr") {
-          alpha_3*expit(10*(2*a-1)) - 0.5
+          alpha_3*expit(20*s-10) + C$alpha_2*x1*x2
         } else {
-          alpha_3*expit(10*(2*(1-a)-1)) - 0.5
+          alpha_3*expit(20*(1-s)-10) + C$alpha_2*x1*x2
         }
       }
     }
     
     if (surv_true %in% c("Cox PH", "Complex")) {
-      S_0 <- function(t, w1, w2, a) {
-        exp( -1 * sc_params$lmbd * (t^sc_params$v) * exp(lin(w1,w2,a)) )
+      Q_0 <- function(t, x1, x2, s) {
+        exp( -1 * sc_params$lmbd * (t^sc_params$v) * exp(lin(x1,x2,s)) )
       }
     } else if (surv_true=="Non PH") {
-      S_0 <- function(t, w1, w2, a) {
-        if (dir=="decr") {
-          exp(-1*1.1*(t+1)*expit(10-50*a))
-        } else {
-          # !!!!!
-        }
-      }
+      # Q_0 <- function(t, x1, x2, s) {
+      #   if (dir=="decr") {
+      #     exp(-1*1.1*(t+1)*expit(10-50*s))
+      #   } else {
+      #     # !!!!!
+      #   }
+      # }
     } else if (surv_true=="exp") {
-      S_0 <- function(t, w1, w2, a) { exp(-1*sc_params$lmbd*t) }
+      Q_0 <- function(t, x1, x2, s) { exp(-1*sc_params$lmbd*t) }
     }
     
-    theta_true_f <- Vectorize(function(a) { 1 - mean(S_0(C$t_e,w1,w2,a)) })
+    r_M0_f <- Vectorize(function(s) { 1 - mean(Q_0(C$t_0,x1,x2,s)) })
     
     # Note: Uncomment this to return true Theta_true
-    #       Only holds if A and W are independent
+    #       Only holds if S and X are independent
     if (T) {
       
-      if (distr_A=="Unif(0,1)") {
-        a <- runif(m)
-      } else if (distr_A=="Unif(0.3,0.7)") {
-        a <- runif(m, min=0.3, max=0.7)
-      } else if (distr_A=="N(0.5,0.01)") {
-        a <- rtruncnorm(m, a=0, b=1, mean=0.5, sd=0.1)
-      } else if (distr_A=="N(0.5,0.04)") {
-        a <- rtruncnorm(m, a=0, b=1, mean=0.5, sd=0.2)
-      } else if (distr_A=="N(0.3+0.4w2,0.04)") {
-        a <- rtruncnorm(m, a=0, b=1, mean=0.3+0.4*w2, sd=0.2)
-      } else if (distr_A=="Tri UP") {
-        a <- sqrt(runif(m))
-      } else if (distr_A=="Tri DN") {
-        a <- 1 - sqrt(runif(m))
+      if (distr_S=="Unif(0,1)") {
+        s <- runif(m)
+      } else if (distr_S=="Unif(0.3,0.7)") {
+        s <- runif(m, min=0.3, max=0.7)
+      } else if (distr_S=="N(0.5,0.01)") {
+        s <- rtruncnorm(m, a=0, b=1, mean=0.5, sd=0.1)
+      } else if (distr_S=="N(0.5,0.04)") {
+        s <- rtruncnorm(m, a=0, b=1, mean=0.5, sd=0.2)
+      } else if (distr_S=="N(0.3+0.4x2,0.09)") {
+        s <- rtruncnorm(m, a=0, b=1, mean=0.3+0.4*x2, sd=0.3)
+      } else if (distr_S=="Tri UP") {
+        s <- sqrt(runif(m))
+      } else if (distr_S=="Tri DN") {
+        s <- 1 - sqrt(runif(m))
       }
       
-      Gamma_true_f <- Vectorize(function(x) {
-        mean( as.integer(a<=x) * (1-S_0(C$t_e,w1,w2,a)) )
+      Gamma_true_f <- Vectorize(function(u) {
+        mean( as.integer(s<=u) * (1-Q_0(C$t_0,x1,x2,s)) )
       })
       attr(dat_orig, "Gamma_true") <- Gamma_true_f(C$points)
       
@@ -191,7 +189,7 @@ generate_data <- function(n, alpha_3, distr_A, edge, surv_true, sc_params,
   }
   
   # Add attributes to dataframe
-  attr(dat_orig, "theta_true") <- theta_true_f(C$points)
+  attr(dat_orig, "r_M0") <- r_M0_f(C$points)
   attr(dat_orig, "sampling") <- sampling
   
   # Add (stabilized) inverse weights

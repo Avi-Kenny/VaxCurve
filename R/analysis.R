@@ -8,16 +8,29 @@
 
 {
   # Choose analysis
-  which_analysis <- "HVTN 705 (all)" # "Janssen" "Moderna" "AMP" "AZD1222"
+  which_analysis <- "HVTN 705 (new)" # "Janssen" "Moderna" "AMP" "AZD1222"
                               # "HVTN 705 (primary)" "HVTN 705 (all)"
   
+  # Set proper task ID variable
+  if (is.na(cluster_config)) {
+    .tid_var <- NA
+  } else if (cluster_config$js=="slurm") {
+    .tid_var <- "SLURM_ARRAY_TASK_ID"
+  } else if (cluster_config$js=="ge") {
+    .tid_var <- "SGE_TASK_ID"
+  } else {
+    stop("Invalid cluster_config$js")
+  }
+  
   # # Uncomment this code to run multiple analyses (e.g. 1=10=Moderna, 11-14=Janssen)
-  # ..tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
+  # ..tid <- as.integer(Sys.getenv(.tid_var))
   # if (..tid<=4) {
   #   which_analysis <- "Janssen"
   # } else {
   #   which_analysis <- "Moderna"
-  #   Sys.setenv("SLURM_ARRAY_TASK_ID"=as.character(round(..tid-4)))
+  #   .tid_lst = list(as.character(round(..tid-4)))
+  #   names(.tid_lst) = .tid_var
+  #   do.call(Sys.setenv, .tid_lst)
   # }
   
   # Set seed
@@ -25,13 +38,21 @@
   
   # Set configuration variables
   # Note: NA param values are set below based on the task ID
-  # !!!!! In the correlates repo, if t_e=0, it is inferred from the data
+  # !!!!! In the correlates repo, if t_0=0, it is inferred from the data
   cfg2 <- list(
     analysis = which_analysis,
     run_analysis = T,
     run_dqa = F,
     run_debug = list(gren_var=F, objs=F),
     run_hyptest = F
+  )
+  
+  # Set analysis-specific flags
+  # Note: some flags are set at the end of the "Setup" block because they are
+  #       dependent on cfg2 variables
+  flags <- list(
+    hvtn705_abstract_fig = F,
+    table_of_cve_vals = T
   )
   
   # Set up analysis-specific configuration variables. Each row in the cfg2$map
@@ -52,7 +73,7 @@
                     "Pseudovirus-nAb ID50 (IU50/ml) (=s)",
                     "Phagocytic Score (=s)")
     cfg2$endpoint <- "COVID"
-    cfg2$t_e <- c(54)
+    cfg2$t_0 <- c(54)
     cfg2$dataset <- c(
       "janssen_pooled_real_data_processed_with_riskscore.csv",
       "janssen_pooled_realADCP_data_processed_with_riskscore.csv"
@@ -86,19 +107,20 @@
     cfg2$folder_cluster <- paste0("Z:/covpn/p3003/analysis/correlates/Part_A_B",
                                   "linded_Phase_Data/adata/")
     cfg2$params = list(
-      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="linear",
-      gamma_type="Super Learner", ci_type="regular", q_n_type="zero",
+      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="m-spline",
+      gamma_type="Super Learner", ci_type="trunc", q_n_type="zero",
+      # gamma_type="Super Learner", ci_type="logit", q_n_type="zero",
       omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
-      f_aIw_n_bins=15
+      f_sIx_n_bins=15
     )
-    C <- list(appx=list(t_e=1,w_tol=25,a=0.01))
+    C <- list(appx=list(t_0=1,x_tol=25,s=0.01))
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
       marker = c(1,2,3,4),
       lab_x = c(1,2,3,4),
       lab_title = c(1,2,3,4),
-      t_e = c(1,1,1,1),
+      t_0 = c(1,1,1,1),
       dataset = c(1,1,1,2),
       cr2_trial = c(1,1,1,2),
       cr2_COR = c(1,1,1,1),
@@ -121,8 +143,8 @@
     cfg2$map2 <- data.frame(
       tid = c(1:4),
       map_row = c(1:4),
-      S_n_type = rep("Super Learner",4),
-      marg = rep("Gamma_star2",4)
+      Q_n_type = rep("Super Learner",4),
+      q_n_type = rep("zero",4) # "new"
     )
     
   }
@@ -152,7 +174,7 @@
                     "Pseudovirus-nAb ID80 (IU80/ml) (=s)",
                     "Live Virus-mnAb ID50 (IU50/ml) (=s)")
     cfg2$endpoint <- "COVID"
-    cfg2$t_e <- c(126,100)
+    cfg2$t_0 <- c(126,100)
     cfg2$dataset <- c(paste0("P3001ModernaCOVEimmunemarkerdata_correlates_proc",
                              "essed_v1.1_lvmn_added_Jan14_2022.csv"))
     cfg2$txct <- T
@@ -195,16 +217,16 @@
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="m-spline",
       gamma_type="Super Learner", ci_type="regular", q_n_type="zero",
       omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
-      f_aIw_n_bins=15
+      f_sIx_n_bins=15
     )
-    C <- list(appx=list(t_e=1,w_tol=25,a=0.001))
+    C <- list(appx=list(t_0=1,x_tol=25,s=0.01)) # !!!!!
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
       marker = c(1,2,3,4,5,6,7,8,9,10),
       lab_x = c(1,1,2,2,3,3,4,4,5,5),
       lab_title = c(1,2,3,4,5,6,7,8,9,10),
-      t_e = c(1,2,1,2,1,2,1,2,1,2),
+      t_0 = c(1,2,1,2,1,2,1,2,1,2),
       dataset = c(1,1,1,1,1,1,1,1,1,1),
       cr2_trial = c(1,1,1,1,1,1,1,1,1,1),
       cr2_COR = c(1,2,1,2,1,2,1,2,1,2),
@@ -229,8 +251,8 @@
     cfg2$map2 <- data.frame(
       tid = c(1:10),
       map_row = c(1:10),
-      S_n_type = rep("Super Learner",10),
-      marg = rep("Gamma_star", 10)
+      Q_n_type = rep("Super Learner",10),
+      q_n_type = rep("zero", 10)
     )
     
   }
@@ -245,7 +267,7 @@
     cfg2$endpoint <- "HIV-1 infection"
     cfg2$amp_protocol <- c("HVTN 703", "HVTN 704", "Pooled")
     cfg2$amp_tx <- c("C3", "T1", "T2", "T1+T2")
-    cfg2$t_e <- c(595,595) # c(601,609)
+    cfg2$t_0 <- c(595,595) # c(601,609)
     cfg2$dataset <- "amp_survival_all.csv"
     cfg2$txct <- F
     cfg2$cr2_trial <- F
@@ -280,9 +302,9 @@
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="linear",
       gamma_type="Super Learner", ci_type="regular", q_n_type="zero",
       omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
-      f_aIw_n_bins=15
+      f_sIx_n_bins=15
     )
-    C <- list(appx=list(t_e=10,w_tol=25,a=0.01))
+    C <- list(appx=list(t_0=10,x_tol=25,s=0.01))
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
@@ -291,7 +313,7 @@
       marker = rep(1,12),
       lab_x = rep(1,12),
       lab_title = c(1,1,1,1,2,2,2,2,3,3,3,3),
-      t_e = c(1,1,1,1,2,2,2,2,1,1,1,1),
+      t_0 = c(1,1,1,1,2,2,2,2,1,1,1,1),
       dataset = rep(1,12),
       cr2_trial = rep(1,12),
       cr2_COR = rep(1,12),
@@ -314,105 +336,8 @@
     cfg2$map2 <- data.frame(
       tid = c(1:12),
       map_row = c(1:12),
-      S_n_type = rep("Super Learner",12),
-      marg = rep("Gamma_star2", 12)
-    )
-    
-  }
-  
-  # Note: this can probably be archived
-  if (cfg2$analysis=="HVTN 705 (primary)") {
-    
-    cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox"))
-    cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Cox"))
-    cfg2$marker <- c("Day210ELCZ", "Day210ELISpotPTEEnv",
-                     "Day210ADCPgp140C97ZAfib", "Day210IgG340mdw_V1V2",
-                     "Day210IgG340mdw_gp120_gp140_vm",
-                     "Day210mdw_xassay_overall")
-    cfg2$lab_title <- c(
-      "IgG to VT-C (EU/ml): Day 210",
-      "ELISpot PTE Env (SFC/million PBMC): Day 210",
-      "Average phagocytosis score to gp140 C97ZA: Day 210",
-      "IgG3 V1V2 breadth (Weighted avg log10 Net MFI): Day 210",
-      "IgG3 gp120 + gp140 breadth (Wt avg log10 Net MFI): Day 210",
-      "Expanded Multi-epitope functions: Day 210"
-    )
-    cfg2$lab_x <- c("IgG to VT-C (=s)",
-                    "ELISpot PTE Env (=s)",
-                    "ADCP gp140 C97ZA (=s)",
-                    "IgG3 V1V2 breadth (=s)",
-                    "IgG3 gp120+gp140 breadth (=s)",
-                    "Expanded multi-epitope functions (=s)")
-    cfg2$endpoint <- "HIV"
-    cfg2$t_e <- c(550)
-    cfg2$dataset <- c("HVTN705_secondcasecontrolprocesseddata.csv")
-    cfg2$txct <- T
-    cfg2$cr2_trial <- c("hvtn705secondprimary")
-    cfg2$cr2_COR <- c("D210")
-    cfg2$cr2_marker <- c(1:6)
-    cfg2$edge_corr <- c("none", "min")
-    cfg2$v <- list(
-      id = c("Subjectid"),
-      time = c("Ttilde.D210"),
-      event = c("Delta.D210"),
-      wt = c("wt.D210"),
-      ph1 = c("Ph1ptids.D210"),
-      ph2 = c("Ph2ptids.D210"),
-      covariates = c("~. + RSA + Age + BMI + Riskscore")
-    )
-    cfg2$qnt <- list(
-      "Risk, nonparametric" = c(0.05,0.95), # c(0.1,0.9)
-      "CVE, nonparametric" = c(0.05,0.95), # c(0.1,0.9)
-      "Risk, Qbins" = c(0,1),
-      "CVE, Qbins" = c(0,1),
-      "Risk, Cox GAM" = c(0.025,0.975),
-      "CVE, Cox GAM" = c(0.025,0.975),
-      "Risk, Cox model" = c(0.025,0.975),
-      "CVE, Cox model" = c(0.025,0.975)
-    )
-    cfg2$zoom_x <- "zoomed" # !!!!! Changed from NA
-    cfg2$zoom_y_cve <- "zoomed"
-    cfg2$zoom_y_risk <- "zoomed (risk)"
-    cfg2$folder_local <- "HVTN 705 (primary) data/"
-    cfg2$folder_cluster <- paste0("Z:/vaccine/p705/analysis/lab/cc/copcor/")
-    cfg2$params = list(
-      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="line", # deriv_type=linear
-      gamma_type="Super Learner", ci_type="regular", q_n_type="zero",
-      omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none",
-      f_aIw_n_bins=15
-    )
-    C <- list(appx=list(t_e=10,w_tol=15,a=0.01)) # !!!!! w_tol=25
-    
-    # Variable map; one row corresponds to one CVE graph
-    cfg2$map <- data.frame(
-      marker = c(1:6),
-      lab_x = c(1:6),
-      lab_title = c(1:6),
-      t_e = rep(1,6),
-      dataset = rep(1,6),
-      cr2_trial = rep(1,6),
-      cr2_COR = rep(1,6),
-      cr2_marker = c(1:6),
-      edge_corr = c(1,2,1,2,1,1),
-      v_id = rep(1,6),
-      v_time = rep(1,6),
-      v_event = rep(1,6),
-      v_wt = rep(1,6),
-      v_ph1 = rep(1,6),
-      v_ph2 = rep(1,6),
-      v_covariates = rep(1,6),
-      zoom_x = rep(1,6),
-      zoom_y_cve = rep(1,6),
-      zoom_y_risk = rep(1,6)
-    )
-    
-    # Secondary map for variations within a graph; map_row corresponds to which
-    #     row of cfg2$map to use
-    cfg2$map2 <- data.frame(
-      tid = c(1:6),
-      map_row = c(1:6),
-      S_n_type = rep("Super Learner",6),
-      marg = rep("Gamma_star",6)
+      Q_n_type = rep("Super Learner",12),
+      q_n_type = rep("new", 12)
     )
     
   }
@@ -518,7 +443,7 @@
       "IgG gp70-Ce1086.B2 V1V2 (=s)", "IgG gp70.B.CaseA V1V2 (=s)"
     )
     cfg2$endpoint <- "HIV"
-    cfg2$t_e <- c(550)
+    cfg2$t_0 <- c(550)
     cfg2$dataset <- c("HVTN705_secondcasecontrolprocesseddata_excludeELISpotmarkers.csv") # c("HVTN705_secondcasecontrolprocesseddata.csv")
     cfg2$txct <- T
     cfg2$cr2_trial <- c("hvtn705second")
@@ -544,7 +469,8 @@
       "Risk, Cox model" = c(0.025,0.975),
       "CVE, Cox model" = c(0.025,0.975)
     )
-    cfg2$zoom_x <- "zoomed" # !!!!! Changed from NA
+    cfg2$zoom_x <- NA # !!!!! Temporarily switched back to this
+    # cfg2$zoom_x <- "zoomed" # !!!!! Changed from NA
     cfg2$zoom_y_cve <- "zoomed"
     cfg2$zoom_y_risk <- "zoomed (risk)"
     cfg2$folder_local <- "HVTN 705 (all) data/"
@@ -553,16 +479,16 @@
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="line",
       gamma_type="Super Learner", ci_type="regular", q_n_type="zero",
       omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none",
-      f_aIw_n_bins=15
+      f_sIx_n_bins=15
     )
-    C <- list(appx=list(t_e=10,w_tol=15,a=0.01)) # !!!!! w_tol=25
+    C <- list(appx=list(t_0=10,x_tol=15,s=0.01)) # !!!!! x_tol=25
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
       marker = c(1:39), # c(1:41)
       lab_x = c(1:39), # c(1:41)
       lab_title = c(1:39), # c(1:41)
-      t_e = rep(1,39), # rep(1,41)
+      t_0 = rep(1,39), # rep(1,41)
       dataset = rep(1,39), # rep(1,41)
       cr2_trial = rep(1,39), # rep(1,41)
       cr2_COR = rep(1,39), # rep(1,41)
@@ -588,8 +514,123 @@
     cfg2$map2 <- data.frame(
       tid = c(1:39), # c(1:41)
       map_row = c(1:39), # c(1:41)
-      S_n_type = rep("Super Learner",39), # 41
-      marg = rep("Gamma_star",39) # 41
+      Q_n_type = rep("Super Learner",39), # 41
+      q_n_type = rep("zero",39) # 41
+    )
+    
+  }
+  
+  if (cfg2$analysis=="HVTN 705 (new)") {
+    
+    cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox"))
+    cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Cox"))
+    cfg2$marker <- c(
+      "ICS4JMos1gp120IFNg_OR_IL2", "ICS4JMos1gp41IFNg_OR_IL2",
+      "ICS4JMos2GagIFNg_OR_IL2", "ICS4JMos2RNAseIntIFNg_OR_IL2",
+      "ICS4JMos2Sgp120IFNg_OR_IL2", "ICS4JMos2Sgp41IFNg_OR_IL2",
+      "ICS8JMos1gp120IFNg_OR_IL2", "ICS8JMos1gp41IFNg_OR_IL2",
+      "ICS8JMos2GagIFNg_OR_IL2", "ICS8JMos2RNAseIntIFNg_OR_IL2",
+      "ICS8JMos2Sgp120IFNg_OR_IL2", "ICS8JMos2Sgp41IFNg_OR_IL2"
+    )
+    cfg2$lab_title <- c(
+      "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos1 gp120: Day 210",
+      "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos1 gp41: Day 210",
+      "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos2 Gag: Day 210",
+      "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos2 RNAseInt: Day 210",
+      "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos2s gp120: Day 210",
+      "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos2s gp41: Day 210",
+      "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos1 gp120: Day 210",
+      "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos1 gp41: Day 210",
+      "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos2 Gag: Day 210",
+      "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos2 RNAseInt: Day 210",
+      "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos2s gp120: Day 210",
+      "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos2s gp41: Day 210"
+    )
+    cfg2$lab_x <- c(
+      "CD4+ T-cells IFN-g/IL-2 JMos1 gp120 (=s)",
+      "CD4+ T-cells IFN-g/IL-2 JMos1 gp41 (=s)",
+      "CD4+ T-cells IFN-g/IL-2 JMos2 Gag (=s)",
+      "CD4+ T-cells IFN-g/IL-2 JMos2 RNAseInt (=s)",
+      "CD4+ T-cells IFN-g/IL-2 JMos2s gp120 (=s)",
+      "CD4+ T-cells IFN-g/IL-2 JMos2s gp41 (=s)",
+      "CD8+ T-cells IFN-g/IL-2 JMos1 gp120 (=s)",
+      "CD8+ T-cells IFN-g/IL-2 JMos1 gp41 (=s)",
+      "CD8+ T-cells IFN-g/IL-2 JMos2 Gag (=s)",
+      "CD8+ T-cells IFN-g/IL-2 JMos2 RNAseInt (=s)",
+      "CD8+ T-cells IFN-g/IL-2 JMos2s gp120 (=s)",
+      "CD8+ T-cells IFN-g/IL-2 JMos2s gp41 (=s)"
+    )
+    cfg2$endpoint <- "HIV"
+    cfg2$t_0 <- c(550)
+    cfg2$dataset <- paste0("HVTN705_secondcasecontrolprocesseddata_excludeELIS",
+                           "potmarkersaddICSmarkers.csv")
+    cfg2$txct <- T
+    cfg2$cr2_trial <- c("hvtn705second")
+    cfg2$cr2_COR <- c("D210")
+    cfg2$cr2_marker <- c(1:12)
+    cfg2$edge_corr <- c("none", "min")
+    cfg2$v <- list(
+      id = c("Subjectid"),
+      time = c("Ttilde.D210"),
+      event = c("Delta.D210"),
+      wt = c("wt.D210"),
+      ph1 = c("Ph1ptids.D210"),
+      ph2 = c("Ph2ptids.D210"),
+      covariates = c("~. + RSA + Age + BMI + Riskscore")
+    )
+    cfg2$qnt <- list(
+      "Risk, nonparametric" = c(0.05,0.95),
+      "CVE, nonparametric" = c(0.05,0.95),
+      "Risk, Qbins" = c(0,1),
+      "CVE, Qbins" = c(0,1),
+      "Risk, Cox GAM" = c(0.025,0.975),
+      "CVE, Cox GAM" = c(0.025,0.975),
+      "Risk, Cox model" = c(0.025,0.975),
+      "CVE, Cox model" = c(0.025,0.975)
+    )
+    cfg2$zoom_x <- "zoomed"
+    cfg2$zoom_y_cve <- "zoomed"
+    cfg2$zoom_y_risk <- "zoomed (risk)"
+    cfg2$folder_local <- "HVTN 705 (all) data/"
+    cfg2$folder_cluster <- paste0("Z:/vaccine/p705/analysis/lab/cc/copcor/")
+    cfg2$params = list(
+      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="line",
+      gamma_type="Super Learner", ci_type="logit", q_n_type="zero",
+      omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none",
+      f_sIx_n_bins=15
+    )
+    C <- list(appx=list(t_0=10,x_tol=25,s=0.01)) # !!!!! Try x_tol=15 if this gives issues
+    
+    # Variable map; one row corresponds to one CVE graph
+    cfg2$map <- data.frame(
+      marker = c(1:12),
+      lab_x = c(1:12),
+      lab_title = c(1:12),
+      t_0 = rep(1,12),
+      dataset = rep(1,12),
+      cr2_trial = rep(1,12),
+      cr2_COR = rep(1,12),
+      cr2_marker = c(1:12),
+      edge_corr = c(1,1,1,1,1,1,1,1,1,1,1,1), # !!!!! TO DO
+      v_id = rep(1,12),
+      v_time = rep(1,12),
+      v_event = rep(1,12),
+      v_wt = rep(1,12),
+      v_ph1 = rep(1,12),
+      v_ph2 = rep(1,12),
+      v_covariates = rep(1,12),
+      zoom_x = rep(1,12),
+      zoom_y_cve = rep(1,12),
+      zoom_y_risk = rep(1,12)
+    )
+    
+    # Secondary map for variations within a graph; map_row corresponds to which
+    #     row of cfg2$map to use
+    cfg2$map2 <- data.frame(
+      tid = c(1:12),
+      map_row = c(1:12),
+      Q_n_type = rep("Super Learner",12),
+      q_n_type = rep("zero",12)
     )
     
   }
@@ -609,7 +650,7 @@
     cfg2$lab_x <- c("Pseudovirus-nAb ID50 (IU50/ml) (=s)",
                     "Anti Spike IgG (BAU/ml) (=s)")
     cfg2$endpoint <- "COVID"
-    cfg2$t_e <- c(117,92)
+    cfg2$t_0 <- c(117,92)
     cfg2$dataset <- c("azd1222_data_processed_with_riskscore.csv",
                       "azd1222_bAb_data_processed_with_riskscore.csv")
     cfg2$txct <- T
@@ -645,16 +686,16 @@
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="line",
       gamma_type="Super Learner", ci_type="regular", q_n_type="zero",
       omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none",
-      f_aIw_n_bins=15
+      f_sIx_n_bins=15
     )
-    C <- list(appx=list(t_e=10,w_tol=25,a=0.01))
+    C <- list(appx=list(t_0=10,x_tol=25,s=0.01))
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
       marker = c(1,2,3,4),
       lab_x = c(1,1,2,2),
       lab_title = c(1,2,3,4),
-      t_e = c(1,2,1,2),
+      t_0 = c(1,2,1,2),
       dataset = c(1,1,2,2),
       cr2_trial = c(1,1,2,2),
       cr2_COR = c(1,2,1,2),
@@ -677,25 +718,25 @@
     cfg2$map2 <- data.frame(
       tid = c(1:4),
       map_row = c(1:4),
-      S_n_type = rep("Super Learner",4),
-      marg = rep("Gamma_star2",4)
+      Q_n_type = rep("Super Learner",4),
+      q_n_type = rep("new",4)
     )
     
   }
   
   # Set config based on local vs. cluster
   if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
-    cfg2$tid <- 4
+    cfg2$tid <- 3
     cfg2$dataset <- paste0(cfg2$folder_cluster,cfg2$dataset)
   } else {
-    cfg2$tid <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID"))
+    cfg2$tid <- as.integer(Sys.getenv(.tid_var))
     cfg2$dataset <- paste0(cfg2$folder_local,cfg2$dataset)
   }
   
   # Set config based on cfg2$map and cfg2$map2
   i <- cfg2$map2[cfg2$tid,"map_row"]
   for (x in c("marker", "lab_x", "lab_title", "day", "dataset", "cr2_trial",
-              "cr2_COR", "cr2_marker", "t_e", "zoom_x", "zoom_y_cve",
+              "cr2_COR", "cr2_marker", "t_0", "zoom_x", "zoom_y_cve",
               "zoom_y_risk", "llox_label", "llox")) {
     cfg2[[x]] <- cfg2[[x]][[cfg2$map[i,x]]]
   }
@@ -709,12 +750,16 @@
   }
   cfg2$params$edge_corr <- cfg2$edge_corr[cfg2$map[i,"edge_corr"]]
   cfg2$v$covariates <- formula(cfg2$v$covariates)
-  cfg2$params$S_n_type <- cfg2$map2[cfg2$tid,"S_n_type"]
-  cfg2$params$marg <- cfg2$map2[cfg2$tid,"marg"]
-  C$t_e <- cfg2$t_e
+  cfg2$params$Q_n_type <- cfg2$map2[cfg2$tid,"Q_n_type"]
+  cfg2$params$q_n_type <- cfg2$map2[cfg2$tid,"q_n_type"]
+  C$t_0 <- cfg2$t_0
   if ((i %in% c(5,7,9)) && cfg2$analysis=="Moderna") {
     cfg2$qnt <- lapply(cfg2$qnt, function(x) { c(0,x[2]) }) # !!!!! temp hack
   }
+  
+  # Set additional analysis-specific flags
+  flags$janssen_id50_lloq <- cfg2$analysis=="Janssen" &&
+    cfg2$marker=="Day29pseudoneutid50"
   
 }
 
@@ -776,20 +821,20 @@
     }
     return(list("vars"=vars, "factors"=factors))
   })(cfg2$v$covariates)
-  df_w <- data.frame(x=c(1:length(df_analysis[[f$vars[1]]])))
+  df_x <- data.frame(tmp=c(1:length(df_analysis[[f$vars[1]]])))
   col <- 1
   for (i in c(1:length(f$vars))) {
     if (f$factors[i]==0) {
-      df_w[[paste0("w",col)]] <- df_analysis[[f$vars[i]]]
+      df_x[[paste0("x",col)]] <- df_analysis[[f$vars[i]]]
       col <- col + 1
     } else {
-      w_col <- as.factor(df_analysis[[f$vars[i]]])
-      levs <- unique(w_col)
+      x_col <- as.factor(df_analysis[[f$vars[i]]])
+      levs <- unique(x_col)
       if (length(levs)==1) {
         stop(paste("Covariate", f$vars[i], "has only one unique level"))
       } else {
         for (j in c(1:(length(levs)-1))) {
-          df_w[[paste0("w",col)]] <- as.integer(
+          df_x[[paste0("x",col)]] <- as.integer(
             df_analysis[[f$vars[i]]]==levs[j]
           )
           col <- col + 1
@@ -797,13 +842,13 @@
       }
     }
   }
-  df_w$x <- NULL
+  df_x$tmp <- NULL
   
   # Create data structures for analysis
   if (is.na(cfg2$v$ph2)) {
-    df_delta <- rep(1, nrow(df_analysis))
+    df_z <- rep(1, nrow(df_analysis))
   } else {
-    df_delta <- as.integer(df_analysis[[cfg2$v$ph2]])
+    df_z <- as.integer(df_analysis[[cfg2$v$ph2]])
   }
   if (is.na(cfg2$v$wt)) {
     df_weights <- rep(1, nrow(df_analysis))
@@ -812,14 +857,14 @@
   }
   dat_orig <- list(
     "id" = df_analysis[[cfg2$v$id]],
-    "y_star" = df_analysis[[cfg2$v$time]],
-    "delta_star" = df_analysis[[cfg2$v$event]],
-    "w" = df_w,
+    "y" = df_analysis[[cfg2$v$time]],
+    "delta" = df_analysis[[cfg2$v$event]],
+    "x" = df_x,
     "weights" = df_weights,
-    "a" = df_analysis[[cfg2$marker]],
-    "delta" = df_delta
+    "s" = df_analysis[[cfg2$marker]],
+    "z" = df_z
   )
-  rm(df_w,df_weights,df_delta)
+  rm(df_x,df_weights,df_z)
   
   # Create data structure to hold results
   plot_data_risk <- data.frame(
@@ -833,9 +878,9 @@
   plot_data_cve <- plot_data_risk
   
   # Stabilize weights (rescale to sum to sample size)
-  dat_orig$weights <- ifelse(dat_orig$delta==1, dat_orig$weights, 0)
-  s <- sum(dat_orig$weights) / length(dat_orig$delta)
-  dat_orig$weights <- dat_orig$weights / s
+  dat_orig$weights <- ifelse(dat_orig$z==1, dat_orig$weights, 0)
+  stb <- sum(dat_orig$weights) / length(dat_orig$z)
+  dat_orig$weights <- dat_orig$weights / stb
   
 }
 
@@ -984,10 +1029,10 @@ if (cfg2$run_analysis && any(unlist(c(cfg2$plot_cve,cfg2$plot_risk))=="Cox")) {
 
 if (cfg2$run_analysis && cfg2$plot_risk$overall=="KM") {
   
-  srv_ov <- survfit(Surv(dat_orig$y_star,dat_orig$delta_star)~1)
-  risk_ov <- 1 - srv_ov$surv[which.min(abs(srv_ov$time-C$t_e))]
-  ci_lo_ov <- 1 - srv_ov$upper[which.min(abs(srv_ov$time-C$t_e))]
-  ci_hi_ov <- 1 - srv_ov$lower[which.min(abs(srv_ov$time-C$t_e))]
+  srv_ov <- survfit(Surv(dat_orig$y,dat_orig$delta)~1)
+  risk_ov <- 1 - srv_ov$surv[which.min(abs(srv_ov$time-C$t_0))]
+  ci_lo_ov <- 1 - srv_ov$upper[which.min(abs(srv_ov$time-C$t_0))]
+  ci_hi_ov <- 1 - srv_ov$lower[which.min(abs(srv_ov$time-C$t_0))]
   
   plot_data_risk <- rbind(plot_data_risk, data.frame(
     x = c(999,999),
@@ -1082,29 +1127,29 @@ if (cfg2$run_dqa) {
   # Number of cases in each group
   num_case_tx <- sum(ind_tx)
   num_case_ct <- sum(ind_ct)
-  num_case_tx_t_e <- sum(ind_tx[time_tx<=C$t_e])
-  num_case_ct_t_e <- sum(ind_ct[time_ct<=C$t_e])
+  num_case_tx_t_0 <- sum(ind_tx[time_tx<=C$t_0])
+  num_case_ct_t_0 <- sum(ind_ct[time_ct<=C$t_0])
   num_atrisk_tx <- length(ind_tx)
   num_atrisk_ct <- length(ind_ct)
   print(paste0("Number of cases in vaccine group: ", num_case_tx))
   print(paste0("Number of cases in control group: ", num_case_ct))
-  print(paste0("Number of cases by day ", C$t_e, " in vaccine group: ",
-              num_case_tx_t_e))
-  print(paste0("Number of cases by day ", C$t_e, " in control group: ",
-              num_case_ct_t_e))
+  print(paste0("Number of cases by day ", C$t_0, " in vaccine group: ",
+              num_case_tx_t_0))
+  print(paste0("Number of cases by day ", C$t_0, " in control group: ",
+              num_case_ct_t_0))
   print(paste0("Number at-risk in vaccine group: ", num_atrisk_tx))
   print(paste0("Number at-risk in control group: ", num_atrisk_ct))
-  print(paste0("Naive P(COVID by day ", C$t_e, ") in vaccine group: ",
-              round(num_case_tx_t_e/num_atrisk_tx,3)))
-  print(paste0("Naive P(COVID by day ", C$t_e, ") in control group: ",
-              round(num_case_ct_t_e/num_atrisk_ct,3)))
+  print(paste0("Naive P(COVID by day ", C$t_0, ") in vaccine group: ",
+              round(num_case_tx_t_0/num_atrisk_tx,3)))
+  print(paste0("Naive P(COVID by day ", C$t_0, ") in control group: ",
+              round(num_case_ct_t_0/num_atrisk_ct,3)))
   print(paste0("Naive vaccine efficacy: ",
-              round(1 - (num_case_tx_t_e/num_atrisk_tx) /
-                      (num_case_ct_t_e/num_atrisk_ct),3)))
+              round(1 - (num_case_tx_t_0/num_atrisk_tx) /
+                      (num_case_ct_t_0/num_atrisk_ct),3)))
   
   # Fraction of point mass at edge
-  a <- dat_orig$a
-  round(sum(a==min(a,na.rm=T),na.rm=T) / sum(!is.na(a)), 3)
+  s <- dat_orig$s
+  round(sum(s==min(s,na.rm=T),na.rm=T) / sum(!is.na(s)), 3)
   
   # Distribution of event times (Ph2=0 vs. Ph2=1)
   if (!is.na(cfg2$v$ph2)) {
@@ -1171,7 +1216,7 @@ if (cfg2$run_dqa) {
 
 {
   
-  process_ests <- function(ests, a_grid, run_cve=F, lab_risk=NA, lab_cve=NA,
+  process_ests <- function(ests, s_grid, run_cve=F, lab_risk=NA, lab_cve=NA,
                            tag="0", ci_type="regular") {
     
     # Extract risk estimates
@@ -1180,7 +1225,7 @@ if (cfg2$run_dqa) {
     # Compute CVE estimates
     if (run_cve) {
       if (!exists("df_ct")) { stop("df_ct does not exist") }
-      risk_ct <- get.marginalized.risk.no.marker(df_ct, C$t_e)
+      risk_ct <- get.marginalized.risk.no.marker(df_ct, C$t_0) # 0.039665
       cve <- Vectorize(function(x) { 1 - x/risk_ct })
       ests_cve <- cve(ests_risk)
       if (ci_type=="regular") {
@@ -1203,7 +1248,7 @@ if (cfg2$run_dqa) {
     }
     
     plot_data_risk <- data.frame(
-      x = a_grid,
+      x = s_grid,
       y = ests_risk,
       curve = rep(lab_risk, length(ests_risk)),
       ci_lo = ci_lo_risk,
@@ -1212,7 +1257,7 @@ if (cfg2$run_dqa) {
     )
     if (run_cve) {
       plot_data_cve <- data.frame(
-        x = a_grid,
+        x = s_grid,
         y = ests_cve,
         curve = rep(lab_cve, length(ests_cve)),
         ci_lo = ci_lo_cve,
@@ -1241,29 +1286,28 @@ if (cfg2$run_analysis &&
   # Obtain estimates
   return_extra <- c()
   if (cfg2$run_debug$objs) {
-    return_extra <- c(return_extra, "omega_n", "f_aIw_n", "S_n", "grid",
-                      "Phi_n", "Gamma_os_n_star", "gcm", "dGCM", "theta_n_Gr")
+    return_extra <- c(return_extra, "omega_n", "f_sIx_n", "Q_n", "grid",
+                      "Phi_n", "Gamma_os_n", "gcm", "dGCM", "r_Mn_Gr")
   }
   if (cfg2$run_debug$gren_var) {
-    return_extra <- c(return_extra, "deriv_theta_n", "f_a_n", "gamma_n")
+    return_extra <- c(return_extra, "deriv_r_Mn", "f_s_n", "gamma_n")
   }
-  if (cfg2$params$marg=="Theta") { return_extra <- c(return_extra,"etastar_n") }
-  a_orig <- dat_orig$a[!is.na(dat_orig$a)]
-  a_grid <- seq(from=min(a_orig), to=max(a_orig), length.out=101)
+  s_orig <- dat_orig$s[!is.na(dat_orig$s)]
+  s_grid <- seq(from=min(s_orig), to=max(s_orig), length.out=101)
   ests <- est_curve(
     dat_orig = dat_orig,
     estimator = "Grenander",
     params = cfg2$params,
-    points = a_grid,
+    points = s_grid,
     dir = "decr",
     return_extra = return_extra
   )
-
+  
   saveRDS(ests, paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds"))
   # ests <- readRDS(paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds"))
   
   run_cve <- as.logical("Grenander" %in% cfg2$plot_cve$est)
-  ests2 <- process_ests(ests, a_grid, run_cve=run_cve,
+  ests2 <- process_ests(ests, s_grid, run_cve=run_cve,
                         lab_risk="Risk, nonparametric",
                         lab_cve="CVE, nonparametric", tag="Gren",
                         ci_type="regular") # !!!!! log(1-CVE)
@@ -1282,13 +1326,13 @@ if (cfg2$run_analysis &&
     any(unlist(c(cfg2$plot_cve$est,cfg2$plot_risk$est))=="Qbins")) {
   
   # Obtain estimates
-  a_orig <- dat_orig$a[!is.na(dat_orig$a)]
-  a_grid <- seq(from=min(a_orig), to=max(a_orig), length.out=101)
+  s_orig <- dat_orig$s[!is.na(dat_orig$s)]
+  s_grid <- seq(from=min(s_orig), to=max(s_orig), length.out=101)
   ests <- est_curve(
     dat_orig = dat_orig,
     estimator = "Qbins",
     params = cfg2$params,
-    points = a_grid,
+    points = s_grid,
     dir = "decr",
     return_extra = c()
   )
@@ -1296,7 +1340,7 @@ if (cfg2$run_analysis &&
   saveRDS(ests, paste0(cfg2$analysis," plots/ests_q_",cfg2$tid,".rds")) # !!!!!
   
   run_cve <- as.logical("Qbins" %in% cfg2$plot_cve$est)
-  ests2 <- process_ests(ests, a_grid, run_cve=run_cve,
+  ests2 <- process_ests(ests, s_grid, run_cve=run_cve,
                         lab_risk="Risk, Qbins", lab_cve="CVE, Qbins",
                         tag="Qbins")
   plot_data_risk <- rbind(plot_data_risk, ests2$risk)
@@ -1314,13 +1358,13 @@ if (cfg2$run_analysis &&
     any(unlist(c(cfg2$plot_cve$est,cfg2$plot_risk$est))=="Cox GAM")) {
   
   # Obtain estimates
-  a_orig <- dat_orig$a[!is.na(dat_orig$a)]
-  a_grid <- seq(from=min(a_orig), to=max(a_orig), length.out=101)
+  s_orig <- dat_orig$s[!is.na(dat_orig$s)]
+  s_grid <- seq(from=min(s_orig), to=max(s_orig), length.out=101)
   ests <- est_curve(
     dat_orig = dat_orig,
     estimator = "Cox GAM",
     params = cfg2$params,
-    points = a_grid,
+    points = s_grid,
     dir = "decr",
     return_extra = c()
   )
@@ -1328,7 +1372,7 @@ if (cfg2$run_analysis &&
   saveRDS(ests, paste0(cfg2$analysis," plots/ests_z_",cfg2$tid,".rds")) # !!!!!
   
   run_cve <- as.logical("Cox GAM" %in% cfg2$plot_cve$est)
-  ests2 <- process_ests(ests, a_grid, run_cve=run_cve,
+  ests2 <- process_ests(ests, s_grid, run_cve=run_cve,
                         lab_risk="Risk, Cox GAM", lab_cve="CVE, Cox GAM",
                         tag="Cox GAM")
   plot_data_risk <- rbind(plot_data_risk, ests2$risk)
@@ -1347,14 +1391,14 @@ if (cfg2$run_analysis &&
   
   # Obtain estimates
   return_extra <- c() # "Phi_n_inv_notrans"
-  a_orig <- dat_orig$a[!is.na(dat_orig$a)]
-  # a_grid <- seq(from=min(a_orig), to=max(a_orig), length.out=101)
-  a_grid <- seq(from=min(a_orig), to=max(a_orig), length.out=5) # !!!!!
+  s_orig <- dat_orig$s[!is.na(dat_orig$s)]
+  # s_grid <- seq(from=min(s_orig), to=max(s_orig), length.out=101)
+  s_grid <- seq(from=min(s_orig), to=max(s_orig), length.out=5) # !!!!!
   ests <- est_curve(
     dat_orig = dat_orig,
     estimator = "Cox gcomp",
     params = cfg2$params,
-    points = a_grid,
+    points = s_grid,
     dir = "decr",
     return_extra = return_extra
   )
@@ -1362,7 +1406,7 @@ if (cfg2$run_analysis &&
   saveRDS(ests, paste0(cfg2$analysis," plots/ests_c_",cfg2$tid,".rds")) # !!!!!
   
   run_cve <- as.logical("Cox gcomp" %in% cfg2$plot_cve$est)
-  ests2 <- process_ests(ests, a_grid, run_cve=run_cve,
+  ests2 <- process_ests(ests, s_grid, run_cve=run_cve,
                         lab_risk="Risk, Cox (analytic)",
                         lab_cve="CVE, Cox (analytic)", tag="Cox gcomp")
   
@@ -1379,24 +1423,34 @@ if (cfg2$run_analysis &&
 
 if (cfg2$run_hyptest) {
   
-  res <- test_2(
+  return_extras <- F
+  test_results <- test_2(
     dat_orig = dat_orig,
-    alt_type = "two-tailed", # decr
-    params = list(),
-    return_extras = T # !!!!!
+    # alt_type = "decr",
+    alt_type = "two-tailed", # decr # !!!!! Temporarily commented out
+    # params = list(),
+    # params = list(type="both", q_n_type="zero", Q_n_type="Super Learner"), # !!!!!
+    params = list(
+      type = c("simple", "simple (with constant)", "S-weighted (with constant)"),
+      # type = c("simple", "complex", "simple (with constant)"),
+      q_n_type = "zero",
+      Q_n_type = "Super Learner" # "Cox PH"
+    ), # !!!!!
+    return_extras = return_extras
   )
-  res_df <- data.frame(reject=res$reject, p_val=res$p_val, beta_n=res$beta_n,
-                       sd_n=res$sd_n, var_n=res$var_n)
+  
   write.table(
-    res_df,
+    do.call(rbind, test_results),
     file = paste0(cfg2$analysis," plots/hyptest_",cfg2$tid,".csv"),
     sep = ",",
     row.names = FALSE
   )
-  saveRDS(
-    res$Theta_os_n,
-    paste0(cfg2$analysis," plots/Theta_os_n_",cfg2$tid,".rds")
-  )
+  if (return_extras) {
+    saveRDS(
+      res$Theta_os_n,
+      paste0(cfg2$analysis," plots/Theta_os_n_",cfg2$tid,".rds")
+    )
+  }
   
 }
 
@@ -1442,11 +1496,7 @@ if (cfg2$run_hyptest) {
   create_plot <- function(plot_data, which, zoom_x=NA, zoom_y=NA, labs, hst,
                           rr_y_axis=F, log10_x_axis=F) {
     
-    # # !!!!! Add lod/2 ?????
-    # lod12 <- min(dat_orig$a,na.rm=T)
-    
     # Change curve labels to factors and set color scale
-    # goldenrod3, darkseagreen3, darkslategray3, darkorange3, darkgoldenrod3, cyan3
     curves <- c("Placebo overall", "Vaccine overall", "Overall VE",
                 "Risk, Cox model", "CVE, Cox model", "Risk, Qbins",
                 "CVE, Qbins", "Risk, Cox GAM", "CVE, Cox GAM",
@@ -1474,7 +1524,6 @@ if (cfg2$run_hyptest) {
       zoom_x <- c(z_x_L - 0.05*(z_x_R-z_x_L),
                   z_x_R + 0.05*(z_x_R-z_x_L))
     } else if (zoom_x[1]=="zoomed") {
-      # zz <- dplyr::filter(plot_data, tag %in% c("Gren", "Qbins") & !is.na(y))$x
       zz <- dplyr::filter(plot_data, tag %in% c("Gren", "Qbins", "Cox") &
                             !is.na(y))$x
       z_x_L <- min(zz, na.rm=T)
@@ -1563,15 +1612,14 @@ if (cfg2$run_hyptest) {
       theme(legend.position="bottom") +
       labs(title=labs$title, x=labs$x, y=labs$y, color=NULL, fill=NULL)
     if (log10_x_axis) {
-      xlim <- c(min(dat_orig$a, na.rm=T), max(dat_orig$a, na.rm=T))
+      xlim <- c(min(dat_orig$s, na.rm=T), max(dat_orig$s, na.rm=T))
       if (is.null(cfg2$llox)) {
         x_axis <- draw.x.axis.cor(xlim, NA)
       } else {
         x_axis <- draw.x.axis.cor(xlim, cfg2$llox)
       }
       
-      # !!!!! Temp Janssen
-      if (cfg2$analysis=="Janssen" && cfg2$marker=="Day29pseudoneutid50") {
+      if (flags$janssen_id50_lloq) {
         x_axis$ticks[4] <- log10(2.7426)
         x_axis$labels[[4]] <- "LLOQ"
       }
@@ -1580,9 +1628,9 @@ if (cfg2$run_hyptest) {
         labels = do.call(expression,x_axis$labels),
         breaks = x_axis$ticks
       )
+      
     }
     if (which=="Risk") {
-      # x_r <- max(hst$breaks)
       y_plac <- filter(plot_data, curve=="Placebo overall")[1,"y"]
       y_vacc <- filter(plot_data, curve=="Vaccine overall")[1,"y"]
       plot <- plot + annotate("text", label="Placebo overall", x=zoom_x[2],
@@ -1607,7 +1655,7 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
   
   # Create cutoff values corresponding to cfg2$qnt
   cutoffs <- lapply(cfg2$qnt, function(qnt) {
-    as.numeric(quantile(dat_orig$a, na.rm=T, probs=qnt))
+    as.numeric(quantile(dat_orig$s, na.rm=T, probs=qnt))
   })
   
   # Trim estimates at specified quantiles
@@ -1628,13 +1676,13 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
   }
   
   hst <- get.marker.histogram(
-    marker = dat_orig$a[!is.na(dat_orig$a)],
-    wt = dat_orig$weights[!is.na(dat_orig$a)],
+    marker = dat_orig$s[!is.na(dat_orig$s)],
+    wt = dat_orig$weights[!is.na(dat_orig$s)],
     trial = cfg2$cr2_trial
   )
   
   if (nrow(plot_data_risk)>0) {
-    cfg2$lab_y <- paste0("Probability of ", cfg2$endpoint, " by day ", cfg2$t_e)
+    cfg2$lab_y <- paste0("Probability of ", cfg2$endpoint, " by day ", cfg2$t_0)
     plot <- create_plot(
       plot_data = trim_plot_data(plot_data_risk),
       which = "Risk",
@@ -1652,9 +1700,9 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
   
   if (nrow(plot_data_cve)>0) {
     cfg2$lab_y <- paste0("Controlled VE against ", cfg2$endpoint,
-                         " by day ", cfg2$t_e)
+                         " by day ", cfg2$t_0)
     
-    if (F) {
+    if (flags$hvtn705_abstract_fig) {
       cfg2$lab_title <- "IgG3 V1V2 breadth (Weighted avg log10 Net MFI): Month 7"
       draw.x.axis.cor <- function(xlim, llox) { # llox currently unused
         xx <- seq(ceiling(xlim[1]), floor(xlim[2]))
@@ -1676,7 +1724,7 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
         }
         return(x_axis)
       }  
-    } # !!!!! Special code for 705 abstract figure
+    }
     
     plot <- create_plot(
       plot_data = trim_plot_data(plot_data_cve),
@@ -1693,10 +1741,12 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
       plot=plot, device="pdf", width=6, height=4
     )
     
-    # write.table(trim_plot_data(plot_data_cve),
-    #             file=paste0(cfg2$analysis," plots/cve_",cfg2$tid,".csv"),
-    #             sep=",",
-    #             row.names=FALSE)
+    if (flags$table_of_cve_vals) {
+      write.table(trim_plot_data(plot_data_cve),
+                  file=paste0(cfg2$analysis," plots/cve_",cfg2$tid,".csv"),
+                  sep=",",
+                  row.names=FALSE)
+    }
     
   }
   
@@ -1711,7 +1761,7 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
 if (F) {
   
   # Temp
-  cfg2$t_e <- 595
+  cfg2$t_0 <- 595
   cfg2$lab_title <- c("HVTN703/HPTN081", "HVTN704/HPTN085", "Pooled AMP trials")
   cfg2$amp_tx2 <- rep(c("Control", "VRC01 10mg/kg", "VRC01 30mg/kg",
                     "VRC01 Pooled"), 3)
@@ -1735,32 +1785,32 @@ if (F) {
       if (i %in% c(3,7,11)) { df_analysis %<>% dplyr::filter(tx=="T2") }
       if (i %in% c(4,8,12)) { df_analysis %<>% dplyr::filter(tx_pool=="T1+T2") }
       dat_orig <- list(
-        y_star = df_analysis[["hiv1survday"]],
-        delta_star = df_analysis[["hiv1event"]],
+        y = df_analysis[["hiv1survday"]],
+        delta = df_analysis[["hiv1event"]],
         weights = rep(1, nrow(df_analysis)),
-        a = df_analysis[["bweight"]]
+        s = df_analysis[["bweight"]]
       )
     }
     
-    # Generate a_orig
-    a_orig <- dat_orig$a[!is.na(dat_orig$a)]
-    saveRDS(a_orig, paste0(cfg2$analysis, " plots/a_orig_", i, ".rds"))
+    # Generate s_orig
+    s_orig <- dat_orig$s[!is.na(dat_orig$s)]
+    saveRDS(s_orig, paste0(cfg2$analysis, " plots/s_orig_", i, ".rds"))
     
     if (i %in% c(1,5,9,13,14,15)) {
       
       # Generate histogram
       hst <- get.marker.histogram(
-        marker = dat_orig$a[!is.na(dat_orig$a)],
-        wt = dat_orig$weights[!is.na(dat_orig$a)],
+        marker = dat_orig$s[!is.na(dat_orig$s)],
+        wt = dat_orig$weights[!is.na(dat_orig$s)],
         trial = F
       )
       saveRDS(hst, paste0(cfg2$analysis, " plots/hist_", i, ".rds"))
       
       # Generate KM object
-      srv_ov <- survfit(Surv(dat_orig$y_star,dat_orig$delta_star)~1)
-      risk_ov <- 1 - srv_ov$surv[which.min(abs(srv_ov$time-C$t_e))]
-      ci_lo_ov <- 1 - srv_ov$upper[which.min(abs(srv_ov$time-C$t_e))]
-      ci_hi_ov <- 1 - srv_ov$lower[which.min(abs(srv_ov$time-C$t_e))]
+      srv_ov <- survfit(Surv(dat_orig$y,dat_orig$delta)~1)
+      risk_ov <- 1 - srv_ov$surv[which.min(abs(srv_ov$time-C$t_0))]
+      ci_lo_ov <- 1 - srv_ov$upper[which.min(abs(srv_ov$time-C$t_0))]
+      ci_hi_ov <- 1 - srv_ov$lower[which.min(abs(srv_ov$time-C$t_0))]
       km <- data.frame(
         x = c(999,999),
         y = rep(risk_ov, 2),
@@ -1791,18 +1841,18 @@ if (F) {
     hst <- readRDS(paste0(cfg2$analysis, " plots/hist_",
                           plot_map$hist[i], ".rds"))
     for (j in plot_map$gren[[i]]) {
-      a_orig <- readRDS(paste0(cfg2$analysis, " plots/a_orig_",
+      s_orig <- readRDS(paste0(cfg2$analysis, " plots/s_orig_",
                              j, ".rds"))
-      a_grid <- seq(from=min(a_orig), to=max(a_orig), length.out=101)
+      s_grid <- seq(from=min(s_orig), to=max(s_orig), length.out=101)
       ests <- readRDS(paste0(cfg2$analysis, " plots/ests_g_",
                              j, ".rds"))
-      ests2 <- process_ests(ests, a_grid, run_cve=F, lab_risk=cfg2$amp_tx2[j],
+      ests2 <- process_ests(ests, s_grid, run_cve=F, lab_risk=cfg2$amp_tx2[j],
                             tag="Gren")
       plot_data_risk <- rbind(plot_data_risk, ests2$risk)
     }
     
     # Generate and save plot
-    cfg2$lab_y <- paste0("Probability of ", cfg2$endpoint, " by day ", cfg2$t_e)
+    cfg2$lab_y <- paste0("Probability of ", cfg2$endpoint, " by day ", cfg2$t_0)
     lab_title <- cfg2$lab_title[plot_map$lab_title[i]]
     plot <- create_plot(
       plot_data = plot_data_risk,
@@ -1834,15 +1884,15 @@ if (cfg2$run_debug$objs) {
   x_vals <- ests$Phi_n(ests$grid)
   inds <- !base::duplicated(x_vals)
   x_vals <- x_vals[inds]
-  y_vals <- -1 * ests$Gamma_os_n_star(ests$grid[inds])
+  y_vals <- -1 * ests$Gamma_os_n(ests$grid[inds])
   GCM_f <- approxfun(x=ests$gcm$x.knots, y=ests$gcm$y.knots,
                      method="linear", rule=1)
   df_A <- data.frame(x=x_vals, y=y_vals, y2=GCM_f(x_vals))
   grid2 <- round(seq(0,1,0.02),2)
-  df_B <- data.frame(x=grid2, y=ests$theta_n_Gr(grid2))
+  df_B <- data.frame(x=grid2, y=ests$r_Mn_Gr(grid2))
   plot1 <- ggplot(df_A, aes(x=x,y=y)) + geom_point(alpha=0.4) + geom_line(aes(y=y2)) +
-    labs(title="x=Phi(A), y=Gamma_n(A)")
-  plot2 <- ggplot(df_B, aes(x=x,y=y)) + geom_line() + labs(title="theta_n estimates")
+    labs(title="x=Phi(S), y=Gamma_n(S)")
+  plot2 <- ggplot(df_B, aes(x=x,y=y)) + geom_line() + labs(title="r_Mn estimates")
   
   ggsave(
     filename = paste0(cfg2$analysis," plots/debug_A_",cfg2$tid,".pdf"),
@@ -1855,20 +1905,20 @@ if (cfg2$run_debug$objs) {
   
   # grid <- round(seq(0,1,0.01),2)
   # gcm <- approxfun(x=ests$gcm$x.knots, y=ests$gcm$y.knots, ties="ordered")
-  # omega_n <- Vectorize(function(a) {
-  #   ests$omega_n(w=c(0,0),a,y_star=100,delta_star=0)
+  # omega_n <- Vectorize(function(s) {
+  #   ests$omega_n(x=c(0,0),s,y=100,delta=0)
   # })
-  # etastar_n <- Vectorize(function(a) {
-  #   ests$etastar_n(a,w=c(0,0))
+  # etastar_n <- Vectorize(function(s) {
+  #   ests$etastar_n(s,x=c(0,0))
   # })
-  # S_n <- Vectorize(function(a) {
-  #   ests$S_n(t=C$t_e, w=c(0,0), a)
+  # Q_n <- Vectorize(function(s) {
+  #   ests$Q_n(t=C$t_0, x=c(0,0), s)
   # })
   # 
   # int_data <- data.frame(
   #   x = rep(grid,3),
   #   y = c(ests$Psi_n(grid), gcm(grid), ests$dGCM(grid)),
-  #   which = rep(c("Psi_n (-1*Theta_os_n)","gcm","dGCM (-1*theta_n)"), each=101)
+  #   which = rep(c("Psi_n (-1*Theta_os_n)","gcm","dGCM (-1*r_Mn)"), each=101)
   # )
   # plot1 <- ggplot(int_data, aes(x=x, y=y, color=which)) +
   #   geom_line() +
@@ -1881,12 +1931,12 @@ if (cfg2$run_debug$objs) {
   
   if (F) {
     
-    # S_n: conditional survival function (as a function of A)
+    # Q_n: conditional survival function (as a function of S)
     # !!!!! Continue
-    # as.data.frame(cbind(w1=rep(0.2,n), w2=rep(1,n)))
+    # as.data.frame(cbind(x1=rep(0.2,n), x2=rep(1,n)))
     int_data2 <- data.frame(
       x = grid,
-      y = S_n(grid)
+      y = Q_n(grid)
       # which = rep(c("",""),each=101)
     )
     ggplot(int_data2, aes(x=x, y=y)) + # color=which
@@ -1903,16 +1953,16 @@ if (cfg2$run_debug$objs) {
     #   geom_line() +
     #   theme(legend.position="bottom")
     
-    # etastar_n
-    int_data4 <- data.frame(
-      x = grid,
-      y = etastar_n(grid)
-      # which = rep(c("",""),each=101)
-    )
-    ggplot(int_data4, aes(x=x, y=y)) + # color=which
-      geom_line() +
-      theme(legend.position="bottom") +
-      labs(title="etastar_n")
+    # # etastar_n
+    # int_data4 <- data.frame(
+    #   x = grid,
+    #   y = etastar_n(grid)
+    #   # which = rep(c("",""),each=101)
+    # )
+    # ggplot(int_data4, aes(x=x, y=y)) + # color=which
+    #   geom_line() +
+    #   theme(legend.position="bottom") +
+    #   labs(title="etastar_n")
     
   }
   
@@ -1923,20 +1973,20 @@ if (cfg2$run_debug$gren_var) {
   # Debugging: Grenander variance scale factor components
   
   print("Grenander variance scale factor components")
-  print("deriv_theta_n")
-  print(ests$deriv_theta_n(seq(0,1,0.05)))
-  print("f_a_n")
-  print(ests$f_a_n(seq(0,1,0.05)))
+  print("deriv_r_Mn")
+  print(ests$deriv_r_Mn(seq(0,1,0.05)))
+  print("f_s_n")
+  print(ests$f_s_n(seq(0,1,0.05)))
   # print("gamma_n")
   # print(ests$gamma_n(seq(0,1,0.05)))
-  print("deriv_theta_n*f_a_n")
-  print(ests$deriv_theta_n(seq(0,1,0.05))*ests$f_a_n(seq(0,1,0.05)))
-  # print("deriv_theta_n*gamma_n")
-  # print(ests$deriv_theta_n(seq(0,1,0.05))*ests$gamma_n(seq(0,1,0.05)))
-  # print("f_a_n*gamma_n")
-  # print(ests$f_a_n(seq(0,1,0.05))*ests$gamma_n(seq(0,1,0.05)))
-  # print("deriv_theta_n*f_a_n*gamma_n")
-  # print(ests$deriv_theta_n(seq(0,1,0.05))*ests$f_a_n(seq(0,1,0.05))*
+  print("deriv_r_Mn*f_s_n")
+  print(ests$deriv_r_Mn(seq(0,1,0.05))*ests$f_s_n(seq(0,1,0.05)))
+  # print("deriv_r_Mn*gamma_n")
+  # print(ests$deriv_r_Mn(seq(0,1,0.05))*ests$gamma_n(seq(0,1,0.05)))
+  # print("f_s_n*gamma_n")
+  # print(ests$f_s_n(seq(0,1,0.05))*ests$gamma_n(seq(0,1,0.05)))
+  # print("deriv_r_Mn*f_s_n*gamma_n")
+  # print(ests$deriv_r_Mn(seq(0,1,0.05))*ests$f_s_n(seq(0,1,0.05))*
   #         ests$gamma_n(seq(0,1,0.05)))
 }
 
@@ -1991,9 +2041,9 @@ if (F) {
            EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
       data = df_ct
     )
-    rate_ct <- 1 - srv_ct$surv[which.min(abs(srv_ct$time-C$t_e))]
-    ci_lo_ct <- 1 - srv_ct$upper[which.min(abs(srv_ct$time-C$t_e))]
-    ci_hi_ct <- 1 - srv_ct$lower[which.min(abs(srv_ct$time-C$t_e))]
+    rate_ct <- 1 - srv_ct$surv[which.min(abs(srv_ct$time-C$t_0))]
+    ci_lo_ct <- 1 - srv_ct$upper[which.min(abs(srv_ct$time-C$t_0))]
+    ci_hi_ct <- 1 - srv_ct$lower[which.min(abs(srv_ct$time-C$t_0))]
     var_ct <- ((ci_hi_ct-ci_lo_ct)/3.92)^2
     
     # Calculate treatment group survival (KM; with SE)
@@ -2002,9 +2052,9 @@ if (F) {
            EventIndPrimaryIncludeNotMolecConfirmedD29)~1,
       data = df_tx
     )
-    rate_tx <- 1 - srv_tx$surv[which.min(abs(srv_tx$time-C$t_e))]
-    ci_lo_tx <- 1 - srv_tx$upper[which.min(abs(srv_tx$time-C$t_e))]
-    ci_hi_tx <- 1 - srv_tx$lower[which.min(abs(srv_tx$time-C$t_e))]
+    rate_tx <- 1 - srv_tx$surv[which.min(abs(srv_tx$time-C$t_0))]
+    ci_lo_tx <- 1 - srv_tx$upper[which.min(abs(srv_tx$time-C$t_0))]
+    ci_hi_tx <- 1 - srv_tx$lower[which.min(abs(srv_tx$time-C$t_0))]
     var_tx <- ((ci_hi_tx-ci_lo_tx)/3.92)^2
     
     # Calculate overall vaccine efficacy (KM; delta method; with SE+CI)
@@ -2023,7 +2073,7 @@ if (F) {
       data = dplyr::filter(df_tx, ph2.D29start1==1),
       weights = wt.D29start1
     ))
-    rate_tx_sub <- 1 - srv_tx_sub$surv[which.min(abs(srv_tx_sub$time-C$t_e))]
+    rate_tx_sub <- 1 - srv_tx_sub$surv[which.min(abs(srv_tx_sub$time-C$t_0))]
     ve_subcohort <- 1 - (rate_tx_sub/rate_ct)
     print(paste0("Overall VE (subcohort): ", round(100*ve_subcohort,1), "%"))
     
@@ -2078,7 +2128,7 @@ if (F) {
     ests_gcomp <- ifelse(which,ests_gcomp,NA)
     
     plot_data_2 <- data.frame(
-      x = c(x1,rep(a_grid,2),x1,x2),
+      x = c(x1,rep(s_grid,2),x1,x2),
       y = c(ests_cve[1],ests_cve,ests_gcomp,rep(ve_overall,2)),
       which = c("Controlled VE",rep(c("Controlled VE","Cox model"),
                                     each=length(p_grid)),

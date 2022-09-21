@@ -5,7 +5,7 @@
 ##### CONFIG #####
 ##################.
 
-# To run multiple sims/analyses concurrently, ONLY change Slurm commands
+# To run multiple sims/analyses concurrently, ONLY change Slurm/SGE commands
 
 # Set global config
 # GitHub packages: tedwestling/ctsCausal, tedwestling/CFsurvival,
@@ -19,21 +19,30 @@ cfg <- list(
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm", "tidyr",
-           "ranger", "xgboost", "survey", "pbapply", "compiler", "simest"),
+           "ranger", "survey", "pbapply", "compiler", "simest"), # "xgboost"
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
                      "data.table", "latex2exp"),
   parallel = "none",
   stop_at_error = F,
-  appx = list(t_e=1, w_tol=25, a=0.01) # !!!!! t_e=1, a=0.001
+  appx = list(t_0=1, x_tol=25, s=0.01) # !!!!! S=0.001
 )
 
 # Set cluster config
-cluster_config <- list(
-  # js = "ge",
-  # dir = paste0("/home/users/avikenny/Desktop/", Sys.getenv("project"))
-  js = "slurm",
-  dir = paste0("/home/akenny/", Sys.getenv("project"))
-)
+if (Sys.getenv("HOME")=="/home/akenny") {
+  # Bionic
+  cluster_config <- list(
+    js = "slurm",
+    dir = paste0("/home/akenny/", Sys.getenv("project"))
+  )
+} else if (Sys.getenv("HOME")=="/home/users/avikenny") {
+  # Bayes
+  cluster_config <- list(
+    js = "ge",
+    dir = paste0("/home/users/avikenny/Desktop/", Sys.getenv("project"))
+  )
+} else {
+  cluster_config <- NA
+}
 
 
 
@@ -87,97 +96,46 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     n = 1000, # 1000
     alpha_3 = -2,
     dir = c("decr"), # "incr"
+    sc_params = list("sc_params"=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5)),
     # sc_params = list("no cens"=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5)),
     # sc_params = list("exp"=list(lmbd=1e-3, v=1.5, lmbd2=5e-4, v2=1.5)),
-    sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
-    # distr_A = c("N(0.3+0.4w2,0.04)"),
-    distr_A = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4w2,0.04)"),
-    # edge = c("expit 0.4"),
-    edge = c("none"),
-    # surv_true = c("Complex"),
-    surv_true = c("Cox PH", "Complex"), # "Cox PH" "Complex" "exp"
+    distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
+    edge = c("none"), # "expit 0.4"
+    surv_true = c("Complex"), # "Cox PH" "Complex" "exp"
+    # surv_true = c("Cox PH", "Complex"), # "Cox PH" "Complex" "exp"
     sampling = c("two-phase (50%)"), # "iid"
     wts_type = c("estimated"), # c("true", "estimated")
     estimator = list(
-      "Grenander (Cox)" = list(
+      "Grenander (true f_sIx, SL)" = list(
         est = "Grenander",
-        params = list(marg="Gamma_star2", S_n_type="Cox PH", # Gamma_star
-                      convex_type="GCM", ecdf_type="linear (mid)",
-                      edge_corr="none",
-                      deriv_type="m-spline", g_n_type="parametric")
+        params = list(q_n_type="zero", Q_n_type="Cox PH", # Q_n_type="Random Forest", Q_n_type="true"
+                      convex_type="GCM", ecdf_type="linear (mid)", # convex_type="LS"
+                      edge_corr="none", # edge_corr="min"
+                      deriv_type="m-spline", g_n_type="true") # g_n_type="binning", g_n_type="true"
       ),
-      "Cox PH" = list(est="Cox gcomp")
-      
-      # "Grenander (Cox)" = list(
-      #   est = "Grenander",
-      #   params = list(marg="Gamma_star", S_n_type="Cox PH", # Gamma_star2
-      #                 convex_type="GCM", ecdf_type="linear (mid)",
-      #                 edge_corr="none", # "min" "none"
-      #                 deriv_type="m-spline", g_n_type="parametric") # binning
-      # ),
-      # "Grenander (RF)" = list(
-      #   est = "Grenander",
-      #   params = list(marg="Gamma_star", S_n_type="Random Forest", # Gamma_star2
-      #                 convex_type="GCM", ecdf_type="linear (mid)",
-      #                 edge_corr="none", # "min" "none"
-      #                 deriv_type="m-spline", g_n_type="parametric") # binning
-      # )
+      "Grenander (true f_sIx, RF)" = list(
+        est = "Grenander",
+        params = list(q_n_type="zero", Q_n_type="Random Forest", # Q_n_type="Random Forest", Q_n_type="true"
+                      convex_type="GCM", ecdf_type="linear (mid)", # convex_type="LS"
+                      edge_corr="none", # edge_corr="min"
+                      deriv_type="m-spline", g_n_type="true") # g_n_type="binning", g_n_type="true"
+      )
       
       
-      # "Grenander (true)" = list(
+      
+      # "Grenander" = list(
       #   est = "Grenander",
-      #   params = list(marg="Gamma_star", S_n_type="true", # Gamma_star2
-      #                 convex_type="GCM", ecdf_type="linear (mid)",
-      #                 edge_corr="none", # "min" "none"
-      #                 deriv_type="m-spline", g_n_type="parametric")
+      #   params = list(q_n_type="zero", Q_n_type="Cox PH", # Q_n_type="Random Forest", Q_n_type="true"
+      #                 convex_type="GCM", ecdf_type="linear (mid)", # convex_type="LS"
+      #                 edge_corr="none", # edge_corr="min"
+      #                 deriv_type="m-spline", g_n_type="parametric") # g_n_type="binning", g_n_type="true"
       # ),
-      # "Grenander (Cox, Gamma)" = list(
-      #   est = "Grenander",
-      #   params = list(marg="Gamma", S_n_type="Cox PH", # Gamma_star2
-      #                 convex_type="GCM", ecdf_type="linear (mid)",
-      #                 edge_corr="none", # "min" "none"
-      #                 deriv_type="m-spline", g_n_type="parametric")
-      # ),
-      # "Grenander (constant)" = list(
-      #   est = "Grenander",
-      #   params = list(marg="Gamma_star", S_n_type="constant", # Gamma_star2
-      #                 convex_type="GCM", ecdf_type="linear (mid)",
-      #                 edge_corr="none", # "min" "none"
-      #                 deriv_type="m-spline", g_n_type="parametric")
-      # )
-      # "Grenander (RF)" = list(
-      #   est = "Grenander",
-      #   params = list(marg="Gamma_star", S_n_type="Random Forest", # Gamma_star2
-      #                 convex_type="GCM", ecdf_type="linear (mid)",
-      #                 edge_corr="none", # "min" "none"
-      #                 deriv_type="m-spline", g_n_type="parametric")
-      # ),
-      # "Grenander (SL)" = list(
-      #   est = "Grenander",
-      #   params = list(marg="Gamma_star", S_n_type="Super Learner", # Gamma_star2
-      #                 convex_type="GCM", ecdf_type="linear (mid)",
-      #                 edge_corr="min", # "min" "none"
-      #                 deriv_type="m-spline", g_n_type="parametric")
-      # )
+      # "Cox PH" = list(est="Cox gcomp")
+      
+      
       # "Qbins (true)" = list(
       #   est = "Qbins",
-      #   params = list(n_bins=8, S_n_type="Cox PH")
-      # ),
-      # "Grenander (LS)" = list(
-      #   est = "Grenander",
-      #   params = list(marg="Gamma_star", S_n_type="Cox PH",
-      #                 convex_type="LS", ecdf_type="linear (mid)",
-      #                 g_n_type="binning")
-      # )
-      # "Grenander (SL/true)" = list(
-      #   est = "Grenander",
-      #   params = list(marg="Gamma_star2", S_n_type="Super Learner",
-      #                 g_n_type="true")
-      # ),
-      # "Grenander (SL/binning)" = list(
-      #   est = "Grenander",
-      #   params = list(marg="Gamma_star2", S_n_type="Super Learner",
-      #                 g_n_type="binning")
+      #   params = list(n_bins=8, Q_n_type="Cox PH")
       # )
     )
   )
@@ -188,16 +146,16 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     alpha_3 = -4,
     dir = c("incr", "decr"),
     sc_params = list("sc_params"=list(lmbd=3e-5, v=1.5, lmbd2=3e-5, v2=1.5)),
-    distr_A = c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"),
+    distr_S = c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"),
     edge = "none",
     surv_true = "Cox PH",
     sampling = "two-phase (6%)",
     wts_type = "estimated",
     estimator = list(
-      "Qbins (5)" = list(est="Qbins", params=list(n_bins=8, S_n_type="Cox PH")),
+      "Qbins (5)" = list(est="Qbins", params=list(n_bins=8, Q_n_type="Cox PH")),
       "Grenander" = list(
         est = "Grenander",
-        params = list(marg="Gamma_star2", S_n_type="Cox PH")
+        params = list(q_n_type="new", Q_n_type="Cox PH")
       )
     )
   )
@@ -207,32 +165,43 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     n = 1000,
     # n = c(100,200,400,800), # 1000
     # n = c(1000,2000),
-    # alpha_3 = 0,
-    alpha_3 = c(0,-0.25,-0.5),
+    alpha_3 = c(0),
+    # alpha_3 = seq(0,-2,-0.5),
     dir = "decr",
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_A = c("Unif(0,1)", "N(0.5,0.04)"), # "N(0.5,0.01)"
-    edge = c("none", "expit 0.5"),
+    distr_S = c("N(0.3+0.4x2,0.09)"),
+    # distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
+    edge = "none",
     surv_true = "Cox PH",
-    sampling = c("iid", "two-phase (72%)"),
-    # sampling = c("iid", "w1", "w2", "two-phase (50%)", "two-phase (50% random)"),
-    # sampling = c("w1", "w2", "two-phase (50%)"),
+    sampling = c("two-phase (50%)"),
+    # sampling = c("iid", "x1", "x2", "two-phase (50%)", "two-phase (50% random)"),
+    # sampling = c("x1", "x2", "two-phase (50%)"),
     # sampling = c("iid", "cycle", "two-phase (72%)", "two-phase (70% random)"),
     wts_type = "true",
     test = list(
-      "Slope (two-tailed, MC)" = list(
+      "Slope (q_n zero)" = list(
         type = "test_2",
         alt_type = "two-tailed", # decr
-        params = list(g_n_type="binning", S_n_type="Cox PH",
-                      omega_n_type="estimated"),
+        params = list(
+          type = c("simple", "simple (with constant)",
+                   "S-weighted (with constant)"),
+          q_n_type = "zero",
+          g_n_type = "true", # simple, complex, both
+          Q_n_type = "Cox PH"
+        ),
         test_stat_only = F
       )
-      # "Slope (two-tailed, boot)" = list(
+      # "Slope (q_n new)" = list(
       #   type = "test_2",
       #   alt_type = "two-tailed", # decr
-      #   test_stat_only = F,
-      #   params = list(g_n_type="binning", S_n_type="Cox PH",
-      #                 omega_n_type="estimated", var="boot", boot_reps=100)
+      #   params = list(
+      #     type = c("simple", "simple (with constant)",
+      #              "S-weighted (with constant)"),
+      #     q_n_type = "new",
+      #     g_n_type = "parametric", # simple, complex, both
+      #     Q_n_type = "Cox PH"
+      #   ),
+      #   test_stat_only = F
       # )
     )
   )
@@ -244,8 +213,8 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     dir = "decr",
     # wts_type = "estimated",
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_A = c("Unif(0,1)"),
-    # distr_A = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
+    distr_S = c("Unif(0,1)"),
+    # distr_S = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
     edge = "none",
     sampling = "two-phase (50%)",
     wts_type = c("true", "estimated")
@@ -277,11 +246,10 @@ if (cfg$main_task=="run") {
   
   # Set global constants
   C <- list(
-    # points = round(seq(0,1,0.1),2), # !!!!!
-    points = round(seq(0,1,0.02),2),
+    points = round(seq(0,1,0.02),2), # round(seq(0,1,0.1),2)
     alpha_1 = 0.5,
     alpha_2 = 0.7,
-    t_e = 200,
+    t_0 = 200,
     appx = cfg$appx
   )
   
@@ -355,15 +323,14 @@ if (F) {
   } # DEBUG: Gamma/Phi
   summ_mse <- list()
   summ_var <- list()
+  summ_sd <- list()
   summ_cov <- list()
-  for (i in c(1:51)) {
-  # for (i in c(1:5)) {
-    m <- format(round(i/50-0.02,2), nsmall=2)
-    # m <- format(round(i/4-0.25,2), nsmall=2)
+  for (i in c(1:51)) { # for (i in c(1:5)) {
+    m <- format(round(i/50-0.02,2), nsmall=2) # m <- format(round(i/4-0.25,2), nsmall=2)
     summ_bias[[i]] <- list(
       name = paste0("bias_",m),
-      estimate = paste0("est_",m),
-      truth = paste0("theta_",m)
+      estimate = paste0("r_Mn_",m),
+      truth = paste0("r_M0_",m)
     )
     if (F) {
       summ_biasG[[i]] <- list(
@@ -379,22 +346,27 @@ if (F) {
     } # DEBUG: Gamma/Phi
     summ_var[[i]] <- list(
       name = paste0("var_",m),
-      x = paste0("est_",m)
+      x = paste0("r_Mn_",m)
+    )
+    summ_sd[[i]] <- list(
+      name = paste0("sd_",m),
+      x = paste0("r_Mn_",m)
     )
     summ_mse[[i]] <- list(
       name = paste0("mse_",m),
-      estimate = paste0("est_",m),
-      truth = paste0("theta_",m)
+      estimate = paste0("r_Mn_",m),
+      truth = paste0("r_M0_",m)
     )
     summ_cov[[i]] <- list(
       name = paste0("cov_",m),
-      truth = paste0("theta_",m),
+      truth = paste0("r_M0_",m),
       lower = paste0("ci_lo_",m),
       upper = paste0("ci_hi_",m),
       na.rm = T
     )
   }
-  summ <- summarize(sim, bias=summ_bias, mse=summ_mse, var=summ_var, coverage=summ_cov)
+  summ <- summarize(sim, bias=summ_bias, mse=summ_mse, var=summ_var,
+                    sd=summ_sd, coverage=summ_cov)
   if (F) {
     summ <- summarize(sim, bias=c(summ_bias,summ_biasG,summ_biasP), mse=summ_mse, coverage=summ_cov)
   } # DEBUG: Gamma/Phi
@@ -403,7 +375,7 @@ if (F) {
   
   p_data <- pivot_longer(
     data = summ,
-    cols = -c(level_id,n,alpha_3,sc_params,distr_A,edge,
+    cols = -c(level_id,n,alpha_3,sc_params,distr_S,edge,
               surv_true,sampling,Estimator,dir,wts_type),
     names_to = c("stat","point"),
     names_sep = "_"
@@ -413,60 +385,63 @@ if (F) {
   # cb_colors <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442",
   #                "#0072B2", "#D55E00", "#CC79A7", "#999999")
   # m_colors <- c(cb_colors[2], cb_colors[5], cb_colors[6]
-    # `Grenander (Est S_n/g_n)` = cb_colors[2],
+    # `Grenander (Est Q_n/g_n)` = cb_colors[2],
   # )
   
   # PLot Y-axis limits
-  plot_lims <- list(b=c(-0.25,0.25), c=c(0,1), m=c(0,0.02), v=c(0,0.01)) # c=c(0.7,1)
+  plot_lims <- list(b=c(-0.25,0.25), c=c(0,1), m=c(0,0.02),
+                    v=c(0,0.01), s=c(0,0.15))
   
   # Set faceting vectors
-  distr_As <- c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4w2,0.04)")
+  distr_Ss <- c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)")
   surv_trues <- c("Cox PH", "Complex")
   
   # Orange 10/90 quantile lines
-  w2 <- rbinom(10^5, size=1, prob=0.5)
+  x2 <- rbinom(10^5, size=1, prob=0.5)
   q3 <- as.numeric(quantile(
-    rtruncnorm(10^5, a=0, b=1, mean=0.3+0.4*w2, sd=0.2), c(0.1,0.9)
+    rtruncnorm(10^5, a=0, b=1, mean=0.3+0.4*x2, sd=0.3), c(0.1,0.9)
   ))
   df_vlines <- data.frame(
     # x = c(qnorm(0.1,0.5,0.1),qnorm(0.1,0.5,0.2),qunif(0.1,0,1),
     #       qnorm(0.9,0.5,0.1),qnorm(0.9,0.5,0.2),qunif(0.9,0,1)),
-    # distr_A = rep(c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"),2)
+    # distr_S = rep(c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"),2)
     x = c(qunif(0.1,0,1), qtruncnorm(0.1, a=0, b=1, mean=0.5, sd=0.2), q3[1],
           qunif(0.9,0,1), qtruncnorm(0.9, a=0, b=1, mean=0.5, sd=0.2), q3[2]),
-    distr_A = rep(distr_As,2)
+    distr_S = rep(distr_Ss,2)
   )
   
   # Grey background densities
-  df_distr_A <- data.frame(
+  df_distr_S <- data.frame(
     x = rep(seq(0,1,0.01),3),
     # ymax = c(dnorm(seq(0,1,0.01), mean=0.5, sd=0.1),
     #          dnorm(seq(0,1,0.01), mean=0.5, sd=0.2),
     #          rep(1,101)),
-    # distr_A = rep(c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"), each=101),
+    # distr_S = rep(c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"), each=101),
     ymax = c(rep(1,101),
              dtruncnorm(seq(0,1,0.01), a=0, b=1, mean=0.5, sd=0.2),
-             0.5*dtruncnorm(seq(0,1,0.01), a=0, b=1, mean=0.3, sd=0.2) +
-             0.5*dtruncnorm(seq(0,1,0.01), a=0, b=1, mean=0.7, sd=0.2)),
-    distr_A = rep(distr_As, each=101),
+             0.5*dtruncnorm(seq(0,1,0.01), a=0, b=1, mean=0.3, sd=0.3) +
+             0.5*dtruncnorm(seq(0,1,0.01), a=0, b=1, mean=0.7, sd=0.3)),
+    distr_S = rep(distr_Ss, each=101),
     value = 0
   )
   if (sim$levels$edge!="none") {
     mass <- as.numeric(strsplit(sim$levels$edge," ",fixed=T)[[1]][2])
     height <- 10 * mass
-    df_distr_A %<>% mutate(
-      ymax = ifelse(x<0.1, 10*mass, (1-mass)*df_distr_A$ymax)
+    df_distr_S %<>% mutate(
+      ymax = ifelse(x<0.1, 10*mass, (1-mass)*df_distr_S$ymax)
     )
     df_vlines <- df_vlines[4:6,]
   }
-  df_distr_b <- mutate(df_distr_A, ymin=plot_lims$b[1],
+  df_distr_b <- mutate(df_distr_S, ymin=plot_lims$b[1],
                        ymax=((ymax*diff(plot_lims$b))/6+plot_lims$b[1]))
-  df_distr_c <- mutate(df_distr_A, ymin=plot_lims$c[1],
+  df_distr_c <- mutate(df_distr_S, ymin=plot_lims$c[1],
                        ymax=((ymax*diff(plot_lims$c))/6+plot_lims$c[1]))
-  df_distr_m <- mutate(df_distr_A, ymin=plot_lims$m[1],
+  df_distr_m <- mutate(df_distr_S, ymin=plot_lims$m[1],
                        ymax=((ymax*diff(plot_lims$m))/6+plot_lims$m[1]))
-  df_distr_v <- mutate(df_distr_A, ymin=plot_lims$v[1],
+  df_distr_v <- mutate(df_distr_S, ymin=plot_lims$v[1],
                        ymax=((ymax*diff(plot_lims$v))/6+plot_lims$v[1]))
+  df_distr_s <- mutate(df_distr_S, ymin=plot_lims$s[1],
+                       ymax=((ymax*diff(plot_lims$s))/6+plot_lims$s[1]))
   
   # Bias plot
   # Export: 10" x 6"
@@ -481,7 +456,7 @@ if (F) {
                linetype="dashed") +
     geom_line() +
     facet_grid(rows = dplyr::vars(factor(surv_true, levels=surv_trues)),
-               cols = dplyr::vars(factor(distr_A, levels=distr_As))) +
+               cols = dplyr::vars(factor(distr_S, levels=distr_Ss))) +
     scale_y_continuous(limits=plot_lims$b) + # labels=percent
     # scale_color_manual(values=m_colors) +
     theme(legend.position="bottom") +
@@ -500,47 +475,69 @@ if (F) {
     geom_hline(aes(yintercept=0.95), linetype="longdash", color="grey") +
     geom_line() +
     facet_grid(rows = dplyr::vars(factor(surv_true, levels=surv_trues)),
-               cols = dplyr::vars(factor(distr_A, levels=distr_As))) +
+               cols = dplyr::vars(factor(distr_S, levels=distr_Ss))) +
     scale_y_continuous(labels=percent, limits=plot_lims$c) +
     # scale_color_manual(values=m_colors) +
     theme(legend.position="bottom") +
     labs(y="Coverage (%)", x="S", color="Estimator")
   
-  # Variance plot
+  # Standard deviation plot
   # Export: 10" x 6"
   ggplot(
-    filter(p_data, stat=="var"),
+    filter(p_data, stat=="sd"),
     aes(x=point, y=value, color=factor(Estimator), group=factor(Estimator))
   ) +
     geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
-                data=df_distr_v, fill="grey", color=NA, alpha=0.4) +
+                data=df_distr_s, fill="grey", color=NA, alpha=0.4) +
     geom_vline(aes(xintercept=x), data=df_vlines, color="orange",
                linetype="dashed") +
     geom_line() +
     facet_grid(rows = dplyr::vars(factor(surv_true, levels=surv_trues)),
-               cols = dplyr::vars(factor(distr_A, levels=distr_As))) +
-    scale_y_continuous(limits=plot_lims$v) +
+               cols = dplyr::vars(factor(distr_S, levels=distr_Ss))) +
+    scale_y_continuous(limits=plot_lims$s) +
     # scale_color_manual(values=m_colors) +
     theme(legend.position="bottom") +
-    labs(y="Variance", x="S", color="Estimator")
+    labs(y="Standard deviation", x="S", color="Estimator")
   
-  # # MSE plot
-  # # Export: 10" x 6"
-  # ggplot(
-  #   filter(p_data, stat=="mse"),
-  #   aes(x=point, y=value, color=factor(Estimator), group=factor(Estimator))
-  # ) +
-  #   geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
-  #               data=df_distr_m, fill="grey", color=NA, alpha=0.4) +
-  #   geom_vline(aes(xintercept=x), data=df_vlines, color="orange",
-  #              linetype="dashed") +
-  #   geom_line() +
-  #   facet_grid(rows = dplyr::vars(factor(surv_true, levels=surv_trues)),
-  #              cols = dplyr::vars(factor(distr_A, levels=distr_As))) +
-  #   scale_y_continuous(limits=plot_lims$m) +
-  #   # scale_color_manual(values=m_colors) +
-  #   theme(legend.position="bottom") +
-  #   labs(y="MSE", x="S", color="Estimator")
+  if (F) {
+    # Variance plot
+    # Export: 10" x 6"
+    ggplot(
+      filter(p_data, stat=="var"),
+      aes(x=point, y=value, color=factor(Estimator), group=factor(Estimator))
+    ) +
+      geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
+                  data=df_distr_v, fill="grey", color=NA, alpha=0.4) +
+      geom_vline(aes(xintercept=x), data=df_vlines, color="orange",
+                 linetype="dashed") +
+      geom_line() +
+      facet_grid(rows = dplyr::vars(factor(surv_true, levels=surv_trues)),
+                 cols = dplyr::vars(factor(distr_S, levels=distr_Ss))) +
+      scale_y_continuous(limits=plot_lims$v) +
+      # scale_color_manual(values=m_colors) +
+      theme(legend.position="bottom") +
+      labs(y="Variance", x="S", color="Estimator")
+  } # Variance plot
+  
+  if (F) {
+    # MSE plot
+    # Export: 10" x 6"
+    ggplot(
+      filter(p_data, stat=="mse"),
+      aes(x=point, y=value, color=factor(Estimator), group=factor(Estimator))
+    ) +
+      geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
+                  data=df_distr_m, fill="grey", color=NA, alpha=0.4) +
+      geom_vline(aes(xintercept=x), data=df_vlines, color="orange",
+                 linetype="dashed") +
+      geom_line() +
+      facet_grid(rows = dplyr::vars(factor(surv_true, levels=surv_trues)),
+                 cols = dplyr::vars(factor(distr_S, levels=distr_Ss))) +
+      scale_y_continuous(limits=plot_lims$m) +
+      # scale_color_manual(values=m_colors) +
+      theme(legend.position="bottom") +
+      labs(y="MSE", x="S", color="Estimator")
+  } # MSE plot
   
 }
 
@@ -559,8 +556,20 @@ if (F) {
   #   color should be n-value
   #   x-axis should be alpha_3
   
-  # Summarize resuls
-  summ <- summarize(sim)
+  # Summarize results
+  # summ <- summarize(sim)
+  # ntypes <- length(names(sim$results)[substr(names(sim$results), 1, 4)=="type"])
+  # for (i in c(1:ntypes)) {
+  #   
+  # }
+  summ <- sim %>% summarize(
+    mean = list(
+      list(name="reject_1", x="reject_1", na.rm=T),
+      list(name="reject_2", x="reject_2", na.rm=T),
+      list(name="reject_3", x="reject_3", na.rm=T)
+    )
+  )
+  summ
   
   summ %<>% rename("Power"=mean_reject)
   
@@ -575,15 +584,15 @@ if (F) {
   )
   
   # Export: 7" x 4.5"
-  # distr_A_ <- "Unif(0,1)"
+  # distr_S_ <- "Unif(0,1)"
   ggplot(
     summ,
     aes(x=alpha_3, y=Power, color=factor(n))
   ) +
     geom_point() +
     geom_line() +
-    facet_grid(cols=dplyr::vars(test), rows=dplyr::vars(distr_A)) +
-    # facet_grid(cols=dplyr::vars(surv_true), rows=dplyr::vars(distr_A)) +
+    facet_grid(cols=dplyr::vars(test), rows=dplyr::vars(distr_S)) +
+    # facet_grid(cols=dplyr::vars(surv_true), rows=dplyr::vars(distr_S)) +
     scale_y_continuous(labels=percent) +
     theme(legend.position="bottom") +
     scale_color_manual(values=m_colors) +
@@ -693,12 +702,12 @@ if (F) {
   summ <- sim %>% summarize(
     bias_pct = list(
       name = "bias_pct",
-      estimate = "theta_est",
-      truth = "theta_true"
+      estimate = "r_Mn",
+      truth = "r_M0"
     ),
     coverage = list(
       name = "coverage",
-      truth = "theta_true",
+      truth = "r_M0",
       lower = "ci_lo",
       upper = "ci_hi"
       # na.rm = T
@@ -719,25 +728,25 @@ if (F) {
   sim %>% SimEngine::summarize(
     mean = list(
       list(name="mean_runtime", x="runtime"),
-      list(name="se_w1", x="se_w1"),
-      list(name="se_w2", x="se_w2"),
-      list(name="se_a", x="se_a"),
+      list(name="se_x1", x="se_x1"),
+      list(name="se_x2", x="se_x2"),
+      list(name="se_s", x="se_s"),
       list(name="se_est_bshz", x="se_est_bshz"),
       list(name="se_est_surv", x="se_est_surv"),
       list(name="se_est_marg", x="se_est_marg")
     ),
     sd = list(
-      list(name="se_w1_empr", x="est_w1"),
-      list(name="se_w2_empr", x="est_w2"),
-      list(name="se_a_empr", x="est_a"),
+      list(name="se_x1_empr", x="est_x1"),
+      list(name="se_x2_empr", x="est_x2"),
+      list(name="se_s_empr", x="est_s"),
       list(name="se_bshz_empr", x="est_bshz"),
       list(name="se_surv_empr", x="est_surv"),
       list(name="se_marg_empr", x="est_marg")
     ),
     coverage = list(
-      list(name="cov_w1", truth="true_w1", estimate="est_w1", se="se_w1"),
-      list(name="cov_w2", truth="true_w2", estimate="est_w2", se="se_w2"),
-      list(name="cov_a", truth="true_a", estimate="est_a", se="se_a"),
+      list(name="cov_x1", truth="true_x1", estimate="est_x1", se="se_x1"),
+      list(name="cov_x2", truth="true_x2", estimate="est_x2", se="se_x2"),
+      list(name="cov_s", truth="true_s", estimate="est_s", se="se_s"),
       list(name="cov_bshz", truth="true_bshz", estimate="est_bshz", se="se_est_bshz"),
       list(name="cov_surv", truth="true_surv", estimate="est_surv", se="se_est_surv"),
       list(name="cov_marg", truth="true_marg", estimate="est_marg", se="se_est_marg")
@@ -763,8 +772,8 @@ if (F) {
   d %<>% filter(level_id==1)
   
   # Set up vector containers
-  theta_true <- c()
-  theta_est <- c()
+  r_M0 <- c()
+  r_Mn <- c()
   ci_lo <- c()
   ci_hi <- c()
   which <- c()
@@ -774,12 +783,12 @@ if (F) {
   row_offset <- 10
   for (i in c(1:51)) {
     m <- format(round(i/50-0.02,2), nsmall=1)
-    theta_true <- c(theta_true, d[1,paste0("theta_",m)])
+    r_M0 <- c(r_M0, d[1,paste0("r_M0_",m)])
   }
   for (i in 1:n_paths) {
     for (j in c(1:51)) {
       m <- format(round(j/50-0.02,2), nsmall=1)
-      theta_est <- c(theta_est, d[i+row_offset,paste0("est_",m)])
+      r_Mn <- c(r_Mn, d[i+row_offset,paste0("r_Mn_",m)])
       ci_lo <- c(ci_lo, d[i+row_offset,paste0("ci_lo_",m)])
       ci_hi <- c(ci_hi, d[i+row_offset,paste0("ci_hi_",m)])
       which <- c(which, i)
@@ -788,7 +797,7 @@ if (F) {
   
   plot_data <- data.frame(
     x = rep(sim$constants$points, n_paths),
-    y = theta_est,
+    y = r_Mn,
     ci_lo = ci_lo,
     ci_hi = ci_hi,
     which = which
@@ -803,7 +812,7 @@ if (F) {
       linetype = "dashed"
     ) +
     geom_line(
-      data = data.frame(x=sim$constants$points, y=theta_true),
+      data = data.frame(x=sim$constants$points, y=r_M0),
       color = "#222222"
     ) +
     geom_line() +
@@ -839,9 +848,9 @@ if (F) {
   d %<>% filter(level_id==1)
   
   # Set up vector containers
-  theta_true <- c()
+  r_M0 <- c()
   # Theta_true <- c()
-  theta_est <- c()
+  r_Mn <- c()
   # Theta_est <- c()
   which <- c()
   
@@ -850,13 +859,13 @@ if (F) {
   row_offset <- 0
   for (i in c(1:51)) {
     m <- format(round(i/50-0.02,2), nsmall=2)
-    theta_true <- c(theta_true, d[1,paste0("theta_",m)])
+    r_M0 <- c(r_M0, d[1,paste0("r_M0_",m)])
     # Theta_true <- c(Theta_true, d[1,paste0("Theta_",m)])
   }
   for (i in 1:n_paths) {
     for (j in c(1:51)) {
       m <- format(round(j/50-0.02,2), nsmall=2)
-      theta_est <- c(theta_est, d[i+row_offset,paste0("est_",m)])
+      r_Mn <- c(r_Mn, d[i+row_offset,paste0("r_Mn_",m)])
       # Theta_est <- c(Theta_est, d[i+row_offset,paste0("esT_",m)])
       which <- c(which, i)
     }
@@ -865,12 +874,12 @@ if (F) {
   # points <- get("points", envir=sim$vars$env)
   points <- C$points
   ggplot(
-    data.frame(x=rep(points, n_paths), y=theta_est, which=which),
+    data.frame(x=rep(points, n_paths), y=r_Mn, which=which),
     aes(x=x, y=y, group=which)
   ) +
     geom_line(alpha=0.05) +
     geom_line(
-      data = data.frame(x=points, y=theta_true),
+      data = data.frame(x=points, y=r_M0),
       aes(x=x, y=y),
       color = "white",
       inherit.aes = F

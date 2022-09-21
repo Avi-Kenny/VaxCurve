@@ -1,40 +1,237 @@
 
-# Cox model for interaction figure
+# DWD
 if (F) {
   
-  df_raw
+  # One
+  r <- sim$results
+  df_plot_1 <- data.frame(
+    x = c(r$Theta_0.0,r$Gamma_0.0,
+          r$Theta_0.2,r$Gamma_0.2,
+          r$Theta_0.5,r$Gamma_0.5,
+          r$Theta_0.7,r$Gamma_0.7,
+          r$Theta_1.0,r$Gamma_1.0),
+    which = rep(c(rep("Theta",500),rep("Gamma",500)),5),
+    point = c(rep("0.0",1000), rep("0.2",1000), rep("0.5",1000),
+              rep("0.7",1000), rep("1.0",1000))
+  )
+  df_plot_2 <- data.frame(
+    x = c(r$Theta_0.0, r$Theta_0.2, r$Theta_0.5, r$Theta_0.7, r$Theta_1.0),
+    point = c(rep("0.0",500), rep("0.2",500), rep("0.5",500),
+              rep("0.7",500), rep("1.0",500))
+  )
+  ggplot(df_plot_2, aes(x=x)) +
+    facet_wrap(~point, scales="free") +
+    geom_histogram(bins=50)
+  
+  # Two
+  r <- sim$results
+  nr <- nrow(r)
+  df_plot <- data.frame(
+    x = c(r$Theta_0.5, r$Theta2_0.5, r$Th_cmp_1,
+          r$Th_cmp_3, r$etastar1, r$etastar2),
+    which = c(rep("Theta (0.5)",nr),
+              rep("Theta2 (0.5)",nr),
+              rep("Theta (cmp 1)",nr),
+              rep("Theta (cmp 3)",nr),
+              rep("etastar1",nr),
+              rep("etastar2",nr))
+  )
+  ggplot(df_plot, aes(x=x)) +
+    facet_wrap(~which, scales="free") +
+    geom_histogram(bins=50)
+    # labs(title=t)
+  
+  # Three
+  r1 <- filter(sim$results, tmp=="old etastar")
+  r2 <- filter(sim$results, tmp=="new etastar")
+  mean(r1$reject_1)
+  mean(r2$reject_1)
+  nr1 <- nrow(r1)
+  nr2 <- nrow(r2)
+  df_plot <- data.frame(
+    x = c(r1$Theta_0.2, r2$Theta_0.2, r1$Theta_0.5, r2$Theta_0.5,
+          r1$etastar_0.2, r2$etastar_0.2, r1$etastar_0.5, r2$etastar_0.5,
+          r1$p_val_1, r2$p_val_1, r1$beta_n_1, r2$beta_n_1,
+          r1$var_n_1, r2$var_n_1, sqrt(r1$var_n_1), sqrt(r2$var_n_1)),
+    which = c(rep("Theta_0.2 (old eta)",nr1),
+              rep("Theta_0.2 (new eta)",nr2),
+              rep("Theta_0.5 (old eta)",nr1),
+              rep("Theta_0.5 (new eta)",nr2),
+              rep("etastar_0.2 (old eta)",nr1),
+              rep("etastar_0.2 (new eta)",nr2),
+              rep("etastar_0.5 (old eta)",nr1),
+              rep("etastar_0.5 (new eta)",nr2),
+              rep("P-val (old eta)",nr1),
+              rep("P-val (new eta)",nr2),
+              rep("beta_n (old eta)",nr1),
+              rep("beta_n (new eta)",nr2),
+              rep("var_n (old eta)",nr1),
+              rep("var_n (new eta)",nr2),
+              rep("sd_n (old eta)",nr1),
+              rep("sd_n (new eta)",nr2))
+  )
+  ggplot(df_plot, aes(x=x)) +
+    facet_wrap(~which, scales="free", ncol=4) +
+    geom_histogram(bins=30)
   
 }
 
-# 
+# Basic simulation of hypothesis test
 if (F) {
   
-  library(SimEngine)
-  run_on_cluster(
-    
-    first = {
-      sim <- new_sim()
-      create_data <- function(n) { rnorm(n) }
-      sim %<>% set_script(function() {
-        data <- create_data(L$n)
-        return(list("mean"=mean(data)))
-      })
-      sim %<>% set_levels(n=c(100,1000))
-      sim %<>% set_config(num_sim=10)
-    },
-    
-    main = {
-      sim %<>% run()
-    },
-    
-    last = {
-      sim %>% SimEngine::summarize()
-    },
-    
-    cluster_config = list(js="ge")
-    
-  )  
+  sim <- new_sim()
   
+  create_data <- function(n, mu_x, mu_y, sigma_x, sigma_y, rho) {
+    mu <- c(mu_x,mu_y)
+    Sigma <- rbind(
+      c(sigma_x^2,rho*sigma_x*sigma_y),
+      c(rho*sigma_x*sigma_y,sigma_y^2)
+    )
+    xy <- mvrnorm(n=n, mu=mu, Sigma=Sigma)
+    return(list(x=xy[,1], y=xy[,2]))
+  }
+  
+  sim %<>% set_levels(
+    n = c(500), # 100
+    mu_x = c(0,1),
+    mu_y = c(0,1),
+    sigma_x = 8,
+    sigma_y = 20,
+    rho = c(0.1,0.5,0.9)
+  )
+  
+  sim %<>% set_config(num_sim=10000)
+  
+  sim %<>% set_script(function() {
+    
+    dat <- create_data(n=L$n, mu_x=L$mu_x, mu_y=L$mu_y, sigma_x=L$sigma_x,
+                       sigma_y=L$sigma_y, rho=L$rho)
+    x <- dat$x
+    y <- dat$y
+    rho_n <- cor(x,y)
+    
+    stat_x <- (sqrt(L$n)*mean(x))/sd(x)
+    stat_y <- (sqrt(L$n)*mean(y))/sd(y)
+    stat_xy_unscaled <- ( sqrt(L$n)*(mean(x)+mean(y)) ) /
+      sqrt( var(x) + 2*cov(x,y) + var(y) )
+    stat_xy_scaled <- sqrt(L$n/(2+2*rho_n)) * (mean(x)/sd(x) + mean(y)/sd(y))
+    
+    stat_xy_l2norm <- L$n*(mean(x)/sd(x))^2 +
+      L$n*((sd(x)*mean(y)-rho_n*sd(y)*mean(x))/(sd(x)*sd(y)*sqrt(1-rho_n^2)))^2
+    
+    p_x <- pchisq(stat_x^2, df=1, lower.tail=FALSE)
+    p_y <- pchisq(stat_y^2, df=1, lower.tail=FALSE)
+    p_xy_unscaled <- pchisq(stat_xy_unscaled^2, df=1, lower.tail=FALSE)
+    p_xy_scaled <- pchisq(stat_xy_scaled^2, df=1, lower.tail=FALSE)
+    p_xy_l2norm <- pchisq(stat_xy_l2norm, df=2, lower.tail=FALSE)
+    
+    return (list(
+      "rej_x" = ifelse(p_x<0.05,1,0),
+      "rej_y" = ifelse(p_y<0.05,1,0),
+      "rej_xy_unscaled" = ifelse(p_xy_unscaled<0.05,1,0),
+      "rej_xy_scaled" = ifelse(p_xy_scaled<0.05,1,0),
+      "rej_xy_l2norm" = ifelse(p_xy_l2norm<0.05,1,0),
+      "rej_bonf" = ifelse(p_x<0.025||p_y<0.025,1,0),
+      "rej_holm" = ifelse(min(p_x,p_y)<0.025||max(p_x,p_y)<0.05,1,0)
+    ))
+    
+  })
+  
+  sim %<>% run()
+  
+  SimEngine::summarize(sim) %>% dplyr::rename(
+    "rej_x" = mean_rej_x,
+    "rej_y" = mean_rej_y,
+    "rej_xy_unscaled" = mean_rej_xy_unscaled,
+    "rej_xy_scaled" = mean_rej_xy_scaled,
+    "rej_xy_l2norm" = mean_rej_xy_l2norm,
+    "rej_bonf" = mean_rej_bonf,
+    "rej_holm" = mean_rej_holm
+  )
+  
+  # ggplot(data.frame(x=test_stat), aes(x=x)) + geom_histogram(bins=100)
+  # mean(test_stat)
+  # var(test_stat)
+  
+}
+
+# Hyp test generalized primitive
+if (F) {
+  
+  In <- as.integer
+  grid <- seq(0,1,0.001)
+  theta_0 <- Vectorize(function(x) {
+    q <- 100
+    In(x<=(1/q))*(q*x) + In(x>(1/q))
+  })
+  k <- 100
+  G_0 <- function(x) {
+    k_x <- 0.5/k
+    m <- (0.5*k)/(k-0.5)
+    In(x<=k_x)*(k*x) + In(x>k_x)*(m*x+(1-m))
+  }
+  G_0_inv <- function(x) {
+    m <- (k-0.5)/(0.5*k)
+    In(x<=0.5)*(x/k) + In(x>0.5)*(m*x+(1-m))
+  }
+  g_0 <- function(x) { grad(G_0,x) }
+  Theta_0 <- Vectorize(function(x) {
+    integrate(theta_0, lower=0, upper=x)$value
+  })
+  Gamma_0 <- Vectorize(function(x) {
+    integrate(function(y) {
+      theta_0(y) * g_0(y)
+    }, lower=0, upper=x)$value
+  })
+  Gamma_0s <- Vectorize(function(x) { Gamma_0(G_0_inv(x)) })
+  fns <- c("theta_0", "G_0", "G_0_inv", "g_0", "Gamma_0", "Gamma_0s", "Theta_0")
+  
+  df_plot <- data.frame(
+    x = rep(grid, 7),
+    y = c(theta_0(grid), G_0(grid), G_0_inv(grid),
+          g_0(grid), Gamma_0(grid), Gamma_0s(grid),
+          Theta_0(grid)),
+    which = rep(factor(fns, levels=fns), each=length(grid))
+  )
+  ggplot(df_plot, aes(x=x, y=y, color=which)) +
+    geom_line() +
+    facet_wrap(~which, ncol=3, scales="free") +
+    theme(legend.position="none")
+  
+}
+
+# Linear spline
+if (F) {
+  
+  # !!!!!
+  grid <- seq(0,1,0.001)
+  m <- 0.25
+  f <- function(x) {
+    In()
+  }
+  
+  In <- as.integer
+  a <- c(-1,1,2,3)
+  f1 <- function(x) {
+    a1 <- a[1]; a2 <- a[2]; a3 <- a[3]; a4 <- a[4];
+    a1 + In(x<=a3)*a2*x + In(x>a3)*(a3*(a2-a4)+a4*x)
+  }
+  f2 <- function(x) {
+    a1 <- a[1]; a2 <- a[2]; a3 <- a[3]; a4 <- a[4];
+    a1 + a2*x + (a4-a2)*pmax(0,x-a3)
+  }
+  grid <- seq(0,3,0.01)
+  ggplot(
+    data.frame(
+      x = rep(grid,2),
+      y = c(f1(grid),f2(grid)),
+      which = rep(c("f1","f2"), each=length(grid))),
+    aes(x=x, y=y, color=which)
+  ) +
+    geom_line() +
+    facet_wrap(~which)
+    
+
 }
 
 # New superfunc pattern (v2)
@@ -401,9 +598,9 @@ if (F) {
   }))
   
   # Check 3
-  (1/n_orig) * sum((1-weights_f)*eta_ss_n(0.7,w_f))
+  (1/n_orig) * sum((1-weights_f)*eta_n(0.7,w_f))
   (1/n_orig) * sum(sapply(c(1:n_orig), function(i) {
-    (1-weights_f[i])*eta_ss_n(0.7,as.numeric(w_f[i,]))
+    (1-weights_f[i])*eta_n(0.7,as.numeric(w_f[i,]))
   }))
   
   # Check 4
@@ -1361,22 +1558,22 @@ if (F) {
     return(construct_superfunc(fnc, aux=NA, vec=c(2,1,1,1), vals=vals))
   }
 
-  # !!!!! New constructor: eta_n
-  construct_eta_n <- function(dat, vals=NA, S_n) {
-    n_orig <- sum(dat$weights)
-    fnc <- function(x,w) {
-      w_long <- as.data.frame(matrix(rep(w,length(dat$a)), ncol=length(w), byrow=T))
-      return(
-        (1/n_orig) * sum(
-          dat$weights * as.integer(dat$a<=x)*(1-S_n(rep(C$t_e,length(dat$a)),w_long,dat$a))
-        )
-      )
-    }
-    return(construct_superfunc(fnc, aux=NA, vec=c(1,2), vals=vals))
-  }
+  # # !!!!! New constructor: eta_n
+  # construct_eta_n <- function(dat, vals=NA, S_n) {
+  #   n_orig <- sum(dat$weights)
+  #   fnc <- function(x,w) {
+  #     w_long <- as.data.frame(matrix(rep(w,length(dat$a)), ncol=length(w), byrow=T))
+  #     return(
+  #       (1/n_orig) * sum(
+  #         dat$weights * as.integer(dat$a<=x)*(1-S_n(rep(C$t_e,length(dat$a)),w_long,dat$a))
+  #       )
+  #     )
+  #   }
+  #   return(construct_superfunc(fnc, aux=NA, vec=c(1,2), vals=vals))
+  # }
   
   # !!!!! New constructor calls
-  eta_n <- construct_eta_n(dat, vlist$AW_grid, S_n)
+  # eta_n <- construct_eta_n(dat, vlist$AW_grid, S_n)
   omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n,
                                type=params$omega_n_type)
   
@@ -2334,9 +2531,9 @@ if (F) {
     Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type,
                           csf=TRUE)
     omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
-    pi_n <- construct_pi_n(dat, vlist$W_grid, type="logistic")
-    theta_os_n_est <- theta_os_n(dat, pi_n, S_n, omega_n)
-    sigma2_os_n_est <- sigma2_os_n(dat, pi_n, S_n, omega_n, theta_os_n_est)
+    g_sn <- construct_g_sn(dat, vlist$W_grid, type="logistic")
+    theta_os_n_est <- theta_os_n(dat, g_sn, S_n, omega_n)
+    sigma2_os_n_est <- sigma2_os_n(dat, g_sn, S_n, omega_n, theta_os_n_est)
     
     ests <- c(ests, theta_os_n_est)
     sigma2s <- c(sigma2s, sigma2_os_n_est/n_orig)
@@ -2374,9 +2571,9 @@ if (F) {
     Sc_n <- construct_S_n(dat_orig, vlist$S_n, type=params$S_n_type,
                           csf=TRUE)
     omega_n <- construct_omega_n(vlist$omega, S_n, Sc_n)
-    pi_n <- construct_pi_n(dat, vlist$W_grid, type="logistic")
-    theta_os_n_est <- theta_os_n(dat, pi_n, S_n, omega_n)
-    sigma2_os_n_est <- sigma2_os_n(dat, pi_n, S_n, omega_n, theta_os_n_est)
+    g_sn <- construct_g_sn(dat, vlist$W_grid, type="logistic")
+    theta_os_n_est <- theta_os_n(dat, g_sn, S_n, omega_n)
+    sigma2_os_n_est <- sigma2_os_n(dat, g_sn, S_n, omega_n, theta_os_n_est)
     
     ests <- c(ests, theta_os_n_est)
     sigma2s <- c(sigma2s, sigma2_os_n_est/n_orig)

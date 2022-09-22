@@ -439,7 +439,7 @@
       omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none",
       f_sIx_n_bins=15
     )
-    C <- list(appx=list(t_0=10,x_tol=25,s=0.01)) # !!!!! Try x_tol=15 if this gives issues
+    C <- list(appx=list(t_0=10,x_tol=15,s=0.01))
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
@@ -451,7 +451,7 @@
       cr2_trial = rep(1,12),
       cr2_COR = rep(1,12),
       cr2_marker = c(1:12),
-      edge_corr = c(1,1,1,1,1,1,1,1,1,1,1,1), # !!!!! TO DO
+      edge_corr = c(2,2,2,2,2,2,2,2,2,2,2,2),
       v_id = rep(1,12),
       v_time = rep(1,12),
       v_event = rep(1,12),

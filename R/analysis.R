@@ -419,14 +419,14 @@
       covariates = "~. + RSA + Age + BMI + Riskscore"
     )
     cfg2$qnt <- list(
-      "Risk, nonparametric" = c(0.05,0.95),
-      "CVE, nonparametric" = c(0.05,0.95),
+      "Risk, nonparametric" = c(0,0.95),
+      "CVE, nonparametric" = c(0,0.95),
       "Risk, Qbins" = c(0,1),
       "CVE, Qbins" = c(0,1),
-      "Risk, Cox GAM" = c(0.025,0.975),
-      "CVE, Cox GAM" = c(0.025,0.975),
-      "Risk, Cox model" = c(0.025,0.975),
-      "CVE, Cox model" = c(0.025,0.975)
+      "Risk, Cox GAM" = c(0,0.975),
+      "CVE, Cox GAM" = c(0,0.975),
+      "Risk, Cox model" = c(0,0.975),
+      "CVE, Cox model" = c(0,0.975)
     )
     cfg2$zoom_x <- "zoomed"
     cfg2$zoom_y_cve <- "zoomed"
@@ -559,7 +559,7 @@
   
   # Set config based on local vs. cluster
   if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
-    cfg2$tid <- 1
+    cfg2$tid <- 10
     cfg2$dataset <- paste0(cfg2$folder_cluster,cfg2$dataset)
   } else {
     cfg2$tid <- as.integer(Sys.getenv(.tid_var))
@@ -1502,7 +1502,7 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
       ifelse(curve %in% which_curves, cutoffs[[curve]][2], NA)
     }, USE.NAMES=F)
     rows_1 <- which(plot_data$curve %in% which_curves) # !!!!! Might not be needed anymore
-    rows_2 <- which(plot_data$x <= cut_lo | plot_data$x >= cut_hi)
+    rows_2 <- which(plot_data$x < cut_lo | plot_data$x > cut_hi)
     rows <- intersect(rows_1, rows_2)
     plot_data[rows, c("y", "ci_lo", "ci_hi")] <- NA
     return(plot_data)

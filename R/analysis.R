@@ -8,7 +8,7 @@
 
 {
   # Choose analysis
-  which_analysis <- "HVTN 705 (new)" # "Janssen" "Moderna" "AMP" "AZD1222"
+  which_analysis <- "HVTN 705 (ICS)" # "Janssen" "Moderna" "AMP" "AZD1222"
                               # "HVTN 705 (primary)" "HVTN 705 (all)"
   
   # Set proper task ID variable
@@ -394,7 +394,7 @@
     
   }
   
-  if (cfg2$analysis=="HVTN 705 (new)") {
+  if (cfg2$analysis=="HVTN 705 (ICS)") {
     
     cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox"))
     cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Cox"))
@@ -431,7 +431,7 @@
     cfg2$zoom_x <- "zoomed"
     cfg2$zoom_y_cve <- "zoomed"
     cfg2$zoom_y_risk <- "zoomed (risk)"
-    cfg2$folder_local <- "HVTN 705 (new) data/"
+    cfg2$folder_local <- "HVTN 705 (ICS) data/"
     cfg2$folder_cluster <- "Z:/vaccine/p705/analysis/lab/cc/copcor/"
     cfg2$params = list(
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="line",

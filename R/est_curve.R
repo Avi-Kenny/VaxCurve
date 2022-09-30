@@ -25,8 +25,8 @@
 #'     root-n estimator to replace the Grenander-based estimator only at the
 #'     leftmost point. "min" adjusts both the leftmost point and the rest of the
 #'     curve.
-#'   - `convex_type` One of c("GCM", "LS"); whether to fit the greatest convex
-#'     minorant (GCM) to the primitive or the least squares (LS) line
+#'   - `convex_type` One of c("GCM", "CLS"); whether to fit the greatest convex
+#'     minorant (GCM) to the primitive or the convex least squares (CLS) line
 #' @param points A vector representing the points at which estimates and CIs
 #'     should be calculated. This should be a unique increasing sequence.
 #' @param dir Direction of monotonicity; one of c("incr", "decr")
@@ -82,6 +82,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     chk(1)
     vlist <- create_val_list(dat_orig)
+    chk(99, "Intermediate")
     srvSL <- construct_Q_n(dat, vlist$Q_n, type=p$Q_n_type, print_coeffs=T)
     chk(2)
     Q_n <- srvSL$srv
@@ -197,7 +198,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
         f = 0
       )
       chk(16)
-    } else if (p$convex_type=="LS") {
+    } else if (p$convex_type=="CLS") {
       gcm <- function(x) { 1 } # Ignored
       fit <- cvx.lse.reg(t=x_vals, z=y_vals)
       pred_x <- round(seq(0,1,0.001),3)

@@ -713,11 +713,18 @@
 ####################################################.
 
 {
+  
   # Set C$appx$t_0 to 10 in "Setup" section
-  Q_0 <- (construct_Q_n(dat, vlist$Q_n, type="true"))$srv
-  Q_CoxPH <- (construct_Q_n(dat, vlist$Q_n, type="Cox PH"))$srv
-  # Q_SL <- (construct_Q_n(dat, vlist$Q_n, type="Super Learner"))$srv
-  Q_SL <- (construct_Q_n(dat, vlist$Q_n, type="Random Forest"))$srv
+  fit_0 <- construct_Q_n(dat, vlist$Q_n, type="true")
+  fit_CoxPH <- construct_Q_n(dat, vlist$Q_n, type="Cox PH")
+  fit_SL <- construct_Q_n(dat, vlist$Q_n, type="Super Learner")
+  fit_CH <- construct_Q_n(dat, vlist$Q_n, type="Charlie")
+  # fit_RF <- construct_Q_n(dat, vlist$Q_n, type="Random Forest")
+  Q_0 <- fit_0$srv
+  Q_CoxPH <- fit_CoxPH$srv
+  Q_SL <- fit_SL$srv
+  Q_CH <- fit_CH$srv
+  # Q_RF <- fit_RF$srv
   
   # Plot true curve against estimated curve (as function of T)
   times <- round(seq(0,200,10))
@@ -725,11 +732,15 @@
   x_a <- as.data.frame(cbind(x1=rep(0.2,n), x2=rep(1,n)))
   x_b <- as.data.frame(cbind(x1=rep(0.5,n), x2=rep(1,n)))
   df <- data.frame(
-    time = rep(times, 12),
+    time = rep(times, 16),
     survival = c(Q_CoxPH(t=times, x=x_a, s=rep(0.2,n)),
                  Q_CoxPH(t=times, x=x_b, s=rep(0.2,n)),
                  Q_CoxPH(t=times, x=x_a, s=rep(0.8,n)),
                  Q_CoxPH(t=times, x=x_b, s=rep(0.8,n)),
+                 Q_CH(t=times, x=x_a, s=rep(0.2,n)),
+                 Q_CH(t=times, x=x_b, s=rep(0.2,n)),
+                 Q_CH(t=times, x=x_a, s=rep(0.8,n)),
+                 Q_CH(t=times, x=x_b, s=rep(0.8,n)),
                  Q_SL(t=times, x=x_a, s=rep(0.2,n)),
                  Q_SL(t=times, x=x_b, s=rep(0.2,n)),
                  Q_SL(t=times, x=x_a, s=rep(0.8,n)),
@@ -738,9 +749,9 @@
                  Q_0(t=times, x=x_b, s=rep(0.2,n)),
                  Q_0(t=times, x=x_a, s=rep(0.8,n)),
                  Q_0(t=times, x=x_b, s=rep(0.8,n))),
-    which = rep(c("Cox PH","SL","True Q_0"), each=4*length(times)),
+    which = rep(c("Cox PH","Charlie","SL","True Q_0"), each=4*length(times)),
     covs = rep(rep(c("x1=0.2,x2=1,s=0.2","x1=0.5,x2=1,s=0.2",
-                     "x1=0.2,x2=1,s=0.8","x1=0.5,x2=1,s=0.8"),3),
+                     "x1=0.2,x2=1,s=0.8","x1=0.5,x2=1,s=0.8"),4),
                each=length(times))
   )
   ggplot(df, aes(x=time, y=survival, color=which)) +
@@ -775,22 +786,13 @@
 
 {
   
-  # Generate data
-  dat_orig <- generate_data(
-    n = 3000,
-    alpha_3 = L$alpha_3,
-    distr_S = L$distr_S,
-    edge = L$edge,
-    surv_true = L$surv_true,
-    sc_params = L$sc_params,
-    sampling = L$sampling,
-    dir = L$dir
-  )
-  vlist <- create_val_list(dat_orig)
+  # Uses objects from above: fit_0, fit_CoxPH, fit_SL, fit_CH, fit_RF
   
-  Qc_0 <- (construct_Q_n(dat, vlist$Q_n, type="true"))$cens
-  Qc_n_Cox <- (construct_Q_n(dat, vlist$Q_n, type="Cox PH"))$cens
-  Qc_n_SL <- (construct_Q_n(dat, vlist$Q_n, type="Super Learner"))$cens
+  Qc_0 <- fit_0$cens
+  Qc_n_Cox <- fit_CoxPH$cens
+  Qc_n_SL <- fit_SL$cens
+  Qc_n_CH <- fit_CH$cens
+  # Q_RF <- fit_RF$srv
   
   # Plot true curve against estimated curve
   times <- round(seq(0,200,10))
@@ -798,12 +800,16 @@
   x_02 <- as.data.frame(cbind(x1=rep(0.2,n), x2=rep(1,n)))
   x_05 <- as.data.frame(cbind(x1=rep(0.5,n), x2=rep(1,n)))
   df <- data.frame(
-    time = rep(times, 12),
+    time = rep(times, 16),
     survival = c(
       Qc_n_Cox(t=times, x_02, s=rep(0.2,n)),
       Qc_n_Cox(t=times, x_05, s=rep(0.2,n)),
       Qc_n_Cox(t=times, x_02, s=rep(0.8,n)),
       Qc_n_Cox(t=times, x_05, s=rep(0.8,n)),
+      Qc_n_CH(t=times, x_02, s=rep(0.2,n)),
+      Qc_n_CH(t=times, x_05, s=rep(0.2,n)),
+      Qc_n_CH(t=times, x_02, s=rep(0.8,n)),
+      Qc_n_CH(t=times, x_05, s=rep(0.8,n)),
       Qc_n_SL(t=times, x_02, s=rep(0.2,n)),
       Qc_n_SL(t=times, x_05, s=rep(0.2,n)),
       Qc_n_SL(t=times, x_02, s=rep(0.8,n)),
@@ -813,9 +819,9 @@
       Qc_0(t=times, x_02, s=rep(0.8,n)),
       Qc_0(t=times, x_05, s=rep(0.8,n))
     ),
-    which = rep(c("Old","New","True Qc_0"), each=4*length(times)),
+    which = rep(c("Cox","Charlie","SL","True Qc_0"), each=4*length(times)),
     covs = rep(rep(c("x1=0.2,x2=1,s=0.2","x1=0.5,x2=1,s=0.2",
-                     "x1=0.2,x2=1,s=0.8","x1=0.5,x2=1,s=0.8"),3), each=length(times))
+                     "x1=0.2,x2=1,s=0.8","x1=0.5,x2=1,s=0.8"),4), each=length(times))
   )
   ggplot(df, aes(x=time, y=survival, color=which)) +
     geom_line() +

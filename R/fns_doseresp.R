@@ -634,6 +634,78 @@ construct_Q_n <- function(dat, vals, type, return_model=F, print_coeffs=F) {
     
   }
   
+  # !!!!! Testing
+  if (type=="Charlie") {
+    
+    newX <- cbind(vals$x, s=vals$s)[which(vals$t==0),]
+    new.times <- unique(vals$t)
+    
+    fit <- survMLc(
+      time = dat$y,
+      event = dat$delta,
+      X = cbind(dat$x, s=dat$s),
+      newX = newX,
+      newtimes = new.times,
+      bin_size = 0.025,
+      time_basis = "continuous",
+      time_grid_approx = sort(unique(dat$y)),
+      surv_form = "exp",
+      SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"), # c("SL.mean", "SL.glm", "SL.gam", "SL.earth", "SL.ranger")
+      V = 5,
+      obsWeights = dat$weights
+    )
+    
+    srv_pred <- fit$S_T_preds
+    cens_pred <- fit$S_C_preds
+    
+    fnc_srv <- function(t, x, s) {
+      r <- list()
+      for (i in 1:length(x)) {
+        r[[i]] <- which(abs(x[i]-newX[[paste0("x",i)]])<1e-8)
+      }
+      if (class(newX[["s"]][1])=="factor") {
+        r[[length(x)+1]] <- which(s==newX[["s"]])
+      } else {
+        r[[length(x)+1]] <- which(abs(s-newX[["s"]])<1e-8)
+      }
+      row <- Reduce(intersect, r)
+      col <- which.min(abs(t-new.times))
+      if (length(row)!=1) {
+        stop(paste0("Error in construct_Q_n (B); ", "t=",t,",x=(",
+                    paste(x,collapse=","),"),s=",s,""))
+      }
+      if (length(col)!=1) {
+        stop(paste0("Error in construct_Q_n (C); ", "t=",t,",x=(",
+                    paste(x,collapse=","),"),s=",s,""))
+      }
+      return(srv_pred[row,col])
+    }
+    
+    fnc_cens <- function(t, x, s) {
+      r <- list()
+      for (i in 1:length(x)) {
+        r[[i]] <- which(abs(x[i]-newX[[paste0("x",i)]])<1e-8)
+      }
+      if (class(newX[["s"]][1])=="factor") {
+        r[[length(x)+1]] <- which(s==newX[["s"]])
+      } else {
+        r[[length(x)+1]] <- which(abs(s-newX[["s"]])<1e-8)
+      }
+      row <- Reduce(intersect, r)
+      col <- which.min(abs(t-new.times))
+      if (length(row)!=1) {
+        stop(paste0("Error in construct_Q_n (B); ", "t=",t,",x=(",
+                    paste(x,collapse=","),"),s=",s,""))
+      }
+      if (length(col)!=1) {
+        stop(paste0("Error in construct_Q_n (C); ", "t=",t,",x=(",
+                    paste(x,collapse=","),"),s=",s,""))
+      }
+      return(cens_pred[row,col])
+    }
+    
+  }
+  
   sfnc_srv <- construct_superfunc(fnc_srv, aux=NA, vec=c(1,2,1), vals=vals)
   sfnc_cens <- construct_superfunc(fnc_cens, aux=NA, vec=c(1,2,1), vals=vals)
   rm("vals", envir=environment(get("fnc_srv",envir=environment(sfnc_srv))))

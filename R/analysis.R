@@ -559,7 +559,7 @@
   
   # Set config based on local vs. cluster
   if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
-    cfg2$tid <- 35
+    cfg2$tid <- 37
     cfg2$dataset <- paste0(cfg2$folder_cluster,cfg2$dataset)
   } else {
     cfg2$tid <- as.integer(Sys.getenv(.tid_var))
@@ -593,6 +593,7 @@
   # Set additional analysis-specific flags
   flags$janssen_id50_lloq <- cfg2$analysis=="Janssen" &&
     cfg2$marker=="Day29pseudoneutid50"
+  flags$hvtn705_supress <- cfg2$analysis=="HVTN 705 (all)" && cfg2$tid==37
   
 }
 
@@ -1501,7 +1502,7 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
     cut_hi <- sapply(plot_data$curve, function(curve) {
       ifelse(curve %in% which_curves, cutoffs[[curve]][2], NA)
     }, USE.NAMES=F)
-    rows_1 <- which(plot_data$curve %in% which_curves) # !!!!! Might not be needed anymore
+    rows_1 <- which(plot_data$curve %in% which_curves)
     rows_2 <- which(plot_data$x < cut_lo | plot_data$x > cut_hi)
     rows <- intersect(rows_1, rows_2)
     plot_data[rows, c("y", "ci_lo", "ci_hi")] <- NA
@@ -1513,6 +1514,19 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
     wt = dat_orig$weights[!is.na(dat_orig$s)],
     trial = cfg2$cr2_trial
   )
+  
+  if (flags$hvtn705_supress) {
+    if (cfg2$marker=="Day210IgGgp70_BF1266.431a.V1V250delta") {
+      ind_lo_cve <- min(which(plot_data_cve$curve=="CVE, nonparametric"))
+      ind_hi_cve <- max(which(plot_data_cve$ci_lo<=-2))
+      plot_data_cve[c(ind_lo_cve:ind_hi_cve), c("y", "ci_lo", "ci_hi")] <- NA
+      ind_lo_risk <- min(which(plot_data_risk$curve=="Risk, nonparametric"))
+      ind_hi_risk <- max(which(plot_data_risk$ci_hi>=0.5))
+      plot_data_risk[c(ind_lo_risk:ind_hi_risk), c("y", "ci_lo", "ci_hi")] <- NA
+    } else {
+      stop("HVTN 705 config changed")
+    }
+  }
   
   if (nrow(plot_data_risk)>0) {
     cfg2$lab_y <- paste0("Probability of ", cfg2$endpoint, " by day ", cfg2$t_0)

@@ -751,6 +751,12 @@ construct_deriv_r_Mn <- function(r_Mn, type, dir="incr") {
   grid <- round(seq(0,1,0.01),2)
   r_Mns <- r_Mn(grid)
   
+  if (type=="true") {
+    
+    # TO DO; pass in dat_orig???
+    
+  }
+  
   if (type=="linear") {
     
     grid_width <- grid[2] - grid[1]
@@ -784,13 +790,17 @@ construct_deriv_r_Mn <- function(r_Mn, type, dir="incr") {
       }
     }
     
-  } else if (type=="line") {
+  }
+  
+  if (type=="line") {
     
     r_Mn_left <- r_Mn(0) # 0.1
     r_Mn_right <- r_Mn(1) # 0.9
     fnc <- function(s) { (r_Mn_right-r_Mn_left)/1 } # 0.8
     
-  } else if (type=="spline") {
+  }
+  
+  if (type=="spline") {
     
     # Identify jump points of step function
     jump_points <- c(0)
@@ -810,7 +820,7 @@ construct_deriv_r_Mn <- function(r_Mn, type, dir="incr") {
     # Construct derivative function
     fnc <- function(s) {
       
-      width <- 0.3
+      width <- 0.2
       x1 <- s - width/2
       x2 <- s + width/2
       if (x1<0) { x2<-width; x1<-0 }
@@ -827,7 +837,9 @@ construct_deriv_r_Mn <- function(r_Mn, type, dir="incr") {
       
     }
     
-  } else if (type=="m-spline") {
+  }
+  
+  if (type=="m-spline") {
     
     # Identify jump points of step function
     jump_points <- c(0)
@@ -878,7 +890,9 @@ construct_deriv_r_Mn <- function(r_Mn, type, dir="incr") {
       
     }
     
-  } else if (type=="gcomp") {
+  }
+  
+  if (type=="gcomp") {
     
     fnc <- function(s) {
       

@@ -30,27 +30,30 @@ if (cfg$which_sim=="estimation") {
     Gamma_true <- attr(dat_orig, "Gamma_true")
     res_list <- list()
     for (i in 1:length(C$points)) {
+      
       m <- format(C$points[i], nsmall=2)
       res_list[paste0("r_M0_",m)] <- r_M0[i]
       res_list[paste0("r_Mn_",m)] <- ests$est[i]
       res_list[paste0("ci_lo_",m)] <- ests$ci_lo[i]
       res_list[paste0("ci_hi_",m)] <- ests$ci_hi[i]
+      
       if (F) {
         res_list[paste0("Gamma_",m)] <- Gamma_true[i]
         res_list[paste0("estG_",m)] <- ests$ests_Gamma[i]
         res_list[paste0("Phi_",m)] <- C$points[i] # Only works for Unif(0,1)
         res_list[paste0("estP_",m)] <- ests$ests_Phi[i]
       } # DEBUG: return Gamma/Phi estimates
+      
     }
     
     if (F) {
+      res_list$tau_n <- ests$tau_n
+      res_list$deriv_r_Mn <- ests$deriv_r_Mn
+      res_list$gamma_n <- ests$gamma_n
       res_list$g_n <- ests$g_n
-      res_list$eta_n3 <- ests$eta_n3
-      res_list$eta_n5 <- ests$eta_n5
-      res_list$alpha_star_n3 <- ests$alpha_star_n3
-      res_list$alpha_star_n5 <- ests$alpha_star_n5
-      res_list$gcomp_n <- ests$gcomp_n
-    } # DEBUG: return extras
+      res_list$g_zn <- ests$g_zn
+      res_list$f_s_n <- ests$f_s_n
+    } # DEBUG: return variance components (evaluated at a point)
     
     # # Return extra results
     # res_list[[".complex"]] <- list(Theta_os_n = ests$Theta_os_n)

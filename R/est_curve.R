@@ -339,9 +339,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       
     }
     
-    # # Add extra return data
-    # res[["Phi_n"]] <- Phi_n
-    
   }
   
   if (estimator=="Qbins") {
@@ -488,20 +485,21 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     res$ests_Phi = c(rep(NA,na_head), ests_Phi, rep(NA,na_tail))
   } # DEBUG: return Gamma/Phi estimates
   
+  if (F) {
+    pt_u <- 0.2
+    pt_x <- c(0,0)
+    res$tau_n <- tau_n(pt_u)
+    res$deriv_r_Mn <- deriv_r_Mn(pt_u)
+    res$gamma_n <- gamma_n(pt_x,pt_u)
+    res$g_n <- g_n(pt_u,pt_x)
+    res$g_zn <- g_zn(pt_x,pt_u)
+    res$f_s_n <- f_s_n(pt_u)
+  } # DEBUG: return variance components (evaluated at a point)
+  
   if (estimator=="Grenander") {
     res$tau_ns <- c(rep(NA,na_head), tau_ns, rep(NA,na_tail))
     res$n <- n_orig
   }
-  
-  if (F) {
-    p3 <- round((0.3+s_shift)*s_scale, -log10(C$appx$s))
-    p5 <- round((0.5+s_shift)*s_scale, -log10(C$appx$s))
-    res$eta_n3 <- eta_n(p3,c(0,0))
-    res$eta_n5 <- eta_n(p5,c(0,0))
-    res$alpha_star_n3 <- alpha_star_n(p3)
-    res$alpha_star_n5 <- alpha_star_n(p5)
-    res$gcomp_n <- gcomp_n(0.9)
-  } # DEBUG: return additional estimates
   
   if ("gcomp" %in% return_extra) {
     Q_n2 <- (construct_Q_n(dat, vlist$Q_n, type="Cox PH"))$srv

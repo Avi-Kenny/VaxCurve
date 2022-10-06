@@ -11,7 +11,7 @@
 # GitHub packages: tedwestling/ctsCausal, tedwestling/CFsurvival,
 #                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
-  main_task = "analysis.R", # run update analysis.R
+  main_task = "run", # run update analysis.R
   which_sim = "estimation", # "estimation" "edge" "testing" "Cox" "debugging"
   level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
   # keep = c(1:3,7:9,16:18,22:24),
@@ -99,9 +99,10 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     sc_params = list("sc_params"=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5)),
     # sc_params = list("no cens"=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5)),
     # sc_params = list("exp"=list(lmbd=1e-3, v=1.5, lmbd2=5e-4, v2=1.5)),
-    distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
+    distr_S = "N(0.5,0.04)",
+    # distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
     edge = c("none"), # "expit 0.4"
-    surv_true = c("Cox PH", "Complex"), # "Cox PH" "Complex" "exp"
+    surv_true = "Complex", # "Cox PH" "Complex" "exp"
     sampling = c("two-phase (50%)"), # "iid"
     wts_type = c("estimated"), # c("true", "estimated")
     estimator = list(

@@ -12,8 +12,8 @@
 #                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
   main_task = "run", # run update analysis.R
-  which_sim = "estimation", # "estimation" "edge" "testing" "Cox" "debugging"
-  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
+  which_sim = "testing", # "estimation" "edge" "testing" "Cox" "debugging"
+  level_set_which = "level_set_testing_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
   # keep = c(1:3,7:9,16:18,22:24),
   num_sim = 1000,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
@@ -162,7 +162,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Testing: compare all methods
   level_set_testing_1 <- list(
-    n = 1000,
+    n = 300,
     # n = c(100,200,400,800), # 1000
     # n = c(1000,2000),
     alpha_3 = c(0),
@@ -173,21 +173,22 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     # distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
     edge = "none",
     surv_true = "Cox PH",
-    sampling = c("two-phase (50%)"),
+    sampling = c("iid"),
+    # sampling = c("two-phase (50%)"),
     # sampling = c("iid", "x1", "x2", "two-phase (50%)", "two-phase (50% random)"),
     # sampling = c("x1", "x2", "two-phase (50%)"),
     # sampling = c("iid", "cycle", "two-phase (72%)", "two-phase (70% random)"),
-    wts_type = "true",
+    wts_type = "true", # estimated
     test = list(
       "Slope (q_n zero)" = list(
         type = "test_2",
         alt_type = "two-tailed", # decr
         params = list(
-          type = c("simple", "simple (with constant)",
-                   "S-weighted (with constant)"),
+          type = c("simple", "simple (with constant)"), # "S-weighted (with constant)"
           q_n_type = "zero",
-          g_n_type = "true", # simple, complex, both
-          Q_n_type = "Cox PH"
+          g_n_type = "true",
+          omega_n_type = "estimated", # "true"
+          Q_n_type = "true" # Cox PH
         ),
         test_stat_only = F
       )
@@ -565,8 +566,8 @@ if (F) {
   summ <- sim %>% summarize(
     mean = list(
       list(name="reject_1", x="reject_1", na.rm=T),
-      list(name="reject_2", x="reject_2", na.rm=T),
-      list(name="reject_3", x="reject_3", na.rm=T)
+      list(name="reject_2", x="reject_2", na.rm=T)
+      # list(name="reject_3", x="reject_3", na.rm=T)
     )
   )
   summ

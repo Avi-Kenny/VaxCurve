@@ -187,7 +187,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
       beta_n = beta_n,
       var_n = var_n
     )
-    chk(11, "simple (with constant): START")
+    chk(11, "simple (with constant): END")
     
   }
   
@@ -414,12 +414,20 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
   # Return debugging components (var="Monte Carlo")
   if (return_extras) { res$Theta_os_n <- Theta_os_n }
   
-  if (F) {
+  if (T) {
     res$extras <- list(
-      Theta_0.2 = Theta_os_n(0.2),
-      Theta_0.5 = Theta_os_n(0.5),
-      etastar_0.2 = etastar_n(u=0.2, x=c(0,0)),
-      etastar_0.5 = etastar_n(u=0.5, x=c(0,0))
+      Theta_0.1 = Theta_os_n(0.1),
+      Theta_0.4 = Theta_os_n(0.4),
+      Theta_0.8 = Theta_os_n(0.8),
+      etastar_0.1 = mean(sapply(c(1:n_orig), function(i) {
+        etastar_n(u=0.1, x=as.numeric(dat_orig$x[i,]))
+      })),
+      etastar_0.4 = mean(sapply(c(1:n_orig), function(i) {
+        etastar_n(u=0.4, x=as.numeric(dat_orig$x[i,]))
+      })),
+      etastar_0.8 = mean(sapply(c(1:n_orig), function(i) {
+        etastar_n(u=0.8, x=as.numeric(dat_orig$x[i,]))
+      }))
     )
   } # DEBUG: return debugging components
   

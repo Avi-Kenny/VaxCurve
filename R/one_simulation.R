@@ -106,13 +106,14 @@ if (cfg$which_sim=="testing") {
       res[[paste0("var_n_",i)]] <- r$var_n
     }
     
-    # !!!!! Debugging
     if (T) {
-      res$Theta_0.2 <- test_results$extras$Theta_0.2
-      res$Theta_0.5 <- test_results$extras$Theta_0.5
-      res$etastar_0.2 <- test_results$extras$etastar_0.2
-      res$etastar_0.5 <- test_results$extras$etastar_0.5
-    }
+      res$Theta_0.1 <- test_results$extras$Theta_0.1
+      res$Theta_0.4 <- test_results$extras$Theta_0.4
+      res$Theta_0.8 <- test_results$extras$Theta_0.8
+      res$etastar_0.1 <- test_results$extras$etastar_0.1
+      res$etastar_0.4 <- test_results$extras$etastar_0.4
+      res$etastar_0.8 <- test_results$extras$etastar_0.8
+    } # DEBUG
     
     if (F) {
       res$if1_mean = test_results$if1_mean

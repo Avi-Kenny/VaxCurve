@@ -2,6 +2,63 @@
 # DWD
 if (F) {
   
+  # [1] "sim_uid"     "level_id"    "rep_id"      "n"           "alpha_3"    
+  # [6] "dir"         "sc_params"   "distr_S"     "edge"        "surv_true"  
+  # [11] "sampling"    "wts_type"    "test"        "runtime"     "type_1"     
+  # [16] "reject_1"    "p_val_1"     "beta_n_1"    "var_n_1"     "type_2"     
+  # [21] "reject_2"    "p_val_2"     "beta_n_2"    "var_n_2"     "Theta_0.1"  
+  # [26] "Theta_0.4"   "Theta_0.8"   "etastar_0.1" "etastar_0.4" "etastar_0.8"  
+  
+  r <- sim$results
+  hist <- function(x, bins=30, xlim=NA){
+    ggplot(data.frame(x=x),aes(x=x)) + geom_histogram(bins=bins)
+    # xlim(-0.01,0.01)
+  }
+  hist(r$etastar_0.1, bins=50)
+  hist(r$etastar_0.4, bins=50)
+  hist(r$etastar_0.8, bins=50)
+  
+  
+}
+
+# Testing coefficients
+if (F) {
+  
+  n <- 100
+  x <- runif(n)
+  y <- 0.8*x^2 + rnorm(n, sd=0.1)
+  # y <- 0.8*x^2 + 0.6*x + rnorm(n, sd=0.1)
+  # y <- 0.8*x^2 + 0.6*x + 0.5 + rnorm(n, sd=0.1)
+  model_1 <- lm(y~0+x+I(x^2))
+  model_2 <- lm(y~x+I(x^2))
+  
+  # Intermediates
+  s_x1 <- mean(x)
+  s_x2 <- mean(x^2)
+  s_x3 <- mean(x^3)
+  s_x4 <- mean(x^4)
+  s_y1 <- mean(y)
+  s_xy <- mean(x*y)
+  s_x2y <- mean(x^2*y)
+  
+  coeff_noint <- (s_xy*s_x3-s_x2y*s_x2) / (s_x3^2-s_x2*s_x4)
+  num <- (s_x3-s_x1*s_x2)*(s_xy-s_x1*s_y1) + (s_x2y-s_x2*s_y1)*(s_x1^2-s_x2)
+  den <- (s_x1*s_x2-s_x3)^2 + (s_x2^2-s_x4)*(s_x2-s_x1^2)
+  coeff_withint <- num/den
+  
+  print("Without intercept")
+  print(coeff_noint)
+  print(model_1$coefficients[[2]])
+  
+  print("With intercept")
+  print(coeff_withint)
+  print(model_2$coefficients[[3]])
+  
+}
+
+# DWD
+if (F) {
+  
   # One
   r <- sim$results
   df_plot_1 <- data.frame(

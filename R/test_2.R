@@ -235,10 +235,15 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params,
     
     # Influence function psi_2 (!!!!! move this)
     infl_fn_psi_2 <- function(x_i, y_i, delta_i, s_i, weight_i) {
-      (1/n_orig) * sum(unlist(lapply(dat$s, function(s_j) {
-        (piece_1*(s_j-lmd_1)+piece_2*(s_j^2-lmd_2)) * 
+      (1/n_orig) * sum(unlist(lapply(c(1:length(dat$s)), function(j) {
+        s_j <- dat$s[j]
+        dat$weights[j] * (piece_1*(s_j-lmd_1)+piece_2*(s_j^2-lmd_2)) * 
           infl_fn_Theta(u=s_j, x_i, y_i, delta_i, s_i, weight_i)
       })))
+      # (1/n_orig) * sum(unlist(lapply(dat$s, function(s_j) {
+      #   (piece_1*(s_j-lmd_1)+piece_2*(s_j^2-lmd_2)) * 
+      #     infl_fn_Theta(u=s_j, x_i, y_i, delta_i, s_i, weight_i)
+      # })))
     }
     infl_fn_psi_2 <- construct_superfunc(infl_fn_psi_2, vec=c(2,1,1,1,1))
     

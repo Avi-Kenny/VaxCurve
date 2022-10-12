@@ -1,5 +1,43 @@
 
-# DWD
+# Profiling construct_S_n
+if (F) {
+  
+  C <- list(
+    points = round(seq(0,1,0.02),2), # round(seq(0,1,0.1),2)
+    alpha_1 = 0.5,
+    alpha_2 = 0.7,
+    t_0 = 200,
+    appx = list(t_0=1, x_tol=25, s=0.01) # !!!!!
+  )
+  L <- list(
+    n=300, alpha_3=-1, dir="decr",
+    sc_params=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5),
+    distr_S="N(0.3+0.4x2,0.09)", edge="none", surv_true="Cox PH",
+    sampling="two-phase (50%)", wts_type="true"
+  )
+  
+  dat_orig <- generate_data(L$n, L$alpha_3, L$distr_S, L$edge, L$surv_true,
+                            L$sc_params, L$sampling, L$dir, L$wts_type)
+  
+  # Rescale S to lie in [0,1] and round values
+  s_min <- min(dat_orig$s,na.rm=T)
+  s_max <- max(dat_orig$s,na.rm=T)
+  s_shift <- -1 * s_min
+  s_scale <- 1/(s_max-s_min)
+  dat_orig$s <- (dat_orig$s+s_shift)*s_scale
+  dat_orig <- round_dat(dat_orig)
+  
+  # Setup
+  n_orig <- length(dat_orig$z)
+  dat <- ss(dat_orig, which(dat_orig$z==1))
+  vlist <- create_val_list(dat_orig)
+  
+  # Construct Q_n
+  srvSL <- construct_Q_n(dat, vlist$Q_n, type="Cox PH", print_coeffs=T)
+  
+}
+
+# Histograms
 if (F) {
   
   # [1] "sim_uid"     "level_id"    "rep_id"      "n"           "alpha_3"    
@@ -14,10 +52,9 @@ if (F) {
     ggplot(data.frame(x=x),aes(x=x)) + geom_histogram(bins=bins)
     # xlim(-0.01,0.01)
   }
-  hist(r$etastar_0.1, bins=50)
-  hist(r$etastar_0.4, bins=50)
-  hist(r$etastar_0.8, bins=50)
-  
+  hist(r$Theta_0.1, bins=50)
+  hist(r$Theta_0.4, bins=50)
+  hist(r$Theta_0.8, bins=50)
   
 }
 

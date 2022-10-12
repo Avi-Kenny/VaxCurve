@@ -140,41 +140,40 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     )
   )
   
-  # Estimation: trial params
-  level_set_estimation_2 <- list(
-    n = 15000,
-    alpha_3 = -4,
-    dir = c("incr", "decr"),
-    sc_params = list("sc_params"=list(lmbd=3e-5, v=1.5, lmbd2=3e-5, v2=1.5)),
-    distr_S = c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"),
-    edge = "none",
-    surv_true = "Cox PH",
-    sampling = "two-phase (6%)",
-    wts_type = "estimated",
-    estimator = list(
-      "Qbins (5)" = list(est="Qbins", params=list(n_bins=8, Q_n_type="Cox PH")),
-      "Grenander" = list(
-        est = "Grenander",
-        params = list(q_n_type="new", Q_n_type="Cox PH")
-      )
-    )
-  )
+  # # Estimation: trial params
+  # level_set_estimation_2 <- list(
+  #   n = 15000,
+  #   alpha_3 = -4,
+  #   dir = c("incr", "decr"),
+  #   sc_params = list("sc_params"=list(lmbd=3e-5, v=1.5, lmbd2=3e-5, v2=1.5)),
+  #   distr_S = c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"),
+  #   edge = "none",
+  #   surv_true = "Cox PH",
+  #   sampling = "two-phase (6%)",
+  #   wts_type = "estimated",
+  #   estimator = list(
+  #     "Qbins (5)" = list(est="Qbins", params=list(n_bins=8, Q_n_type="Cox PH")),
+  #     "Grenander" = list(
+  #       est = "Grenander",
+  #       params = list(q_n_type="new", Q_n_type="Cox PH")
+  #     )
+  #   )
+  # )
   
   # Testing: compare all methods
   level_set_testing_1 <- list(
-    n = 300,
+    n = 1000,
     # n = c(100,200,400,800), # 1000
     # n = c(1000,2000),
     alpha_3 = c(0),
     # alpha_3 = seq(0,-2,-0.5),
     dir = "decr",
-    sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
+    sc_params = list("sc_params"=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5)),
     distr_S = c("N(0.3+0.4x2,0.09)"),
     # distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
     edge = "none",
     surv_true = "Cox PH",
-    sampling = c("iid"),
-    # sampling = c("two-phase (50%)"),
+    sampling = c("two-phase (50%)"),
     # sampling = c("iid", "x1", "x2", "two-phase (50%)", "two-phase (50% random)"),
     # sampling = c("x1", "x2", "two-phase (50%)"),
     # sampling = c("iid", "cycle", "two-phase (72%)", "two-phase (70% random)"),
@@ -184,11 +183,12 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
         type = "test_2",
         alt_type = "two-tailed", # decr
         params = list(
-          type = c("simple", "simple (with constant)"), # "S-weighted (with constant)"
+          type = c("simple", "simple (with constant)",
+                   "S-weighted (with constant)"),
           q_n_type = "zero",
-          g_n_type = "true",
+          g_n_type = "parametric",
           omega_n_type = "estimated", # "true"
-          Q_n_type = "true" # Cox PH
+          Q_n_type = "Cox PH" # Cox PH
         ),
         test_stat_only = F
       )
@@ -566,8 +566,8 @@ if (F) {
   summ <- sim %>% summarize(
     mean = list(
       list(name="reject_1", x="reject_1", na.rm=T),
-      list(name="reject_2", x="reject_2", na.rm=T)
-      # list(name="reject_3", x="reject_3", na.rm=T)
+      list(name="reject_2", x="reject_2", na.rm=T),
+      list(name="reject_3", x="reject_3", na.rm=T)
     )
   )
   summ

@@ -438,6 +438,12 @@ construct_Phi_n <- function (dat, which="ecdf", type="step") {
 #' @return Conditional density estimator function
 construct_Q_n <- function(dat, vals, type, return_model=F, print_coeffs=F) {
   
+  if (type=="Cox PH2") {
+    
+    
+    
+  }
+  
   if (type %in% c("Cox PH", "Super Learner")) {
     if (type=="Cox PH") {
       methods <- c("survSL.coxph")
@@ -1177,7 +1183,7 @@ construct_f_n_srv <- function(Q_n=NA, Qc_n=NA, width=40, vals=NA) {
 #' @return q_n nuisance estimator function
 construct_q_n <- function(type="new", dat, dat_orig,
                           omega_n=NA, g_n=NA, p_n=NA, gcomp_n=NA,
-                          alpha_star_n=NA, f_sIx_n=NA, Q_n=NA, Qc_n=NA,
+                          Gamma_tilde_n=NA, f_sIx_n=NA, Q_n=NA, Qc_n=NA,
                           f_n_srv=NA, vals=NA) {
   
   if (type=="new") {
@@ -1189,7 +1195,7 @@ construct_q_n <- function(type="new", dat, dat_orig,
     
     q_n_star <- function(y, delta, x, s, u) {
       In(s<=u)*q_n_star_inner(y, delta, x, s) -
-        In(s!=0)*alpha_star_n(u)
+        In(s!=0)*Gamma_tilde_n(u)
     }
     q_n_star <- construct_superfunc(q_n_star, aux=NA, vec=c(1,1,2,1,1), vals=NA)
     
@@ -1717,7 +1723,7 @@ construct_infl_fn_1 <- function(dat, Gamma_os_n, Phi_n, lambda_2,
 #' 
 #' @param x x
 #' @return x
-construct_infl_fn_Gamma <- function(omega_n, g_n, gcomp_n, p_n, alpha_star_n,
+construct_infl_fn_Gamma <- function(omega_n, g_n, gcomp_n, p_n, Gamma_tilde_n,
                                     q_n, eta_n, Gamma_os_n) {
   
   fnc <- function(u,x,y,delta,s,wt) {
@@ -1728,7 +1734,7 @@ construct_infl_fn_Gamma <- function(omega_n, g_n, gcomp_n, p_n, alpha_star_n,
     } else {
       piece_1 <- In(s!=0 & s<=u)
       piece_2 <- omega_n(x,s,y,delta)/(p_n*g_n(s,x)) + gcomp_n(s)/p_n
-      piece_3 <- In(s!=0)*alpha_star_n(u)
+      piece_3 <- In(s!=0)*Gamma_tilde_n(u)
     }
     wt*(piece_1*piece_2-piece_3/p_n) +
       (1-wt)*q_n(x,y,delta,u) +
@@ -2212,7 +2218,7 @@ sigma2_edge <- function(dat, g_sn, Q_n, omega_n, r_Mn_edge_est, val=0) {
 #' @param p_n !!!!!
 #' @param vals !!!!!
 #' @return Nuisance estimator function
-construct_alpha_star_n <- function(dat, gcomp_n, p_n, vals=NA) {
+construct_Gamma_tilde_n <- function(dat, gcomp_n, p_n, vals=NA) {
   
   n_orig <- sum(dat$weights)
   piece_1 <- dat$weights * In(dat$s!=0) * gcomp_n(dat$s)
@@ -2259,7 +2265,7 @@ construct_eta_n <- function(dat, Q_n, p_n, vals=NA) {
 #' 
 #' @param x !!!!!
 construct_Gamma_os_n <- function(dat, dat_orig, omega_n, g_n, eta_n, p_n, q_n,
-                                 gcomp_n, alpha_star_n, vals=NA) {
+                                 gcomp_n, Gamma_tilde_n, vals=NA) {
   
   n_orig <- length(dat_orig$z)
   piece_1 <- In(dat$s!=0)
@@ -2282,7 +2288,7 @@ construct_Gamma_os_n <- function(dat, dat_orig, omega_n, g_n, eta_n, p_n, q_n,
     } # DEBUG
     
     (1/(n_orig*p_n)) * sum(dat$weights * (
-      piece_1*In(dat$s<=u)*piece_2 - piece_1*alpha_star_n(u)
+      piece_1*In(dat$s<=u)*piece_2 - piece_1*Gamma_tilde_n(u)
     )) +
       (1/n_orig) * sum(
         piece_3 * (

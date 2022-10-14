@@ -113,15 +113,15 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     eta_n <- construct_eta_n(dat, Q_n, p_n, vals=NA)
     gcomp_n <- construct_gcomp_n(dat_orig, vals=vlist$S_grid, Q_n)
     chk(6)
-    alpha_star_n <- construct_alpha_star_n(dat, gcomp_n, p_n, vals=NA)
+    Gamma_tilde_n <- construct_Gamma_tilde_n(dat, gcomp_n, p_n, vals=NA)
     f_n_srv <- construct_f_n_srv(Q_n=Q_n, Qc_n=Qc_n)
     chk(7)
     q_n <- construct_q_n(type=p$q_n_type, dat, dat_orig, omega_n=omega_n, g_n=g_n,
-                         p_n=p_n, gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
+                         p_n=p_n, gcomp_n=gcomp_n, Gamma_tilde_n=Gamma_tilde_n,
                          Q_n=Q_n, Qc_n=Qc_n, f_n_srv=f_n_srv)
     chk(8)
     Gamma_os_n <- construct_Gamma_os_n(dat, dat_orig, omega_n, g_n, eta_n, p_n,
-                                       q_n, gcomp_n, alpha_star_n,
+                                       q_n, gcomp_n, Gamma_tilde_n,
                                        vals=vlist$S_grid)
     chk(9)
     
@@ -164,8 +164,9 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     if (F) {
       q_n <- construct_q_n(type="new", dat, dat_orig, omega_n=omega_n, g_n=g_n,
-                           p_n=p_n, gcomp_n=gcomp_n, alpha_star_n=alpha_star_n,
-                           Q_n=Q_n, Qc_n=Qc_n, f_n_srv=f_n_srv)
+                           p_n=p_n, gcomp_n=gcomp_n,
+                           Gamma_tilde_n=Gamma_tilde_n, Q_n=Q_n, Qc_n=Qc_n,
+                           f_n_srv=f_n_srv)
       q_n(dat_orig$x[1:3,],dat_orig$y[1:3],dat_orig$delta[1:3],u=0.5)
       q_n(dat_orig$x[4:6,],dat_orig$y[4:6],dat_orig$delta[4:6],u=0.5)
     } # DEBUG

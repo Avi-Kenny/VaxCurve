@@ -1,4 +1,62 @@
 
+# DWD
+if (F) {
+  
+  theta_0 <- Vectorize(function(x) {
+    # as.integer(x>=0.5)
+    x^2
+    # 2*x
+  })
+  Theta_0 <- Vectorize(function(x) {
+    # as.integer(x>=0.5)*(x-0.5)
+    (1/3)*x^3
+    # x^2
+  })
+  p_0 <- Vectorize(function(x) {
+    1
+  })
+  
+  of1 <- function(par) {
+    integrate(
+      function(x) {
+        (theta_0(x) - (par[1]+par[2]*x))^2 * p_0(x)
+      },
+      lower = 0,
+      upper = 1
+    )$value
+  }
+  
+  of2 <- function(par) {
+    integrate(
+      function(x) {
+        (Theta_0(x) - (par[1]*x+0.5*par[2]*x^2))^2 * p_0(x)
+      },
+      lower = 0,
+      upper = 1
+    )$value
+  }
+  
+  opt1 <- optim(par=c(alpha=-0.2, beta=1.4), fn=of1)
+  opt2 <- optim(par=c(alpha=-0.2, beta=1.4), fn=of2)
+  print(opt1$par)
+  print(opt2$par)
+  
+  fit1 <- Vectorize(function(x) { opt1$par[[1]] + opt1$par[[2]]*x })
+  fit2 <- Vectorize(function(x) { opt2$par[[1]]*x + 0.5*opt2$par[[2]]*x^2 })
+  
+  grid <- seq(0,1,0.01)
+  df_plot <- data.frame(
+    x = rep(grid,4),
+    y = c(theta_0(grid), fit1(grid), Theta_0(grid), fit2(grid)),
+    which = rep(c("theta_0", "LS fit", "Theta_0", "LS fit"), each=length(grid)),
+    fac = rep(c("first", "second"), each=2*length(grid))
+  )
+  ggplot(df_plot, aes(x=x, y=y, color=factor(which))) +
+    geom_line() +
+    facet_wrap(~fac, ncol=2)
+  
+}
+
 # Profiling construct_S_n
 if (F) {
   

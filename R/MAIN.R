@@ -12,10 +12,10 @@
 #                  tedwestling/survSuperLearner, zeehio/facetscales
 cfg <- list(
   main_task = "run", # run update analysis.R
-  which_sim = "testing", # "estimation" "edge" "testing" "Cox" "debugging"
-  level_set_which = "level_set_testing_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
+  which_sim = "estimation", # "estimation" "edge" "testing" "Cox" "debugging"
+  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
   # keep = c(1:3,7:9,16:18,22:24),
-  num_sim = 1000,
+  num_sim = 300,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm", "tidyr",
@@ -93,7 +93,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Estimation: ideal params
   level_set_estimation_1 <- list(
-    n = 1000, # 1000
+    n = 500, # 1000
     alpha_3 = -2,
     dir = c("decr"), # "incr"
     sc_params = list("sc_params"=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5)),
@@ -103,7 +103,8 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     # distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
     edge = c("none"), # "expit 0.4"
     surv_true = "Complex", # "Cox PH" "Complex" "exp"
-    sampling = c("two-phase (50%)"), # "iid"
+    sampling = c("iid"), # "iid"
+    # sampling = c("two-phase (50%)"), # "iid"
     wts_type = c("estimated"), # c("true", "estimated")
     estimator = list(
       "Grenander (GCM)" = list(
@@ -112,14 +113,14 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
                       convex_type="GCM", ecdf_type="linear (mid)", # convex_type="LS"
                       edge_corr="none", # edge_corr="min"
                       deriv_type="m-spline", g_n_type="parametric") # g_n_type="binning", g_n_type="true"
-      ),
-      "Grenander (CLS)" = list(
-        est = "Grenander",
-        params = list(q_n_type="zero", Q_n_type="Cox PH", # Q_n_type="Random Forest", Q_n_type="true"
-                      convex_type="CLS", ecdf_type="linear (mid)", # convex_type="LS"
-                      edge_corr="none", # edge_corr="min"
-                      deriv_type="m-spline", g_n_type="parametric") # g_n_type="binning", g_n_type="true"
       )
+      # "Grenander (CLS)" = list(
+      #   est = "Grenander",
+      #   params = list(q_n_type="zero", Q_n_type="Cox PH", # Q_n_type="Random Forest", Q_n_type="true"
+      #                 convex_type="CLS", ecdf_type="linear (mid)", # convex_type="LS"
+      #                 edge_corr="none", # edge_corr="min"
+      #                 deriv_type="m-spline", g_n_type="parametric") # g_n_type="binning", g_n_type="true"
+      # )
       
       
       
@@ -162,18 +163,17 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Testing: compare all methods
   level_set_testing_1 <- list(
-    n = 1000,
+    n = c(300,1000),
     # n = c(100,200,400,800), # 1000
     # n = c(1000,2000),
-    alpha_3 = c(0),
-    # alpha_3 = seq(0,-2,-0.5),
+    alpha_3 = c(0,-0.5),
+    # alpha_3 = c(0,-0.5,-1,-1.5,-2),
     dir = "decr",
     sc_params = list("sc_params"=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_S = c("N(0.3+0.4x2,0.09)"),
-    # distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
+    distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
     edge = "none",
     surv_true = "Cox PH",
-    sampling = c("two-phase (50%)"),
+    sampling = c("iid"), # "two-phase (50%)"
     # sampling = c("iid", "x1", "x2", "two-phase (50%)", "two-phase (50% random)"),
     # sampling = c("x1", "x2", "two-phase (50%)"),
     # sampling = c("iid", "cycle", "two-phase (72%)", "two-phase (70% random)"),
@@ -186,9 +186,9 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
           type = c("simple", "simple (with constant)",
                    "S-weighted (with constant)"),
           q_n_type = "zero",
-          g_n_type = "parametric",
+          g_n_type = "true", # "parametric"
           omega_n_type = "estimated", # "true"
-          Q_n_type = "Cox PH" # Cox PH
+          Q_n_type = "true" # "Cox PH"
         ),
         test_stat_only = F
       )

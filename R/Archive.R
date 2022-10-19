@@ -1,4 +1,88 @@
 
+# test2.R: "debugging" test statistic (test based on Theta_n alone)
+if (F) {
+  
+  # Compute test statistic and variance estimate
+  beta_n <- Theta_os_n(0.5) - 0.495
+  var_n <- 0
+  for (i in c(1:n_orig)) {
+    s_i <- dat_orig$s[i]
+    y_i <- dat_orig$y[i]
+    delta_i <- dat_orig$delta[i]
+    weight_i <- dat_orig$weight[i]
+    x_i <- as.numeric(dat_orig$x[i,])
+    var_n <- var_n + (
+      infl_fn_Theta(u=0.5, x_i, y_i, delta_i, s_i, weight_i)
+    )^2
+  }
+  var_n <- var_n/(n_orig^2)
+  
+  res[[length(res)+1]] <- list(
+    type = "debug",
+    p_val = compute_p_val(alt_type, beta_n, var_n),
+    beta_n = beta_n,
+    var_n = var_n
+  )
+  
+}
+
+# test2.R: "complex" test statistic
+if (F) {
+  
+  if ("complex" %in% p$type) {
+    
+    # Compute test statistic and variance estimate
+    lambda_2n <- (1/n_orig) * sum(dat$weights*dat$s^2)
+    lambda_3n <- (1/n_orig) * sum(dat$weights*dat$s^3)
+    beta_n <- (1/n_orig) * sum(dat$weights*(
+      (lambda_2n*dat$s^2-lambda_3n*dat$s) * Theta_os_n(dat$s)
+    ))
+    
+    # Compute variance estimate
+    xi_1n <- (1/n_orig)*sum(dat$weights*dat$s*Theta_os_n(dat$s))
+    xi_2n <- (1/n_orig)*sum(dat$weights*dat$s^2*Theta_os_n(dat$s))
+    piece_2 <- 2*(lambda_3n*xi_1n-lambda_2n*xi_2n)
+    var_n <- 0
+    n_dat <- length(dat$z)
+    dat_s <- dat$s
+    dat_s2 <- dat_s^2
+    for (i in c(1:n_orig)) {
+      x_i <- as.data.frame(
+        matrix(rep(dat_orig$x[i,],n_dat), ncol=length(dat_orig$x[i,]), byrow=T)
+      )
+      y_i <- rep(dat_orig$y[i],n_dat)
+      delta_i <- rep(dat_orig$delta[i],n_dat)
+      s_i <- rep(dat_orig$s[i],n_dat)
+      wt_i <- dat_orig$weights[i]
+      if (wt_i==0) {
+        piece_1 <- 0
+      } else {
+        s_i <- dat_orig$s[i]
+        piece_1 <- wt_i * ( xi_2n*s_i^2 - xi_1n*s_i^3 +
+                              (lambda_2n*s_i^2-lambda_3n*s_i)*Theta_os_n(s_i) )
+      }
+      piece_3 <- (1/n_orig) * sum(
+        dat$weights * (lambda_2n*dat_s2-lambda_3n*dat_s) *
+          infl_fn_Theta(dat_s,x_i,y_i,delta_i,s_i,wt_i)
+      )
+      var_n <- var_n + (piece_1+piece_2+piece_3)^2
+    }
+    var_n <- var_n/(n_orig^2)
+    
+    # !!!!! Temporary
+    beta_n <- -1 * beta_n
+    
+    res[[length(res)+1]] <- list(
+      type = "complex",
+      p_val = compute_p_val(alt_type, beta_n, var_n),
+      beta_n = beta_n,
+      var_n = var_n
+    )
+    
+  }
+  
+}
+
 # test2.R: Test statistic based on Gamma_n
 if (F) {
   

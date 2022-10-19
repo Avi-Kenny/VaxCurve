@@ -1779,6 +1779,41 @@ construct_infl_fn_Theta <- function(omega_n, f_sIx_n, q_tilde_n, etastar_n,
 #' 
 #' @param x x
 #' @return x
+construct_infl_fn_beta_n <- function(infl_fn_Theta) {
+  
+  u_mc <- round(seq(C$appx$s,1,C$appx$s),-log10(C$appx$s))
+  m <- length(u_mc)
+  lambda_1 <- mean(u_mc) # ~1/2
+  lambda_2 <- mean((u_mc)^2) # ~1/3
+  lambda_3 <- mean((u_mc)^3) # ~1/4
+  
+  fnc <- function(s, y, delta, weight, x) {
+    
+    s_m <- rep(s,m)
+    y_m <- rep(y,m)
+    delta_m <- rep(delta,m)
+    weight_m <- rep(weight,m)
+    x_m <- as.data.frame(matrix(rep(x,m), ncol=length(x), byrow=T))
+    
+    return((1/m) * sum(
+      infl_fn_Theta(u=u_mc, x_m, y_m, delta_m, s_m, weight_m) * (
+        (lambda_3-lambda_1*lambda_2)*(u_mc-lambda_1) +
+          (lambda_1^2-lambda_2)*(u_mc^2-lambda_2)
+      ))
+    )
+    
+  }
+  
+  return(fnc)
+  
+}
+
+
+
+#' !!!!! document
+#' 
+#' @param x x
+#' @return x
 construct_infl_fn_2 <- function(dat, Phi_n, infl_fn_Gamma, lambda_2, lambda_3) {
   
   n_orig <- sum(dat$weights)
@@ -2183,29 +2218,46 @@ r_Mn_edge <- function(dat, g_sn, Q_n, omega_n, val=0) {
 
 
 
-#' Compute asymptotic variance of one-step estimator r_Mn_edge
+#' Construct influence function corresponding to r_Mn_edge
 #' 
-#' @param dat Subsample of dataset returned by ss() for which z==1
-#' @param g_sn Propensity score estimator returned by construct_g_sn()
 #' @param Q_n Conditional survival function estimator returned by construct_Q_n
+#' @param g_sn Propensity score estimator returned by construct_g_sn()
 #' @param omega_n A nuisance influence function returned by construct_omega_n()
 #' @param r_Mn_edge_est Estimate returned by one-step estimator r_Mn_edge()
 #' @param val Value of S
-#' @return Asymptotic variance estimate
-sigma2_edge <- function(dat, g_sn, Q_n, omega_n, r_Mn_edge_est, val=0) {
+#' @return Value of one-step estimator
+construct_infl_fn_r_Mn_edge <- function(Q_n, g_sn, omega_n, r_Mn_edge_est,
+                                        val=0, vals=NA) {
   
-  n_orig <- sum(dat$weights)
-  n_dat <- nrow(dat$x)
+  fnc <- function(weight, s, x, y, delta) {
+    if (weight==0) {
+      return(0)
+    } else {
+      return(weight * (
+        1 - Q_n(C$t_0,x,s=val) + (
+          (In(s==val)/g_sn(x,val)) * omega_n(x,s=val,y,delta)
+        ) -
+          r_Mn_edge_est
+      ))
+    }
+  }
   
-  return(
-    (1/n_orig) * sum((dat$weights * (
-      Q_n(rep(C$t_0,n_dat),dat$x,s=rep(val,n_dat)) - (
-        (In(dat$s==val)/g_sn(dat$x, rep(val,n_dat))) *
-          omega_n(dat$x,s=rep(val,n_dat),dat$y,dat$delta)
-      ) -
-        (1-r_Mn_edge_est)
-    ))^2)
-  )
+  return(construct_superfunc(fnc, aux=NA, vec=c(1,1,2,1,1), vals=vals))
+  
+}
+
+
+
+#' Construct influence function corresponding to test statistic beta_en
+#' 
+#' @param Q_n Conditional survival function estimator returned by construct_Q_n
+#' @return Influence function
+construct_infl_fn_beta_en <- function(infl_fn_Theta, infl_fn_r_Mn_edge) {
+  
+  return(function(x, y, delta, s, weight) {
+    infl_fn_Theta(u=1, x, y, delta, s, weight) -
+      infl_fn_r_Mn_edge(weight, s, x, y, delta)
+  })
   
 }
 

@@ -9,13 +9,14 @@
 
 # Set global config
 # GitHub packages: tedwestling/ctsCausal, tedwestling/CFsurvival,
-#                  tedwestling/survSuperLearner, zeehio/facetscales
+#                  tedwestling/survSuperLearner, zeehio/facetscales,
+#                  cwolock/survML
 cfg <- list(
   main_task = "run", # run update analysis.R
-  which_sim = "estimation", # "estimation" "edge" "testing" "Cox" "debugging"
-  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
+  which_sim = "testing", # "estimation" "edge" "testing" "Cox" "debugging"
+  level_set_which = "level_set_testing_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
   # keep = c(1:3,7:9,16:18,22:24),
-  num_sim = 300,
+  num_sim = 1000,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm", "tidyr",
@@ -163,15 +164,18 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Testing: compare all methods
   level_set_testing_1 <- list(
-    n = c(300,1000),
+    n = c(500),
     # n = c(100,200,400,800), # 1000
     # n = c(1000,2000),
     alpha_3 = c(0,-0.5),
+    # alpha_3 = c(0,-0.5),
     # alpha_3 = c(0,-0.5,-1,-1.5,-2),
     dir = "decr",
     sc_params = list("sc_params"=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
-    edge = "none",
+    distr_S = "Unif(0,1)",
+    # distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
+    edge = "expit 0.4",
+    # edge = "none",
     surv_true = "Cox PH",
     sampling = c("iid"), # "two-phase (50%)"
     # sampling = c("iid", "x1", "x2", "two-phase (50%)", "two-phase (50% random)"),
@@ -183,8 +187,9 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
         type = "test_2",
         alt_type = "two-tailed", # decr
         params = list(
-          type = c("simple", "simple (with constant)",
-                   "S-weighted (with constant)"),
+          type = c("simple (with constant)", "edge", "combined"),
+          # type = c("simple", "simple (with constant)",
+          #          "S-weighted (with constant)"),
           q_n_type = "zero",
           g_n_type = "true", # "parametric"
           omega_n_type = "estimated", # "true"
@@ -568,6 +573,8 @@ if (F) {
       list(name="reject_1", x="reject_1", na.rm=T),
       list(name="reject_2", x="reject_2", na.rm=T),
       list(name="reject_3", x="reject_3", na.rm=T)
+      # list(name="reject_4", x="reject_4", na.rm=T),
+      # list(name="reject_5", x="reject_5", na.rm=T)
     )
   )
   summ

@@ -158,7 +158,11 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       chk(10)
       g_sn <- construct_g_sn(dat, vlist$X_grid, type="logistic")
       r_Mn_edge_est <- r_Mn_edge(dat, g_sn, Q_n, omega_n)
-      sigma2_edge_est <- sigma2_edge(dat, g_sn, Q_n, omega_n, r_Mn_edge_est)
+      infl_fn_r_Mn_edge <- construct_infl_fn_r_Mn_edge(Q_n, g_sn, omega_n,
+                                                       r_Mn_edge_est, val=0)
+      sigma2_edge_est <- (1/n_orig) * sum((
+        infl_fn_r_Mn_edge(dat$weights, dat$s, dat$x, dat$y, dat$delta)
+      )^2)
       chk(11)
     }
     
@@ -391,7 +395,12 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     })
     sigma2s <- sapply(c(1:length(points)), function(i) {
       a_binned <- transform_s(points[i])
-      return(sigma2_edge(dat, g_sn, Q_n, omega_n, ests[i], val=s_binned))
+      infl_fn_bin <- construct_infl_fn_r_Mn_edge(Q_n, g_sn, omega_n,
+                                                 ests[i], val=s_binned)
+      s2 <- (1/n_orig) * sum((
+        infl_fn_bin(dat$weights, dat$s, dat$x, dat$y, dat$delta)
+      )^2)
+      return(s2)
     })
     
     # Construct CIs

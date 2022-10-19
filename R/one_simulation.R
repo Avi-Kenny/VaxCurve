@@ -107,12 +107,23 @@ if (cfg$which_sim=="testing") {
     }
     
     if (T) {
-      res$Theta_0.1 <- test_results$extras$Theta_0.1
-      res$Theta_0.4 <- test_results$extras$Theta_0.4
-      res$Theta_0.8 <- test_results$extras$Theta_0.8
-      res$etastar_0.1 <- test_results$extras$etastar_0.1
-      res$etastar_0.4 <- test_results$extras$etastar_0.4
-      res$etastar_0.8 <- test_results$extras$etastar_0.8
+      res$Theta_1.0 <- test_results$extras$Theta_1.0
+      res$r_Mn_0.0 <- test_results$extras$r_Mn_0.0
+      res$r_M0_0.0 <- attr(dat_orig,"r_M0")[1]
+      res$r_M0_0.5 <- attr(dat_orig,"r_M0")[26]
+      res$r_M0_1.0 <- attr(dat_orig,"r_M0")[51]
+      res$beta_n <- test_results$extras$beta_n
+      res$beta_en <- test_results$extras$beta_en
+      res$sigma_bn <- test_results$extras$sigma_bn
+      res$sigma_ben <- test_results$extras$sigma_ben
+      res$rho_n <- test_results$extras$rho_n
+      
+      # res$Theta_0.1 <- test_results$extras$Theta_0.1
+      # res$Theta_0.4 <- test_results$extras$Theta_0.4
+      # res$Theta_0.8 <- test_results$extras$Theta_0.8
+      # res$etastar_0.1 <- test_results$extras$etastar_0.1
+      # res$etastar_0.4 <- test_results$extras$etastar_0.4
+      # res$etastar_0.8 <- test_results$extras$etastar_0.8
     } # DEBUG
     
     if (F) {
@@ -182,7 +193,11 @@ if (cfg$which_sim=="edge") {
                                  type=params$omega_n_type)
     g_sn <- construct_g_sn(dat, vlist$W_grid, type="logistic")
     r_Mn_edge_est <- r_Mn_edge(dat, g_sn, Q_n, omega_n)
-    sigma2_edge_est <- sigma2_edge(dat, g_sn, Q_n, omega_n, r_Mn_edge_est)
+    infl_fn_r_Mn_edge <- construct_infl_fn_r_Mn_edge(Q_n, g_sn, omega_n,
+                                                     r_Mn_edge_est, val=0)
+    sigma2_edge_est <- (1/n_orig) * sum((
+      infl_fn_r_Mn_edge(dat$weights, dat$s, dat$x, dat$y, dat$delta)
+    )^2)
     
     # Return results
     return(list(

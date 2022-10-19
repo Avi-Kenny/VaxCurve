@@ -17,14 +17,15 @@
   C <- list(points=round(seq(0,1,0.02),2), alpha_1=0.5, alpha_2=0.7, t_0=200,
             appx=list(t_0=10, x_tol=25, s=0.01))
   L <- list(
-    n=1000, alpha_3=-2, dir="decr",
+    n=500, alpha_3=0, dir="decr",
     sc_params=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5), # sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5), # Uncomment this for (almost) no censoring
-    distr_S="N(0.3+0.4x2,0.09)", edge="none", surv_true="Cox PH", # "N(0.3+0.4x2,0.04)"
-    sampling="two-phase (50%)", estimator=list(est="Grenander",params=params) # two-phase (72%)
+    distr_S="Unif(0,1)", edge="expit 0.4", surv_true="Cox PH", # "N(0.3+0.4x2,0.04)"
+    sampling="iid", estimator=list(est="Grenander", params=params), # two-phase (72%)
+    wts_type="true"
     # n=15000, alpha_3=-4, dir="decr",
     # sc_params=list(lmbd=3e-5, v=1.5, lmbd2=3e-5, v2=1.5), # sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5), # Uncomment this for (almost) no censoring
     # distr_S="N(0.5,0.04)", edge="none", surv_true="Cox PH",
-    # sampling="two-phase (6%)", estimator=list(est="Grenander",params=params)
+    # sampling="two-phase (50%)", estimator=list(est="Grenander",params=params)
   )
   
   # 3. Generate dataset

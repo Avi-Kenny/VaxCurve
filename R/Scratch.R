@@ -2,6 +2,30 @@
 # DWD
 if (F) {
   
+  # !!!!! Need to check if I should also calculate the denominator; should be easy enough
+  
+  bt <- function(x) { dbeta(x=x, shape1=0.1, shape2=0.1) }
+  x <- seq(0,1,0.01)
+  y <- sapply(x, bt)
+  ggplot(data.frame(x=x, y=y), aes(x=x, y=y)) + geom_line()
+  
+  # U <- runif(10^6)
+  # U <- rexp(10^6)
+  U <- rbeta(10^6, shape1=0.1, shape2=0.1)
+  l1 <- mean(U)
+  l2 <- mean(U^2)
+  l3 <- mean(U^3)
+  l4 <- mean(U^4)
+  denom <- (l1*l2-l3)^2 + (l2^2-l4)*(l2-l1^2)
+  print(denom)
+  
+  # Also do simple denom
+  
+}
+
+# DWD
+if (F) {
+  
   theta_0 <- Vectorize(function(x) {
     # as.integer(x>=0.5)
     x^2

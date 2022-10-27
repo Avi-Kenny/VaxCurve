@@ -96,8 +96,8 @@ if (cfg$which_sim=="testing") {
     
     # Parse results object
     res <- list()
-    # for (i in c(1:length(test_results))) {
-    for (i in c(1:(length(test_results)-1))) { # !!!!!
+    for (i in c(1:length(test_results))) {
+    # for (i in c(1:(length(test_results)-1))) { # !!!!!
       r <- test_results[[i]]
       res[[paste0("type_",i)]] <- r$type
       res[[paste0("reject_",i)]] <- as.integer(r$p_val<0.05)
@@ -106,7 +106,7 @@ if (cfg$which_sim=="testing") {
       res[[paste0("var_n_",i)]] <- r$var_n
     }
     
-    if (T) {
+    if (F) {
       res$Theta_1.0 <- test_results$extras$Theta_1.0
       res$r_Mn_0.0 <- test_results$extras$r_Mn_0.0
       res$r_M0_0.0 <- attr(dat_orig,"r_M0")[1]
@@ -117,41 +117,6 @@ if (cfg$which_sim=="testing") {
       res$sigma_bn <- test_results$extras$sigma_bn
       res$sigma_ben <- test_results$extras$sigma_ben
       res$rho_n <- test_results$extras$rho_n
-      
-      # res$Theta_0.1 <- test_results$extras$Theta_0.1
-      # res$Theta_0.4 <- test_results$extras$Theta_0.4
-      # res$Theta_0.8 <- test_results$extras$Theta_0.8
-      # res$etastar_0.1 <- test_results$extras$etastar_0.1
-      # res$etastar_0.4 <- test_results$extras$etastar_0.4
-      # res$etastar_0.8 <- test_results$extras$etastar_0.8
-    } # DEBUG
-    
-    if (F) {
-      res$if1_mean = test_results$if1_mean
-      res$if2_mean = test_results$if2_mean
-      res$r_1n = test_results$r_1n
-      res$r_2n = test_results$r_2n
-      res$Psi_1_var_est = test_results$Psi_1_var_est
-      res$sum12_est = test_results$sum12_est
-      res$sum12_var_est = test_results$sum12_var_est
-      res$Psi_1_est = test_results$Psi_1_est
-      res$Psi_2_est = test_results$Psi_2_est
-      res$Psi_G_est = test_results$Psi_G_est
-      res$Psi_1_var_est = test_results$Psi_1_var_est
-      res$Psi_2_var_est = test_results$Psi_2_var_est
-      res$Psi_12_covar = test_results$Psi_12_covar
-      res$p_val_Psi_1 = test_results$p_val_Psi_1
-      res$p_val_Psi_2 = test_results$p_val_Psi_2
-      res$p_val_Psi_G = test_results$p_val_Psi_G
-      res$p_val_sum12 = test_results$p_val_sum12
-      res$p_val_sum12b = test_results$p_val_sum12b
-      res$p_val_alt = test_results$p_val_alt
-      res$reject_Psi_1 = test_results$reject_Psi_1
-      res$reject_Psi_2 = test_results$reject_Psi_2
-      res$reject_Psi_G = test_results$reject_Psi_G
-      res$reject_sum12 = test_results$reject_sum12
-      res$reject_sum12b = test_results$reject_sum12b
-      res$reject_alt = test_results$reject_alt
     } # DEBUG
     
     return(res)

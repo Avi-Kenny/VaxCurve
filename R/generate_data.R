@@ -50,7 +50,9 @@ generate_data <- function(n, alpha_3, distr_S, edge, surv_true, sc_params,
   }
   
   # Adjust S for point mass at the edge
-  if (edge=="expit 0.2") {
+  if (edge=="expit 0.1") {
+    edge_probs <- expit(x$x1+x$x2-3.3)
+  } else if (edge=="expit 0.2") {
     edge_probs <- expit(x$x1+x$x2-2.5)
   } else if (edge=="expit 0.4") {
     edge_probs <- expit(x$x1+x$x2-1.4)
@@ -79,6 +81,12 @@ generate_data <- function(n, alpha_3, distr_S, edge, surv_true, sc_params,
       } else {
         lin <- alpha_3*expit(20*(1-s)-10) + C$alpha_2*x$x1*x$x2
       }
+    } else if (surv_true=="Step") {
+      if (dir=="decr") {
+        lin <- C$alpha_1*x$x1 + C$alpha_2*x$x2 + (alpha_3/2)*In(s>0)
+      } else {
+        lin <- C$alpha_1*x$x1 + C$alpha_2*x$x2 + (alpha_3/2)*In(s<=0)
+      }
     } else if (surv_true=="exp") {
       H_0_inv <- function(t) { ((1/sc_params$lmbd)*t) }
       lin <- 0
@@ -106,7 +114,7 @@ generate_data <- function(n, alpha_3, distr_S, edge, surv_true, sc_params,
     
     # Generate survival variables
     y <- pmin(t,c)
-    delta <- as.integer(y==t)
+    delta <- In(y==t)
     
   }
   
@@ -138,10 +146,16 @@ generate_data <- function(n, alpha_3, distr_S, edge, surv_true, sc_params,
         } else {
           alpha_3*expit(20*(1-s)-10) + C$alpha_2*x1*x2
         }
+      } else if (surv_true=="Step") {
+        if (dir=="decr") {
+          C$alpha_1*x1 + C$alpha_2*x2 + (alpha_3/2)*In(s>0)
+        } else {
+          C$alpha_1*x1 + C$alpha_2*x2 + (alpha_3/2)*In(s<=0)
+        }
       }
     }
     
-    if (surv_true %in% c("Cox PH", "Complex")) {
+    if (surv_true %in% c("Cox PH", "Complex", "Step")) {
       Q_0 <- function(t, x1, x2, s) {
         exp( -1 * sc_params$lmbd * (t^sc_params$v) * exp(lin(x1,x2,s)) )
       }
@@ -180,7 +194,7 @@ generate_data <- function(n, alpha_3, distr_S, edge, surv_true, sc_params,
       }
       
       Gamma_true_f <- Vectorize(function(u) {
-        mean( as.integer(s<=u) * (1-Q_0(C$t_0,x1,x2,s)) )
+        mean( In(s<=u) * (1-Q_0(C$t_0,x1,x2,s)) )
       })
       attr(dat_orig, "Gamma_true") <- Gamma_true_f(C$points)
       

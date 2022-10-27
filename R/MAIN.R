@@ -100,41 +100,26 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     sc_params = list("sc_params"=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5)),
     # sc_params = list("no cens"=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5)),
     # sc_params = list("exp"=list(lmbd=1e-3, v=1.5, lmbd2=5e-4, v2=1.5)),
-    distr_S = "N(0.5,0.04)",
-    # distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
+    # distr_S = "N(0.5,0.04)",
+    distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
     edge = c("none"), # "expit 0.4"
     surv_true = "Complex", # "Cox PH" "Complex" "exp"
-    sampling = c("iid"), # "iid"
-    # sampling = c("two-phase (50%)"), # "iid"
+    sampling = c("iid"), # "two-phase (50%)"
     wts_type = c("estimated"), # c("true", "estimated")
     estimator = list(
       "Grenander (GCM)" = list(
         est = "Grenander",
-        params = list(q_n_type="zero", Q_n_type="Cox PH", # Q_n_type="Random Forest", Q_n_type="true"
-                      convex_type="GCM", ecdf_type="linear (mid)", # convex_type="LS"
-                      edge_corr="none", # edge_corr="min"
-                      deriv_type="m-spline", g_n_type="parametric") # g_n_type="binning", g_n_type="true"
+        params = list(
+          q_n_type="zero",
+          Q_n_type="Cox PH", # "Random Forest", "true"
+          convex_type="GCM", # "CLS"
+          ecdf_type="linear (mid)",
+          edge_corr="none", # "min"
+          deriv_type="m-spline",
+          g_n_type="parametric" # "binning" "true"
+        )
       )
-      # "Grenander (CLS)" = list(
-      #   est = "Grenander",
-      #   params = list(q_n_type="zero", Q_n_type="Cox PH", # Q_n_type="Random Forest", Q_n_type="true"
-      #                 convex_type="CLS", ecdf_type="linear (mid)", # convex_type="LS"
-      #                 edge_corr="none", # edge_corr="min"
-      #                 deriv_type="m-spline", g_n_type="parametric") # g_n_type="binning", g_n_type="true"
-      # )
-      
-      
-      
-      # "Grenander" = list(
-      #   est = "Grenander",
-      #   params = list(q_n_type="zero", Q_n_type="Cox PH", # Q_n_type="Random Forest", Q_n_type="true"
-      #                 convex_type="GCM", ecdf_type="linear (mid)", # convex_type="LS"
-      #                 edge_corr="none", # edge_corr="min"
-      #                 deriv_type="m-spline", g_n_type="parametric") # g_n_type="binning", g_n_type="true"
-      # ),
       # "Cox PH" = list(est="Cox gcomp")
-      
-      
       # "Qbins (true)" = list(
       #   est = "Qbins",
       #   params = list(n_bins=8, Q_n_type="Cox PH")
@@ -142,62 +127,79 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     )
   )
   
-  # # Estimation: trial params
-  # level_set_estimation_2 <- list(
-  #   n = 15000,
-  #   alpha_3 = -4,
-  #   dir = c("incr", "decr"),
-  #   sc_params = list("sc_params"=list(lmbd=3e-5, v=1.5, lmbd2=3e-5, v2=1.5)),
-  #   distr_S = c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"),
-  #   edge = "none",
-  #   surv_true = "Cox PH",
-  #   sampling = "two-phase (6%)",
-  #   wts_type = "estimated",
-  #   estimator = list(
-  #     "Qbins (5)" = list(est="Qbins", params=list(n_bins=8, Q_n_type="Cox PH")),
-  #     "Grenander" = list(
-  #       est = "Grenander",
-  #       params = list(q_n_type="new", Q_n_type="Cox PH")
-  #     )
-  #   )
-  # )
-  
   # Testing: compare all methods
   level_set_testing_1 <- list(
-    n = c(500),
+    n = c(2000),
     # n = c(100,200,400,800), # 1000
-    # n = c(1000,2000),
-    alpha_3 = c(0,-0.5),
     # alpha_3 = c(0,-0.5),
-    # alpha_3 = c(0,-0.5,-1,-1.5,-2),
+    alpha_3 = seq(0,-0.5,-0.1),
     dir = "decr",
     sc_params = list("sc_params"=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_S = "Unif(0,1)",
+    distr_S = c("Unif(0,1)"),
     # distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
-    edge = "expit 0.4",
-    # edge = "none",
-    surv_true = "Cox PH",
-    sampling = c("iid"), # "two-phase (50%)"
-    # sampling = c("iid", "x1", "x2", "two-phase (50%)", "two-phase (50% random)"),
-    # sampling = c("x1", "x2", "two-phase (50%)"),
-    # sampling = c("iid", "cycle", "two-phase (72%)", "two-phase (70% random)"),
-    wts_type = "true", # estimated
+    edge = c("none", "expit 0.1", "expit 0.4"),
+    surv_true = c("Cox PH"), # "Complex"
+    sampling = c("two-phase (50%)"), # "iid" "two-phase (50%)"
+    wts_type = "estimated", # "estimated" "true"
     test = list(
-      "Slope (q_n zero)" = list(
+      "Slope (Cox/binning)" = list(
+        type = "test_2",
+        alt_type = "decr",
+        # alt_type = "two-tailed", # decr
+        params = list(
+          type = c("simple (with constant)", "edge", "combined", "combined 2"),
+          # type = c("simple (with constant)", "edge", "combined"),
+          q_n_type = "zero",
+          g_n_type = "binning", # "parametric" "true"
+          omega_n_type = "estimated", # "true"
+          Q_n_type = "Cox PH" # "Cox PH"
+        ),
+        test_stat_only = F
+      )
+      # "test_2 (q_n new)" = list(
+      #   type = "test_2",
+      #   alt_type = "two-tailed", # decr
+      #   params = list(
+      #     type = c("simple", "simple (with constant)",
+      #              "S-weighted (with constant)"),
+      #     q_n_type = "new",
+      #     g_n_type = "parametric", # simple, complex, both
+      #     Q_n_type = "Cox PH"
+      #   ),
+      #   test_stat_only = F
+      # )
+    )
+  )
+  
+  # Testing: compare all methods
+  level_set_testing_2 <- list(
+    n = c(2000),
+    # n = c(100,200,400,800), # 1000
+    alpha_3 = c(0,-0.25,-0.5),
+    # alpha_3 = seq(0,-0.5,-0.05),
+    dir = "decr",
+    sc_params = list("sc_params"=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5)),
+    distr_S = c("Unif(0,1)"),
+    # distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
+    edge = c("expit 0.1", "expit 0.4"),
+    # edge = c("none", "expit 0.1", "expit 0.4"),
+    surv_true = c("Step"), # "Complex" "Cox PH"
+    sampling = c("two-phase (50%)"), # "iid" "two-phase (50%)"
+    wts_type = "estimated", # "estimated" "true"
+    test = list(
+      "Slope (Cox/binning)" = list(
         type = "test_2",
         alt_type = "two-tailed", # decr
         params = list(
           type = c("simple (with constant)", "edge", "combined"),
-          # type = c("simple", "simple (with constant)",
-          #          "S-weighted (with constant)"),
           q_n_type = "zero",
-          g_n_type = "true", # "parametric"
+          g_n_type = "binning", # "parametric" "true"
           omega_n_type = "estimated", # "true"
-          Q_n_type = "true" # "Cox PH"
+          Q_n_type = "Random Forest" # "Cox PH"
         ),
         test_stat_only = F
       )
-      # "Slope (q_n new)" = list(
+      # "test_2 (q_n new)" = list(
       #   type = "test_2",
       #   alt_type = "two-tailed", # decr
       #   params = list(
@@ -217,14 +219,11 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     n = 500,
     alpha_3 = -2,
     dir = "decr",
-    # wts_type = "estimated",
     sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_S = c("Unif(0,1)"),
-    # distr_S = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
+    distr_S = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
     edge = "none",
-    sampling = "two-phase (50%)",
+    sampling = "two-phase (50%)", # "iid" "two-phase (50%)"
     wts_type = c("true", "estimated")
-    # sampling = c("iid", "two-phase (72%)", "two-phase (50%)", "two-phase (25%)")
   )
   
   level_set <- get(cfg$level_set_which)
@@ -572,12 +571,65 @@ if (F) {
     mean = list(
       list(name="reject_1", x="reject_1", na.rm=T),
       list(name="reject_2", x="reject_2", na.rm=T),
-      list(name="reject_3", x="reject_3", na.rm=T)
-      # list(name="reject_4", x="reject_4", na.rm=T),
-      # list(name="reject_5", x="reject_5", na.rm=T)
+      list(name="reject_3", x="reject_3", na.rm=T),
+      list(name="reject_4", x="reject_4", na.rm=T)
     )
   )
   summ
+  
+  # Figure
+  {
+    p_data <- pivot_longer(
+      data = summ,
+      cols = c(reject_1,reject_2,reject_3),
+      names_to = "test_type",
+      values_to = "Power"
+    )
+    test_types <- c("Simple (with constant)", "Edge", "Combined")
+    p_data %<>% mutate(
+      edge = factor(edge, levels=c("none", "expit 0.1", "expit 0.4")),
+      alpha_3 = -1 * alpha_3,
+      test_type = case_when(
+        test_type=="reject_1" ~ test_types[1],
+        test_type=="reject_2" ~ test_types[2],
+        test_type=="reject_3" ~ test_types[3]
+      ),
+      test_type = factor(test_type, levels=test_types)
+    )
+    
+    # Export: 10 x 4
+    ggplot(
+      p_data,
+      aes(x=alpha_3, y=Power, color=test_type)
+    ) +
+      geom_point() +
+      geom_line() +
+      facet_grid(cols=dplyr::vars(edge)) + # rows=dplyr::vars(distr_S)
+      scale_y_continuous(labels=percent) +
+      theme(legend.position="bottom") +
+      # scale_color_manual(values=m_colors) +
+      labs(title="Hypothesis test, distr_A=N(0.3+0.4x2,0.09)",
+           color="Test type", x="Effect size")
+    
+    # facet: edge
+    # X: alpha_3
+    # Y: power
+    
+  }
+  
+  if (F) {
+    summ2 <- sim %>% summarize(
+      mean = list(
+        list(name="mean_reject_1", x="reject_1", na.rm=T),
+        list(name="mean_var_n_1", x="var_n_1", na.rm=T),
+        list(name="mean_beta_n_1", x="beta_n_1", na.rm=T)
+      ),
+      var = list(
+        list(name="var_beta_n_1", x="beta_n_1", na.rm=T)
+      )
+    )
+    summ2
+  } # DEBUG
   
   summ %<>% rename("Power"=mean_reject)
   

@@ -2,82 +2,75 @@
 # DWD
 if (F) {
   
-  # !!!!! Need to check if I should also calculate the denominator; should be easy enough
-  
-  bt <- function(x) { dbeta(x=x, shape1=0.1, shape2=0.1) }
-  x <- seq(0,1,0.01)
-  y <- sapply(x, bt)
-  ggplot(data.frame(x=x, y=y), aes(x=x, y=y)) + geom_line()
-  
-  # U <- runif(10^6)
-  # U <- rexp(10^6)
-  U <- rbeta(10^6, shape1=0.1, shape2=0.1)
-  l1 <- mean(U)
-  l2 <- mean(U^2)
-  l3 <- mean(U^3)
-  l4 <- mean(U^4)
-  denom <- (l1*l2-l3)^2 + (l2^2-l4)*(l2-l1^2)
-  print(denom)
-  
-  # Also do simple denom
+  summ2 <- sim %>% summarize(
+    mean=list(
+      list(name="srv_x1", x="srv_x1"),
+      list(name="srv_x2", x="srv_x2"),
+      list(name="srv_xs", x="srv_s"),
+      list(name="cns_x1", x="cns_x1"),
+      list(name="cns_x2", x="cns_x2"),
+      list(name="cns_xs", x="cns_s")
+    ),
+    sd=list(
+      list(name="sd_srv_x1", x="srv_x1"),
+      list(name="sd_srv_x2", x="srv_x2"),
+      list(name="sd_srv_xs", x="srv_s"),
+      list(name="sd_cns_x1", x="cns_x1"),
+      list(name="sd_cns_x2", x="cns_x2"),
+      list(name="sd_cns_xs", x="cns_s")
+    )
+  )
   
 }
 
 # DWD
 if (F) {
   
-  theta_0 <- Vectorize(function(x) {
-    # as.integer(x>=0.5)
-    x^2
-    # 2*x
-  })
-  Theta_0 <- Vectorize(function(x) {
-    # as.integer(x>=0.5)*(x-0.5)
-    (1/3)*x^3
-    # x^2
-  })
-  p_0 <- Vectorize(function(x) {
-    1
-  })
+  library(microbenchmark)
   
-  of1 <- function(par) {
-    integrate(
-      function(x) {
-        (theta_0(x) - (par[1]+par[2]*x))^2 * p_0(x)
-      },
-      lower = 0,
-      upper = 1
-    )$value
-  }
+  dat_orig <- generate_data(L$n, L$alpha_3, L$distr_S, L$edge, L$surv_true,
+                            L$sc_params, L$sampling, L$dir)
+  dat <- ss(dat_orig, which(dat_orig$z==1))
+  vlist <- create_val_list(dat_orig)
   
-  of2 <- function(par) {
-    integrate(
-      function(x) {
-        (Theta_0(x) - (par[1]*x+0.5*par[2]*x^2))^2 * p_0(x)
-      },
-      lower = 0,
-      upper = 1
-    )$value
-  }
+  fit_CoxPH <- construct_Q_n(dat, vlist$Q_n, type="Cox PH")
+  fit_CoxPH2 <- construct_Q_n(dat, vlist$Q_n, type="Cox PH2")
+  fit_CoxPH3 <- construct_Q_n(dat, vlist$Q_n, type="Cox PH3")
   
-  opt1 <- optim(par=c(alpha=-0.2, beta=1.4), fn=of1)
-  opt2 <- optim(par=c(alpha=-0.2, beta=1.4), fn=of2)
-  print(opt1$par)
-  print(opt2$par)
+  Q_CoxPH <- fit_CoxPH$srv
+  Q_CoxPH2 <- fit_CoxPH2$srv
+  Q_CoxPH3 <- fit_CoxPH3$srv
   
-  fit1 <- Vectorize(function(x) { opt1$par[[1]] + opt1$par[[2]]*x })
-  fit2 <- Vectorize(function(x) { opt2$par[[1]]*x + 0.5*opt2$par[[2]]*x^2 })
+  times <- round(seq(0,200,10))
+  n <- length(times)
+  x_a <- as.data.frame(cbind(x1=rep(0.2,n), x2=rep(1,n)))
   
-  grid <- seq(0,1,0.01)
-  df_plot <- data.frame(
-    x = rep(grid,4),
-    y = c(theta_0(grid), fit1(grid), Theta_0(grid), fit2(grid)),
-    which = rep(c("theta_0", "LS fit", "Theta_0", "LS fit"), each=length(grid)),
-    fac = rep(c("first", "second"), each=2*length(grid))
-  )
-  ggplot(df_plot, aes(x=x, y=y, color=factor(which))) +
-    geom_line() +
-    facet_wrap(~fac, ncol=2)
+  microbenchmark({
+    Q_CoxPH(t=150, x=c(1,1), s=0.5)
+  }, times=100L)
+  microbenchmark({
+    Q_CoxPH2(t=150, x=c(1,1), s=0.5)
+  }, times=100L)
+  microbenchmark({
+    Q_CoxPH3(t=150, x=c(1,1), s=0.5)
+  }, times=100L)
+  
+  microbenchmark({
+    Q_CoxPH(t=times, x=x_a, s=rep(0.2,n))
+  }, times=100L)
+  microbenchmark({
+    Q_CoxPH2(t=times, x=x_a, s=rep(0.2,n))
+  }, times=100L)
+  microbenchmark({
+    sapply(times, function(t) {
+      Q_CoxPH3(t=t, x=c(0.2,1), s=0.2)
+    })
+  }, times=100L)
+  microbenchmark({
+    unlist(lapply(times, function(t) {
+      Q_CoxPH3(t=t, x=c(0.2,1), s=0.2)
+    }))
+  }, times=100L)
   
 }
 
@@ -143,13 +136,12 @@ if (F) {
 # Testing coefficients
 if (F) {
   
-  n <- 100
+  n <- 10000
   x <- runif(n)
+  # x <- rbeta(n, shape1=10, shape2=0.1)
   y <- 0.8*x^2 + rnorm(n, sd=0.1)
   # y <- 0.8*x^2 + 0.6*x + rnorm(n, sd=0.1)
   # y <- 0.8*x^2 + 0.6*x + 0.5 + rnorm(n, sd=0.1)
-  model_1 <- lm(y~0+x+I(x^2))
-  model_2 <- lm(y~x+I(x^2))
   
   # Intermediates
   s_x1 <- mean(x)
@@ -164,11 +156,14 @@ if (F) {
   num <- (s_x3-s_x1*s_x2)*(s_xy-s_x1*s_y1) + (s_x2y-s_x2*s_y1)*(s_x1^2-s_x2)
   den <- (s_x1*s_x2-s_x3)^2 + (s_x2^2-s_x4)*(s_x2-s_x1^2)
   coeff_withint <- num/den
+  print(den) # !!!!!
   
+  model_1 <- lm(y~0+x+I(x^2))
   print("Without intercept")
   print(coeff_noint)
   print(model_1$coefficients[[2]])
   
+  model_2 <- lm(y~x+I(x^2))
   print("With intercept")
   print(coeff_withint)
   print(model_2$coefficients[[3]])

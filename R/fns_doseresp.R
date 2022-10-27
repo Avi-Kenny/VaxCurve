@@ -438,9 +438,51 @@ construct_Phi_n <- function (dat, which="ecdf", type="step") {
 #' @return Conditional density estimator function
 construct_Q_n <- function(dat, vals, type, return_model=F, print_coeffs=F) {
   
-  if (type=="Cox PH2") {
+  if (type %in% c("Cox PH2", "Cox PH3")) {
     
+    # ..p <<- list() # !!!!!
+    model_srv <- coxph(
+      formula = formula(paste0("Surv(y,delta)~",
+                               paste(names(dat$x),collapse="+"),"+s")),
+      data = cbind(y=dat$y, delta=dat$delta, dat$x, s=dat$s),
+      weights = dat$weights
+    )
+    coeffs_srv <- as.numeric(model_srv$coefficients)
+    # ..p$coeffs_srv <<- coeffs_srv # !!!!!
+    bh_srv <- survival::basehaz(model_srv, centered=FALSE)
     
+    model_cens <- coxph(
+      formula = formula(paste0("Surv(y,delta)~",
+                               paste(names(dat$x),collapse="+"),"+s")),
+      data = cbind(y=dat$y, delta=1-dat$delta, dat$x, s=dat$s),
+      weights = dat$weights
+    )
+    coeffs_cens <- as.numeric(model_cens$coefficients)
+    # ..p$coeffs_cens <<- coeffs_cens # !!!!!
+    bh_cens <- survival::basehaz(model_cens, centered=FALSE)
+    
+    fnc_srv <- function(t, x, s) {
+      if (t==0) {
+        return(1)
+      } else {
+        # Lambda_t <- bh_srv$hazard[which.min(abs(bh_srv$time-t))]
+        Lambda_t <- bh_srv$hazard[max(which((bh_srv$time<t)==T))]
+        return(exp(-1*Lambda_t*exp(sum(coeffs_srv*as.numeric(c(x,s))))))
+      }
+    }
+    
+    fnc_cens <- function(t, x, s) {
+      if (t==0) {
+        return(1)
+      } else {
+        Lambda_t <- bh_cens$hazard[max(which((bh_cens$time<t)==T))]
+        # Lambda_t <- bh_cens$hazard[which.min(abs(bh_cens$time-t))]
+        return(exp(-1*Lambda_t*exp(sum(coeffs_cens*as.numeric(c(x,s))))))
+      }
+    }
+    
+    rm(model_srv)
+    rm(model_cens)
     
   }
   
@@ -565,6 +607,12 @@ construct_Q_n <- function(dat, vals, type, return_model=F, print_coeffs=F) {
             lin <- alpha_3*expit(20*s-10)
           } else {
             lin <- alpha_3*expit(20*(1-s)-10)
+          }
+        } else if (L$surv_true=="Step") {
+          if (L$dir=="decr") {
+            lin <- C$alpha_1*x[1] + C$alpha_2*x[2] + (alpha_3/2)*In(s>0)
+          } else {
+            lin <- C$alpha_1*x[1] + C$alpha_2*x[2] + (alpha_3/2)*In(s<=0)
           }
         } else if (L$surv_true=="exp") {
           lin <- 0
@@ -712,8 +760,13 @@ construct_Q_n <- function(dat, vals, type, return_model=F, print_coeffs=F) {
     
   }
   
-  sfnc_srv <- construct_superfunc(fnc_srv, aux=NA, vec=c(1,2,1), vals=vals)
-  sfnc_cens <- construct_superfunc(fnc_cens, aux=NA, vec=c(1,2,1), vals=vals)
+  if (type=="Cox PH3") {
+    sfnc_srv <- fnc_srv
+    sfnc_cens <- fnc_cens
+  } else {
+    sfnc_srv <- construct_superfunc(fnc_srv, aux=NA, vec=c(1,2,1), vals=vals)
+    sfnc_cens <- construct_superfunc(fnc_cens, aux=NA, vec=c(1,2,1), vals=vals)
+  }
   rm("vals", envir=environment(get("fnc_srv",envir=environment(sfnc_srv))))
   
   return(list(srv=sfnc_srv, cens=sfnc_cens))

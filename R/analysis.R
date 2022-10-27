@@ -8,7 +8,7 @@
 
 {
   # Choose analysis
-  which_analysis <- "HVTN 705 (all)" # "Janssen" "Moderna" "AMP" "AZD1222"
+  which_analysis <- "Moderna" # "Janssen" "Moderna" "AMP" "AZD1222"
                               # "HVTN 705 (primary)" "HVTN 705 (all)"
   
   # Set proper task ID variable
@@ -22,16 +22,16 @@
     stop("Invalid cluster_config$js")
   }
   
-  # # Uncomment this code to run multiple analyses (e.g. 1=10=Moderna, 11-14=Janssen)
-  # ..tid <- as.integer(Sys.getenv(.tid_var))
-  # if (..tid<=4) {
-  #   which_analysis <- "Janssen"
-  # } else {
-  #   which_analysis <- "Moderna"
-  #   .tid_lst = list(as.character(round(..tid-4)))
-  #   names(.tid_lst) = .tid_var
-  #   do.call(Sys.setenv, .tid_lst)
-  # }
+  # Uncomment this code to run multiple analyses (e.g. 1=10=Moderna, 11-14=Janssen)
+  ..tid <- as.integer(Sys.getenv(.tid_var))
+  if (..tid<=4) {
+    which_analysis <- "Janssen"
+  } else {
+    which_analysis <- "Moderna"
+    .tid_lst = list(as.character(round(..tid-4)))
+    names(.tid_lst) = .tid_var
+    do.call(Sys.setenv, .tid_lst)
+  }
   
   # Set seed
   set.seed(1)
@@ -41,10 +41,10 @@
   # !!!!! In the correlates repo, if t_0=0, it is inferred from the data
   cfg2 <- list(
     analysis = which_analysis,
-    run_analysis = T,
+    run_analysis = F,
     run_dqa = F,
     run_debug = list(gren_var=F, objs=F),
-    run_hyptest = F
+    run_hyptest = T
   )
   
   # Set analysis-specific flags
@@ -52,7 +52,8 @@
   #       dependent on cfg2 variables
   flags <- list(
     hvtn705_abstract_fig = F,
-    table_of_cve_vals = T
+    table_of_cve_vals = F,
+    npcve_paper = F
   )
   
   # Set up analysis-specific configuration variables. Each row in the cfg2$map
@@ -224,6 +225,14 @@
       Q_n_type = rep("Super Learner",10),
       q_n_type = rep("zero", 10)
     )
+    
+    # Flag-specific operation
+    if (flags$npcve_paper) {
+      
+      cfg2$zoom_x <- c("zoomed", "zoomed llox")
+      cfg2$map$zoom_x <- c(1,1,1,1,2,1,2,1,2,1)
+      
+    }
     
   }
   
@@ -559,7 +568,7 @@
   
   # Set config based on local vs. cluster
   if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
-    cfg2$tid <- 37
+    cfg2$tid <- 5
     cfg2$dataset <- paste0(cfg2$folder_cluster,cfg2$dataset)
   } else {
     cfg2$tid <- as.integer(Sys.getenv(.tid_var))
@@ -1128,17 +1137,17 @@ if (cfg2$run_analysis &&
   }
   s_orig <- dat_orig$s[!is.na(dat_orig$s)]
   s_grid <- seq(from=min(s_orig), to=max(s_orig), length.out=101)
-  ests <- est_curve(
-    dat_orig = dat_orig,
-    estimator = "Grenander",
-    params = cfg2$params,
-    points = s_grid,
-    dir = "decr",
-    return_extra = return_extra
-  )
-  
-  saveRDS(ests, paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds"))
-  # ests <- readRDS(paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds"))
+  # ests <- est_curve(
+  #   dat_orig = dat_orig,
+  #   estimator = "Grenander",
+  #   params = cfg2$params,
+  #   points = s_grid,
+  #   dir = "decr",
+  #   return_extra = return_extra
+  # )
+  # 
+  # saveRDS(ests, paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds"))
+  ests <- readRDS(paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds"))
   
   run_cve <- as.logical("Grenander" %in% cfg2$plot_cve$est)
   ests2 <- process_ests(ests, s_grid, run_cve=run_cve,
@@ -1257,34 +1266,30 @@ if (cfg2$run_analysis &&
 
 if (cfg2$run_hyptest) {
   
-  return_extras <- F
   test_results <- test_2(
     dat_orig = dat_orig,
-    # alt_type = "decr",
-    alt_type = "two-tailed", # decr # !!!!! Temporarily commented out
-    # params = list(),
-    # params = list(type="both", q_n_type="zero", Q_n_type="Super Learner"), # !!!!!
+    alt_type = "two-tailed", # "decr"
     params = list(
-      type = c("simple", "simple (with constant)", "S-weighted (with constant)"),
-      # type = c("simple", "complex", "simple (with constant)"),
+      type = c("simple (with constant)", "edge", "combined"), # "S-weighted (with constant)"
       q_n_type = "zero",
-      Q_n_type = "Super Learner" # "Cox PH"
-    ), # !!!!!
-    return_extras = return_extras
+      Q_n_type = "Super Learner"
+    )
   )
   
+  if (T) {
+    saveRDS(
+      test_results,
+      paste0(cfg2$analysis," plots/test_results_",cfg2$tid,".rds")
+    )
+  }
+  
+  test_results$extras <- NULL
   write.table(
     do.call(rbind, test_results),
     file = paste0(cfg2$analysis," plots/hyptest_",cfg2$tid,".csv"),
     sep = ",",
     row.names = FALSE
   )
-  if (return_extras) {
-    saveRDS(
-      res$Theta_os_n,
-      paste0(cfg2$analysis," plots/Theta_os_n_",cfg2$tid,".rds")
-    )
-  }
   
 }
 
@@ -1368,7 +1373,7 @@ if (cfg2$run_hyptest) {
       zz <- dplyr::filter(plot_data, tag %in% c("Gren", "Qbins", "Cox") &
                             !is.na(y))$x
       z_x_R <- max(zz, na.rm=T)
-      z_x_L <- log10(cfg2$llox)
+      z_x_L <- log10(cfg2$llox/2)
       zoom_x <- c(z_x_L - 0.05*(z_x_R-z_x_L),
                   z_x_R + 0.05*(z_x_R-z_x_L))
     }
@@ -1526,6 +1531,10 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
     } else {
       stop("HVTN 705 config changed")
     }
+  }
+  
+  if (flags$npcve_paper) {
+    cfg2$lab_title <- NULL
   }
   
   if (nrow(plot_data_risk)>0) {

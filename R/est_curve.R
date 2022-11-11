@@ -111,17 +111,17 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     n_orig <- length(dat_orig$z)
     p_n <- (1/n_orig) * sum(dat$weights * as.integer(dat$s!=0))
     eta_n <- construct_eta_n(dat, Q_n, p_n, vals=NA)
-    gcomp_n <- construct_gcomp_n(dat_orig, vals=vlist$S_grid, Q_n)
+    r_tilde_Mn <- construct_r_tilde_Mn(dat_orig, vals=vlist$S_grid, Q_n)
     chk(6)
-    Gamma_tilde_n <- construct_Gamma_tilde_n(dat, gcomp_n, p_n, vals=NA)
+    Gamma_tilde_n <- construct_Gamma_tilde_n(dat, r_tilde_Mn, p_n, vals=NA)
     f_n_srv <- construct_f_n_srv(Q_n=Q_n, Qc_n=Qc_n)
     chk(7)
     q_n <- construct_q_n(type=p$q_n_type, dat, dat_orig, omega_n=omega_n, g_n=g_n,
-                         p_n=p_n, gcomp_n=gcomp_n, Gamma_tilde_n=Gamma_tilde_n,
+                         p_n=p_n, r_tilde_Mn=r_tilde_Mn, Gamma_tilde_n=Gamma_tilde_n,
                          Q_n=Q_n, Qc_n=Qc_n, f_n_srv=f_n_srv)
     chk(8)
     Gamma_os_n <- construct_Gamma_os_n(dat, dat_orig, omega_n, g_n, eta_n, p_n,
-                                       q_n, gcomp_n, Gamma_tilde_n,
+                                       q_n, r_tilde_Mn, Gamma_tilde_n,
                                        vals=vlist$S_grid)
     chk(9)
     
@@ -168,7 +168,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     if (F) {
       q_n <- construct_q_n(type="new", dat, dat_orig, omega_n=omega_n, g_n=g_n,
-                           p_n=p_n, gcomp_n=gcomp_n,
+                           p_n=p_n, r_tilde_Mn=r_tilde_Mn,
                            Gamma_tilde_n=Gamma_tilde_n, Q_n=Q_n, Qc_n=Qc_n,
                            f_n_srv=f_n_srv)
       q_n(dat_orig$x[1:3,],dat_orig$y[1:3],dat_orig$delta[1:3],u=0.5)
@@ -513,7 +513,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   
   if ("gcomp" %in% return_extra) {
     Q_n2 <- (construct_Q_n(dat, vlist$Q_n, type="Cox PH"))$srv
-    res$gcomp <- construct_gcomp_n(dat_orig, vlist$S_grid, Q_n=Q_n2)
+    res$gcomp <- construct_r_tilde_Mn(dat_orig, vlist$S_grid, Q_n=Q_n2)
   }
   fns_extra <- c("f_s_n", "gamma_n", "deriv_r_Mn", "Phi_n_inv", "Phi_n",
                  "omega_n", "f_sIx_n", "Q_n", "gcm", "dGCM", "grid",

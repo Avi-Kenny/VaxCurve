@@ -428,14 +428,14 @@ if (cfg$which_sim=="debugging") {
       # g_n <- construct_g_n(f_sIx_n, f_s_n)
       # p_n <- (1/n_orig) * sum(dat$weights * as.integer(dat$s!=0))
       # eta_n <- construct_eta_n(dat, Q_n, p_n, vals=NA)
-      # gcomp_n <- construct_gcomp_n(dat_orig, vals=vlist$S_grid, Q_n)
-      # Gamma_tilde_n <- construct_Gamma_tilde_n(dat, gcomp_n, p_n, vals=NA)
+      # r_tilde_Mn <- construct_r_tilde_Mn(dat_orig, vals=vlist$S_grid, Q_n)
+      # Gamma_tilde_n <- construct_Gamma_tilde_n(dat, r_tilde_Mn, p_n, vals=NA)
       # f_n_srv <- construct_f_n_srv(Q_n=Q_n, Qc_n=Qc_n)
       # q_n <- construct_q_n(type=p$q_n_type, dat, dat_orig, omega_n=omega_n, g_n=g_n,
-      #                      p_n=p_n, gcomp_n=gcomp_n, Gamma_tilde_n=Gamma_tilde_n,
+      #                      p_n=p_n, r_tilde_Mn=r_tilde_Mn, Gamma_tilde_n=Gamma_tilde_n,
       #                      Q_n=Q_n, Qc_n=Qc_n, f_n_srv=f_n_srv)
       # Gamma_os_n <- construct_Gamma_os_n(dat, dat_orig, omega_n, g_n, eta_n, p_n,
-      #                                    q_n, gcomp_n, Gamma_tilde_n,
+      #                                    q_n, r_tilde_Mn, Gamma_tilde_n,
       #                                    vals=vlist$S_grid)
     } # DEBUG
     

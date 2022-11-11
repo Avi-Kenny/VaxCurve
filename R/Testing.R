@@ -266,7 +266,7 @@
     g_n <- construct_g_n(f_sIx_n, f_s_n)
     omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n)
     Gamma_os_n <- construct_Gamma_os_n(dat, dat_orig, omega_n, g_n, eta_n, p_n,
-                                       q_n, gcomp_n, Gamma_tilde_n)
+                                       q_n, r_tilde_Mn, Gamma_tilde_n)
     
     # Construct additional component functions
     Psi_n <- Vectorize(function(u) {
@@ -488,7 +488,7 @@
     Qc_n <- srvSL$cens
     omega_n <- construct_omega_n(Q_n, Qc_n)
     Gamma_os_n <- construct_Gamma_os_n(dat, dat_orig, omega_n, g_n, eta_n, p_n,
-                                       q_n, gcomp_n, Gamma_tilde_n)
+                                       q_n, r_tilde_Mn, Gamma_tilde_n)
     
     # Return the value of Gamma_os_n(0.5)
     return (Gamma_os_n(0.5))
@@ -532,10 +532,10 @@
     Q_n <- srvSL$srv
     Qc_n <- srvSL$cens
     omega_n <- construct_omega_n(Q_n, Qc_n)
-    gcomp_n <- construct_gcomp_n(dat_orig, vals_S_grid, Q_n)
+    r_tilde_Mn <- construct_r_tilde_Mn(dat_orig, vals_S_grid, Q_n)
     # eta_n <- construct_eta_n(dat, vals_SX_grid, Q_n) # ARCHIVED
     Gamma_os_n <- construct_Gamma_os_n(dat, dat_orig, omega_n, g_n, eta_n, p_n,
-                                       q_n, gcomp_n, Gamma_tilde_n)
+                                       q_n, r_tilde_Mn, Gamma_tilde_n)
     
     if (F) {
       
@@ -567,7 +567,7 @@
     }
     
     # Construct influence function
-    infl_fn_Gamma <- construct_infl_fn_Gamma(omega_n, g_n, gcomp_n,
+    infl_fn_Gamma <- construct_infl_fn_Gamma(omega_n, g_n, r_tilde_Mn,
                                              eta_n, Gamma_os_n)
     
     # Estimate variance and SD
@@ -636,7 +636,7 @@
     Qc_n <- srvSL$cens
     omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n)
     Gamma_os_n <- construct_Gamma_os_n(dat, dat_orig, omega_n, g_n, eta_n, p_n,
-                                       q_n, gcomp_n, Gamma_tilde_n)
+                                       q_n, r_tilde_Mn, Gamma_tilde_n)
     
     # Compute the test statistic
     beta_n <- (1/n_orig) * sum(

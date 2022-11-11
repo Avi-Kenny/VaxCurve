@@ -782,7 +782,7 @@ construct_Q_n <- function(dat, vals, type, return_model=F, print_coeffs=F) {
 #'     construct_superfunc()
 #' @param Q_n Conditional survival function estimator returned by construct_Q_n
 #' @return G-computation estimator of theta_0
-construct_gcomp_n <- function(dat_orig, vals=NA, Q_n) {
+construct_r_tilde_Mn <- function(dat_orig, vals=NA, Q_n) {
   
   fnc <- function(s) {
     1 - mean(Q_n(
@@ -1235,14 +1235,14 @@ construct_f_n_srv <- function(Q_n=NA, Qc_n=NA, width=40, vals=NA) {
 #' @param type One of c("new", "zero")
 #' @return q_n nuisance estimator function
 construct_q_n <- function(type="new", dat, dat_orig,
-                          omega_n=NA, g_n=NA, p_n=NA, gcomp_n=NA,
+                          omega_n=NA, g_n=NA, p_n=NA, r_tilde_Mn=NA,
                           Gamma_tilde_n=NA, f_sIx_n=NA, Q_n=NA, Qc_n=NA,
                           f_n_srv=NA, vals=NA) {
   
   if (type=="new") {
     
     q_n_star_inner <- function(y, delta, x, s) {
-      In(s!=0)*omega_n(x,s,y,delta)/g_n(s,x) + gcomp_n(s)
+      In(s!=0)*omega_n(x,s,y,delta)/g_n(s,x) + r_tilde_Mn(s)
     }
     q_n_star_inner <- construct_superfunc(q_n_star_inner, aux=NA, vec=c(1,1,2,1), vals=NA)
     
@@ -1776,7 +1776,7 @@ construct_infl_fn_1 <- function(dat, Gamma_os_n, Phi_n, lambda_2,
 #' 
 #' @param x x
 #' @return x
-construct_infl_fn_Gamma <- function(omega_n, g_n, gcomp_n, p_n, Gamma_tilde_n,
+construct_infl_fn_Gamma <- function(omega_n, g_n, r_tilde_Mn, p_n, Gamma_tilde_n,
                                     q_n, eta_n, Gamma_os_n) {
   
   fnc <- function(u,x,y,delta,s,wt) {
@@ -1786,7 +1786,7 @@ construct_infl_fn_Gamma <- function(omega_n, g_n, gcomp_n, p_n, Gamma_tilde_n,
       piece_3 <- 0
     } else {
       piece_1 <- In(s!=0 & s<=u)
-      piece_2 <- omega_n(x,s,y,delta)/(p_n*g_n(s,x)) + gcomp_n(s)/p_n
+      piece_2 <- omega_n(x,s,y,delta)/(p_n*g_n(s,x)) + r_tilde_Mn(s)/p_n
       piece_3 <- In(s!=0)*Gamma_tilde_n(u)
     }
     wt*(piece_1*piece_2-piece_3/p_n) +
@@ -1966,7 +1966,7 @@ create_val_list <- function(dat_orig, factor_S=NA) {
 #' @param x x
 #' @return x
 construct_Gamma_cf_k <- function(dat_train, dat_test, vals=NA, omega_n, g_n,
-                                 gcomp_n, eta_n) {
+                                 r_tilde_Mn, eta_n) {
   
   # !!!!! Needs to be updated
   
@@ -1985,12 +1985,12 @@ construct_Gamma_cf_k <- function(dat_train, dat_test, vals=NA, omega_n, g_n,
     piece_1 <- (1/n_test) * sum(weights_1 * (
       In(d1$s<=s) *
         ((omega_n(d1$x,d1$s,d1$y,d1$delta) / g_n(d1$s,d1$x)) +
-           gcomp_n(d1$s)
+           r_tilde_Mn(d1$s)
         ) +
         eta_n(s,d1$x)
     ))
     
-    piece_2 <- (1/n_train) * sum(weights_2 * In(d2$s<=s)*gcomp_n(d2$s))
+    piece_2 <- (1/n_train) * sum(weights_2 * In(d2$s<=s)*r_tilde_Mn(d2$s))
     
     return(piece_1-piece_2)
     
@@ -2035,7 +2035,7 @@ construct_Gamma_cf <- function(dat_orig, params, vlist) {
     srvSL <- construct_Q_n(dat_train, vlist$Q_n, type=params$Q_n_type)
     Q_n <- srvSL$srv
     Qc_n <- srvSL$cens
-    gcomp_n <- construct_gcomp_n(dat_orig_train, vlist$S_grid, Q_n)
+    r_tilde_Mn <- construct_r_tilde_Mn(dat_orig_train, vlist$S_grid, Q_n)
     # eta_n <- construct_eta_n(dat_train, vlist$SX_grid, Q_n) # ARCHIVED
     f_sIx_n <- construct_f_sIx_n(dat_train, vlist$SX_grid, type=params$g_n_type,
                                  k=15, s_scale=s_scale, s_shift=s_shift)
@@ -2046,11 +2046,11 @@ construct_Gamma_cf <- function(dat_orig, params, vlist) {
     
     # Construct K functions
     Gamma_cf_k[[k]] <- construct_Gamma_cf_k(
-      dat_train, dat_test, vlist$S_grid, omega_n, g_n, gcomp_n, eta_n
+      dat_train, dat_test, vlist$S_grid, omega_n, g_n, r_tilde_Mn, eta_n
     )
     
     # Remove objects
-    rm(Phi_n,Phi_n_inv,Q_n,Qc_n,gcomp_n,eta_n,f_sIx_n,f_s_n,g_n,omega_n)
+    rm(Phi_n,Phi_n_inv,Q_n,Qc_n,r_tilde_Mn,eta_n,f_sIx_n,f_s_n,g_n,omega_n)
     
   }
   
@@ -2323,10 +2323,10 @@ construct_infl_fn_beta_en <- function(infl_fn_Theta, infl_fn_r_Mn_edge) {
 #' @param p_n !!!!!
 #' @param vals !!!!!
 #' @return Nuisance estimator function
-construct_Gamma_tilde_n <- function(dat, gcomp_n, p_n, vals=NA) {
+construct_Gamma_tilde_n <- function(dat, r_tilde_Mn, p_n, vals=NA) {
   
   n_orig <- sum(dat$weights)
-  piece_1 <- dat$weights * In(dat$s!=0) * gcomp_n(dat$s)
+  piece_1 <- dat$weights * In(dat$s!=0) * r_tilde_Mn(dat$s)
   
   fnc <- function(u) {
     (1/(n_orig*p_n)) * sum(In(dat$s<=u)*piece_1)
@@ -2370,16 +2370,16 @@ construct_eta_n <- function(dat, Q_n, p_n, vals=NA) {
 #' 
 #' @param x !!!!!
 construct_Gamma_os_n <- function(dat, dat_orig, omega_n, g_n, eta_n, p_n, q_n,
-                                 gcomp_n, Gamma_tilde_n, vals=NA) {
+                                 r_tilde_Mn, Gamma_tilde_n, vals=NA) {
   
   n_orig <- length(dat_orig$z)
   piece_1 <- In(dat$s!=0)
   piece_2 <- (omega_n(dat$x,dat$s,dat$y,dat$delta) /
-                g_n(dat$s,dat$x)) + gcomp_n(dat$s)
+                g_n(dat$s,dat$x)) + r_tilde_Mn(dat$s)
   piece_3 <- (1-dat_orig$weights)
   
   # Remove large intermediate objects
-  rm(omega_n,g_n,gcomp_n)
+  rm(omega_n,g_n,r_tilde_Mn)
   
   fnc <- function(u) {
     

@@ -1,4 +1,169 @@
 
+# fns_doseresp: construct_rho_n
+if (F) {
+  
+  construct_rho_n <- function(dat, Phi_n, vals=NA) {
+    
+    n_orig <- sum(dat$weights)
+    
+    fnc <- function(s) {
+      (1/n_orig) * sum(
+        dat$weights * (Phi_n(dat$s)^3) * (In(s<=dat$s) - Phi_n(dat$s))
+      )
+    }
+    
+    return(construct_superfunc(fnc, aux=NA, vec=T, vals=vals))
+    
+  }
+  
+}
+
+# fns_doseresp: construct_xi_n
+if (F) {
+  
+  construct_xi_n <- function(Phi_n, lambda_2, lambda_3, vals=NA) {
+    
+    fnc <- function(s_i,s_j) {
+      (2*In(s_i<=s_j) - 3*Phi_n(s_j))*Phi_n(s_j)*lambda_2 +
+        (2*Phi_n(s_j) - In(s_i<=s_j))*lambda_3
+    }
+    
+    return(construct_superfunc(fnc, aux=NA, vec=c(1,1), vals=vals))
+    
+  }
+
+}
+
+# fns_doseresp: beta_n_var_hat
+if (F) {
+  
+  beta_n_var_hat <- function(dat, dat_orig, infl_fn_1, infl_fn_2) {
+    
+    n_orig <- sum(dat$weights)
+    
+    b_sum <- 0
+    for (i in c(1:length(dat_orig$s))) {
+      if (dat_orig$z[i]==0) {
+        b_sum <- b_sum + (infl_fn_2(dat_orig$x[i,], dat_orig$y[i],
+                                    dat_orig$delta[i], dat_orig$s[i],
+                                    dat_orig$weights[i]))^2
+      } else {
+        b_sum <- b_sum + (
+          dat_orig$weights[i]*infl_fn_1(dat_orig$s[i]) +
+            infl_fn_2(dat_orig$x[i,], dat_orig$y[i], dat_orig$delta[i],
+                      dat_orig$s[i], dat_orig$weights[i])
+        )^2
+      }
+    }
+    
+    return( (1/n_orig)*b_sum )
+    
+  }
+  
+}
+
+# fns_doseresp: construct_infl_fn_2
+if (F) {
+  
+  construct_infl_fn_2 <- function(dat, Phi_n, infl_fn_Gamma, lambda_2, lambda_3) {
+    
+    n_orig <- sum(dat$weights)
+    weights_j <- dat$weights
+    s_j <- dat$s
+    len <- length(s_j)
+    
+    fnc <- function(x,y,delta,s,wt) {
+      x_long <- as.data.frame(
+        matrix(rep(x,len), ncol=length(x), byrow=T)
+      )
+      (1/n_orig) * sum(weights_j * (
+        ( lambda_2*(Phi_n(s_j)^2) - lambda_3*Phi_n(s_j) ) *
+          infl_fn_Gamma(s_j, x_long, rep(y,len), rep(delta,len),
+                        rep(s,len), rep(wt,len))
+      ))
+    }
+    
+    return(construct_superfunc(fnc, vec=c(2,1,1,1,1)))
+    
+  }
+  
+}
+
+# fns_doseresp: construct_infl_fn_Gamma
+if (F) {
+  
+  construct_infl_fn_Gamma <- function(omega_n, g_n, r_tilde_Mn, p_n, Gamma_tilde_n,
+                                      q_n, eta_n, Gamma_os_n) {
+    
+    fnc <- function(u,x,y,delta,s,wt) {
+      if (wt==0) {
+        piece_1 <- 0
+        piece_2 <- 0
+        piece_3 <- 0
+      } else {
+        piece_1 <- In(s!=0 & s<=u)
+        piece_2 <- omega_n(x,s,y,delta)/(p_n*g_n(s,x)) + r_tilde_Mn(s)/p_n
+        piece_3 <- In(s!=0)*Gamma_tilde_n(u)
+      }
+      wt*(piece_1*piece_2-piece_3/p_n) +
+        (1-wt)*q_n(x,y,delta,u) +
+        eta_n(u,x) -
+        Gamma_os_n(round(u,-log10(C$appx$s)))
+    }
+    
+    return(construct_superfunc(fnc, vec=c(1,2,1,1,1,1)))
+    
+  }
+  
+}
+
+# fns_doseresp: construct_infl_fn_1
+if (F) {
+  
+  construct_infl_fn_1 <- function(dat, Gamma_os_n, Phi_n, lambda_2,
+                                  lambda_3, vals=NA) {
+    
+    n_orig <- sum(dat$weights)
+    weights_j <- dat$weights
+    s_j <- dat$s
+    
+    rho_n <- function(s,u) {
+      (1/n_orig) * sum(
+        weights_j * (Phi_n(s))^u * Gamma_os_n(round(s,-log10(C$appx$s)))
+      )
+    }
+    
+    rho_1 <- rho_n(s_j,1)
+    rho_2 <- rho_n(s_j,2)
+    piece_01 <- Gamma_os_n(round(s_j,-log10(C$appx$s)))
+    piece_20 <- (Phi_n(s_j))^2
+    piece_10 <- Phi_n(s_j)
+    piece_11 <- Phi_n(s_j) * Gamma_os_n(round(s_j,-log10(C$appx$s)))
+    
+    fnc <- function(s_i) {
+      
+      piece_1 <- (2*(1/n_orig)*sum(weights_j*In(s_i<=s_j)*piece_10)+
+                    (Phi_n(s_i))^2-6*lambda_2)*rho_2
+      piece_2 <- lambda_2*(
+        2*(1/n_orig)*sum(weights_j*In(s_i<=s_j)*piece_11)+
+          (Phi_n(s_i))^2*Gamma_os_n(round(s_i,-log10(C$appx$s)))
+      )
+      piece_3 <- (3*(1/n_orig)*sum(weights_j*In(s_i<=s_j)*piece_20)+
+                    (Phi_n(s_i))^3-6*lambda_3)*rho_1
+      piece_4 <- lambda_3*((1/n_orig)*sum(weights_j*In(s_i<=s_j)*
+                                            piece_01)+Phi_n(s_i)*
+                             Gamma_os_n(round(s_i,-log10(C$appx$s))))
+      
+      return(piece_1+piece_2-piece_3-piece_4)
+      
+    }
+    
+    return(construct_superfunc(fnc, aux=NA, vec=c(1), vals=vals))
+    
+  }
+
+}
+
 # test2.R: "debugging" test statistic (test based on Theta_n alone)
 if (F) {
   

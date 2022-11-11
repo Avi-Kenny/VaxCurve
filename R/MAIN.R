@@ -13,10 +13,10 @@
 #                  cwolock/survML
 cfg <- list(
   main_task = "run", # run update analysis.R
-  which_sim = "testing", # "estimation" "edge" "testing" "Cox" "debugging"
-  level_set_which = "level_set_testing_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
+  which_sim = "edge", # "estimation" "edge" "testing" "Cox" "debugging"
+  level_set_which = "level_set_edge_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
   # keep = c(1:3,7:9,16:18,22:24),
-  num_sim = 1000,
+  num_sim = 500,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm", "tidyr",
@@ -110,13 +110,13 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       "Grenander (GCM)" = list(
         est = "Grenander",
         params = list(
-          q_n_type="zero",
-          Q_n_type="Cox PH", # "Random Forest", "true"
-          convex_type="GCM", # "CLS"
-          ecdf_type="linear (mid)",
-          edge_corr="none", # "min"
-          deriv_type="m-spline",
-          g_n_type="parametric" # "binning" "true"
+          q_n_type = "zero",
+          Q_n_type = "Cox PH", # "Random Forest", "true"
+          convex_type = "GCM", # "CLS"
+          ecdf_type = "linear (mid)",
+          edge_corr = "none", # "min"
+          deriv_type = "m-spline",
+          g_n_type = "parametric" # "binning" "true"
         )
       )
       # "Cox PH" = list(est="Cox gcomp")
@@ -131,31 +131,34 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   level_set_testing_1 <- list(
     n = c(2000),
     # n = c(100,200,400,800), # 1000
-    # alpha_3 = c(0,-0.5),
+    # alpha_3 = 0,
+    # alpha_3 = c(0,-0.25,-0.5),
     alpha_3 = seq(0,-0.5,-0.1),
     dir = "decr",
     sc_params = list("sc_params"=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_S = c("Unif(0,1)"),
+    distr_S = c("Unif(0,1)", "N(0.5,0.04)"),
     # distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
+    # edge = "expit 0.4",
     edge = c("none", "expit 0.1", "expit 0.4"),
     surv_true = c("Cox PH"), # "Complex"
     sampling = c("two-phase (50%)"), # "iid" "two-phase (50%)"
-    wts_type = "estimated", # "estimated" "true"
+    wts_type = c("estimated"), # "estimated" "true"
     test = list(
-      "Slope (Cox/binning)" = list(
+      "Slope (two-tailed)" = list(
         type = "test_2",
-        alt_type = "decr",
-        # alt_type = "two-tailed", # decr
+        # alt_type = "decr",
+        alt_type = "two-tailed", # decr
         params = list(
           type = c("simple (with constant)", "edge", "combined", "combined 2"),
-          # type = c("simple (with constant)", "edge", "combined"),
           q_n_type = "zero",
           g_n_type = "binning", # "parametric" "true"
+          f_sIx_n_bins = 15,
           omega_n_type = "estimated", # "true"
           Q_n_type = "Cox PH" # "Cox PH"
         ),
         test_stat_only = F
       )
+      
       # "test_2 (q_n new)" = list(
       #   type = "test_2",
       #   alt_type = "two-tailed", # decr
@@ -211,6 +214,33 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       #   ),
       #   test_stat_only = F
       # )
+    )
+  )
+  
+  # Estimation: ideal params
+  level_set_edge_1 <- list(
+    n = 1000,
+    alpha_3 = -2,
+    dir = "decr",
+    sc_params = list("sc_params"=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5)),
+    distr_S = "Unif(0,1)",
+    edge = "expit 0.4",
+    surv_true = "Cox PH",
+    sampling = c("two-phase (50%)"), # iid
+    wts_type = "estimated", # c("true", "estimated")
+    estimator = list(
+      "Grenander (GCM)" = list(
+        est = "Grenander",
+        params = list(
+          q_n_type = "zero",
+          Q_n_type = "Cox PH",
+          convex_type = "GCM",
+          ecdf_type = "linear (mid)",
+          edge_corr = "none",
+          deriv_type = "m-spline",
+          g_n_type = "binning"
+        )
+      )
     )
   )
   
@@ -577,25 +607,34 @@ if (F) {
   )
   summ
   
+  # !!!!!
+  summ1 <- summ %>% filter(distr_S=="Unif(0,1)" & test=="Slope (two-tailed)")
+  summ2 <- summ %>% filter(distr_S=="Unif(0,1)" & test=="Slope (decr)")
+  summ3 <- summ %>% filter(distr_S=="N(0.5,0.04)" & test=="Slope (two-tailed)")
+  summ4 <- summ %>% filter(distr_S=="N(0.5,0.04)" & test=="Slope (decr)")
+  summ <- summ4
+  
   # Figure
   {
     p_data <- pivot_longer(
       data = summ,
-      cols = c(reject_1,reject_2,reject_3),
+      cols = c(reject_1,reject_2,reject_3,reject_4),
       names_to = "test_type",
       values_to = "Power"
     )
-    test_types <- c("Simple (with constant)", "Edge", "Combined")
+    test_types <- c("Simple (with constant)", "Edge", "Combined", "Combined 2")
     p_data %<>% mutate(
       edge = factor(edge, levels=c("none", "expit 0.1", "expit 0.4")),
       alpha_3 = -1 * alpha_3,
       test_type = case_when(
         test_type=="reject_1" ~ test_types[1],
         test_type=="reject_2" ~ test_types[2],
-        test_type=="reject_3" ~ test_types[3]
+        test_type=="reject_3" ~ test_types[3],
+        test_type=="reject_4" ~ test_types[4]
       ),
       test_type = factor(test_type, levels=test_types)
     )
+    # p_data %<>% filter(test_type!="Combined") # !!!!! Uncommend for decr
     
     # Export: 10 x 4
     ggplot(
@@ -608,7 +647,7 @@ if (F) {
       scale_y_continuous(labels=percent) +
       theme(legend.position="bottom") +
       # scale_color_manual(values=m_colors) +
-      labs(title="Hypothesis test, distr_A=N(0.3+0.4x2,0.09)",
+      labs(title="Hypothesis test, distr_A=N(0.5,0.04), directional", # N(0.3+0.4x2,0.09)
            color="Test type", x="Effect size")
     
     # facet: edge
@@ -983,3 +1022,159 @@ if (F) {
     labs(x="x", y="CDF", color="Distribution")
   
 }
+
+
+
+###############################.
+##### VIZ: Hyp test proof #####
+###############################.
+
+if (F) {
+  
+  
+  # x <- runif(10^5)
+  # y <- Theta(x) + rnorm(10^5, sd=0.01)
+  # summary(lm(y~x))
+  
+  # x <- c(0.285, 0.854, 0.57, 0.641, 0.59)[c(1,2,5)]
+  # y <- c(Theta(0.285),Theta(0.854), L(0.57), Theta(0.641), perp(0.59))[c(1,2,5)]
+  # summary(lm(y~x+I(x^2)))
+  
+  
+  
+  x <- seq(0,1,0.001)
+  L <- Vectorize(function(x) { -0.167 + 0.583*x })
+  Theta <- Vectorize(function(x) { x^7 })
+  perp <- Vectorize(function(x) { 1.143 - 1.715*x })
+  Q <- Vectorize(function(x) { -0.02515 - 0.07581*x + 0.5775*x^2 })
+  
+  df_plot <- data.frame(
+    x = rep(x,3),
+    y = c(L(x), Theta(x), Q(x)),
+    which = rep(c("Linear", "Theta_0", "Quadratic"), each=length(x))
+  )
+  
+  # Export 5.5" x 6.4"
+  ggplot(df_plot, aes(x=x, y=y, color=which)) +
+    geom_line() +
+    geom_line(
+      # aes(group=group),
+      data = data.frame(
+        # x = c(c(0.5,0.7), c(0.285,0.641), c(0.641,0.854)),
+        # y = c(perp(c(0.5,0.7)), c(0.285^7,0.641^7), c(0.641^7,0.854^7)),
+        x = c(0.5,0.7),
+        y = perp(c(0.5,0.7)),
+        # group = c(1,1,2,2,3,3),
+        which = rep(NA,2) # 6
+      ),
+      color = "grey",
+      linetype = "dashed"
+    ) +
+    geom_point(
+      # aes(x=x, y=y, color=which),
+      data = data.frame(
+        x = c(0.285, 0.854, 0.57, 0.641, 0.59),
+        y = c(0.285^7,0.854^7, L(0.57), 0.641^7, perp(0.59)),
+        which = c("1", "1", "2", "3", "1")
+      ),
+      # inherit.aes = F,
+      show.legend = F,
+      size = 2
+    ) +
+    scale_color_manual(
+      values=c("Linear"="turquoise", "Theta_0"="salmon",
+               "Quadratic"="darkorchid1",
+               "1"="orange", "2"="forestgreen", "3"="dodgerblue1"),
+      breaks = c("Linear", "Theta_0", "Quadratic")
+    ) +
+    labs(color="Function") +
+    theme(legend.position="bottom")
+  
+  
+  
+  
+  # New
+  
+  
+  
+  # expit <- function(x) { exp(x)/(1+exp(x)) }
+  # x <- seq(0,1,0.001)
+  # # x <- seq(-10,10,0.001)
+  # Theta <- Vectorize(function(x) { expit(10*x) - 0.5 })
+  # # Theta <- Vectorize(function(x) { sqrt(5-(x-1)^2) })
+  # cf <- coefficients(lm(y~x, data=data.frame(x=x, y=Theta(x))))
+  # Lin <- Vectorize(function(x) { cf[[1]] + cf[[2]]*x })
+  # df_plot <- data.frame(
+  #   x = rep(x,2),
+  #   y = c(Theta(x), Lin(x)),
+  #   which = rep(c("Theta", "lin"), each=length(x))
+  # )
+  # ggplot(df_plot, aes(x=x, y=y, color=factor(which))) + geom_line() #+ ylim(0.5,1)
+  
+  
+  # Find crossing points
+  # uniroot(function(x) { Theta(x)-L(x) }, c(0,0.3))$root
+  # uniroot(function(x) { Theta(x)-L(x) }, c(0.3,1))$root
+  # uniroot(function(x) { Theta(x)-perp(x) }, c(0.35,0.5))$root
+  
+  # Find parabola coefficients
+  # coefficients(lm(
+  #   y ~ x+I(x^2),
+  #   data = data.frame(
+  #     x = c(0.152, 0.715, 0.427),
+  #     y = c(L(0.152), L(0.715), perp(0.427))
+  #   )
+  # ))
+  
+  x <- seq(0,1,0.001)
+  L <- Vectorize(function(x) { 0.272 + 0.318*x })
+  Theta <- Vectorize(function(x) { exp(10*x)/(1+exp(10*x))-0.5 })
+  perp <- Vectorize(function(x) { 1.775 - 3.145*x })
+  Q <- Vectorize(function(x) { 0.2386564 + 0.5840004*x - 0.3068056*x^2 })
+  
+  df_plot <- data.frame(
+    x = rep(x,3),
+    y = c(L(x), Theta(x), Q(x)),
+    which = rep(c("Linear", "Theta_0", "Quadratic"), each=length(x))
+  )
+  
+  # Export 7.5" x 5"
+  ggplot(df_plot, aes(x=x, y=y, color=which)) +
+    geom_line() +
+    geom_line(
+      data = data.frame(
+        x = c(0.39,0.47),
+        y = perp(c(0.39,0.47)),
+        which = rep(NA,2)
+      ),
+      color = "grey",
+      linetype = "dashed"
+    ) +
+    geom_point(
+      data = data.frame(
+        # Cross 1, cross 2, lin midpoint, perp curve, parab point
+        x = c(0.152, 0.715, 0.434, 0.411, 0.427),
+        y = c(L(0.152), L(0.715), L(0.434), perp(0.411), perp(0.427)),
+        which = c("1", "1", "2", "3", "4")
+      ),
+      show.legend = F,
+      size = 2
+    ) +
+    scale_color_manual(
+      values=c("Linear"="turquoise", "Theta_0"="salmon",
+               "Quadratic"="darkorchid1", "1"="orange", "2"="dodgerblue1",
+               "3"="forestgreen", "4"="red"),
+      breaks = c("Linear", "Theta_0", "Quadratic")
+    ) +
+    labs(color="Function") +
+    theme(legend.position="bottom")
+    # ylim(0,1)
+
+  
+  
+  
+  
+}
+
+
+

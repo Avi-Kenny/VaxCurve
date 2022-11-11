@@ -1268,15 +1268,16 @@ if (cfg2$run_hyptest) {
   
   test_results <- test_2(
     dat_orig = dat_orig,
-    alt_type = "two-tailed", # "decr"
+    alt_type = "decr",
+    # alt_type = "two-tailed",
     params = list(
-      type = c("simple (with constant)", "edge", "combined"), # "S-weighted (with constant)"
+      type = c("simple (with constant)", "edge", "combined", "combined 2"), # "S-weighted (with constant)"
       q_n_type = "zero",
       Q_n_type = "Super Learner"
     )
   )
   
-  if (T) {
+  if (F) {
     saveRDS(
       test_results,
       paste0(cfg2$analysis," plots/test_results_",cfg2$tid,".rds")

@@ -2,24 +2,36 @@
 # DWD
 if (F) {
   
-  summ2 <- sim %>% summarize(
-    mean=list(
-      list(name="srv_x1", x="srv_x1"),
-      list(name="srv_x2", x="srv_x2"),
-      list(name="srv_xs", x="srv_s"),
-      list(name="cns_x1", x="cns_x1"),
-      list(name="cns_x2", x="cns_x2"),
-      list(name="cns_xs", x="cns_s")
-    ),
-    sd=list(
-      list(name="sd_srv_x1", x="srv_x1"),
-      list(name="sd_srv_x2", x="srv_x2"),
-      list(name="sd_srv_xs", x="srv_s"),
-      list(name="sd_cns_x1", x="cns_x1"),
-      list(name="sd_cns_x2", x="cns_x2"),
-      list(name="sd_cns_xs", x="cns_s")
-    )
+  k <- 10
+  x <- seq(0,1,0.001)
+  y <- x^k
+  cf <- coefficients(lm(y~x))
+  L <- Vectorize(function(x) { cf[[1]] + cf[[2]]*x })
+  df_plot <- data.frame(
+    x = rep(x,2),
+    y = c(y, L(x)),
+    which = rep(c("points", "linear fit"), each=length(x))
   )
+  plot_1 <- ggplot(df_plot, aes(x=x, y=y, color=which)) + geom_line() +
+    # labs(title=paste0("Y=X^",k,", Slope: ", round(cf[[2]], 3))) +
+    labs(title=paste0("Vertical LS, Slope: ", round(cf[[2]], 3))) +
+    xlim(0,1) + ylim(0,1) + theme(legend.position="bottom")
+  
+  y2 <- x
+  x2 <- y
+  cf2 <- coefficients(lm(y2~x2))
+  L2 <- Vectorize(function(x) { cf2[[1]] + cf2[[2]]*x })
+  df_plot2 <- data.frame(
+    x = rep(x2,2),
+    y = c(y2, L2(x2)),
+    which = rep(c("points", "linear fit"), each=length(x2))
+  )
+  plot_2 <- ggplot(df_plot2, aes(x=y, y=x, color=which)) + geom_line() +
+    # labs(title=paste0("Y=X^(1/",k,") or Slope: ", round(cf2[[2]], 3))) +
+    labs(title=paste0("Horizontal LS, Slope: ", round(cf2[[2]], 3))) +
+    xlim(0,1) + ylim(0,1) + theme(legend.position="bottom")
+  
+  ggarrange(plot_1, plot_2)
   
 }
 

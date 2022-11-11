@@ -366,10 +366,6 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params, test_stat_only=F) {
     beta_star_n <- sqrt(n_orig/(2+2*rho_n)) *
       (beta_n/sigma_bn + beta_en/sigma_ben)
     
-    # # !!!!!
-    # beta_star_n2 <- sqrt(n_orig) * beta_n/sigma_bn
-    # beta_star_n3 <- sqrt(n_orig) * beta_en/sigma_ben
-    
     res[[length(res)+1]] <- list(
       type = "combined 2",
       p_val = compute_p_val(alt_type, beta_star_n, 1),
@@ -385,7 +381,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params, test_stat_only=F) {
   if ("mixed boot" %in% p$type) {} # !!!!! Archived for now
   if ("debug" %in% p$type) {} # !!!!! Archived for now
   
-  if (F) {
+  if (T) {
     res$extras <- list(
       Theta_1.0 = Theta_os_n(1),
       r_Mn_0.0 = r_Mn_edge_est,

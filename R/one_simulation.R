@@ -96,8 +96,8 @@ if (cfg$which_sim=="testing") {
     
     # Parse results object
     res <- list()
-    for (i in c(1:length(test_results))) {
-    # for (i in c(1:(length(test_results)-1))) { # !!!!!
+    # for (i in c(1:length(test_results))) {
+    for (i in c(1:(length(test_results)-1))) { # !!!!!
       r <- test_results[[i]]
       res[[paste0("type_",i)]] <- r$type
       res[[paste0("reject_",i)]] <- as.integer(r$p_val<0.05)
@@ -106,7 +106,7 @@ if (cfg$which_sim=="testing") {
       res[[paste0("var_n_",i)]] <- r$var_n
     }
     
-    if (F) {
+    if (T) {
       res$Theta_1.0 <- test_results$extras$Theta_1.0
       res$r_Mn_0.0 <- test_results$extras$r_Mn_0.0
       res$r_M0_0.0 <- attr(dat_orig,"r_M0")[1]

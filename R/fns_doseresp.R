@@ -1850,8 +1850,8 @@ construct_infl_fn_beta_n <- function(infl_fn_Theta) {
     
     return((1/m) * sum(
       infl_fn_Theta(u=u_mc, x_m, y_m, delta_m, s_m, weight_m) * (
-        (lambda_3-lambda_1*lambda_2)*(u_mc-lambda_1) +
-          (lambda_1^2-lambda_2)*(u_mc^2-lambda_2)
+        (lambda_1*lambda_2-lambda_3)*(u_mc-lambda_1) +
+          (lambda_2-lambda_1^2)*(u_mc^2-lambda_2)
       ))
     )
     

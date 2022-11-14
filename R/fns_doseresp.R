@@ -1356,16 +1356,6 @@ construct_f_sIx_n <- function(dat, vals=NA, type, k=0, z1=F,
   
   if (z1) { dat$weights <- rep(1, length(dat$weights)) }
   
-  # Create normalization factor (to multiply density by if there is a point mass
-  # at the edge)
-  # !!!!! Check whether this is still needed; probably not
-  if (edge_corr=="none") {
-    norm_factor <- 1
-  } else {
-    norm_factor <- sum(dat$s!=0)/length(dat$s)
-    dat <- ss(dat, which(dat$s!=0))
-  }
-  
   if (type=="true") {
     
     # Note: this is not accurate if edge!="none"
@@ -1996,6 +1986,37 @@ construct_g_sn <- function(dat, vals=NA, type, f_sIx_n=NA, cutoffs=NA) {
 }
 
 
+#' Construct estimator of nuisance g_sn
+#' 
+#' @param x TO DO
+#' @return TO DO
+construct_g_sn2 <- function(dat, f_n_srv, g_n, p_n, vals=NA) {
+  
+  n_orig <- sum(dat$weights)
+  
+  fnc <- function(x, y, delta) {
+    
+    num <- f_n_srv(y, delta, x, 0) * g_n(0,x) * (1-p_n)
+    den <- (1/n_orig) * sum(unlist(lapply(c(1:length(dat$s)), function(i) {
+      dat$weights[i] * f_n_srv(y, delta, x, dat$s[i]) * g_n(dat$s[i],x)
+    })))
+    
+    return(num/den)
+    
+    # if (denom==0) {
+    #   return (0)
+    # } else {
+    #   num <- sum(dat$weights*q_n_star_*f_n_srv_*g_n_)
+    #   return(num/denom)
+    # }
+    
+  }
+  
+  return(construct_superfunc(fnc, aux=NA, vec=c(2,1,1), vals=vals))
+  
+}
+
+
 
 #' Construct estimator of g_z0(x,s) = P(Z=1|X=x,S=s)
 #' 
@@ -2098,6 +2119,50 @@ r_Mn_edge <- function(dat, g_sn, Q_n, omega_n, val=0) {
 
 
 
+#' Compute one-step estimator of counterfactual survival at S=0
+#' 
+#' @param dat Subsample of dataset returned by ss() for which z==1
+#' @param g_sn Propensity score estimator returned by construct_g_sn()
+#' @param Q_n Conditional survival function estimator returned by construct_Q_n
+#' @param omega_n A nuisance influence function returned by construct_omega_n()
+#' @param val Value of S
+#' @return Value of one-step estimator
+r_Mn_edge2 <- function(dat_orig, dat, g_sn, g_n, p_n, Q_n, omega_n, val=0) {
+  
+  n_orig <- sum(dat$weights)
+  
+  v <- 0
+  for (i in c(1:n_orig)) {
+    
+    z_i <- dat_orig$z[i]
+    weight_i <- dat_orig$weights[i]
+    if (z_i==0) {
+      s_i <- 0
+      pi_i <- 1
+    } else {
+      s_i <- dat_orig$s[i]
+      pi_i <- 1/weight_i
+    }
+    x_i <- as.numeric(dat_orig$x[i,])
+    y_i <- dat_orig$y[i]
+    delta_i <- dat_orig$delta[i]
+    
+    v <- v + Q_n(C$t_0,x_i,s=val) + (
+      ( z_i*In(s_i==val) + g_sn(x_i, y_i, delta_i)*(pi_i-z_i) ) *
+        omega_n(x_i,s=val,y_i,delta_i)
+    ) / (pi_i * (1-p_n) * g_n(val,x_i))
+    
+    # print(paste0("i= ",i,"; v=",v))
+    
+  }
+  v <- v / n_orig
+  
+  return(1-v)
+  
+}
+
+
+
 #' Construct influence function corresponding to r_Mn_edge
 #' 
 #' @param Q_n Conditional survival function estimator returned by construct_Q_n
@@ -2123,6 +2188,42 @@ construct_infl_fn_r_Mn_edge <- function(Q_n, g_sn, omega_n, r_Mn_edge_est,
   }
   
   return(construct_superfunc(fnc, aux=NA, vec=c(1,1,2,1,1), vals=vals))
+  
+}
+
+
+
+#' Construct influence function corresponding to r_Mn_edge
+#' 
+#' @param Q_n Conditional survival function estimator returned by construct_Q_n
+#' @param g_sn Propensity score estimator returned by construct_g_sn()
+#' @param omega_n A nuisance influence function returned by construct_omega_n()
+#' @param r_Mn_edge_est Estimate returned by one-step estimator r_Mn_edge()
+#' @param val Value of S
+#' @return Value of one-step estimator
+construct_infl_fn_r_Mn_edge2 <- function(Q_n, g_sn, omega_n, g_n,
+                                         r_Mn_edge_est, p_n, val=0, vals=NA) {
+  
+  fnc <- function(z, weight, s, x, y, delta) {
+    
+    if (z==0) {
+      s <- 0
+      pi_ <- 1
+    } else {
+      pi_ <- 1/weight
+    }
+    
+    return(
+      1 - Q_n(C$t_0, x, s=val) + (
+        ( z*In(s==val) + g_sn(x, y, delta)*(pi_-z) ) *
+          omega_n(x,s=val,y,delta)
+      ) / (pi_ * (1-p_n) * g_n(val,x)) -
+        r_Mn_edge_est
+    )
+    
+  }
+  
+  return(construct_superfunc(fnc, aux=NA, vec=c(1,1,1,2,1,1), vals=vals))
   
 }
 

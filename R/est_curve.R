@@ -101,15 +101,15 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     } # DEBUG
     
     f_sIx_n <- construct_f_sIx_n(dat, vlist$SX_grid, type=p$g_n_type,
-                                 k=p$f_sIx_n_bins, edge_corr=p$edge_corr,
-                                 s_scale=s_scale, s_shift=s_shift)
+                                 k=p$f_sIx_n_bins, s_scale=s_scale,
+                                 s_shift=s_shift)
     f_s_n <- construct_f_s_n(dat_orig, vlist$S_grid, f_sIx_n)
     g_n <- construct_g_n(f_sIx_n, f_s_n)
     chk(5)
     dat2 <- ss(dat, which(dat$s!=0))
     Phi_n <- construct_Phi_n(dat2, type=p$ecdf_type)
     n_orig <- length(dat_orig$z)
-    p_n <- (1/n_orig) * sum(dat$weights * as.integer(dat$s!=0))
+    p_n <- (1/n_orig) * sum(dat$weights * In(dat$s!=0))
     eta_n <- construct_eta_n(dat, Q_n, p_n, vals=NA)
     r_tilde_Mn <- construct_r_tilde_Mn(dat_orig, vals=vlist$S_grid, Q_n)
     chk(6)

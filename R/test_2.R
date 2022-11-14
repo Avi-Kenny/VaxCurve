@@ -50,8 +50,8 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params, test_stat_only=F) {
   omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n, type=p$omega_n_type)
   etastar_n <- construct_etastar_n(Q_n, vals=NA)
   f_sIx_n <- construct_f_sIx_n(dat, vlist$SX_grid, type=p$g_n_type,
-                               k=p$f_sIx_n_bins, edge_corr="none",
-                               s_scale=s_scale, s_shift=s_shift)
+                               k=p$f_sIx_n_bins, s_scale=s_scale,
+                               s_shift=s_shift)
   f_n_srv <- construct_f_n_srv(Q_n=Q_n, Qc_n=Qc_n)
   q_tilde_n <- construct_q_tilde_n(type=p$q_n_type, f_n_srv, f_sIx_n,
                                    omega_n)

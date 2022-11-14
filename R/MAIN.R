@@ -13,10 +13,10 @@
 #                  cwolock/survML
 cfg <- list(
   main_task = "run", # run update analysis.R
-  which_sim = "edge", # "estimation" "edge" "testing" "Cox" "debugging"
-  level_set_which = "level_set_edge_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
+  which_sim = "estimation", # "estimation" "edge" "testing" "Cox" "debugging"
+  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
   # keep = c(1:3,7:9,16:18,22:24),
-  num_sim = 500,
+  num_sim = 1000,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
            "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm", "tidyr",
@@ -93,18 +93,18 @@ if (load_pkgs_local) {
 if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Estimation: ideal params
+  # For edge sims, use edge="expit 0.4" and edge_corr="min"
   level_set_estimation_1 <- list(
-    n = 500, # 1000
+    n = 1000,
     alpha_3 = -2,
-    dir = c("decr"), # "incr"
+    dir = c("decr"),
     sc_params = list("sc_params"=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5)),
     # sc_params = list("no cens"=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5)),
     # sc_params = list("exp"=list(lmbd=1e-3, v=1.5, lmbd2=5e-4, v2=1.5)),
-    # distr_S = "N(0.5,0.04)",
     distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
-    edge = c("none"), # "expit 0.4"
-    surv_true = "Complex", # "Cox PH" "Complex" "exp"
-    sampling = c("iid"), # "two-phase (50%)"
+    edge = c("expit 0.4"), #  "none" "expit 0.4"
+    surv_true = c("Cox PH", "Complex"), # "Cox PH" "Complex" "exp"
+    sampling = c("two-phase (50%)"), # "two-phase (50%)"
     wts_type = c("estimated"), # c("true", "estimated")
     estimator = list(
       "Grenander (GCM)" = list(
@@ -114,12 +114,12 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
           Q_n_type = "Cox PH", # "Random Forest", "true"
           convex_type = "GCM", # "CLS"
           ecdf_type = "linear (mid)",
-          edge_corr = "none", # "min"
+          edge_corr = "min", # "none" "min"
           deriv_type = "m-spline",
-          g_n_type = "parametric" # "binning" "true"
+          g_n_type = "binning" # "binning" "true"
         )
-      )
-      # "Cox PH" = list(est="Cox gcomp")
+      ),
+      "Cox PH" = list(est="Cox gcomp")
       # "Qbins (true)" = list(
       #   est = "Qbins",
       #   params = list(n_bins=8, Q_n_type="Cox PH")
@@ -219,7 +219,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Estimation: ideal params
   level_set_edge_1 <- list(
-    n = 1000,
+    n = 3000, # 1000
     alpha_3 = -2,
     dir = "decr",
     sc_params = list("sc_params"=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5)),
@@ -228,17 +228,21 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     surv_true = "Cox PH",
     sampling = c("two-phase (50%)"), # iid
     wts_type = "estimated", # c("true", "estimated")
+    simtype = "new", # !!!!!
+    # simtype = c("old", "new"), # !!!!!
     estimator = list(
       "Grenander (GCM)" = list(
         est = "Grenander",
         params = list(
-          q_n_type = "zero",
+          # q_n_type = "zero",
           Q_n_type = "Cox PH",
-          convex_type = "GCM",
-          ecdf_type = "linear (mid)",
-          edge_corr = "none",
-          deriv_type = "m-spline",
+          omega_n_type = "estimated",
           g_n_type = "binning"
+          # convex_type = "GCM",
+          # ecdf_type = "linear (mid)",
+          # edge_corr = "none",
+          # deriv_type = "m-spline",
+          # g_n_type = "binning"
         )
       )
     )
@@ -799,18 +803,14 @@ if (F) {
   
   # Summarize results
   summ <- sim %>% summarize(
-    bias_pct = list(
-      name = "bias_pct",
-      estimate = "r_Mn",
-      truth = "r_M0"
-    ),
-    coverage = list(
-      name = "coverage",
-      truth = "r_M0",
-      lower = "ci_lo",
-      upper = "ci_hi"
-      # na.rm = T
-    )
+    mean = list(name="sd_est", x="sigma2_edge_est", na.rm=T),
+    sd = list(name="sd_emp", x="r_Mn", na.rm=T),
+    bias_pct = list(name="bias_pct", estimate="r_Mn", truth="r_M0", na.rm=T),
+    coverage = list(name="coverage", truth="r_M0", lower="ci_lo",
+                    upper="ci_hi", na.rm=T)
+  )
+  summ %<>% mutate(
+    sd_est = sqrt(sd_est/n)
   )
   summ
   

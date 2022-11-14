@@ -2,36 +2,25 @@
 # DWD
 if (F) {
   
-  k <- 10
-  x <- seq(0,1,0.001)
-  y <- x^k
-  cf <- coefficients(lm(y~x))
-  L <- Vectorize(function(x) { cf[[1]] + cf[[2]]*x })
-  df_plot <- data.frame(
-    x = rep(x,2),
-    y = c(y, L(x)),
-    which = rep(c("points", "linear fit"), each=length(x))
+  x_old <- (filter(sim$results, simtype=="old"))$r_Mn
+  x_new <- (filter(sim$results, simtype=="new"))$r_Mn
+  df <- data.frame(
+    x = c(x_old, x_new),
+    grp = rep(c("old", "new"), each=length(x_old))
   )
-  plot_1 <- ggplot(df_plot, aes(x=x, y=y, color=which)) + geom_line() +
-    # labs(title=paste0("Y=X^",k,", Slope: ", round(cf[[2]], 3))) +
-    labs(title=paste0("Vertical LS, Slope: ", round(cf[[2]], 3))) +
-    xlim(0,1) + ylim(0,1) + theme(legend.position="bottom")
   
-  y2 <- x
-  x2 <- y
-  cf2 <- coefficients(lm(y2~x2))
-  L2 <- Vectorize(function(x) { cf2[[1]] + cf2[[2]]*x })
-  df_plot2 <- data.frame(
-    x = rep(x2,2),
-    y = c(y2, L2(x2)),
-    which = rep(c("points", "linear fit"), each=length(x2))
-  )
-  plot_2 <- ggplot(df_plot2, aes(x=y, y=x, color=which)) + geom_line() +
-    # labs(title=paste0("Y=X^(1/",k,") or Slope: ", round(cf2[[2]], 3))) +
-    labs(title=paste0("Horizontal LS, Slope: ", round(cf2[[2]], 3))) +
-    xlim(0,1) + ylim(0,1) + theme(legend.position="bottom")
+  ggplot(df, aes(x=x, group=grp, fill=factor(grp))) +
+    geom_histogram(color="white") +
+    facet_wrap(~grp, ncol=2)
   
-  ggarrange(plot_1, plot_2)
+  sd(x_old) # 0.0346
+  sd(x_new) # 0.0329
+  mean(sqrt(
+    (filter(sim$results, simtype=="old"))$sigma2_edge_est/1000
+  )) # 0.0372
+  mean(sqrt(
+    (filter(sim$results, simtype=="new"))$sigma2_edge_est/1000
+  )) # 0.0284
   
 }
 

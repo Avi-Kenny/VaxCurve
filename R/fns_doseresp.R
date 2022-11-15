@@ -1351,8 +1351,8 @@ construct_q_tilde_n <- function(type="new", f_n_srv=NA, f_sIx_n=NA,
 #' @return Conditional density estimator function
 #' @notes
 #'   - Assumes support of A is [0,1]
-construct_f_sIx_n <- function(dat, vals=NA, type, k=0, z1=F,
-                              edge_corr="none", s_scale=1, s_shift=0) {
+construct_f_sIx_n <- function(dat, vals=NA, type, k=0, z1=F, s_scale=1,
+                              s_shift=0) {
   
   if (z1) { dat$weights <- rep(1, length(dat$weights)) }
   
@@ -1429,6 +1429,51 @@ construct_f_sIx_n <- function(dat, vals=NA, type, k=0, z1=F,
       return( dtruncnorm(s, a=0, b=1, mean=mu, sd=sigma) )
     }
     
+  } else if (type=="parametric (edge)") {
+    
+    # Density for a single observation
+    dens_s <- function(s, x, prm) {
+      mu <- sum( c(1,x) * c(expit(prm[1]),prm[2:(length(x)+1)]) )
+      sigma <- 10*expit(prm[length(prm)])
+      return( dtruncnorm(s, a=C$appx$s, b=1, mean=mu, sd=sigma) )
+    }
+    
+    # Estimate p_0 
+    n_orig <- sum(dat$weights)
+    p_n <- (1/n_orig) * sum(dat$weights * In(dat$s!=0))
+    
+    # Filter out observations with s==0
+    dat <- ss(dat, which(dat$s!=0))
+    
+    # Set up weighted likelihood
+    wlik <- function(prm) {
+      -1 * sum(sapply(c(1:length(dat$s)), function(i) {
+        dat$weights[i] *
+          log(pmax(dens_s(s=dat$s[i], x=as.numeric(dat$x[i,]), prm),1e-8))
+      }))
+    }
+    
+    # Run optimizer
+    opt <- solnp(
+      pars = c(rep(0, length(dat$x)+1), 0.15),
+      fun = wlik
+    )
+    if (opt$convergence!=0) {
+      warning("construct_f_sIx_n: solnp() did not converge")
+    }
+    prm <- opt$pars
+    
+    # Remove large intermediate objects
+    rm(dat,dens_s,opt)
+    
+    fnc <- function(s, x) {
+      mu <- sum( c(1,x) * c(expit(prm[1]),prm[2:(length(x)+1)]) )
+      sigma <- 10*expit(prm[length(prm)])
+      pc_1 <- In(s==0) * ( (1-p_n) / C$appx$s )
+      pc_2 <- In(s!=0) * p_n * dtruncnorm(s, a=0, b=1, mean=mu, sd=sigma)
+      return(pc_1+pc_2)
+    }
+    
   } else if (type=="binning") {
     
     # Set up binning density (based on Diaz and Van Der Laan 2011)
@@ -1478,7 +1523,7 @@ construct_f_sIx_n <- function(dat, vals=NA, type, k=0, z1=F,
         p1 <- ifelse(bin==k, 1, hz[bin])
         p2 <- ifelse(bin==1, 1, prod(1-hz[1:(bin-1)]))
         
-        return(norm_factor*k*p1*p2)
+        return(k*p1*p2)
         
       }
       
@@ -1882,115 +1927,115 @@ construct_Gamma_cf <- function(dat_orig, params, vlist) {
 
 
 
-#' Construct propensity score estimator of g_s0 = P(S=0|X=x)
-#' 
-#' @param dat Subsample of dataset returned by ss() for which z==1
-#' @param vals List of values to pre-compute function on; passed to
-#'     construct_superfunc(); REQUIRED FOR SUPERLEARNER
-#' @param type One of c("true", "logistic", "Super Learner", "generalized"). If
-#'     type=="true", the only valid value is zero. If type=="generalized", the
-#'     arguments `f_sIx_n` and `cutoffs` must also be supplied.
-#' @return Propensity score estimator of g_s0
-#' @notes For all types except for "generalized", this function constructs the
-#'     probability P(S=0|X=x). The type "generalized" constructs the probability
-#'     P(S=s|X=x) for a generic value a that has positive mass.
-construct_g_sn <- function(dat, vals=NA, type, f_sIx_n=NA, cutoffs=NA) {
-  
-  # Construct indicator I{S=0}
-  ind_S0 <- In(dat$s==0)
-  
-  if (type=="true") {
-    
-    # Note: These are only valid for val==0
-    if (L$edge=="expit") {
-      fnc <- function(x, val) {
-        if (val==0) { expit(x[1]+x[2]-3.3) }
-      }
-    } else if (L$edge=="expit2") {
-      fnc <- function(x, val) {
-        if (val==0) { expit(x[1]+x[2]-1) }
-      }
-    } else if (L$edge=="Complex") {
-      fnc <- function(x, val) {
-        if (val==0) { 0.84*x[2]*pmax(0,1-4*abs(x[1]-0.5)) }
-      }
-    } else if (L$edge=="none") {
-      fnc <- function(x, val) {
-        if (val==0) { 0 }
-      }
-    }
-    
-  } else if (type=="logistic") {
-    
-    fml <- "ind_S0~1"
-    for (i in 1:length(dat$x)) {
-      fml <- paste0(fml, "+x",i)
-    }
-    fml <- formula(fml)
-    df <- cbind(ind_S0, dat$x)
-    suppressWarnings({
-      model <- glm(
-        fml,
-        data = df,
-        family = "binomial",
-        weights = dat$weights
-      )
-    })
-    coeffs <- model$coefficients
-    
-    # !!!!! val is unused
-    fnc <- function(x, val) { as.numeric(expit(coeffs %*% c(1,x))) }
-    
-  } else if (type=="SL") {
-    
-    # sl <- SuperLearner(
-    #   Y = ind_S0,
-    #   X = dat$x,
-    #   newX = vals,
-    #   family = binomial(),
-    #   SL.library = "SL.earth", # SL.glm SL.gbm SL.ranger SL.earth
-    #   # SL.library = c("SL.earth", "SL.gam", "SL.ranger"), # SL.glm SL.gbm SL.ranger SL.earth
-    #   obsWeights = dat$weights,
-    #   control = list(saveFitLibrary=FALSE)
-    # )
-    # assign("sl", sl, envir=.GlobalEnv) # ?????
-    # 
-    # fnc <- function(x, val) {
-    #   
-    #   r <- list()
-    #   for (i in 1:length(x)) {
-    #     r[[i]] <- which(abs(x[i]-newX[[paste0("x",i)]])<1e-8)
-    #   }
-    #   index <- Reduce(intersect, r)
-    #   return(sl$SL.predict[index])
-    # }
-    
-  } else if (type=="generalized") {
-    
-    fnc <- function(x, val) {
-      
-      # val should be an index of the bin
-      bin_start <- cutoffs[as.numeric(val)]
-      bin_stop <- cutoffs[as.numeric(val)+1]
-      grid <- seq(bin_start, bin_stop, length.out=11)[1:10]
-      avg_height <- mean(sapply(grid, function(s) { f_sIx_n(s, x=x) }))
-      
-      return((bin_stop-bin_start)*avg_height)
-      
-    }
-    
-  }
-  
-  return(construct_superfunc(fnc, aux=NA, vec=c(2,1), vals=vals))
-  
-}
+#' #' Construct propensity score estimator of g_s0 = P(S=0|X=x)
+#' #' 
+#' #' @param dat Subsample of dataset returned by ss() for which z==1
+#' #' @param vals List of values to pre-compute function on; passed to
+#' #'     construct_superfunc(); REQUIRED FOR SUPERLEARNER
+#' #' @param type One of c("true", "logistic", "Super Learner", "generalized"). If
+#' #'     type=="true", the only valid value is zero. If type=="generalized", the
+#' #'     arguments `f_sIx_n` and `cutoffs` must also be supplied.
+#' #' @return Propensity score estimator of g_s0
+#' #' @notes For all types except for "generalized", this function constructs the
+#' #'     probability P(S=0|X=x). The type "generalized" constructs the probability
+#' #'     P(S=s|X=x) for a generic value a that has positive mass.
+#' construct_g_sn <- function(dat, vals=NA, type, f_sIx_n=NA, cutoffs=NA) {
+#'   
+#'   # Construct indicator I{S=0}
+#'   ind_S0 <- In(dat$s==0)
+#'   
+#'   if (type=="true") {
+#'     
+#'     # Note: These are only valid for val==0
+#'     if (L$edge=="expit") {
+#'       fnc <- function(x, val) {
+#'         if (val==0) { expit(x[1]+x[2]-3.3) }
+#'       }
+#'     } else if (L$edge=="expit2") {
+#'       fnc <- function(x, val) {
+#'         if (val==0) { expit(x[1]+x[2]-1) }
+#'       }
+#'     } else if (L$edge=="Complex") {
+#'       fnc <- function(x, val) {
+#'         if (val==0) { 0.84*x[2]*pmax(0,1-4*abs(x[1]-0.5)) }
+#'       }
+#'     } else if (L$edge=="none") {
+#'       fnc <- function(x, val) {
+#'         if (val==0) { 0 }
+#'       }
+#'     }
+#'     
+#'   } else if (type=="logistic") {
+#'     
+#'     fml <- "ind_S0~1"
+#'     for (i in 1:length(dat$x)) {
+#'       fml <- paste0(fml, "+x",i)
+#'     }
+#'     fml <- formula(fml)
+#'     df <- cbind(ind_S0, dat$x)
+#'     suppressWarnings({
+#'       model <- glm(
+#'         fml,
+#'         data = df,
+#'         family = "binomial",
+#'         weights = dat$weights
+#'       )
+#'     })
+#'     coeffs <- model$coefficients
+#'     
+#'     # !!!!! val is unused
+#'     fnc <- function(x, val) { as.numeric(expit(coeffs %*% c(1,x))) }
+#'     
+#'   } else if (type=="SL") {
+#'     
+#'     # sl <- SuperLearner(
+#'     #   Y = ind_S0,
+#'     #   X = dat$x,
+#'     #   newX = vals,
+#'     #   family = binomial(),
+#'     #   SL.library = "SL.earth", # SL.glm SL.gbm SL.ranger SL.earth
+#'     #   # SL.library = c("SL.earth", "SL.gam", "SL.ranger"), # SL.glm SL.gbm SL.ranger SL.earth
+#'     #   obsWeights = dat$weights,
+#'     #   control = list(saveFitLibrary=FALSE)
+#'     # )
+#'     # assign("sl", sl, envir=.GlobalEnv) # ?????
+#'     # 
+#'     # fnc <- function(x, val) {
+#'     #   
+#'     #   r <- list()
+#'     #   for (i in 1:length(x)) {
+#'     #     r[[i]] <- which(abs(x[i]-newX[[paste0("x",i)]])<1e-8)
+#'     #   }
+#'     #   index <- Reduce(intersect, r)
+#'     #   return(sl$SL.predict[index])
+#'     # }
+#'     
+#'   } else if (type=="generalized") {
+#'     
+#'     fnc <- function(x, val) {
+#'       
+#'       # val should be an index of the bin
+#'       bin_start <- cutoffs[as.numeric(val)]
+#'       bin_stop <- cutoffs[as.numeric(val)+1]
+#'       grid <- seq(bin_start, bin_stop, length.out=11)[1:10]
+#'       avg_height <- mean(sapply(grid, function(s) { f_sIx_n(s, x=x) }))
+#'       
+#'       return((bin_stop-bin_start)*avg_height)
+#'       
+#'     }
+#'     
+#'   }
+#'   
+#'   return(construct_superfunc(fnc, aux=NA, vec=c(2,1), vals=vals))
+#'   
+#' }
 
 
 #' Construct estimator of nuisance g_sn
 #' 
 #' @param x TO DO
 #' @return TO DO
-construct_g_sn2 <- function(dat, f_n_srv, g_n, p_n, vals=NA) {
+construct_g_sn <- function(dat, f_n_srv, g_n, p_n, vals=NA) {
   
   n_orig <- sum(dat$weights)
   
@@ -2001,14 +2046,11 @@ construct_g_sn2 <- function(dat, f_n_srv, g_n, p_n, vals=NA) {
       dat$weights[i] * f_n_srv(y, delta, x, dat$s[i]) * g_n(dat$s[i],x)
     })))
     
-    return(num/den)
+    if (den==0) {
+      warning("Denominator of zero in g_sn()")
+    }
     
-    # if (denom==0) {
-    #   return (0)
-    # } else {
-    #   num <- sum(dat$weights*q_n_star_*f_n_srv_*g_n_)
-    #   return(num/denom)
-    # }
+    return(num/den)
     
   }
   
@@ -2093,29 +2135,29 @@ construct_g_zn <- function(dat_orig, vals=NA, type="Super Learner",
 
 
 
-#' Compute one-step estimator of counterfactual survival at S=0
-#' 
-#' @param dat Subsample of dataset returned by ss() for which z==1
-#' @param g_sn Propensity score estimator returned by construct_g_sn()
-#' @param Q_n Conditional survival function estimator returned by construct_Q_n
-#' @param omega_n A nuisance influence function returned by construct_omega_n()
-#' @param val Value of S
-#' @return Value of one-step estiamtor
-r_Mn_edge <- function(dat, g_sn, Q_n, omega_n, val=0) {
-  
-  n_orig <- sum(dat$weights)
-  n_dat <- nrow(dat$x)
-  
-  return(
-    1 - (1/n_orig) * sum(dat$weights * (
-      Q_n(rep(C$t_0,n_dat),dat$x,s=rep(val,n_dat)) - (
-        (In(dat$s==val)/g_sn(dat$x, rep(val,n_dat))) *
-          omega_n(dat$x,s=rep(val,n_dat),dat$y,dat$delta)
-      )
-    ))
-  )
-  
-}
+#' #' Compute one-step estimator of counterfactual survival at S=0
+#' #' 
+#' #' @param dat Subsample of dataset returned by ss() for which z==1
+#' #' @param g_sn Propensity score estimator returned by construct_g_sn()
+#' #' @param Q_n Conditional survival function estimator returned by construct_Q_n
+#' #' @param omega_n A nuisance influence function returned by construct_omega_n()
+#' #' @param val Value of S
+#' #' @return Value of one-step estiamtor
+#' r_Mn_edge <- function(dat, g_sn, Q_n, omega_n, val=0) {
+#'   
+#'   n_orig <- sum(dat$weights)
+#'   n_dat <- nrow(dat$x)
+#'   
+#'   return(
+#'     1 - (1/n_orig) * sum(dat$weights * (
+#'       Q_n(rep(C$t_0,n_dat),dat$x,s=rep(val,n_dat)) - (
+#'         (In(dat$s==val)/g_sn(dat$x, rep(val,n_dat))) *
+#'           omega_n(dat$x,s=rep(val,n_dat),dat$y,dat$delta)
+#'       )
+#'     ))
+#'   )
+#'   
+#' }
 
 
 
@@ -2127,7 +2169,7 @@ r_Mn_edge <- function(dat, g_sn, Q_n, omega_n, val=0) {
 #' @param omega_n A nuisance influence function returned by construct_omega_n()
 #' @param val Value of S
 #' @return Value of one-step estimator
-r_Mn_edge2 <- function(dat_orig, dat, g_sn, g_n, p_n, Q_n, omega_n, val=0) {
+r_Mn_edge <- function(dat_orig, dat, g_sn, g_n, p_n, Q_n, omega_n, val=0) {
   
   n_orig <- sum(dat$weights)
   
@@ -2163,33 +2205,33 @@ r_Mn_edge2 <- function(dat_orig, dat, g_sn, g_n, p_n, Q_n, omega_n, val=0) {
 
 
 
-#' Construct influence function corresponding to r_Mn_edge
-#' 
-#' @param Q_n Conditional survival function estimator returned by construct_Q_n
-#' @param g_sn Propensity score estimator returned by construct_g_sn()
-#' @param omega_n A nuisance influence function returned by construct_omega_n()
-#' @param r_Mn_edge_est Estimate returned by one-step estimator r_Mn_edge()
-#' @param val Value of S
-#' @return Value of one-step estimator
-construct_infl_fn_r_Mn_edge <- function(Q_n, g_sn, omega_n, r_Mn_edge_est,
-                                        val=0, vals=NA) {
-  
-  fnc <- function(weight, s, x, y, delta) {
-    if (weight==0) {
-      return(0)
-    } else {
-      return(weight * (
-        1 - Q_n(C$t_0,x,s=val) + (
-          (In(s==val)/g_sn(x,val)) * omega_n(x,s=val,y,delta)
-        ) -
-          r_Mn_edge_est
-      ))
-    }
-  }
-  
-  return(construct_superfunc(fnc, aux=NA, vec=c(1,1,2,1,1), vals=vals))
-  
-}
+#' #' Construct influence function corresponding to r_Mn_edge
+#' #' 
+#' #' @param Q_n Conditional survival function estimator returned by construct_Q_n
+#' #' @param g_sn Propensity score estimator returned by construct_g_sn()
+#' #' @param omega_n A nuisance influence function returned by construct_omega_n()
+#' #' @param r_Mn_edge_est Estimate returned by one-step estimator r_Mn_edge()
+#' #' @param val Value of S
+#' #' @return Value of one-step estimator
+#' construct_infl_fn_r_Mn_edge <- function(Q_n, g_sn, omega_n, r_Mn_edge_est,
+#'                                         val=0, vals=NA) {
+#'   
+#'   fnc <- function(weight, s, x, y, delta) {
+#'     if (weight==0) {
+#'       return(0)
+#'     } else {
+#'       return(weight * (
+#'         1 - Q_n(C$t_0,x,s=val) + (
+#'           (In(s==val)/g_sn(x,val)) * omega_n(x,s=val,y,delta)
+#'         ) -
+#'           r_Mn_edge_est
+#'       ))
+#'     }
+#'   }
+#'   
+#'   return(construct_superfunc(fnc, aux=NA, vec=c(1,1,2,1,1), vals=vals))
+#'   
+#' }
 
 
 
@@ -2201,7 +2243,7 @@ construct_infl_fn_r_Mn_edge <- function(Q_n, g_sn, omega_n, r_Mn_edge_est,
 #' @param r_Mn_edge_est Estimate returned by one-step estimator r_Mn_edge()
 #' @param val Value of S
 #' @return Value of one-step estimator
-construct_infl_fn_r_Mn_edge2 <- function(Q_n, g_sn, omega_n, g_n,
+construct_infl_fn_r_Mn_edge <- function(Q_n, g_sn, omega_n, g_n,
                                          r_Mn_edge_est, p_n, val=0, vals=NA) {
   
   fnc <- function(z, weight, s, x, y, delta) {

@@ -9,28 +9,43 @@
   
   # 2. Set global constants
   params <- list(
-    Q_n_type="Cox PH", g_n_type="parametric", ci_type="regular", cf_folds=1,
-    edge_corr="none", ecdf_type="linear (mid)", deriv_type="linear",
-    gamma_type="Super Learner", omega_n_type="estimated",
-    q_n_type="zero" # Gamma_star
+    Q_n_type = "Cox PH", # "Random Forest", "true"
+    convex_type = "GCM", # "CLS"
+    g_n_type = "parametric", # "binning" "parametric" "parametric (edge)" "true"
+    ci_type = "regular",
+    cf_folds = 1,
+    edge_corr = "none", # "none" "min"
+    ecdf_type = "linear (mid)",
+    deriv_type = "m-spline", # "m-spline" "linear"
+    gamma_type = "Super Learner",
+    omega_n_type = "estimated",
+    q_n_type = "zero"
   )
-  C <- list(points=round(seq(0,1,0.02),2), alpha_1=0.5, alpha_2=0.7, t_0=200,
-            appx=list(t_0=10, x_tol=25, s=0.01))
+  C <- list(
+    points = round(seq(0,1,0.02),2),
+    alpha_1 = 0.5,
+    alpha_2 = 0.7,
+    t_0 = 200,
+    appx=list(t_0=10, x_tol=25, s=0.01)
+  )
   L <- list(
-    n=500, alpha_3=0, dir="decr",
-    sc_params=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5), # sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5), # Uncomment this for (almost) no censoring
-    distr_S="Unif(0,1)", edge="expit 0.4", surv_true="Cox PH", # "N(0.3+0.4x2,0.04)"
-    sampling="iid", estimator=list(est="Grenander", params=params), # two-phase (72%)
-    wts_type="true"
-    # n=15000, alpha_3=-4, dir="decr",
-    # sc_params=list(lmbd=3e-5, v=1.5, lmbd2=3e-5, v2=1.5), # sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5), # Uncomment this for (almost) no censoring
-    # distr_S="N(0.5,0.04)", edge="none", surv_true="Cox PH",
-    # sampling="two-phase (50%)", estimator=list(est="Grenander",params=params)
+    n = 1000,
+    alpha_3 = 0,
+    dir = "decr",
+    sc_params = list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5), # sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5), # Uncomment this for (almost) no censoring
+    distr_S = "N(0.3+0.4x2,0.09)", # "Unif(0,1)" "N(0.5,0.04)" "N(0.3+0.4x2,0.09)"
+    edge = "expit 0.4", # "none" "expit 0.4"
+    surv_true = "Cox PH", # "Cox PH" "Complex"
+    sampling = "iid", # "two-phase (50%)"
+    estimator = list(est="Grenander", params=params),
+    wts_type = "estimated"
   )
   
   # 3. Generate dataset
   dat_orig <- generate_data(L$n, L$alpha_3, L$distr_S, L$edge, L$surv_true,
-                            L$sc_params, L$sampling, L$dir) # wts_type="estimated"
+                            L$sc_params, L$sampling, L$dir, L$wts_type)
+  
+  
   dat <- ss(dat_orig, which(dat_orig$z==1))
   vlist <- create_val_list(dat_orig)
   
@@ -1011,6 +1026,58 @@
     theme(legend.position="bottom") +
     labs(color="Estimator", title="Estimation of marginal density: f(S)") +
     ylim(c(0,NA))
+  
+}
+
+
+
+################################################.
+##### Conditional density estimator (edge) #####
+################################################.
+
+{
+  # True conditional density function
+  p_0 <- 0.6 # Should correspond to L$edge
+  f_sIx_0 <- construct_f_sIx_n(dat, NA, type="true", k=15)
+  f_sIx_n_para <- construct_f_sIx_n(dat, NA, type="parametric")
+  f_sIx_n_para2 <- construct_f_sIx_n(dat, NA, type="parametric (edge)")
+  
+  # Generate plot data
+  grid <- round(seq(0,1,0.01),2)
+  f_sIx_models <- c("Truth", "parametric", "parametric (edge)")
+  n_models <- length(f_sIx_models)
+  len <- length(grid)
+  plot_data <- data.frame(
+    s = rep(grid, 4*n_models),
+    density = c(
+      sapply(grid, function(s) { p_0*f_sIx_0(s, x=c(0.2,0)) }),
+      sapply(grid, function(s) { p_0*f_sIx_0(s, x=c(0.8,0)) }),
+      sapply(grid, function(s) { p_0*f_sIx_0(s, x=c(0.2,1)) }),
+      sapply(grid, function(s) { p_0*f_sIx_0(s, x=c(0.8,1)) }),
+      sapply(grid, function(s) { f_sIx_n_para(s, x=c(0.2,0)) }),
+      sapply(grid, function(s) { f_sIx_n_para(s, x=c(0.8,0)) }),
+      sapply(grid, function(s) { f_sIx_n_para(s, x=c(0.2,1)) }),
+      sapply(grid, function(s) { f_sIx_n_para(s, x=c(0.8,1)) }),
+      sapply(grid, function(s) { f_sIx_n_para2(s, x=c(0.2,0)) }),
+      sapply(grid, function(s) { f_sIx_n_para2(s, x=c(0.8,0)) }),
+      sapply(grid, function(s) { f_sIx_n_para2(s, x=c(0.2,1)) }),
+      sapply(grid, function(s) { f_sIx_n_para2(s, x=c(0.8,1)) })
+    ),
+    which = rep(f_sIx_models, each=len*4),
+    covariates = rep(c(
+      rep("X1=0.2, X2=0",len),
+      rep("X1=0.8, X2=0",len),
+      rep("X1=0.2, X2=1",len),
+      rep("X1=0.8, X2=1",len)
+    ), n_models)
+  )
+  ggplot(plot_data, aes(x=s, y=density, color=factor(which))) +
+    geom_line() +
+    facet_wrap(~covariates, ncol=4) +
+    theme(legend.position="bottom") +
+    labs(color="Estimator", title="Estimation of conditional density: f(S|X)") +
+    # ylim(c(0,NA))
+    ylim(c(0,2.5))
   
 }
 

@@ -93,7 +93,8 @@ if (load_pkgs_local) {
 if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Estimation: ideal params
-  # For edge sims, use edge="expit 0.4" and edge_corr="min"
+  # For edge sims, use edge="expit 0.4", edge_corr="min", and either
+  #     g_n_type="binning" or g_n_type="parametric (edge)"
   level_set_estimation_1 <- list(
     n = 1000,
     alpha_3 = -2,
@@ -102,7 +103,8 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     # sc_params = list("no cens"=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5)),
     # sc_params = list("exp"=list(lmbd=1e-3, v=1.5, lmbd2=5e-4, v2=1.5)),
     distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
-    edge = c("expit 0.4"), #  "none" "expit 0.4"
+    edge = c("none"), #  "none" "expit 0.4"
+    # edge = c("expit 0.4"), #  "none" "expit 0.4"
     surv_true = c("Cox PH", "Complex"), # "Cox PH" "Complex" "exp"
     sampling = c("two-phase (50%)"), # "two-phase (50%)"
     wts_type = c("estimated"), # c("true", "estimated")
@@ -114,12 +116,14 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
           Q_n_type = "Cox PH", # "Random Forest", "true"
           convex_type = "GCM", # "CLS"
           ecdf_type = "linear (mid)",
-          edge_corr = "min", # "none" "min"
+          edge_corr = "none", # "none" "min"
+          # edge_corr = "min", # "none" "min"
           deriv_type = "m-spline",
-          g_n_type = "binning" # "binning" "true"
+          g_n_type = "parametric" # "binning" "parametric" "parametric (edge)" "true"
+          # g_n_type = "parametric (edge)" # "binning" "parametric" "parametric (edge)" "true"
         )
-      ),
-      "Cox PH" = list(est="Cox gcomp")
+      )
+      # "Cox PH" = list(est="Cox gcomp")
       # "Qbins (true)" = list(
       #   est = "Qbins",
       #   params = list(n_bins=8, Q_n_type="Cox PH")
@@ -281,16 +285,16 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
 # qsub -hold_jid 1992344 -t 1-600 -v sim_run='main',cluster='bayes',type='R',project='z.VaxCurve' -cwd -e ./io/ -o ./io/ run_r.sh
 # qsub -hold_jid 1992345 -v sim_run='last',cluster='bayes',type='R',project='z.VaxCurve' -cwd -e ./io/ -o ./z.VaxCurve/ run_r.sh
 
+# Set global constants
+C <- list(
+  points = round(seq(0,1,0.02),2), # round(seq(0,1,0.1),2)
+  alpha_1 = 0.5,
+  alpha_2 = 0.7,
+  t_0 = 200,
+  appx = cfg$appx
+)
+
 if (cfg$main_task=="run") {
-  
-  # Set global constants
-  C <- list(
-    points = round(seq(0,1,0.02),2), # round(seq(0,1,0.1),2)
-    alpha_1 = 0.5,
-    alpha_2 = 0.7,
-    t_0 = 200,
-    appx = cfg$appx
-  )
   
   run_on_cluster(
     
@@ -1161,18 +1165,25 @@ if (F) {
       size = 2
     ) +
     scale_color_manual(
+      # values=c("Linear"="turquoise", "Theta_0"="salmon",
+      #          "Quadratic"="darkorchid1", "1"="orange", "2"="dodgerblue1",
+      #          "3"="forestgreen", "4"="red"),
+      # breaks = c("Linear", "Theta_0", "Quadratic")
       values=c("Linear"="turquoise", "Theta_0"="salmon",
                "Quadratic"="darkorchid1", "1"="orange", "2"="dodgerblue1",
                "3"="forestgreen", "4"="red"),
-      breaks = c("Linear", "Theta_0", "Quadratic")
+      breaks = c("Linear", "Theta_0", "Quadratic"),
+      labels = c(unname(TeX("$\\,\\,\\,\\Theta_0^L\\,\\,$")),
+                 unname(TeX("$\\,\\,\\,\\Theta_0\\,\\,$")),
+                 unname(TeX("$\\Q_p$")))
     ) +
-    labs(color="Function") +
+    annotate("text", x=0.175, y=0.3, size=4, label=unname(TeX("$p_1$"))) +
+    annotate("text", x=0.735, y=0.475, size=4, label=unname(TeX("$p_2$"))) +
+    annotate("text", x=0.465, y=0.395, size=4, label=unname(TeX("$p_m$"))) +
+    annotate("text", x=0.43, y=0.51, size=4, label=unname(TeX("$p_i$"))) +
+    annotate("text", x=0.41, y=0.44, size=4, label=unname(TeX("$p$"))) +
+    labs(color="Function: ") +
     theme(legend.position="bottom")
-    # ylim(0,1)
-
-  
-  
-  
   
 }
 

@@ -156,12 +156,13 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     # Construct one-step edge estimator
     if (p$edge_corr!="none") {
       chk(10)
-      g_sn <- construct_g_sn(dat, vlist$X_grid, type="logistic")
-      r_Mn_edge_est <- r_Mn_edge(dat, g_sn, Q_n, omega_n)
-      infl_fn_r_Mn_edge <- construct_infl_fn_r_Mn_edge(Q_n, g_sn, omega_n,
-                                                       r_Mn_edge_est, val=0)
+      g_sn <- construct_g_sn(dat, f_n_srv, g_n, p_n)
+      r_Mn_edge_est <- r_Mn_edge(dat_orig, dat, g_sn, g_n, p_n, Q_n, omega_n)
+      infl_fn_r_Mn_edge <- construct_infl_fn_r_Mn_edge(Q_n, g_sn, omega_n, g_n,
+                                                        r_Mn_edge_est, p_n)
       sigma2_edge_est <- (1/n_orig) * sum((
-        infl_fn_r_Mn_edge(dat$weights, dat$s, dat$x, dat$y, dat$delta)
+        infl_fn_r_Mn_edge(dat_orig$z, dat_orig$weights, dat_orig$s, dat_orig$x,
+                          dat_orig$y, dat_orig$delta)
       )^2)
       chk(11)
     }

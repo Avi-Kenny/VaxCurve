@@ -12,7 +12,7 @@
 #                  tedwestling/survSuperLearner, zeehio/facetscales,
 #                  cwolock/survML
 cfg <- list(
-  main_task = "run", # run update analysis.R
+  main_task = "update", # run update analysis.R
   which_sim = "estimation", # "estimation" "edge" "testing" "Cox" "debugging"
   level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
   # keep = c(1:3,7:9,16:18,22:24),
@@ -103,8 +103,8 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     # sc_params = list("no cens"=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5)),
     # sc_params = list("exp"=list(lmbd=1e-3, v=1.5, lmbd2=5e-4, v2=1.5)),
     distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
-    edge = c("none"), #  "none" "expit 0.4"
-    # edge = c("expit 0.4"), #  "none" "expit 0.4"
+    # edge = c("none"), #  "none" "expit 0.4"
+    edge = c("expit 0.4"), #  "none" "expit 0.4"
     surv_true = c("Cox PH", "Complex"), # "Cox PH" "Complex" "exp"
     sampling = c("two-phase (50%)"), # "two-phase (50%)"
     wts_type = c("estimated"), # c("true", "estimated")
@@ -116,14 +116,14 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
           Q_n_type = "Cox PH", # "Random Forest", "true"
           convex_type = "GCM", # "CLS"
           ecdf_type = "linear (mid)",
-          edge_corr = "none", # "none" "min"
-          # edge_corr = "min", # "none" "min"
+          # edge_corr = "none", # "none" "min"
+          edge_corr = "min", # "none" "min"
           deriv_type = "m-spline",
-          g_n_type = "parametric" # "binning" "parametric" "parametric (edge)" "true"
-          # g_n_type = "parametric (edge)" # "binning" "parametric" "parametric (edge)" "true"
+          # g_n_type = "parametric" # "binning" "parametric" "parametric (edge)" "true"
+          g_n_type = "parametric (edge)" # "binning" "parametric" "parametric (edge)" "true"
         )
-      )
-      # "Cox PH" = list(est="Cox gcomp")
+      ),
+      "Cox PH" = list(est="Cox gcomp")
       # "Qbins (true)" = list(
       #   est = "Qbins",
       #   params = list(n_bins=8, Q_n_type="Cox PH")
@@ -223,30 +223,32 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Estimation: ideal params
   level_set_edge_1 <- list(
-    n = 3000, # 1000
+    n = 2000, # 1000
     alpha_3 = -2,
     dir = "decr",
     sc_params = list("sc_params"=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5)),
     distr_S = "Unif(0,1)",
+    # distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
     edge = "expit 0.4",
-    surv_true = "Cox PH",
-    sampling = c("two-phase (50%)"), # iid
-    wts_type = "estimated", # c("true", "estimated")
-    simtype = "new", # !!!!!
+    surv_true = c("Cox PH", "Complex"), # "Cox PH" "Complex" "exp"
+    sampling = c("two-phase (50%)"), # "iid" "two-phase (50%)"
+    wts_type = "estimated", # "true", "estimated"
     # simtype = c("old", "new"), # !!!!!
     estimator = list(
-      "Grenander (GCM)" = list(
+      "Grenander (Cox PH)" = list(
         est = "Grenander",
         params = list(
-          # q_n_type = "zero",
-          Q_n_type = "Cox PH",
+          Q_n_type = "Cox PH", # "Cox PH" "Random Forest" asdf
           omega_n_type = "estimated",
-          g_n_type = "binning"
-          # convex_type = "GCM",
-          # ecdf_type = "linear (mid)",
-          # edge_corr = "none",
-          # deriv_type = "m-spline",
-          # g_n_type = "binning"
+          g_n_type = "parametric (edge)" # "binning" "parametric" "parametric (edge)" "true"
+        )
+      ),
+      "Grenander (RF)" = list(
+        est = "Grenander",
+        params = list(
+          Q_n_type = "Random Forest", # "Cox PH" "Random Forest" asdf
+          omega_n_type = "estimated",
+          g_n_type = "parametric (edge)" # "binning" "parametric" "parametric (edge)" "true"
         )
       )
     )

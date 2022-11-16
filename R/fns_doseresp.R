@@ -2189,17 +2189,15 @@ r_Mn_edge <- function(dat_orig, dat, g_sn, g_n, p_n, Q_n, omega_n, val=0) {
     y_i <- dat_orig$y[i]
     delta_i <- dat_orig$delta[i]
     
-    v <- v + Q_n(C$t_0,x_i,s=val) + (
+    v <- v + (
       ( z_i*In(s_i==val) + g_sn(x_i, y_i, delta_i)*(pi_i-z_i) ) *
         omega_n(x_i,s=val,y_i,delta_i)
-    ) / (pi_i * (1-p_n) * g_n(val,x_i))
-    
-    # print(paste0("i= ",i,"; v=",v))
+    ) / (pi_i * (1-p_n) * g_n(val,x_i)) - Q_n(C$t_0,x_i,s=val)
     
   }
   v <- v / n_orig
   
-  return(1-v)
+  return(1+v)
   
 }
 

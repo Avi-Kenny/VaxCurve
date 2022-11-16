@@ -165,17 +165,17 @@ if (cfg$which_sim=="edge") {
     omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n,
                                  type=L$estimator$params$omega_n_type)
     
-    if (L$simtype=="old") {
+    # if (L$simtype=="old") {
       
-      g_sn <- construct_g_sn(dat, vlist$W_grid, type="logistic")
-      r_Mn_edge_est <- r_Mn_edge(dat, g_sn, Q_n, omega_n)
-      infl_fn_r_Mn_edge <- construct_infl_fn_r_Mn_edge(Q_n, g_sn, omega_n,
-                                                       r_Mn_edge_est, val=0)
-      sigma2_edge_est <- (1/n_orig) * sum((
-        infl_fn_r_Mn_edge(dat$weights, dat$s, dat$x, dat$y, dat$delta)
-      )^2)
+      # g_sn <- construct_g_sn(dat, vlist$W_grid, type="logistic")
+      # r_Mn_edge_est <- r_Mn_edge(dat, g_sn, Q_n, omega_n)
+      # infl_fn_r_Mn_edge <- construct_infl_fn_r_Mn_edge(Q_n, g_sn, omega_n,
+      #                                                  r_Mn_edge_est, val=0)
+      # sigma2_edge_est <- (1/n_orig) * sum((
+      #   infl_fn_r_Mn_edge(dat$weights, dat$s, dat$x, dat$y, dat$delta)
+      # )^2)
       
-    } else if (L$simtype=="new") {
+    # } else if (L$simtype=="new") {
       
       p_n <- (1/n_orig) * sum(dat$weights * In(dat$s!=0))
       f_n_srv <- construct_f_n_srv(Q_n=Q_n, Qc_n=Qc_n)
@@ -184,16 +184,16 @@ if (cfg$which_sim=="edge") {
       f_s_n <- construct_f_s_n(dat_orig, vlist$S_grid, f_sIx_n)
       g_n <- construct_g_n(f_sIx_n, f_s_n)
       
-      g_sn <- construct_g_sn2(dat, f_n_srv, g_n, p_n)
-      r_Mn_edge_est <- r_Mn_edge2(dat_orig, dat, g_sn, g_n, p_n, Q_n, omega_n)
-      infl_fn_r_Mn_edge <- construct_infl_fn_r_Mn_edge2(Q_n, g_sn, omega_n, g_n,
+      g_sn <- construct_g_sn(dat, f_n_srv, g_n, p_n)
+      r_Mn_edge_est <- r_Mn_edge(dat_orig, dat, g_sn, g_n, p_n, Q_n, omega_n)
+      infl_fn_r_Mn_edge <- construct_infl_fn_r_Mn_edge(Q_n, g_sn, omega_n, g_n,
                                                         r_Mn_edge_est, p_n)
       sigma2_edge_est <- (1/n_orig) * sum((
         infl_fn_r_Mn_edge(dat_orig$z, dat_orig$weights, dat_orig$s, dat_orig$x,
                           dat_orig$y, dat_orig$delta)
       )^2)
       
-    }
+    # }
     
     # Return results
     return(list(

@@ -272,13 +272,13 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
         }
       })
       
-      gren_points <- sapply(c(1:length(points)), function(i) {
-        if (dir=="incr") {
-          as.numeric(r_Mn(points[i])>r_Mn_edge_est)
-        } else {
-          as.numeric(r_Mn(points[i])<r_Mn_edge_est)
-        }
-      })
+      # gren_points <- sapply(c(1:length(points)), function(i) {
+      #   if (dir=="incr") {
+      #     as.numeric(r_Mn(points[i])>r_Mn_edge_est)
+      #   } else {
+      #     as.numeric(r_Mn(points[i])<r_Mn_edge_est)
+      #   }
+      # })
       
     }
     
@@ -337,10 +337,14 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
         ci_lo[1] <- ests[1] - 1.96*sqrt(sigma2_edge_est/n_orig)
         ci_hi[1] <- ests[1] + 1.96*sqrt(sigma2_edge_est/n_orig)
       } else if (p$edge_corr=="min") {
-        ci_lo2 <- ests - 1.96*sqrt(sigma2_edge_est/n_orig)
-        ci_hi2 <- ests + 1.96*sqrt(sigma2_edge_est/n_orig)
-        ci_lo <- (1-gren_points)*ci_lo2 + replace_na(gren_points*ci_lo, 0)
-        ci_hi <- (1-gren_points)*ci_hi2 + replace_na(gren_points*ci_hi, 0)
+        ci_lo2 <- ests[1] - 1.96*sqrt(sigma2_edge_est/n_orig)
+        ci_hi2 <- ests[1] + 1.96*sqrt(sigma2_edge_est/n_orig)
+        ci_lo <- In(r_Mn_edge_est<=ests)*pmin(ci_lo,ci_lo2) +
+          In(r_Mn_edge_est>ests)*ci_lo
+        ci_lo[1] <- ci_lo2
+        ci_hi <- In(r_Mn_edge_est<=ests)*pmin(ci_hi,ci_hi2) +
+          In(r_Mn_edge_est>ests)*ci_hi
+        ci_hi[1] <- ci_hi2
       }
       
     }

@@ -438,53 +438,53 @@ construct_Phi_n <- function (dat, which="ecdf", type="step") {
 #' @return Conditional density estimator function
 construct_Q_n <- function(dat, vals, type, return_model=F, print_coeffs=F) {
   
-  if (type %in% c("Cox PH2", "Cox PH3")) {
-    
-    # ..p <<- list() # !!!!!
-    model_srv <- coxph(
-      formula = formula(paste0("Surv(y,delta)~",
-                               paste(names(dat$x),collapse="+"),"+s")),
-      data = cbind(y=dat$y, delta=dat$delta, dat$x, s=dat$s),
-      weights = dat$weights
-    )
-    coeffs_srv <- as.numeric(model_srv$coefficients)
-    # ..p$coeffs_srv <<- coeffs_srv # !!!!!
-    bh_srv <- survival::basehaz(model_srv, centered=FALSE)
-    
-    model_cens <- coxph(
-      formula = formula(paste0("Surv(y,delta)~",
-                               paste(names(dat$x),collapse="+"),"+s")),
-      data = cbind(y=dat$y, delta=1-dat$delta, dat$x, s=dat$s),
-      weights = dat$weights
-    )
-    coeffs_cens <- as.numeric(model_cens$coefficients)
-    # ..p$coeffs_cens <<- coeffs_cens # !!!!!
-    bh_cens <- survival::basehaz(model_cens, centered=FALSE)
-    
-    fnc_srv <- function(t, x, s) {
-      if (t==0) {
-        return(1)
-      } else {
-        # Lambda_t <- bh_srv$hazard[which.min(abs(bh_srv$time-t))]
-        Lambda_t <- bh_srv$hazard[max(which((bh_srv$time<t)==T))]
-        return(exp(-1*Lambda_t*exp(sum(coeffs_srv*as.numeric(c(x,s))))))
-      }
-    }
-    
-    fnc_cens <- function(t, x, s) {
-      if (t==0) {
-        return(1)
-      } else {
-        Lambda_t <- bh_cens$hazard[max(which((bh_cens$time<t)==T))]
-        # Lambda_t <- bh_cens$hazard[which.min(abs(bh_cens$time-t))]
-        return(exp(-1*Lambda_t*exp(sum(coeffs_cens*as.numeric(c(x,s))))))
-      }
-    }
-    
-    rm(model_srv)
-    rm(model_cens)
-    
-  }
+  # if (type %in% c("Cox PH2", "Cox PH3")) {
+  #   
+  #   # ..p <<- list() # !!!!!
+  #   model_srv <- coxph(
+  #     formula = formula(paste0("Surv(y,delta)~",
+  #                              paste(names(dat$x),collapse="+"),"+s")),
+  #     data = cbind(y=dat$y, delta=dat$delta, dat$x, s=dat$s),
+  #     weights = dat$weights
+  #   )
+  #   coeffs_srv <- as.numeric(model_srv$coefficients)
+  #   # ..p$coeffs_srv <<- coeffs_srv # !!!!!
+  #   bh_srv <- survival::basehaz(model_srv, centered=FALSE)
+  #   
+  #   model_cens <- coxph(
+  #     formula = formula(paste0("Surv(y,delta)~",
+  #                              paste(names(dat$x),collapse="+"),"+s")),
+  #     data = cbind(y=dat$y, delta=1-dat$delta, dat$x, s=dat$s),
+  #     weights = dat$weights
+  #   )
+  #   coeffs_cens <- as.numeric(model_cens$coefficients)
+  #   # ..p$coeffs_cens <<- coeffs_cens # !!!!!
+  #   bh_cens <- survival::basehaz(model_cens, centered=FALSE)
+  #   
+  #   fnc_srv <- function(t, x, s) {
+  #     if (t==0) {
+  #       return(1)
+  #     } else {
+  #       # Lambda_t <- bh_srv$hazard[which.min(abs(bh_srv$time-t))]
+  #       Lambda_t <- bh_srv$hazard[max(which((bh_srv$time<t)==T))]
+  #       return(exp(-1*Lambda_t*exp(sum(coeffs_srv*as.numeric(c(x,s))))))
+  #     }
+  #   }
+  #   
+  #   fnc_cens <- function(t, x, s) {
+  #     if (t==0) {
+  #       return(1)
+  #     } else {
+  #       Lambda_t <- bh_cens$hazard[max(which((bh_cens$time<t)==T))]
+  #       # Lambda_t <- bh_cens$hazard[which.min(abs(bh_cens$time-t))]
+  #       return(exp(-1*Lambda_t*exp(sum(coeffs_cens*as.numeric(c(x,s))))))
+  #     }
+  #   }
+  #   
+  #   rm(model_srv)
+  #   rm(model_cens)
+  #   
+  # }
   
   if (type %in% c("Cox PH", "Super Learner")) {
     if (type=="Cox PH") {
@@ -688,8 +688,7 @@ construct_Q_n <- function(dat, vals, type, return_model=F, print_coeffs=F) {
     
   }
   
-  # !!!!! Testing
-  if (type=="Charlie") {
+  if (type=="survML") {
     
     newX <- cbind(vals$x, s=vals$s)[which(vals$t==0),]
     new.times <- unique(vals$t)
@@ -704,13 +703,29 @@ construct_Q_n <- function(dat, vals, type, return_model=F, print_coeffs=F) {
       time_basis = "continuous",
       time_grid_approx = sort(unique(dat$y)),
       surv_form = "exp",
-      SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"), # c("SL.mean", "SL.glm", "SL.gam", "SL.earth", "SL.ranger")
+      SL.library = rep(c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),2),
       V = 5,
       obsWeights = dat$weights
     )
     
     srv_pred <- fit$S_T_preds
     cens_pred <- fit$S_C_preds
+    
+    if (print_coeffs && type=="Super Learner") {
+      cat("\n-------------------------------------\n")
+      cat("survML SuperLearner algorithm weights\n")
+      cat("\n-------------------------------------\n")
+      cat("P_Delta coeffs\n")
+      cat("--------------\n")
+      fit$fits$P_Delta$reg.object$coef
+      cat("S_Y_1 coeffs\n")
+      cat("------------\n")
+      fit$fits$S_Y_1$reg.object$coef
+      cat("S_Y_0 coeffs\n")
+      cat("------------\n")
+      fit$fits$S_Y_0$reg.object$coef
+      cat("\n-------------------------------------\n")
+    }
     
     fnc_srv <- function(t, x, s) {
       r <- list()
@@ -1479,7 +1494,7 @@ construct_f_sIx_n <- function(dat, vals=NA, type, k=0, z1=F, s_scale=1,
     # Set up binning density (based on Diaz and Van Der Laan 2011)
     # prm[1] through prm[k-1] are the hazard components for the bins 1 to k-1
     # prm[k] and prm[k+1] are the coefficients for W1 and W2
-    create_dens <- function(k, dat) {
+    create_dens <- function(k, dat, remove_dat=F) {
       
       # Cut points
       alphas <- seq(0, 1, length.out=k+1)
@@ -1512,7 +1527,9 @@ construct_f_sIx_n <- function(dat, vals=NA, type, k=0, z1=F, s_scale=1,
       prm <- opt$pars
       
       # Remove large intermediate objects
-      rm(dat,dens_s,opt)
+      rm(dens_s,opt)
+      
+      if (remove_dat) { rm(dat) }
       
       fnc <- function(s, x) {
         
@@ -1535,7 +1552,7 @@ construct_f_sIx_n <- function(dat, vals=NA, type, k=0, z1=F, s_scale=1,
       # Prep
       n_folds <- 5
       folds <- sample(cut(c(1:length(dat$s)), breaks=n_folds, labels=FALSE))
-      ks <- c(5,10,15,20,25)
+      ks <- c(5,10,15,20) # !!!!! Make this an argument
       best <- list(k=999, max_log_lik=999)
       
       # Cross-validation
@@ -1545,15 +1562,19 @@ construct_f_sIx_n <- function(dat, vals=NA, type, k=0, z1=F, s_scale=1,
         for (i in c(1:n_folds)) {
           dat_train <- list(
             s = dat$s[-which(folds==i)],
+            weights = dat$weights[-which(folds==i)],
             x = dat$x[-which(folds==i),]
           )
           dat_test <- list(
             s = dat$s[which(folds==i)],
+            weights = dat$weights[which(folds==i)],
             x = dat$x[which(folds==i),]
           )
           dens <- create_dens(k, dat_train)
           sum_log_lik <- sum_log_lik +
-            sum(log(dens(dat_test$s, dat_test$x)))
+            sum(log(sapply(c(1:length(dat_test$s)), function(j) {
+              dens(dat_test$s[j], as.numeric(dat_test$x[j,]))
+            })))
         }
         
         if (sum_log_lik>best$max_log_lik || best$max_log_lik==999) {
@@ -1564,10 +1585,11 @@ construct_f_sIx_n <- function(dat, vals=NA, type, k=0, z1=F, s_scale=1,
       }
       
       k <- best$k
+      print(paste("Number of bins selected (f_sIx_n):", k))
       
     }
     
-    fnc <- create_dens(k, dat)
+    fnc <- create_dens(k, dat, remove_dat=T)
     
   }
   
@@ -2275,9 +2297,9 @@ construct_infl_fn_r_Mn_edge <- function(Q_n, g_sn, omega_n, g_n,
 #' @return Influence function
 construct_infl_fn_beta_en <- function(infl_fn_Theta, infl_fn_r_Mn_edge) {
   
-  return(function(x, y, delta, s, weight) {
+  return(function(z, x, y, delta, s, weight) {
     infl_fn_Theta(u=1, x, y, delta, s, weight) -
-      infl_fn_r_Mn_edge(weight, s, x, y, delta)
+      infl_fn_r_Mn_edge(z, weight, s, x, y, delta)
   })
   
 }

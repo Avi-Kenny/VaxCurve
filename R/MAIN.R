@@ -12,9 +12,9 @@
 #                  tedwestling/survSuperLearner, zeehio/facetscales,
 #                  cwolock/survML
 cfg <- list(
-  main_task = "update", # run update analysis.R
-  which_sim = "estimation", # "estimation" "edge" "testing" "Cox" "debugging"
-  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
+  main_task = "analysis.R", # run update analysis.R
+  which_sim = "testing", # "estimation" "edge" "testing" "Cox" "debugging"
+  level_set_which = "level_set_testing_3", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
   # keep = c(1:3,7:9,16:18,22:24),
   num_sim = 1000,
   pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
@@ -92,134 +92,81 @@ if (load_pkgs_local) {
 
 if (Sys.getenv("sim_run") %in% c("first", "")) {
   
-  # Estimation: ideal params
-  # For edge sims, use edge="expit 0.4", edge_corr="min", and either
-  #     g_n_type="binning" or g_n_type="parametric (edge)"
+  # Archive
+  # sc_params = list("no cens"=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5)),
+  # sc_params = list("exp"=list(lmbd=1e-3, v=1.5, lmbd2=5e-4, v2=1.5)),
+  # estimator = list(
+  #   "Qbins (true)" = list(est="Qbins",params=list(n_bins=8,Q_n_type="Cox PH"))
+  # )
+  
+  # Estimation: no edge mass
   level_set_estimation_1 <- list(
     n = 1000,
     alpha_3 = -2,
-    dir = c("decr"),
+    dir = "decr",
     sc_params = list("sc_params"=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5)),
-    # sc_params = list("no cens"=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5)),
-    # sc_params = list("exp"=list(lmbd=1e-3, v=1.5, lmbd2=5e-4, v2=1.5)),
     distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
-    # edge = c("none"), #  "none" "expit 0.4"
-    edge = c("expit 0.4"), #  "none" "expit 0.4"
+    edge = "none", #  "none" "expit 0.4"
     surv_true = c("Cox PH", "Complex"), # "Cox PH" "Complex" "exp"
-    sampling = c("two-phase (50%)"), # "two-phase (50%)"
-    wts_type = c("estimated"), # c("true", "estimated")
+    sampling = "two-phase (50%)", # "iid" "two-phase (50%)"
+    wts_type = "estimated", # "true", "estimated"
     estimator = list(
       "Grenander (GCM)" = list(
         est = "Grenander",
         params = list(
           q_n_type = "zero",
-          Q_n_type = "Cox PH", # "Random Forest", "true"
-          convex_type = "GCM", # "CLS"
+          Q_n_type = "Cox PH", # "Cox PH" "Random Forest", "true"
+          convex_type = "GCM", # "GCM" "CLS"
           ecdf_type = "linear (mid)",
-          # edge_corr = "none", # "none" "min"
-          edge_corr = "min", # "none" "min"
+          edge_corr = "none", # "none" "min"
           deriv_type = "m-spline",
-          # g_n_type = "parametric" # "binning" "parametric" "parametric (edge)" "true"
-          g_n_type = "parametric (edge)" # "binning" "parametric" "parametric (edge)" "true"
+          g_n_type = "parametric" # "binning" "parametric" "parametric (edge)" "true"
         )
       ),
       "Cox PH" = list(est="Cox gcomp")
-      # "Qbins (true)" = list(
-      #   est = "Qbins",
-      #   params = list(n_bins=8, Q_n_type="Cox PH")
-      # )
     )
   )
   
-  # Testing: compare all methods
+  # Estimation: edge mass
+  level_set_estimation_2 <- level_set_estimation_1
+  level_set_estimation_2$edge <- "expit 0.4"
+  level_set_estimation_2$estimator[[1]]$params$edge_corr <- "min"
+  level_set_estimation_2$estimator[[1]]$params$g_n_type <- "parametric (edge)"
+  
+  # Hypothesis testing: Unif(0,1)
   level_set_testing_1 <- list(
-    n = c(2000),
-    # n = c(100,200,400,800), # 1000
-    # alpha_3 = 0,
-    # alpha_3 = c(0,-0.25,-0.5),
+    n = 2000,
     alpha_3 = seq(0,-0.5,-0.1),
     dir = "decr",
     sc_params = list("sc_params"=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_S = c("Unif(0,1)", "N(0.5,0.04)"),
-    # distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
-    # edge = "expit 0.4",
+    distr_S = "Unif(0,1)", # "Unif(0,1)" "N(0.5,0.04)" "N(0.3+0.4x2,0.09)"
     edge = c("none", "expit 0.1", "expit 0.4"),
-    surv_true = c("Cox PH"), # "Complex"
-    sampling = c("two-phase (50%)"), # "iid" "two-phase (50%)"
-    wts_type = c("estimated"), # "estimated" "true"
+    surv_true = c("Cox PH", "Step"), # "Cox PH" "Step" "Complex"
+    sampling = "two-phase (50%)", # "iid" "two-phase (50%)"
+    wts_type = "estimated", # "estimated" "true"
     test = list(
       "Slope (two-tailed)" = list(
         type = "test_2",
-        # alt_type = "decr",
-        alt_type = "two-tailed", # decr
+        alt_type = "decr", # "decr" "two-tailed"
         params = list(
-          type = c("simple (with constant)", "edge", "combined", "combined 2"),
-          q_n_type = "zero",
-          g_n_type = "binning", # "parametric" "true"
-          f_sIx_n_bins = 15,
-          omega_n_type = "estimated", # "true"
-          Q_n_type = "Cox PH" # "Cox PH"
+          type = c("simple (with constant)", "combined 2"),
+          Q_n_type = "Cox PH",
+          q_n_type = "zero", # "zero" "new"
+          g_n_type = "parametric (edge)", # "binning" "parametric" "parametric (edge)" "true"
+          omega_n_type = "estimated"
         ),
         test_stat_only = F
       )
-      
-      # "test_2 (q_n new)" = list(
-      #   type = "test_2",
-      #   alt_type = "two-tailed", # decr
-      #   params = list(
-      #     type = c("simple", "simple (with constant)",
-      #              "S-weighted (with constant)"),
-      #     q_n_type = "new",
-      #     g_n_type = "parametric", # simple, complex, both
-      #     Q_n_type = "Cox PH"
-      #   ),
-      #   test_stat_only = F
-      # )
     )
   )
   
-  # Testing: compare all methods
-  level_set_testing_2 <- list(
-    n = c(2000),
-    # n = c(100,200,400,800), # 1000
-    alpha_3 = c(0,-0.25,-0.5),
-    # alpha_3 = seq(0,-0.5,-0.05),
-    dir = "decr",
-    sc_params = list("sc_params"=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_S = c("Unif(0,1)"),
-    # distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
-    edge = c("expit 0.1", "expit 0.4"),
-    # edge = c("none", "expit 0.1", "expit 0.4"),
-    surv_true = c("Step"), # "Complex" "Cox PH"
-    sampling = c("two-phase (50%)"), # "iid" "two-phase (50%)"
-    wts_type = "estimated", # "estimated" "true"
-    test = list(
-      "Slope (Cox/binning)" = list(
-        type = "test_2",
-        alt_type = "two-tailed", # decr
-        params = list(
-          type = c("simple (with constant)", "edge", "combined"),
-          q_n_type = "zero",
-          g_n_type = "binning", # "parametric" "true"
-          omega_n_type = "estimated", # "true"
-          Q_n_type = "Random Forest" # "Cox PH"
-        ),
-        test_stat_only = F
-      )
-      # "test_2 (q_n new)" = list(
-      #   type = "test_2",
-      #   alt_type = "two-tailed", # decr
-      #   params = list(
-      #     type = c("simple", "simple (with constant)",
-      #              "S-weighted (with constant)"),
-      #     q_n_type = "new",
-      #     g_n_type = "parametric", # simple, complex, both
-      #     Q_n_type = "Cox PH"
-      #   ),
-      #   test_stat_only = F
-      # )
-    )
-  )
+  # Hypothesis testing: N(0.5,0.04)
+  level_set_testing_2 <- level_set_testing_1
+  level_set_testing_2$distr_S <- "N(0.5,0.04)"
+  
+  # Hypothesis testing: N(0.3+0.4x2,0.09)
+  level_set_testing_3 <- level_set_testing_1
+  level_set_testing_3$distr_S <- "N(0.3+0.4x2,0.09)"
   
   # Estimation: ideal params
   level_set_edge_1 <- list(
@@ -488,6 +435,13 @@ if (F) {
   df_distr_s <- mutate(df_distr_S, ymin=plot_lims$s[1],
                        ymax=((ymax*diff(plot_lims$s))/6+plot_lims$s[1]))
   
+  if (T) {
+    p_data %<>% mutate(
+      Estimator = ifelse(Estimator %in% c("Grenander", "Grenander (GCM)"),
+                         "NPCVE", Estimator)
+    )
+  }
+  
   # Bias plot
   # Export: 10" x 6"
   # Note: change "bias" to "biasG" for Gamma and "biasP" for Phi
@@ -597,10 +551,6 @@ if (F) {
   # # Read in simulation object
   sim <- readRDS("../SimEngine.out/sim_testing_20210820.rds")
   
-  # !!!!! Modify everything below
-  #   color should be n-value
-  #   x-axis should be alpha_3
-  
   # Summarize results
   # summ <- summarize(sim)
   # ntypes <- length(names(sim$results)[substr(names(sim$results), 1, 4)=="type"])
@@ -610,55 +560,55 @@ if (F) {
   summ <- sim %>% summarize(
     mean = list(
       list(name="reject_1", x="reject_1", na.rm=T),
-      list(name="reject_2", x="reject_2", na.rm=T),
-      list(name="reject_3", x="reject_3", na.rm=T),
-      list(name="reject_4", x="reject_4", na.rm=T)
+      list(name="reject_2", x="reject_2", na.rm=T)
+      # list(name="reject_3", x="reject_3", na.rm=T),
+      # list(name="reject_4", x="reject_4", na.rm=T)
     )
   )
   summ
   
-  # !!!!!
-  summ1 <- summ %>% filter(distr_S=="Unif(0,1)" & test=="Slope (two-tailed)")
-  summ2 <- summ %>% filter(distr_S=="Unif(0,1)" & test=="Slope (decr)")
-  summ3 <- summ %>% filter(distr_S=="N(0.5,0.04)" & test=="Slope (two-tailed)")
-  summ4 <- summ %>% filter(distr_S=="N(0.5,0.04)" & test=="Slope (decr)")
-  summ <- summ4
+  # # !!!!!
+  # summ1 <- summ %>% filter(distr_S=="Unif(0,1)" & test=="Slope (two-tailed)")
+  # summ2 <- summ %>% filter(distr_S=="Unif(0,1)" & test=="Slope (decr)")
+  # summ3 <- summ %>% filter(distr_S=="N(0.5,0.04)" & test=="Slope (two-tailed)")
+  # summ4 <- summ %>% filter(distr_S=="N(0.5,0.04)" & test=="Slope (decr)")
+  # summ <- summ4
   
   # Figure
   {
     p_data <- pivot_longer(
       data = summ,
-      cols = c(reject_1,reject_2,reject_3,reject_4),
+      cols = c(reject_1,reject_2), # reject_3
       names_to = "test_type",
       values_to = "Power"
     )
-    test_types <- c("Simple (with constant)", "Edge", "Combined", "Combined 2")
+    test_types <- c("Standard", "Edge-adapted") # "Edge"
     p_data %<>% mutate(
-      edge = factor(edge, levels=c("none", "expit 0.1", "expit 0.4")),
+      edge = factor(edge,
+                    levels=c("none", "expit 0.1", "expit 0.4"),
+                    labels=c("P(S=0) = 0", "P(S=0) = 0.1", "P(S=0) = 0.4")),
       alpha_3 = -1 * alpha_3,
       test_type = case_when(
         test_type=="reject_1" ~ test_types[1],
-        test_type=="reject_2" ~ test_types[2],
-        test_type=="reject_3" ~ test_types[3],
-        test_type=="reject_4" ~ test_types[4]
+        test_type=="reject_2" ~ test_types[2]
+        # test_type=="reject_3" ~ test_types[3]
       ),
       test_type = factor(test_type, levels=test_types)
     )
     # p_data %<>% filter(test_type!="Combined") # !!!!! Uncommend for decr
     
-    # Export: 10 x 4
+    # Export: 10" x 6"
     ggplot(
       p_data,
       aes(x=alpha_3, y=Power, color=test_type)
     ) +
       geom_point() +
       geom_line() +
-      facet_grid(cols=dplyr::vars(edge)) + # rows=dplyr::vars(distr_S)
+      facet_grid(cols=dplyr::vars(edge), rows=dplyr::vars(surv_true)) +
       scale_y_continuous(labels=percent) +
       theme(legend.position="bottom") +
       # scale_color_manual(values=m_colors) +
-      labs(title="Hypothesis test, distr_A=N(0.5,0.04), directional", # N(0.3+0.4x2,0.09)
-           color="Test type", x="Effect size")
+      labs(color="Test type", x="Effect size")
     
     # facet: edge
     # X: alpha_3

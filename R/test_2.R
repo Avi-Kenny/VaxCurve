@@ -43,7 +43,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params, test_stat_only=F) {
   dat <- ss(dat_orig, which(dat_orig$z==1))
   vlist <- create_val_list(dat_orig)
   
-  # Construct component functions
+  # Construct component functions (needed by all tests)
   srvSL <- construct_Q_n(dat, vlist$Q_n, type=p$Q_n_type, print_coeffs=T)
   Q_n <- srvSL$srv
   Qc_n <- srvSL$cens
@@ -59,6 +59,19 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params, test_stat_only=F) {
                                      q_tilde_n, etastar_n)
   infl_fn_Theta <- construct_infl_fn_Theta(omega_n, f_sIx_n, q_tilde_n,
                                            etastar_n, Theta_os_n)
+  
+  # Construct component functions (needed by some tests)
+  if (length(intersect(c("edge", "combined", "combined 2"), p$type))>0) {
+    p_n <- (1/n_orig) * sum(dat$weights * In(dat$s!=0))
+    f_s_n <- construct_f_s_n(dat_orig, vlist$S_grid, f_sIx_n)
+    g_n <- construct_g_n(f_sIx_n, f_s_n)
+    g_sn <- construct_g_sn(dat, f_n_srv, g_n, p_n)
+    r_Mn_edge_est <- r_Mn_edge(dat_orig, dat, g_sn, g_n, p_n, Q_n, omega_n)
+    infl_fn_r_Mn_edge <- construct_infl_fn_r_Mn_edge(Q_n, g_sn, omega_n, g_n,
+                                                     r_Mn_edge_est, p_n)
+    infl_fn_beta_en <- construct_infl_fn_beta_en(infl_fn_Theta,
+                                                 infl_fn_r_Mn_edge)
+  }
   
   # Function to compute P values
   compute_p_val <- function(alt_type, beta_n, var_n) {
@@ -221,29 +234,23 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params, test_stat_only=F) {
   
   if ("edge" %in% p$type) {
     
-    # Construct pieces needed for hypothesis test
-    g_sn <- construct_g_sn(dat, vlist$X_grid, type="logistic")
-    r_Mn_edge_est <- r_Mn_edge(dat, g_sn, Q_n, omega_n)
-    infl_fn_r_Mn_edge <- construct_infl_fn_r_Mn_edge(Q_n, g_sn, omega_n,
-                                                     r_Mn_edge_est, val=0)
-    infl_fn_beta_en <- construct_infl_fn_beta_en(infl_fn_Theta,
-                                                 infl_fn_r_Mn_edge)
-    
     # Compute test statistic and variance estimate
     beta_en <- Theta_os_n(1) - r_Mn_edge_est
     var_n <- 0
-    var_edge <- 0 # !!!!! TEMP
+    # var_edge <- 0 # !!!!! TEMP
     for (i in c(1:n_orig)) {
+      z_i <- dat_orig$z[i]
       s_i <- dat_orig$s[i]
       x_i <- as.numeric(dat_orig$x[i,])
       y_i <- dat_orig$y[i]
       delta_i <- dat_orig$delta[i]
       weight_i <- dat_orig$weight[i]
-      var_n <- var_n + (infl_fn_beta_en(x_i, y_i, delta_i, s_i, weight_i))^2
-      var_edge <- var_edge + (infl_fn_r_Mn_edge(weight_i, s_i, x_i, y_i, delta_i))^2 # !!!!! TEMP
+      var_n <- var_n +
+        (infl_fn_beta_en(z_i, x_i, y_i, delta_i, s_i, weight_i))^2
+      # var_edge <- var_edge + (infl_fn_r_Mn_edge(weight_i, s_i, x_i, y_i, delta_i))^2 # !!!!! TEMP
     }
     var_n <- var_n/(n_orig^2)
-    var_edge <- var_edge/(n_orig^2) # !!!!! TEMP
+    # var_edge <- var_edge/(n_orig^2) # !!!!! TEMP
     
     res[[length(res)+1]] <- list(
       type = "edge",
@@ -269,19 +276,14 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params, test_stat_only=F) {
     infl_fn_beta_n <- construct_infl_fn_beta_n(infl_fn_Theta)
 
     # Construct pieces needed for beta_en
-    g_sn <- construct_g_sn(dat, vlist$X_grid, type="logistic")
-    r_Mn_edge_est <- r_Mn_edge(dat, g_sn, Q_n, omega_n)
-    infl_fn_r_Mn_edge <- construct_infl_fn_r_Mn_edge(Q_n, g_sn, omega_n,
-                                                     r_Mn_edge_est, val=0)
-    infl_fn_beta_en <- construct_infl_fn_beta_en(infl_fn_Theta,
-                                                 infl_fn_r_Mn_edge)
     beta_en <- Theta_os_n(1) - r_Mn_edge_est
-
+    
     # Calculate variance components
     sigma2_bn <- 0
     sigma2_ben <- 0
     cov_n <- 0
     for (i in c(1:n_orig)) {
+      z_i <- dat_orig$z[i]
       s_i <- dat_orig$s[i]
       x_i <- as.numeric(dat_orig$x[i,])
       y_i <- dat_orig$y[i]
@@ -289,7 +291,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params, test_stat_only=F) {
       weight_i <- dat_orig$weight[i]
       
       if_bn <- infl_fn_beta_n(s_i, y_i, delta_i, weight_i, x_i)
-      if_ben <- infl_fn_beta_en(x_i, y_i, delta_i, s_i, weight_i)
+      if_ben <- infl_fn_beta_en(z_i, x_i, y_i, delta_i, s_i, weight_i)
       
       sigma2_bn <- sigma2_bn + if_bn^2
       sigma2_ben <- sigma2_ben + if_ben^2
@@ -331,12 +333,6 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params, test_stat_only=F) {
     infl_fn_beta_n <- construct_infl_fn_beta_n(infl_fn_Theta)
     
     # Construct pieces needed for beta_en
-    g_sn <- construct_g_sn(dat, vlist$X_grid, type="logistic")
-    r_Mn_edge_est <- r_Mn_edge(dat, g_sn, Q_n, omega_n)
-    infl_fn_r_Mn_edge <- construct_infl_fn_r_Mn_edge(Q_n, g_sn, omega_n,
-                                                     r_Mn_edge_est, val=0)
-    infl_fn_beta_en <- construct_infl_fn_beta_en(infl_fn_Theta,
-                                                 infl_fn_r_Mn_edge)
     beta_en <- Theta_os_n(1) - r_Mn_edge_est
     
     # Calculate variance components
@@ -344,6 +340,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params, test_stat_only=F) {
     sigma2_ben <- 0
     cov_n <- 0
     for (i in c(1:n_orig)) {
+      z_i <- dat_orig$z[i]
       s_i <- dat_orig$s[i]
       x_i <- as.numeric(dat_orig$x[i,])
       y_i <- dat_orig$y[i]
@@ -351,7 +348,7 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params, test_stat_only=F) {
       weight_i <- dat_orig$weight[i]
       
       if_bn <- infl_fn_beta_n(s_i, y_i, delta_i, weight_i, x_i)
-      if_ben <- infl_fn_beta_en(x_i, y_i, delta_i, s_i, weight_i)
+      if_ben <- infl_fn_beta_en(z_i, x_i, y_i, delta_i, s_i, weight_i)
       
       sigma2_bn <- sigma2_bn + if_bn^2
       sigma2_ben <- sigma2_ben + if_ben^2
@@ -381,12 +378,12 @@ test_2 <- function(dat_orig, alt_type="two-tailed", params, test_stat_only=F) {
   if ("mixed boot" %in% p$type) {} # !!!!! Archived for now
   if ("debug" %in% p$type) {} # !!!!! Archived for now
   
-  if (T) {
+  if (F) {
     res$extras <- list(
       Theta_1.0 = Theta_os_n(1),
       r_Mn_0.0 = r_Mn_edge_est,
-      var_edge = var_edge,
-      sd_edge = sqrt(var_edge),
+      # var_edge = var_edge,
+      # sd_edge = sqrt(var_edge),
       beta_n = beta_n,
       beta_en = beta_en,
       sigma_bn = sigma_bn,

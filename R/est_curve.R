@@ -82,7 +82,6 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     chk(1)
     vlist <- create_val_list(dat_orig)
-    chk(99, "Intermediate")
     srvSL <- construct_Q_n(dat, vlist$Q_n, type=p$Q_n_type, print_coeffs=T)
     chk(2)
     Q_n <- srvSL$srv

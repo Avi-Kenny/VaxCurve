@@ -2,25 +2,24 @@
 # DWD
 if (F) {
   
-  x_old <- (filter(sim$results, simtype=="old"))$r_Mn
-  x_new <- (filter(sim$results, simtype=="new"))$r_Mn
-  df <- data.frame(
-    x = c(x_old, x_new),
-    grp = rep(c("old", "new"), each=length(x_old))
+  n <- 100
+  newX <- data.frame(x1=runif(n), x2=runif(n))
+  new.times <- rexp(n)
+  
+  fit <- survMLc(
+    time = rexp(n),
+    event = rbinom(n, prob=0.1, size=1),
+    X = data.frame(x1=runif(n), x2=runif(n)),
+    # newX = newX,
+    newtimes = new.times,
+    bin_size = 0.025,
+    time_basis = "continuous",
+    time_grid_approx = sort(unique(dat$y)),
+    surv_form = "exp",
+    SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth", "SL.glmnet",
+                   "SL.ridge", "SL.gbm"),
+    V = 5
   )
-  
-  ggplot(df, aes(x=x, group=grp, fill=factor(grp))) +
-    geom_histogram(color="white") +
-    facet_wrap(~grp, ncol=2)
-  
-  sd(x_old) # 0.0346
-  sd(x_new) # 0.0329
-  mean(sqrt(
-    (filter(sim$results, simtype=="old"))$sigma2_edge_est/1000
-  )) # 0.0372
-  mean(sqrt(
-    (filter(sim$results, simtype=="new"))$sigma2_edge_est/1000
-  )) # 0.0284
   
 }
 

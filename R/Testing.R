@@ -11,7 +11,8 @@
   params <- list(
     Q_n_type = "Cox PH", # "Random Forest", "true"
     convex_type = "GCM", # "CLS"
-    g_n_type = "parametric", # "binning" "parametric" "parametric (edge)" "true"
+    g_n_type = "binning", # "binning" "parametric" "parametric (edge)" "true"
+    f_sIx_n_bins = 0,
     ci_type = "regular",
     cf_folds = 1,
     edge_corr = "none", # "none" "min"
@@ -734,7 +735,7 @@
   fit_0 <- construct_Q_n(dat, vlist$Q_n, type="true")
   fit_CoxPH <- construct_Q_n(dat, vlist$Q_n, type="Cox PH")
   fit_SL <- construct_Q_n(dat, vlist$Q_n, type="Super Learner")
-  fit_CH <- construct_Q_n(dat, vlist$Q_n, type="Charlie")
+  fit_CH <- construct_Q_n(dat, vlist$Q_n, type="survML")
   # fit_RF <- construct_Q_n(dat, vlist$Q_n, type="Random Forest")
   Q_0 <- fit_0$srv
   Q_CoxPH <- fit_CoxPH$srv
@@ -765,7 +766,7 @@
                  Q_0(t=times, x=x_b, s=rep(0.2,n)),
                  Q_0(t=times, x=x_a, s=rep(0.8,n)),
                  Q_0(t=times, x=x_b, s=rep(0.8,n))),
-    which = rep(c("Cox PH","Charlie","SL","True Q_0"), each=4*length(times)),
+    which = rep(c("Cox PH","survML","SL","True Q_0"), each=4*length(times)),
     covs = rep(rep(c("x1=0.2,x2=1,s=0.2","x1=0.5,x2=1,s=0.2",
                      "x1=0.2,x2=1,s=0.8","x1=0.5,x2=1,s=0.8"),4),
                each=length(times))
@@ -835,7 +836,7 @@
       Qc_0(t=times, x_02, s=rep(0.8,n)),
       Qc_0(t=times, x_05, s=rep(0.8,n))
     ),
-    which = rep(c("Cox","Charlie","SL","True Qc_0"), each=4*length(times)),
+    which = rep(c("Cox","survML","SL","True Qc_0"), each=4*length(times)),
     covs = rep(rep(c("x1=0.2,x2=1,s=0.2","x1=0.5,x2=1,s=0.2",
                      "x1=0.2,x2=1,s=0.8","x1=0.5,x2=1,s=0.8"),4), each=length(times))
   )

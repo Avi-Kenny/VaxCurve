@@ -8,8 +8,8 @@
 
 {
   # Choose analysis
-  which_analysis <- "Moderna" # "Janssen" "Moderna" "AMP" "AZD1222"
-                              # "HVTN 705 (primary)" "HVTN 705 (all)"
+  which_analysis <- "Janssen (partA)" # "Janssen" "Moderna" "AMP" "AZD1222"
+  # "HVTN 705 (primary)" "HVTN 705 (all)"
   
   # Set proper task ID variable
   if (cluster_config$js=="slurm") {
@@ -22,16 +22,16 @@
     stop("Invalid cluster_config$js")
   }
   
-  # Uncomment this code to run multiple analyses (e.g. 1=10=Moderna, 11-14=Janssen)
-  ..tid <- as.integer(Sys.getenv(.tid_var))
-  if (..tid<=4) {
-    which_analysis <- "Janssen"
-  } else {
-    which_analysis <- "Moderna"
-    .tid_lst = list(as.character(round(..tid-4)))
-    names(.tid_lst) = .tid_var
-    do.call(Sys.setenv, .tid_lst)
-  }
+  # # Uncomment this code to run multiple analyses (e.g. 1=10=Moderna, 11-14=Janssen)
+  # ..tid <- as.integer(Sys.getenv(.tid_var))
+  # if (..tid<=4) {
+  #   which_analysis <- "Janssen"
+  # } else {
+  #   which_analysis <- "Moderna"
+  #   .tid_lst = list(as.character(round(..tid-4)))
+  #   names(.tid_lst) = .tid_var
+  #   do.call(Sys.setenv, .tid_lst)
+  # }
   
   # Set seed
   set.seed(1)
@@ -41,10 +41,10 @@
   # !!!!! In the correlates repo, if t_0=0, it is inferred from the data
   cfg2 <- list(
     analysis = which_analysis,
-    run_analysis = F,
+    run_analysis = T,
     run_dqa = F,
     run_debug = list(gren_var=F, objs=F),
-    run_hyptest = T
+    run_hyptest = F
   )
   
   # Set analysis-specific flags
@@ -68,6 +68,7 @@
     cfg2$lab_x <- c("Anti Spike IgG (BAU/ml) (=s)", "Anti RBD IgG (BAU/ml) (=s)", "Pseudovirus-nAb ID50 (IU50/ml) (=s)", "Phagocytic Score (=s)")
     cfg2$endpoint <- "COVID"
     cfg2$t_0 <- 54
+    # Note: Youyi changed "janssen_pooled_real_..." to "janssen_pooled_EUA_"
     cfg2$dataset <- c("janssen_pooled_real_data_processed_with_riskscore.csv", "janssen_pooled_realADCP_data_processed_with_riskscore.csv")
     cfg2$txct <- T
     cfg2$cr2_trial <- c("janssen_pooled_real", "janssen_pooled_realADCP")
@@ -97,9 +98,9 @@
     cfg2$folder_local <- "Janssen data/"
     cfg2$folder_cluster <- "Z:/covpn/p3003/analysis/correlates/Part_A_Blinded_Phase_Data/adata/"
     cfg2$params = list(
-      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="m-spline",
-      gamma_type="Super Learner", ci_type="trunc", q_n_type="zero",
-      # gamma_type="Super Learner", ci_type="logit", q_n_type="zero",
+      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="m-spline", # "parametric (edge)"
+      # gamma_type="Super Learner", ci_type="trunc", q_n_type="zero", # Used historically
+      gamma_type="Super Learner", ci_type="logit", q_n_type="zero",
       omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
       f_sIx_n_bins=15
     )
@@ -185,8 +186,9 @@
     cfg2$llox_label <- "LOD" # NEW
     cfg2$llox <- c(0.3076,1.594,2.42,15.02,22.66) # NEW
     cfg2$params = list(
-      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="m-spline",
-      gamma_type="Super Learner", ci_type="regular", q_n_type="zero",
+      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="m-spline", # "parametric"
+      # gamma_type="Super Learner", ci_type="regular", q_n_type="zero", # Used historically
+      gamma_type="Super Learner", ci_type="logit", q_n_type="zero",
       omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
       f_sIx_n_bins=15
     )
@@ -566,9 +568,100 @@
     
   }
   
+  if (cfg2$analysis=="Janssen (partA)") {
+    
+    cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox"))
+    cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Cox"))
+    cfg2$marker <- c("Day29bindSpike", "Day29bindRBD", "Day29pseudoneutid50", "Day29ADCP")
+    cfg2$lab_title <- c("Binding Antibody to Spike: Day 29", "Binding Antibody to RBD: Day 29", "PsV Neutralization 50% Titer: Day 29", "Phagocytic Score: Day 29")
+    cfg2$lab_x <- c("Anti Spike IgG (BAU/ml) (=s)", "Anti RBD IgG (BAU/ml) (=s)", "Pseudovirus-nAb ID50 (IU50/ml) (=s)", "Phagocytic Score (=s)")
+    cfg2$endpoint <- "COVID"
+    cfg2$t_0 <- c(181,109,181,101)
+    cfg2$dataset <- c("janssen_pooled_partA_data_processed_with_riskscore.csv",
+                      "janssen_na_partA_data_processed_with_riskscore.csv",
+                      "janssen_la_partA_data_processed_with_riskscore.csv",
+                      "janssen_sa_partA_data_processed_with_riskscore.csv")
+    # "janssen_pooled_partAsenior_data_processed_with_riskscore.csv",
+    # "janssen_pooled_partAnonsenior_data_processed_with_riskscore.csv") # !!!!!
+    cfg2$txct <- T
+    cfg2$cr2_trial <- c("janssen_pooled_partA", "janssen_na_partA", "janssen_la_partA", "janssen_sa_partA")
+    cfg2$cr2_COR <- "D29IncludeNotMolecConfirmed"
+    cfg2$cr2_marker <- c(1,2,3,4)
+    cfg2$edge_corr <- c("min") # !!!!! check
+    cfg2$v <- list(
+      id = "Ptid",
+      time = "EventTimePrimaryIncludeNotMolecConfirmedD29",
+      event = "EventIndPrimaryIncludeNotMolecConfirmedD29",
+      wt = "wt.D29",
+      ph1 = "ph1.D29",
+      ph2 = "ph2.D29",
+      covariates = c("~. + risk_score + as.factor(Region)", "~. + risk_score")
+    )
+    cfg2$qnt <- list(
+      "Risk, nonparametric" = c(0,0.95), # !!!!!
+      "CVE, nonparametric" = c(0,0.95), # !!!!!
+      "Risk, Cox model" = c(0,0.975), # !!!!!
+      "CVE, Cox model" = c(0,0.975) # !!!!!
+    )
+    cfg2$zoom_x <- "zoomed"
+    cfg2$zoom_y_cve <- NA
+    cfg2$zoom_y_risk <- "zoomed (risk)"
+    cfg2$folder_local <- "Janssen (partA) data/"
+    cfg2$folder_cluster <- "Z:/covpn/p3003/analysis/correlates/Part_A_Blinded_Phase_Data/adata/"
+    # cfg2$llox_label <- c("LOD", "LLOQ") # !!!!!
+    # cfg2$llox <- c(0.3076,1.594,2.42,15.02,22.66) # !!!!!
+    cfg2$params = list(
+      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="m-spline", # "parametric (edge)"
+      # g_n_type="parametric (edge)", ecdf_type="linear (mid)", deriv_type="m-spline", # "parametric (edge)"
+      gamma_type="Super Learner", ci_type="logit", q_n_type="zero",
+      omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
+      f_sIx_n_bins=15
+    )
+    C <- list(appx=list(t_0=1,x_tol=25,s=0.01))
+    
+    # Variable map; one row corresponds to one CVE graph
+    cfg2$map <- data.frame(
+      marker = rep(c(1:4), 4),
+      lab_x = rep(c(1:4), 4),
+      lab_title = rep(c(1:4), 4),
+      t_0 = rep(c(1:4), each=4),
+      dataset = rep(c(1:4), each=4),
+      cr2_trial = rep(c(1:4), each=4),
+      cr2_COR = rep(1, 16),
+      cr2_marker = rep(c(1:4), 4),
+      edge_corr = rep(1, 16),
+      v_id = rep(1, 16),
+      v_time = rep(1, 16),
+      v_event = rep(1, 16),
+      v_wt = rep(1, 16),
+      v_ph1 = rep(1, 16),
+      v_ph2 = rep(1, 16),
+      v_covariates = c(rep(1,4), rep(2,12)),
+      zoom_x = rep(1, 16),
+      zoom_y_cve = rep(1, 16),
+      zoom_y_risk = rep(1, 16)
+      # llox_label = c(1,1,1,1,1,1,1,1,1,1),
+      # llox = c(1,1,2,2,3,3,4,4,5,5)
+    )
+    
+    # Secondary map for variations within a graph; map_row corresponds to which
+    #     row of cfg2$map to use
+    cfg2$map2 <- data.frame(
+      tid = c(1:16),
+      map_row = c(1:16),
+      Q_n_type = rep("Super Learner",16), # survML
+      q_n_type = rep("zero",16)
+      # tid = c(1:12),
+      # map_row = rep(c(1:4), 3),
+      # Q_n_type = rep(c("Super Learner", "Cox PH", "survML"), each=4),
+      # q_n_type = rep("zero", 12)
+    )
+    
+  }
+  
   # Set config based on local vs. cluster
   if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
-    cfg2$tid <- 5
+    cfg2$tid <- 1
     cfg2$dataset <- paste0(cfg2$folder_cluster,cfg2$dataset)
   } else {
     cfg2$tid <- as.integer(Sys.getenv(.tid_var))
@@ -594,7 +687,6 @@
   cfg2$v$covariates <- formula(cfg2$v$covariates)
   cfg2$params$Q_n_type <- cfg2$map2[cfg2$tid,"Q_n_type"]
   cfg2$params$q_n_type <- cfg2$map2[cfg2$tid,"q_n_type"]
-  C$t_0 <- cfg2$t_0
   if ((i %in% c(5,7,9)) && cfg2$analysis=="Moderna") {
     cfg2$qnt <- lapply(cfg2$qnt, function(x) { c(0,x[2]) }) # !!!!! temp hack
   }
@@ -603,6 +695,7 @@
   flags$janssen_id50_lloq <- cfg2$analysis=="Janssen" &&
     cfg2$marker=="Day29pseudoneutid50"
   flags$hvtn705_supress <- cfg2$analysis=="HVTN 705 (all)" && cfg2$tid==37
+  flags$bsero <- cfg2$analysis=="Janssen (partA)"
   
 }
 
@@ -621,6 +714,10 @@
     df_ph1 <- dplyr::filter(df_raw, !!rlang::sym(cfg2$v$ph1)==T)
   } else {
     df_ph1 <- df_raw
+  }
+  if (flags$bsero) {
+    df_ph1 %<>% dplyr::filter(Bserostatus==0)
+    df_ph1 %<>% dplyr::filter(!is.na(risk_score))
   }
   if (cfg2$analysis=="AMP") {
     if (cfg2$amp_protocol!="Pooled") {
@@ -708,6 +805,12 @@
     "z" = df_z
   )
   rm(df_x,df_weights,df_z)
+  
+  if (cfg2$t_0==0) {
+    C$t_0 <- max(dat_orig$y[dat_orig$delta==1 & dat_orig$z==1])
+  } else {
+    C$t_0 <- cfg2$t_0
+  }
   
   # Create data structure to hold results
   plot_data_risk <- data.frame(
@@ -948,7 +1051,7 @@ if (F) {
     coord_flip() +
     labs(x=mrk_lab, y="Cohort",
          title=title_lab)
-    
+  
 }
 
 
@@ -977,18 +1080,18 @@ if (cfg2$run_dqa) {
   print(paste0("Number of cases in vaccine group: ", num_case_tx))
   print(paste0("Number of cases in control group: ", num_case_ct))
   print(paste0("Number of cases by day ", C$t_0, " in vaccine group: ",
-              num_case_tx_t_0))
+               num_case_tx_t_0))
   print(paste0("Number of cases by day ", C$t_0, " in control group: ",
-              num_case_ct_t_0))
+               num_case_ct_t_0))
   print(paste0("Number at-risk in vaccine group: ", num_atrisk_tx))
   print(paste0("Number at-risk in control group: ", num_atrisk_ct))
   print(paste0("Naive P(COVID by day ", C$t_0, ") in vaccine group: ",
-              round(num_case_tx_t_0/num_atrisk_tx,3)))
+               round(num_case_tx_t_0/num_atrisk_tx,3)))
   print(paste0("Naive P(COVID by day ", C$t_0, ") in control group: ",
-              round(num_case_ct_t_0/num_atrisk_ct,3)))
+               round(num_case_ct_t_0/num_atrisk_ct,3)))
   print(paste0("Naive vaccine efficacy: ",
-              round(1 - (num_case_tx_t_0/num_atrisk_tx) /
-                      (num_case_ct_t_0/num_atrisk_ct),3)))
+               round(1 - (num_case_tx_t_0/num_atrisk_tx) /
+                       (num_case_ct_t_0/num_atrisk_ct),3)))
   
   # Fraction of point mass at edge
   s <- dat_orig$s
@@ -1014,7 +1117,7 @@ if (cfg2$run_dqa) {
     data.frame(
       x = c(time_tx[which(ind_tx==1)], time_ct[which(ind_ct==1)]),
       which = c(rep("Tx",num_case_tx), rep("Ct",num_case_ct))
-      ),
+    ),
     aes(x=x, fill=which)
   ) +
     facet_wrap(~which) +
@@ -1119,9 +1222,9 @@ if (cfg2$run_dqa) {
 
 
 
-#####################################.
-##### Data analysis (Grenander) #####
-#####################################.
+#################################.
+##### Data analysis (NPCVE) #####
+#################################.
 
 if (cfg2$run_analysis &&
     any(unlist(c(cfg2$plot_cve$est,cfg2$plot_risk$est))=="Grenander")) {
@@ -1137,17 +1240,17 @@ if (cfg2$run_analysis &&
   }
   s_orig <- dat_orig$s[!is.na(dat_orig$s)]
   s_grid <- seq(from=min(s_orig), to=max(s_orig), length.out=101)
-  # ests <- est_curve(
-  #   dat_orig = dat_orig,
-  #   estimator = "Grenander",
-  #   params = cfg2$params,
-  #   points = s_grid,
-  #   dir = "decr",
-  #   return_extra = return_extra
-  # )
-  # 
-  # saveRDS(ests, paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds"))
-  ests <- readRDS(paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds"))
+  ests <- est_curve(
+    dat_orig = dat_orig,
+    estimator = "Grenander",
+    params = cfg2$params,
+    points = s_grid,
+    dir = "decr",
+    return_extra = return_extra
+  )
+  
+  saveRDS(ests, paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds"))
+  # ests <- readRDS(paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds"))
   
   run_cve <- as.logical("Grenander" %in% cfg2$plot_cve$est)
   ests2 <- process_ests(ests, s_grid, run_cve=run_cve,
@@ -1539,7 +1642,7 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
   }
   
   if (nrow(plot_data_risk)>0) {
-    cfg2$lab_y <- paste0("Probability of ", cfg2$endpoint, " by day ", cfg2$t_0)
+    cfg2$lab_y <- paste0("Probability of ", cfg2$endpoint, " by day ", C$t_0)
     plot <- create_plot(
       plot_data = trim_plot_data(plot_data_risk),
       which = "Risk",
@@ -1557,7 +1660,7 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
   
   if (nrow(plot_data_cve)>0) {
     cfg2$lab_y <- paste0("Controlled VE against ", cfg2$endpoint,
-                         " by day ", cfg2$t_0)
+                         " by day ", C$t_0)
     
     if (flags$hvtn705_abstract_fig) {
       cfg2$lab_title <- "IgG3 V1V2 breadth (Weighted avg log10 Net MFI): Month 7"
@@ -1618,10 +1721,10 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
 if (F) {
   
   # Temp
-  cfg2$t_0 <- 595
+  C$t_0 <- 595
   cfg2$lab_title <- c("HVTN703/HPTN081", "HVTN704/HPTN085", "Pooled AMP trials")
   cfg2$amp_tx2 <- rep(c("Control", "VRC01 10mg/kg", "VRC01 30mg/kg",
-                    "VRC01 Pooled"), 3)
+                        "VRC01 Pooled"), 3)
   
   # Generate histograms and KM objects
   # !!!!! Eventually replace this section and instead save the objects above,
@@ -1694,12 +1797,12 @@ if (F) {
     
     # Read in data objects
     plot_data_risk <- readRDS(paste0(cfg2$analysis, " plots/km_",
-                         plot_map$overall[i], ".rds"))
+                                     plot_map$overall[i], ".rds"))
     hst <- readRDS(paste0(cfg2$analysis, " plots/hist_",
                           plot_map$hist[i], ".rds"))
     for (j in plot_map$gren[[i]]) {
       s_orig <- readRDS(paste0(cfg2$analysis, " plots/s_orig_",
-                             j, ".rds"))
+                               j, ".rds"))
       s_grid <- seq(from=min(s_orig), to=max(s_orig), length.out=101)
       ests <- readRDS(paste0(cfg2$analysis, " plots/ests_g_",
                              j, ".rds"))
@@ -1709,7 +1812,7 @@ if (F) {
     }
     
     # Generate and save plot
-    cfg2$lab_y <- paste0("Probability of ", cfg2$endpoint, " by day ", cfg2$t_0)
+    cfg2$lab_y <- paste0("Probability of ", cfg2$endpoint, " by day ", C$t_0)
     lab_title <- cfg2$lab_title[plot_map$lab_title[i]]
     plot <- create_plot(
       plot_data = plot_data_risk,

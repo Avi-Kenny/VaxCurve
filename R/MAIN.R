@@ -135,7 +135,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   
   # Hypothesis testing: Unif(0,1)
   level_set_testing_1 <- list(
-    n = 2000,
+    n = 1000,
     alpha_3 = seq(0,-0.5,-0.1),
     dir = "decr",
     sc_params = list("sc_params"=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5)),
@@ -298,14 +298,13 @@ if (cfg$main_task=="run") {
 
 
 
-###################################.
-##### VIZ: Estimation (sim 1) #####
-###################################.
+#########################################.
+##### VIZ: Estimation (bias,cov,sd) #####
+#########################################.
 
 if (F) {
   
-  # Read in simulation object
-  sim <- readRDS("../SimEngine.out/sim_est_20211004.rds")
+  # sim <- readRDS("../SimEngine.out/sim_est_20220824.rds")
   
   # Summarize results
   summ_bias <- list()
@@ -374,12 +373,6 @@ if (F) {
   )
   p_data %<>% mutate(point = as.numeric(point))
   
-  # cb_colors <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442",
-  #                "#0072B2", "#D55E00", "#CC79A7", "#999999")
-  # m_colors <- c(cb_colors[2], cb_colors[5], cb_colors[6]
-    # `Grenander (Est Q_n/g_n)` = cb_colors[2],
-  # )
-  
   # PLot Y-axis limits
   plot_lims <- list(b=c(-0.25,0.25), c=c(0,1), m=c(0,0.02),
                     v=c(0,0.01), s=c(0,0.15))
@@ -394,9 +387,6 @@ if (F) {
     rtruncnorm(10^5, a=0, b=1, mean=0.3+0.4*x2, sd=0.3), c(0.1,0.9)
   ))
   df_vlines <- data.frame(
-    # x = c(qnorm(0.1,0.5,0.1),qnorm(0.1,0.5,0.2),qunif(0.1,0,1),
-    #       qnorm(0.9,0.5,0.1),qnorm(0.9,0.5,0.2),qunif(0.9,0,1)),
-    # distr_S = rep(c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"),2)
     x = c(qunif(0.1,0,1), qtruncnorm(0.1, a=0, b=1, mean=0.5, sd=0.2), q3[1],
           qunif(0.9,0,1), qtruncnorm(0.9, a=0, b=1, mean=0.5, sd=0.2), q3[2]),
     distr_S = rep(distr_Ss,2)
@@ -405,10 +395,6 @@ if (F) {
   # Grey background densities
   df_distr_S <- data.frame(
     x = rep(seq(0,1,0.01),3),
-    # ymax = c(dnorm(seq(0,1,0.01), mean=0.5, sd=0.1),
-    #          dnorm(seq(0,1,0.01), mean=0.5, sd=0.2),
-    #          rep(1,101)),
-    # distr_S = rep(c("N(0.5,0.01)", "N(0.5,0.04)", "Unif(0,1)"), each=101),
     ymax = c(rep(1,101),
              dtruncnorm(seq(0,1,0.01), a=0, b=1, mean=0.5, sd=0.2),
              0.5*dtruncnorm(seq(0,1,0.01), a=0, b=1, mean=0.3, sd=0.3) +
@@ -435,12 +421,10 @@ if (F) {
   df_distr_s <- mutate(df_distr_S, ymin=plot_lims$s[1],
                        ymax=((ymax*diff(plot_lims$s))/6+plot_lims$s[1]))
   
-  if (T) {
-    p_data %<>% mutate(
-      Estimator = ifelse(Estimator %in% c("Grenander", "Grenander (GCM)"),
-                         "NPCVE", Estimator)
-    )
-  }
+  p_data %<>% mutate(
+    Estimator = ifelse(Estimator %in% c("Grenander", "Grenander (GCM)"),
+                       "NPCVE", Estimator)
+  )
   
   # Bias plot
   # Export: 10" x 6"
@@ -542,6 +526,196 @@ if (F) {
 
 
 
+################################################.
+##### VIZ: Estimation (actual vs limit sd) #####
+################################################.
+
+if (F) {
+  
+  print(paste("Start:",Sys.time()))
+  
+  # !!!!! Add estimated SD to plots ??? (extract from CIs)
+  
+  # sim <- readRDS("../SimEngine.out/sim_est_20220824.rds")
+  
+  # Summarize results
+  summ_sd <- list()
+  for (i in c(1:51)) { # for (i in c(1:5)) {
+    m <- format(round(i/50-0.02,2), nsmall=2) # m <- format(round(i/4-0.25,2), nsmall=2)
+    summ_sd[[i]] <- list(
+      name = paste0("sd_",m),
+      x = paste0("r_Mn_",m)
+    )
+  }
+  summ <- summarize(sim, sd=summ_sd)
+  summ %<>% filter(estimator=="Grenander")
+  
+  C <- list(
+    points = round(seq(0,1,0.02),2),
+    alpha_1 = 0.5,
+    alpha_2 = 0.7,
+    t_0 = 200,
+    appx=list(t_0=1, x_tol=25, s=0.01)
+  )
+  
+  for (i in c(1:nrow(summ))) {
+    
+    x1 <- rep(round(seq(0,1,0.1),1),2)
+    x2 <- rep(c(0,1), each=11)
+    
+    L <- list(
+      n = summ[i,"n"],
+      alpha_3 = summ[i,"alpha_3"],
+      distr_S = summ[i,"distr_S"],
+      edge = summ[i,"edge"],
+      surv_true = summ[i,"surv_true"],
+      sc_params = sim$levels$sc_params$sc_params,
+      sampling = summ[i,"sampling"],
+      dir = summ[i,"dir"],
+      wts_type = summ[i,"wts_type"]
+    )
+    dat_orig <- generate_data(L$n, L$alpha_3, L$distr_S, L$edge, L$surv_true,
+                              L$sc_params, L$sampling, L$dir, L$wts_type)
+    dat_orig <- round_dat(dat_orig)
+    dat <- ss(dat_orig, which(dat_orig$z==1))
+    dat_orig_large <- generate_data(10^5, L$alpha_3, L$distr_S, L$edge, L$surv_true, # !!!!! Try 10^6 or 10^7
+                              L$sc_params, L$sampling, L$dir, L$wts_type)
+    dat_orig_large <- round_dat(dat_orig_large)
+    dat_large <- ss(dat_orig_large, which(dat_orig_large$z==1))
+    
+    f_sIx_0 <- construct_f_sIx_n(dat, vals=NA, type="true")
+
+    f_s_0 <- Vectorize(function(s) {
+      mean(sapply(c(1:22), function(i) {
+        x <- c(x1[i],x2[i])
+        return(f_sIx_0(s,x))
+      }))
+    })
+    
+    g_0 <- function(s,x) { f_sIx_0(s,x) / f_s_0(s) }
+    
+    deriv_r_M0 <- construct_deriv_r_Mn(r_Mn=NA, type="true", dat_orig=dat_orig)
+    
+    vlist <- create_val_list(dat_orig)
+    srvSL <- construct_Q_n(dat, vlist$Q_n, type="true")
+    Q_n <- srvSL$srv
+    Qc_n <- srvSL$cens
+    omega_0 <- construct_omega_n(NA, Q_n, Qc_n, type="true")
+    
+    gamma_0 <- function(x,s) {
+      ind <- which(dat_large$x$x1==x[1] &
+                     dat_large$x$x2==x[2] &
+                     dat_large$s==s)
+      if (length(ind)==0) {
+        return(NA)
+      }
+      dat_ss <- ss(dat_large,ind)
+      po <- (dat_ss$weights*
+               omega_0(dat_ss$x,dat_ss$s,dat_ss$y,dat_ss$delta))^2
+      return(mean(po))
+    }
+    
+    f_sIx_z1_0 <- construct_f_sIx_n(dat, NA, type="parametric", z1=T)
+    
+    Pz_0 <- function(x) {
+      ind <- which(dat_orig_large$x$x1==x[1] & dat_orig_large$x$x2==x[2])
+      mean(ss(dat_orig_large,ind)$z)
+    }
+    
+    g_z0 <- function(x,s) {
+      (f_sIx_z1_0(s,x)/f_sIx_0(s,x)) * Pz_0(x)
+    }
+    
+    # Calculate true tau_0
+    tau_0 <- Vectorize(function(u) {
+      abs(
+        ((4*deriv_r_M0(u))/(f_s_0(u))) * mean(sapply(c(1:22), function(i) {
+          x <- c(x1[i],x2[i])
+          return( (gamma_0(x,u)*g_z0(x,u)) / g_0(u,x) )
+        })
+        ))^(1/3)
+    })
+
+    sd_0 <- function(u) { (0.52*tau_0(u)) / L$n^(1/3) }
+    
+    for (pt in C$points) {
+      summ[i,paste0("sd0_",format(pt,nsmall=2))] <- sd_0(pt)
+    }
+    summ[i,paste0("sd0_",format(pt,nsmall=2))]
+    
+  }
+  
+  p_data <- pivot_longer(
+    data = summ,
+    cols = -c(level_id,n,alpha_3,sc_params,distr_S,edge,
+              surv_true,sampling,estimator,dir,wts_type),
+    names_to = c("stat","point"),
+    names_sep = "_"
+  )
+  p_data %<>% mutate(
+    point = as.numeric(point),
+    stat = ifelse(stat=="sd", "Empirical SD",
+                  ifelse(stat=="sd0", "True SD", "error"))
+  )
+  
+  # PLot Y-axis limits
+  plot_lims <- list(s=c(0,0.15))
+  
+  # Set faceting vectors
+  distr_Ss <- c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)")
+  surv_trues <- c("Cox PH", "Complex")
+  
+  # Orange 10/90 quantile lines
+  x2 <- rbinom(10^5, size=1, prob=0.5)
+  q3 <- as.numeric(quantile(
+    rtruncnorm(10^5, a=0, b=1, mean=0.3+0.4*x2, sd=0.3), c(0.1,0.9)
+  ))
+  df_vlines <- data.frame(
+    x = c(qunif(0.1,0,1), qtruncnorm(0.1, a=0, b=1, mean=0.5, sd=0.2), q3[1],
+          qunif(0.9,0,1), qtruncnorm(0.9, a=0, b=1, mean=0.5, sd=0.2), q3[2]),
+    distr_S = rep(distr_Ss,2)
+  )
+  
+  # Grey background densities
+  df_distr_S <- data.frame(
+    x = rep(seq(0,1,0.01),3),
+    ymax = c(rep(1,101),
+             dtruncnorm(seq(0,1,0.01), a=0, b=1, mean=0.5, sd=0.2),
+             0.5*dtruncnorm(seq(0,1,0.01), a=0, b=1, mean=0.3, sd=0.3) +
+               0.5*dtruncnorm(seq(0,1,0.01), a=0, b=1, mean=0.7, sd=0.3)),
+    distr_S = rep(distr_Ss, each=101),
+    value = 0
+  )
+  df_distr_s <- mutate(df_distr_S, ymin=plot_lims$s[1],
+                       ymax=((ymax*diff(plot_lims$s))/6+plot_lims$s[1]))
+  
+  # Standard deviation plot
+  # Export: 10" x 6"
+  # plot_lims$s <- c(0,0.15)
+  plot_lims$s <- c(0,0.3)
+  ggplot(
+    p_data,
+    aes(x=point, y=value, color=factor(stat), group=factor(stat))
+  ) +
+    geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
+                data=df_distr_s, fill="grey", color=NA, alpha=0.4) +
+    geom_vline(aes(xintercept=x), data=df_vlines, color="orange",
+               linetype="dashed") +
+    geom_line() +
+    facet_grid(rows = dplyr::vars(factor(surv_true, levels=surv_trues)),
+               cols = dplyr::vars(factor(distr_S, levels=distr_Ss))) +
+    scale_y_continuous(limits=plot_lims$s) +
+    theme(legend.position="bottom") +
+    labs(y="Standard deviation", x="S", color="")
+  
+  # "Start: 2022-11-28 20:26:22"
+  # "End:   2022-11-28 20:39:41"
+  print(paste("End:",Sys.time()))
+  
+}
+
+
+
 ################################.
 ##### VIZ: Testing (sim 1) #####
 ################################.
@@ -565,7 +739,7 @@ if (F) {
       # list(name="reject_4", x="reject_4", na.rm=T)
     )
   )
-  summ
+  # summ
   
   # # !!!!!
   # summ1 <- summ %>% filter(distr_S=="Unif(0,1)" & test=="Slope (two-tailed)")

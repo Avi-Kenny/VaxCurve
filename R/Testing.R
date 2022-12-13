@@ -31,7 +31,7 @@
   )
   L <- list(
     n = 1000,
-    alpha_3 = 0,
+    alpha_3 = -2,
     dir = "decr",
     sc_params = list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5), # sc_params=list(lmbd=1e-3, v=1.5, lmbd2=5e-7, v2=1.5), # Uncomment this for (almost) no censoring
     distr_S = "N(0.3+0.4x2,0.09)", # "Unif(0,1)" "N(0.5,0.04)" "N(0.3+0.4x2,0.09)"
@@ -309,7 +309,7 @@
     
     r_Mn <- r_Mn_Gr
     deriv_r_Mn <- construct_deriv_r_Mn(r_Mn, type=params$deriv_type,
-                                             L$dir="decr")
+                                             dir="decr")
     
     # Compute estimates
     deriv_ests <- c(deriv_ests, deriv_r_Mn(grid))
@@ -1040,21 +1040,25 @@
   # True conditional density function
   p_0 <- 0.6 # Should correspond to L$edge
   f_sIx_0 <- construct_f_sIx_n(dat, NA, type="true", k=15)
-  f_sIx_n_para <- construct_f_sIx_n(dat, NA, type="parametric")
-  f_sIx_n_para2 <- construct_f_sIx_n(dat, NA, type="parametric (edge)")
+  # f_sIx_n_para <- construct_f_sIx_n(dat, NA, type="parametric")
+  f_sIx_n_para <- construct_f_sIx_n(dat, NA, type="parametric (edge)")
+  f_sIx_n_para2 <- construct_f_sIx_n(dat, NA, type="parametric (edge) 2")
+  
+  # !!!!! True params (last three): c(-1.4,1,1)
   
   # Generate plot data
   grid <- round(seq(0,1,0.01),2)
-  f_sIx_models <- c("Truth", "parametric", "parametric (edge)")
+  # f_sIx_models <- c("Truth", "parametric", "parametric (edge)")
+  f_sIx_models <- c("Truth", "parametric (edge)", "parametric (edge) 2")
   n_models <- length(f_sIx_models)
   len <- length(grid)
   plot_data <- data.frame(
     s = rep(grid, 4*n_models),
     density = c(
-      sapply(grid, function(s) { p_0*f_sIx_0(s, x=c(0.2,0)) }),
-      sapply(grid, function(s) { p_0*f_sIx_0(s, x=c(0.8,0)) }),
-      sapply(grid, function(s) { p_0*f_sIx_0(s, x=c(0.2,1)) }),
-      sapply(grid, function(s) { p_0*f_sIx_0(s, x=c(0.8,1)) }),
+      sapply(grid, function(s) { (1-expit(0.2-1.4))*f_sIx_0(s, x=c(0.2,0)) }),
+      sapply(grid, function(s) { (1-expit(0.8-1.4))*f_sIx_0(s, x=c(0.8,0)) }),
+      sapply(grid, function(s) { (1-expit(1.2-1.4))*f_sIx_0(s, x=c(0.2,1)) }),
+      sapply(grid, function(s) { (1-expit(1.8-1.4))*f_sIx_0(s, x=c(0.8,1)) }),
       sapply(grid, function(s) { f_sIx_n_para(s, x=c(0.2,0)) }),
       sapply(grid, function(s) { f_sIx_n_para(s, x=c(0.8,0)) }),
       sapply(grid, function(s) { f_sIx_n_para(s, x=c(0.2,1)) }),

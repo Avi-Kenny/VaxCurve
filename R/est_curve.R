@@ -291,10 +291,9 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     } # DEBUG: return Gamma/Phi estimates
     
     # Construct variance scale factor
-    deriv_r_Mn <- construct_deriv_r_Mn(r_Mn, type=p$deriv_type,
-                                             dir=dir)
+    deriv_r_Mn <- construct_deriv_r_Mn(r_Mn, type=p$deriv_type, dir=dir)
     
-    tau_n <- construct_tau_n(deriv_r_Mn, gamma_n, f_s_n, g_zn, g_n,
+    tau_n <- construct_tau_n(deriv_r_Mn, gamma_n, f_sIx_n, f_s_n, g_zn,
                              dat_orig)
     chk(22)
     

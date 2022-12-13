@@ -1,25 +1,24 @@
 
-# DWD
+# Loop through files and extract edge mass and # events
 if (F) {
   
-  n <- 100
-  newX <- data.frame(x1=runif(n), x2=runif(n))
-  new.times <- rexp(n)
+  files <- dir("Debugging/TEMP")
+  files <- files[-c(1,2)]
+  file_stub <- "slurm-4559435_"
   
-  fit <- survMLc(
-    time = rexp(n),
-    event = rbinom(n, prob=0.1, size=1),
-    X = data.frame(x1=runif(n), x2=runif(n)),
-    # newX = newX,
-    newtimes = new.times,
-    bin_size = 0.025,
-    time_basis = "continuous",
-    time_grid_approx = sort(unique(dat$y)),
-    surv_form = "exp",
-    SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth", "SL.glmnet",
-                   "SL.ridge", "SL.gbm"),
-    V = 5
-  )
+  numPH2 <- rep(NA,44)
+  edgeMass <- rep(NA,44)
+  
+  for (i in c(1:44)) {
+    
+    file <- paste0("Debugging/TEMP/",file_stub,i,".out")
+    fileString <- readChar(file, file.info(file)$size)
+    numPH2[i] <- as.numeric(sub("\".*", "", sub(".*# of PH2 events: ", "", fileString)))
+    edgeMass[i] <- as.numeric(sub("\".*", "", sub(".*Edge mass: ", "", fileString)))
+    
+  }
+  
+  print(data.frame(i=c(1:44), numPH2=numPH2, edgeMass=edgeMass))
   
 }
 

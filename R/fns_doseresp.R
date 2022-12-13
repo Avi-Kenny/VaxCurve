@@ -819,15 +819,24 @@ construct_r_tilde_Mn <- function(dat_orig, vals=NA, Q_n) {
 #' @param r_Mn An estimator of r_M0
 #' @param type One of c("gcomp", "linear", "spline")
 #' @param dir Direction of monotonicity; one of c("incr", "decr")
-construct_deriv_r_Mn <- function(r_Mn, type, dir="incr") {
+#' @param dat_orig Only used for type="true"
+construct_deriv_r_Mn <- function(r_Mn, type, dir="decr", dat_orig=NA) {
   
   # Estimate entire function on grid
-  grid <- round(seq(0,1,0.01),2)
-  r_Mns <- r_Mn(grid)
+  if (type!="true") {
+    grid <- round(seq(0,1,0.01),2)
+    r_Mns <- r_Mn(grid)
+  }
   
   if (type=="true") {
     
-    # TO DO; pass in dat_orig???
+    fnc <- function(s) {
+      s_idx <- which.min(abs(s-C$points))
+      ch_y <- diff(attr(dat_orig, "r_M0"))[s_idx]
+      if (is.na(ch_y)) { ch_y <- diff(attr(dat_orig,"r_M0"))[round(s_idx-1)] }
+      ch_x <- C$points[2] - C$points[1] # Assumes equal spacing of points
+      return(ch_y/ch_x)
+    }
     
   }
   
@@ -1000,16 +1009,27 @@ construct_deriv_r_Mn <- function(r_Mn, type, dir="incr") {
 #' @param gamma_n Nuisance function estimator returned by construct_gamma_n()
 #' @param f_s_n Density estimator returned by construct_f_s_n()
 #' @return Chernoff scale factor estimator function
-construct_tau_n <- function(deriv_r_Mn, gamma_n, f_s_n,
-                            g_zn=NA, g_n=NA, dat_orig=NA) {
+construct_tau_n <- function(deriv_r_Mn=NA, gamma_n=NA, f_sIx_n=NA, f_s_n=NA,
+                            g_zn=NA, dat_orig=NA) {
   
   n_orig <- length(dat_orig$s)
   x <- dat_orig$x
+  # return(Vectorize(function(u) {
+  #   abs(
+  #     ((4*deriv_r_Mn(u))/(n_orig*f_s_n(u))) *
+  #       sum((gamma_n(x,u)*g_zn(x,u))/g_n(u,x))
+  #   )^(1/3)
+  # }))
   return(Vectorize(function(u) {
+    # abs(
+    #   ((4*deriv_r_Mn(u))/f_s_n(u)) * (1/n_orig)*sum(
+    #     (gamma_n(x,rep(u,n_orig))*g_zn(x,rep(u,n_orig))) / g_n(rep(u,n_orig),x)
+    #   ))^(1/3)
     abs(
-      ((4*deriv_r_Mn(u))/(n_orig*f_s_n(u))) *
-        sum((gamma_n(x,u)*g_zn(x,u))/g_n(u,x))
-    )^(1/3)
+      4*deriv_r_Mn(u) * (1/n_orig)*sum(
+        (gamma_n(x,rep(u,n_orig))*g_zn(x,rep(u,n_orig))) /
+          f_sIx_n(rep(u,n_orig),x)
+    ))^(1/3)
   }))
   
 }
@@ -1487,6 +1507,76 @@ construct_f_sIx_n <- function(dat, vals=NA, type, k=0, z1=F, s_scale=1,
       pc_1 <- In(s==0) * ( (1-p_n) / C$appx$s )
       pc_2 <- In(s!=0) * p_n * dtruncnorm(s, a=0, b=1, mean=mu, sd=sigma)
       return(pc_1+pc_2)
+    }
+    
+  } else if (type=="parametric (edge) 2") {
+    
+    # Density for a single observation
+    dens_s <- function(s, x, prm) {
+      mu <- sum( c(1,x) * c(expit(prm[1]),prm[2:(length(x)+1)]) )
+      sigma <- 10*expit(prm[round(length(x)+2)]) # !!!!! Try using exp instead of expit
+      return( dtruncnorm(s, a=C$appx$s, b=1, mean=mu, sd=sigma) )
+    }
+    
+    # Probability P(S=s|X=x) for s==0 or s!=0
+    prob_s <- function(s, x, prm) {
+      s <- ifelse(s==0, 0, 1)
+      lin <- sum(c(1,x)*prm)
+      return(expit(lin)^(1-s)*(1-expit(lin))^s)
+    }
+    
+    # Set up weighted likelihood (edge)
+    wlik_1 <- function(prm) {
+      -1 * sum(sapply(c(1:length(dat$s)), function(i) {
+        dat$weights[i] *
+          log(pmax(prob_s(s=dat$s[i], x=as.numeric(dat$x[i,]), prm),1e-8))
+      }))
+    }
+    
+    # Run optimizer (edge)
+    opt_1 <- solnp(
+      pars = rep(0.01, length(dat$x)+1),
+      fun = wlik_1
+    )
+    if (opt_1$convergence!=0) {
+      warning("construct_f_sIx_n: opt_1 did not converge")
+    }
+    prm_1 <- opt_1$pars
+    print("prm_1") # !!!!!
+    print(prm_1) # !!!!!
+    
+    # Filter out observations with s==0
+    dat_1 <- ss(dat, which(dat$s!=0))
+    
+    # Set up weighted likelihood (Normal)
+    wlik_2 <- function(prm) {
+      -1 * sum(sapply(c(1:length(dat_1$s)), function(i) {
+        dat_1$weights[i] *
+          log(pmax(dens_s(s=dat_1$s[i], x=as.numeric(dat_1$x[i,]), prm),1e-8))
+      }))
+    }
+    
+    # Run optimizer (Normal)
+    opt_2 <- solnp(
+      pars = c(rep(0.01, length(dat_1$x)+1), 0.15),
+      fun = wlik_2
+    )
+    if (opt_2$convergence!=0) {
+      warning("construct_f_sIx_n: solnp() did not converge")
+    }
+    prm_2 <- opt_2$pars
+    print("prm_2") # !!!!!
+    print(prm_2) # !!!!!
+    
+    # Remove large intermediate objects
+    rm(dat,dat_1,opt_1,opt_2)
+    
+    fnc <- function(s, x) {
+      if (s==0) {
+        return(prob_s(s=0, x, prm_1) / C$appx$s)
+      } else {
+        return(prob_s(s=1, x, prm_1) * dens_s(s, x, prm_2))
+      }
     }
     
   } else if (type=="binning") {

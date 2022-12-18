@@ -1523,7 +1523,7 @@ if (cfg2$run_hyptest) {
     alt_type = "decr",
     # alt_type = "two-tailed",
     params = list(
-      type = c("simple (with constant)", "edge", "combined", "combined 2"), # "S-weighted (with constant)"
+      type = c("simple (with constant)", "edge", "combined", "combined 2"),
       q_n_type = "zero",
       Q_n_type = "Super Learner"
     )
@@ -1547,22 +1547,24 @@ if (cfg2$run_hyptest) {
   # Process hyp test results
   if (F) {
     
-    folder <- "Janssen (partA) plots/Run 11 (58 graphs, 0.90 cutoff)/Hyptest"
+    # folder <- "Janssen (partA) plots/Run 11 (58 graphs, 0.90 cutoff)/Hyptest"
+    folder <- "Profiscov plots/Run 5 (added hyptest)/Hyptest"
     files <- dir(folder)
-    p_vals <- rep(NA, 58)
+    n_pvals <- length(files)
+    p_vals <- rep(NA, n_pvals)
     
-    for (i in c(1:58)) {
+    for (i in c(1:n_pvals)) {
       
       file <- paste0(folder, "/hyptest_", i, ".csv")
       df <- read.csv(file)
-      df %<>% filter(type=="combined 2")
+      # df %<>% filter(type=="combined 2")
       p_vals[i] <- df$p_val
       
     }
     
     # Save results
-    write.table(data.frame(i=c(1:58), p_val=round(p_vals,3)),
-                file = "p_vals.csv",
+    write.table(data.frame(i=c(1:n_pvals), p_val=round(p_vals,3)),
+                file = paste0(folder, "/", "p_vals.csv"),
                 sep = ",",
                 row.names = F)
     

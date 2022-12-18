@@ -1,4 +1,54 @@
 
+# TEMP
+if (F) {
+  
+  # f <- Vectorize(function(x) {
+  #   k <- 5
+  #   dbeta(x, shape1=1, shape2=k)
+  # })
+  # f <- function(x) { 1 }
+  
+  library(truncnorm)
+  library(ggplot2)
+  
+  grid <- seq(0.01,1,0.01)
+  vec_x <- vec_y <- vec_d <- vec_p <- c()
+  for (distr in c("Uniform", "Normal")) {
+    for (k in c(1,2,3,4,5)) {
+      
+      if (distr=="Uniform") {
+        f <- function(x) { 1 }
+      } else if (distr=="Normal") {
+        f <- Vectorize(function(x) {
+          dtruncnorm(x, a=0, b=1, mean=0.5, sd=0.2)
+        })
+      }
+      
+      if (k==1) { p <- c(5,1) }
+      if (k==2) { p <- c(2,1) }
+      if (k==3) { p <- c(1,1) }
+      if (k==4) { p <- c(1,2) }
+      if (k==5) { p <- c(1,5) }
+      
+      f_mod <- function(x) { f(x) * dbeta(x, shape1=p[1], shape2=p[2]) }
+      int_f <- Vectorize(function(x) { integrate(f_mod, lower=0, upper=x)$value })
+      f2 <- function(x) { grad(int_f,x)/int_f(1) }
+      # f2 <- function(x) { int_f(x)/int_f(1) }
+      
+      vec_x <- c(vec_x, grid)
+      vec_y <- c(vec_y, f2(grid))
+      vec_d <- c(vec_d, rep(distr, length(grid)))
+      vec_p <- c(vec_p, rep(paste0(k,". Beta(",p[1],",",p[2],")"), length(grid)))
+    }
+  }
+  
+  df_plot <- data.frame(x=vec_x, y=vec_y, d=vec_d, p=vec_p)
+  ggplot(df_plot, aes(x=x, y=y)) + geom_line() +
+    facet_grid(rows=dplyr::vars(d), cols=dplyr::vars(p),
+               scales="free_y")
+  
+}
+
 # Loop through files and extract edge mass and # events
 if (F) {
   

@@ -1,5 +1,22 @@
 
-# TEMP
+# Comparing new package to old estimates
+if (F) {
+  
+  var <- "omega_4"
+  x1 <- filter(sim$results, use_package==T)
+  x2 <- filter(sim$results, use_package==F)
+  df_plot <- data.frame(
+    x = c(x1[,var], x2[,var]),
+    grp = c(rep("vaccine", length(x1[,var])),
+            rep("VaxCurve", length(x2[,var])))
+  )
+  ggplot(df_plot, aes(x=x, group=grp, fill=factor(grp))) +
+    geom_histogram(color="white") +
+    facet_wrap(~grp, ncol=1)
+
+}
+
+# Illustration for Nima
 if (F) {
   
   # f <- Vectorize(function(x) {

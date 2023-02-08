@@ -16,14 +16,53 @@ if (cfg$which_sim=="estimation") {
                               L$sc_params, L$sampling, L$dir, L$wts_type)
     
     # Obtain estimates
-    ests <- est_curve(
-      dat_orig = dat_orig,
-      estimator = L$estimator$est,
-      params = L$estimator$params,
-      points = C$points,
-      dir = L$dir
-      # return_extra = "deriv_r_Mn" # "Theta_os_n"
-    )
+    if (L$use_package) {
+      
+      # Adapt data to new format
+      # !!!!! Eventually, change generate_data() and est_curve()
+      {
+        attr(dat_orig, "n_orig") <- L$n
+        attr(dat_orig, "dim_x") <- 2
+        dat <- list(df_vc=dat_orig)
+        class(dat) <- "dat_vaccine"
+      }
+      
+      if (L$estimator$est=="Grenander") {
+        
+        ests <- vaccine::est_np(dat=dat, t_0=C$t_0, cve=F, s_out=C$points,
+                                edge_corr=F, params=list(
+                                  surv_type = "Cox",
+                                  density_type = L$estimator$params$g_n_type,
+                                  deriv_type = L$estimator$params$deriv_type,
+                                  q_n_type = L$estimator$params$q_n_type
+                                ),
+                                grid_size=list(y=101, s=101, x=20))
+                                # grid_size=list(y=401, s=201, x=20))
+        
+      } else if (L$estimator$est=="Cox gcomp") {
+        
+        ests <- vaccine::est_cox(dat=dat, t_0=C$t_0, cve=F, s_out=C$points,
+                                 ci_type="logit",
+                                 grid_size=list(y=101, s=101, x=20))
+        
+      } else {
+        
+        stop("L$estimator$est incorrectly specified.")
+        
+      }
+
+    } else {
+      
+      ests <- est_curve(
+        dat_orig = dat_orig,
+        estimator = L$estimator$est,
+        params = L$estimator$params,
+        points = C$points,
+        dir = L$dir
+        # return_extra = "deriv_r_Mn" # "Theta_os_n"
+      )
+      
+    }
     
     # Return results
     r_M0 <- attr(dat_orig, "r_M0")
@@ -45,6 +84,24 @@ if (cfg$which_sim=="estimation") {
       } # DEBUG: return Gamma/Phi estimates
       
     }
+    
+    if (F) {
+      res_list["Gamma_0.2"] <- ests$extras$Gamma_0.2
+      res_list["Gamma_0.5"] <- ests$extras$Gamma_0.5
+      res_list["Gamma_tilde_0.2"] <- ests$extras$Gamma_tilde_0.2
+      res_list["Gamma_tilde_0.5"] <- ests$extras$Gamma_tilde_0.5
+      res_list["r_tilde_0.2"] <- ests$extras$r_tilde_0.2
+      res_list["r_tilde_0.5"] <- ests$extras$r_tilde_0.5
+      res_list["eta_0.2"] <- ests$extras$eta_0.2
+      res_list["eta_0.5"] <- ests$extras$eta_0.5
+      res_list["g_n_0.2"] <- ests$extras$g_n_0.2
+      res_list["g_n_0.5"] <- ests$extras$g_n_0.5
+      res_list["omega_1"] <- ests$extras$omega_1
+      res_list["omega_2"] <- ests$extras$omega_2
+      res_list["omega_3"] <- ests$extras$omega_3
+      res_list["omega_4"] <- ests$extras$omega_4
+      res_list["p_n"] <- ests$extras$p_n
+    } # DEBUG (1 of 3): !!!!! figure out differences w vaccine package
     
     if (F) {
       res_list$tau_n <- ests$tau_n

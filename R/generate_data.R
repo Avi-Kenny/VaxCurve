@@ -24,6 +24,8 @@
 generate_data <- function(n, alpha_3, distr_S, edge, surv_true, sc_params,
                           sampling, dir, wts_type="true") {
   
+  if (F) { n=200; alpha_3=-2; distr_S="Unif(0,1)"; edge="none"; surv_true="Cox PH"; sc_params=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5); sampling="two-phase (50%)"; dir="decr"; wts_type="estimated"; C=list(alpha_1=0.5, alpha_2=0.7, points=round(seq(0,1,0.02),2), t_0=200); source("R/fns_doseresp.R"); }
+  
   # Sample baseline covariates
   x <- data.frame(
     x1 = sample(round(seq(0,1,0.1),1), size=n, replace=T),
@@ -63,6 +65,8 @@ generate_data <- function(n, alpha_3, distr_S, edge, surv_true, sc_params,
   }
   edge_val <- rbinom(n, size=1, prob=edge_probs)
   s <- (1-edge_val)*s
+  
+  # s <- round(s,2) # !!!!! TEMP
   
   # Generate event times
   {

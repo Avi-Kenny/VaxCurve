@@ -5,24 +5,28 @@
 ##### CONFIG #####
 ##################.
 
+# # !!!!!
+# devtools::install_github(repo="Avi-Kenny/vaccine", lib="/home/akenny/R_lib", dependencies=T); stop("Done installing `vaccine` package");
+
 # To run multiple sims/analyses concurrently, ONLY change Slurm/SGE commands
 
 # Set global config
 # GitHub packages: tedwestling/ctsCausal, tedwestling/CFsurvival,
 #                  tedwestling/survSuperLearner, zeehio/facetscales,
-#                  cwolock/survML
+#                  cwolock/survML, Avi-Kenny/vaccine
+
 cfg <- list(
-  main_task = "analysis.R", # run update analysis.R
-  which_sim = "testing", # "estimation" "edge" "testing" "Cox" "debugging"
-  level_set_which = "level_set_testing_3", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1
+  main_task = "run", # run update analysis.R
+  which_sim = "estimation", # "estimation" "edge" "testing" "Cox" "debugging"
+  level_set_which = "level_set_estimation_xx", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1 level_set_estimation_xx
   # keep = c(1:3,7:9,16:18,22:24),
   num_sim = 1000,
-  pkgs = c("dplyr", "boot", "car", "mgcv", "memoise", "EnvStats", "fdrtool",
-           "splines", "survival", "SuperLearner", "survSuperLearner",
+  pkgs = c("vaccine", "dplyr", "boot", "car", "mgcv", "memoise", "EnvStats",
+           "fdrtool", "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm", "tidyr",
            "ranger", "survey", "pbapply", "compiler", "simest", "survML"), # "xgboost"
-  pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "facetscales", "scales",
-                     "data.table", "latex2exp"),
+  pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "scales", "data.table",
+                     "latex2exp"),
   parallel = "none",
   stop_at_error = F,
   appx = list(t_0=1, x_tol=25, s=0.01) # !!!!! S=0.001
@@ -110,6 +114,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     surv_true = c("Cox PH", "Complex"), # "Cox PH" "Complex" "exp"
     sampling = "two-phase (50%)", # "iid" "two-phase (50%)"
     wts_type = "estimated", # "true", "estimated"
+    # use_package = c(T,F),
     estimator = list(
       "Grenander (GCM)" = list(
         est = "Grenander",
@@ -123,6 +128,69 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
           g_n_type = "parametric" # "binning" "parametric" "parametric (edge)" "true"
         )
       ),
+      "Cox PH" = list(est="Cox gcomp")
+    )
+  )
+  
+  # Estimation: !!!!! TEMP TESTING
+  level_set_estimation_xx <- list(
+    n = 1000,
+    # n = c(500,1000,2000,4000),
+    alpha_3 = -2,
+    dir = "decr",
+    sc_params = list("sc_params"=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5)),
+    # distr_S = c("Unif(0,1)"),
+    distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
+    edge = "none", #  "none" "expit 0.4"
+    # surv_true = c("Cox PH"), # "Cox PH" "Complex" "exp"
+    surv_true = c("Cox PH", "Complex"), # "Cox PH" "Complex" "exp"
+    sampling = "two-phase (50%)", # "iid" "two-phase (50%)"
+    wts_type = "estimated", # "true", "estimated"
+    # use_package = T,
+    use_package = c(T,F),
+    estimator = list(
+      # "Grenander (GCM)" = list(
+      #   est = "Grenander",
+      #   params = list(
+      #     q_n_type = "zero", # "standard"
+      #     Q_n_type = "Cox PH", # "Cox PH" "Random Forest", "true"
+      #     convex_type = "GCM", # "GCM" "CLS"
+      #     ecdf_type = "linear (mid)",
+      #     edge_corr = "none", # "none" "min"
+      #     deriv_type = "m-spline",
+      #     g_n_type = "parametric" # "binning" "parametric" "parametric (edge)" "true"
+      #   )
+      # ),
+      
+      # # !!!!!
+      # "Grenander (regular CIs)" = list( # !!!!!
+      #   est = "Grenander",
+      #   params = list(
+      #     q_n_type = "zero", # "standard"
+      #     Q_n_type = "Cox PH", # "Cox PH" "Random Forest", "true"
+      #     convex_type = "GCM", # "GCM" "CLS"
+      #     ecdf_type = "linear (mid)",
+      #     edge_corr = "none", # "none" "min"
+      #     deriv_type = "m-spline",
+      #     g_n_type = "parametric", # "binning" "parametric" "parametric (edge)" "true"
+      #     mono_cis = F
+      #   ) # !!!!!
+      # ), # !!!!!
+      # "Grenander (mono CIs)" = list(
+      #   est = "Grenander",
+      #   params = list(
+      #     q_n_type = "zero", # "standard"
+      #     Q_n_type = "Cox PH", # "Cox PH" "Random Forest", "true"
+      #     convex_type = "GCM", # "GCM" "CLS"
+      #     ecdf_type = "linear (mid)",
+      #     edge_corr = "none", # "none" "min"
+      #     deriv_type = "m-spline",
+      #     g_n_type = "parametric", # "binning" "parametric" "parametric (edge)" "true"
+      #     mono_cis = T
+      #   )
+      # ) # !!!!!
+      # # !!!!!
+      
       "Cox PH" = list(est="Cox gcomp")
     )
   )
@@ -144,6 +212,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     surv_true = c("Cox PH", "Step"), # "Cox PH" "Step" "Complex"
     sampling = "two-phase (50%)", # "iid" "two-phase (50%)"
     wts_type = "estimated", # "estimated" "true"
+    use_package = F, # !!!!! Not yet implemented
     test = list(
       "Slope (two-tailed)" = list(
         type = "test_2",
@@ -181,6 +250,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     sampling = c("two-phase (50%)"), # "iid" "two-phase (50%)"
     wts_type = "estimated", # "true", "estimated"
     # simtype = c("old", "new"), # !!!!!
+    use_package = F,
     estimator = list(
       "Grenander (Cox PH)" = list(
         est = "Grenander",
@@ -210,7 +280,8 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     distr_S = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
     edge = "none",
     sampling = "two-phase (50%)", # "iid" "two-phase (50%)"
-    wts_type = c("true", "estimated")
+    wts_type = c("true", "estimated"),
+    use_package = F # !!!!! Not yet implemented
   )
   
   level_set <- get(cfg$level_set_which)
@@ -366,8 +437,10 @@ if (F) {
   
   p_data <- pivot_longer(
     data = summ,
+    # cols = -c(level_id,n,alpha_3,sc_params,distr_S,edge,
+    #           surv_true,sampling,Estimator,dir,wts_type),
     cols = -c(level_id,n,alpha_3,sc_params,distr_S,edge,
-              surv_true,sampling,Estimator,dir,wts_type),
+              surv_true,sampling,Estimator,dir,wts_type,use_package),
     names_to = c("stat","point"),
     names_sep = "_"
   )
@@ -431,6 +504,7 @@ if (F) {
   # Note: change "bias" to "biasG" for Gamma and "biasP" for Phi
   ggplot(
     filter(p_data, stat=="bias"),
+    # aes(x=point, y=value, color=factor(use_package), group=factor(use_package))
     aes(x=point, y=value, color=factor(Estimator), group=factor(Estimator))
   ) +
     geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
@@ -449,6 +523,7 @@ if (F) {
   # Export: 10" x 6"
   ggplot(
     filter(p_data, stat=="cov"),
+    # aes(x=point, y=value, color=factor(use_package), group=factor(use_package))
     aes(x=point, y=value, color=factor(Estimator), group=factor(Estimator))
   ) +
     geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
@@ -468,6 +543,7 @@ if (F) {
   # Export: 10" x 6"
   ggplot(
     filter(p_data, stat=="sd"),
+    # aes(x=point, y=value, color=factor(use_package), group=factor(use_package))
     aes(x=point, y=value, color=factor(Estimator), group=factor(Estimator))
   ) +
     geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),

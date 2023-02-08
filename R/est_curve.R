@@ -33,7 +33,7 @@
 #' @param return_extra A character vector of additional components to return
 #' @return A list of point estimates, SEs and CIs
 est_curve <- function(dat_orig, estimator, params, points, dir="decr",
-                      return_extra=NULL) {
+                      return_extra=NULL, return_edge=F) {
   
   # Set default params
   .default_params <- list(
@@ -494,6 +494,26 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   )
   
   if (F) {
+    res$extras <- list(
+      "Gamma_0.2" = Gamma_os_n(0.2),
+      "Gamma_0.5" = Gamma_os_n(0.5),
+      "Gamma_tilde_0.2" = Gamma_tilde_n(0.2),
+      "Gamma_tilde_0.5" = Gamma_tilde_n(0.5),
+      "r_tilde_0.2" = r_tilde_Mn(0.2),
+      "r_tilde_0.5" = r_tilde_Mn(0.5),
+      "eta_0.2" = eta_n(u=0.2,x=c(0,0)),
+      "eta_0.5" = eta_n(u=0.5,x=c(1,1)),
+      "g_n_0.2" = g_n(s=0.2,x=c(0,0)),
+      "g_n_0.5" = g_n(s=0.5,x=c(1,1)),
+      "omega_1" = omega_n(x=c(0,0),s=0.2,y=100,delta=0),
+      "omega_2" = omega_n(x=c(0,0),s=0.4,y=150,delta=1),
+      "omega_3" = omega_n(x=c(1,1),s=0.6,y=100,delta=0),
+      "omega_4" = omega_n(x=c(1,1),s=0.8,y=150,delta=1),
+      "p_n" = p_n
+    )
+  } # DEBUG (2 of 3): !!!!! figure out differences w vaccine package
+  
+  if (F) {
     res$ests_Gamma = c(rep(NA,na_head), ests_Gamma, rep(NA,na_tail))
     res$ests_Phi = c(rep(NA,na_head), ests_Phi, rep(NA,na_tail))
   } # DEBUG: return Gamma/Phi estimates
@@ -512,6 +532,12 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   if (estimator=="Grenander") {
     res$tau_ns <- c(rep(NA,na_head), tau_ns, rep(NA,na_tail))
     res$n <- n_orig
+  }
+  
+  # !!!!! Janssen mediation
+  if (return_edge) {
+    res$r_Mn_edge_est <- r_Mn_edge_est
+    res$sigma2_edge_est <- sigma2_edge_est
   }
   
   if ("gcomp" %in% return_extra) {

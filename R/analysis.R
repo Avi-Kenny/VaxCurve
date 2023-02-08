@@ -6,7 +6,7 @@
 
 {
   # Choose analysis
-  which_analysis <- "Profiscov" # "Janssen" "Moderna" "AMP" "AZD1222" "Janssen (partA)" "Profiscov" "HVTN 705 (primary)" "HVTN 705 (all)"
+  which_analysis <- "Janssen (partA)" # "Janssen" "Moderna" "AMP" "AZD1222" "Janssen (partA)" "Profiscov" "HVTN 705 (primary)" "HVTN 705 (all)"
   
   # Set proper task ID variable
   if (cluster_config$js=="slurm") {
@@ -92,6 +92,7 @@
     cfg2$zoom_y_cve <- NA
     cfg2$zoom_y_risk <- "zoomed (risk)"
     cfg2$zoom_y_max <- NA
+    cfg2$more_ticks <- F
     cfg2$folder_local <- "Janssen data/"
     cfg2$folder_cluster <- "Z:/covpn/p3003/analysis/correlates/Part_A_Blinded_Phase_Data/adata/"
     cfg2$params = list(
@@ -123,7 +124,8 @@
       v_covariates = c(1,1,1,1),
       zoom_x = c(1,1,1,1),
       zoom_y_cve = c(1,1,1,1),
-      zoom_y_risk = c(1,1,1,1)
+      zoom_y_risk = c(1,1,1,1),
+      more_ticks = c(1,1,1,1)
     )
     
     # Secondary map for variations within a graph; map_row corresponds to which
@@ -179,6 +181,7 @@
     cfg2$zoom_y_cve <- list(c(0.58,1.02)) # "zoomed"
     cfg2$zoom_y_risk <- list(c(-0.002,0.072))
     cfg2$zoom_y_max <- NA
+    cfg2$more_ticks <- F
     cfg2$folder_local <- "Moderna data/"
     cfg2$folder_cluster <- "Z:/covpn/p3001/analysis/correlates/Part_A_Blinded_Phase_Data/adata/"
     cfg2$llox_label <- "LOD" # NEW
@@ -213,6 +216,7 @@
       zoom_x = c(1,2,3,4,5,5,5,5,5,5),
       zoom_y_cve = c(1,1,1,1,1,1,1,1,1,1),
       zoom_y_risk = c(1,1,1,1,1,1,1,1,1,1),
+      more_ticks = c(1,1,1,1,1,1,1,1,1,1),
       llox_label = c(1,1,1,1,1,1,1,1,1,1),
       llox = c(1,1,2,2,3,3,4,4,5,5)
     )
@@ -275,6 +279,7 @@
     cfg2$zoom_y_cve <- "zoomed"
     cfg2$zoom_y_risk <- "zoomed (risk)"
     cfg2$zoom_y_max <- NA
+    cfg2$more_ticks <- F
     cfg2$folder_local <- "AMP data/"
     cfg2$folder_cluster <- "Z:/vaccine/p704/analysis/datashare/avi_kenny/adata/"
     cfg2$params = list(
@@ -307,7 +312,8 @@
       v_covariates = c(1,1,1,1,1,1,1,1,2,2,2,2),
       zoom_x = rep(1,12),
       zoom_y_cve = rep(1,12),
-      zoom_y_risk = rep(1,12)
+      zoom_y_risk = rep(1,12),
+      more_ticks = rep(1,12)
     )
     
     # Secondary map for variations within a graph; map_row corresponds to which
@@ -360,6 +366,7 @@
     cfg2$zoom_y_cve <- "zoomed"
     cfg2$zoom_y_risk <- "zoomed (risk)"
     cfg2$zoom_y_max <- NA
+    cfg2$more_ticks <- F
     cfg2$folder_local <- "HVTN 705 (all) data/"
     cfg2$folder_cluster <- "Z:/vaccine/p705/analysis/lab/cc/copcor/"
     cfg2$params = list(
@@ -391,7 +398,8 @@
       v_covariates = rep(1,39),
       zoom_x = rep(1,39),
       zoom_y_cve = rep(1,39),
-      zoom_y_risk = rep(1,39)
+      zoom_y_risk = rep(1,39),
+      more_ticks = rep(1,39)
     )
     
     # Secondary map for variations within a graph; map_row corresponds to which
@@ -443,6 +451,7 @@
     cfg2$zoom_y_cve <- "zoomed"
     cfg2$zoom_y_risk <- "zoomed (risk)"
     cfg2$zoom_y_max <- NA
+    cfg2$more_ticks <- F
     cfg2$folder_local <- "HVTN 705 (ICS) data/"
     cfg2$folder_cluster <- "Z:/vaccine/p705/analysis/lab/cc/copcor/"
     cfg2$params = list(
@@ -473,7 +482,8 @@
       v_covariates = rep(1,12),
       zoom_x = rep(1,12),
       zoom_y_cve = rep(1,12),
-      zoom_y_risk = rep(1,12)
+      zoom_y_risk = rep(1,12),
+      more_ticks = rep(1,12)
     )
     
     # Secondary map for variations within a graph; map_row corresponds to which
@@ -526,6 +536,7 @@
     cfg2$zoom_y_cve <- NA
     cfg2$zoom_y_risk <- "zoomed (risk)"
     cfg2$zoom_y_max <- NA
+    cfg2$more_ticks <- F
     cfg2$folder_local <- "AZD1222 data/"
     cfg2$folder_cluster <- "Z:/covpn/p3002/analysis/correlates/Part_A_Blinded_Phase_Data/adata/"
     cfg2$params = list(
@@ -556,7 +567,8 @@
       v_covariates = c(1,1,1,1),
       zoom_x = c(1,1,1,1),
       zoom_y_cve = c(1,1,1,1),
-      zoom_y_risk = c(1,1,1,1)
+      zoom_y_risk = c(1,1,1,1),
+      more_ticks = c(1,1,1,1)
     )
     
     # Secondary map for variations within a graph; map_row corresponds to which
@@ -769,7 +781,7 @@
   
   # Set config based on local vs. cluster
   if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
-    cfg2$tid <- 1
+    cfg2$tid <- 47
     cfg2$dataset <- paste0(cfg2$folder_cluster,cfg2$dataset)
   } else {
     cfg2$tid <- as.integer(Sys.getenv(.tid_var))
@@ -930,7 +942,7 @@
     C$t_0 <- min(time_1,time_2)
   } else {
     if (cfg2$t_0==0) {
-      C$t_0 <- max(dat_orig$y[dat_orig$delta==1 & dat_orig$z==1])
+      C$t_0 <- max(dat_orig$y[dat_orig$z==1 & dat_orig$delta==1])
     } else {
       C$t_0 <- cfg2$t_0
     }
@@ -1314,8 +1326,19 @@ if (cfg2$run_dqa) {
   process_ests <- function(ests, s_grid, run_cve=F, lab_risk=NA, lab_cve=NA,
                            tag="0", ci_type="regular") {
     
-    # Extract risk estimates
+    # Extract risk estimates and CIs
     ests_risk <- ests$est
+    if (ci_type=="regular") {
+      ci_lo_risk <- ests$ci_lo %>% pmax(0) %>% pmin(1)
+      ci_hi_risk <- ests$ci_hi %>% pmax(0) %>% pmin(1)
+    } else if (ci_type=="log(1-CVE)") {
+      ci_lo_risk <- risk_ct * exp(
+        log(ests_risk/risk_ct) - (ests$tau_ns*qnt)/(ests$n^(1/3)*ests_risk)
+      )
+      ci_hi_risk <- risk_ct * exp(
+        log(ests_risk/risk_ct) + (ests$tau_ns*qnt)/(ests$n^(1/3)*ests_risk)
+      )
+    }
     
     # Compute CVE estimates
     if (run_cve) {
@@ -1324,19 +1347,11 @@ if (cfg2$run_dqa) {
       cve <- Vectorize(function(x) { 1 - x/risk_ct })
       ests_cve <- cve(ests_risk)
       if (ci_type=="regular") {
-        ci_lo_risk <- ests$ci_lo %>% pmax(0) %>% pmin(1)
-        ci_hi_risk <- ests$ci_hi %>% pmax(0) %>% pmin(1)
         ci_lo_cve <- cve(ci_hi_risk) %>% pmin(1) # Reversing is intentional
         ci_hi_cve <- cve(ci_lo_risk) %>% pmin(1) # Reversing is intentional
       } else if (ci_type=="log(1-CVE)") {
         # The 0.975 quantile of the Chernoff distribution occurs at roughly 1.00
         qnt <- 1.00
-        ci_lo_risk <- risk_ct * exp(
-          log(ests_risk/risk_ct) - (ests$tau_ns*qnt)/(ests$n^(1/3)*ests_risk)
-        )
-        ci_hi_risk <- risk_ct * exp(
-          log(ests_risk/risk_ct) + (ests$tau_ns*qnt)/(ests$n^(1/3)*ests_risk)
-        )
         ci_lo_cve <- 1 - (ci_hi_risk/risk_ct) # Reversing is intentional
         ci_hi_cve <- 1 - (ci_lo_risk/risk_ct) # Reversing is intentional
       }
@@ -1395,8 +1410,27 @@ if (cfg2$run_analysis &&
     params = cfg2$params,
     points = s_grid,
     dir = "decr",
-    return_extra = return_extra
+    return_extra = return_extra,
+    return_edge = T # !!!!! TEMP; Janssen mediation
   )
+  
+  # !!!!!
+  if (F) {
+    ci_lo <- ests$ci_lo
+    ci_hi <- ests$ci_hi
+    val <- ci_lo[1]
+    for (i in c(2:length(ci_lo))) {
+      if (!is.na(ci_lo[i]) && !is.na(val) && ci_lo[i]>val) { ci_lo[i] <- val }
+      val <- ci_lo[i]
+    }
+    val <- ci_hi[1]
+    for (i in c(2:length(ci_hi))) {
+      if (!is.na(ci_hi[i]) && !is.na(val) && ci_hi[i]>val) { ci_hi[i] <- val }
+      val <- ci_hi[i]
+    }
+    ests$ci_lo <- ci_lo
+    ests$ci_hi <- ci_hi
+  }
   
   saveRDS(ests, paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds"))
   # ests <- readRDS(paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds"))
@@ -1408,6 +1442,72 @@ if (cfg2$run_analysis &&
                         ci_type="regular") # !!!!! log(1-CVE)
   plot_data_risk <- rbind(plot_data_risk, ests2$risk)
   if (run_cve) { plot_data_cve <- rbind(plot_data_cve, ests2$cve) }
+  
+}
+
+
+
+##################################################.
+##### !!!!! Janssen mediation analysis !!!!! #####
+##################################################.
+
+if (F) {
+  
+  # NDE
+  est_risk <- ests$r_Mn_edge_est
+  var_risk <- ests$sigma2_edge_est
+  n <- ests$n
+  ci_lo_risk <- est_risk - 1.96*sqrt(var_risk/n)
+  ci_hi_risk <- est_risk + 1.96*sqrt(var_risk/n)
+  risk_ct <- get.marginalized.risk.no.marker(df_ct, C$t_0)
+  cve <- Vectorize(function(x) { 1 - x/risk_ct })
+  est_cve <- cve(est_risk)
+  sd_cve <- sqrt(var_risk) / risk_ct
+  ci_lo_cve <- cve(ci_hi_risk) %>% pmin(1)
+  ci_hi_cve <- cve(ci_lo_risk) %>% pmin(1)
+  
+  # PM
+  est_ov <- overall.ve[[1]]
+  sd_ov <- sd(1-res.vacc.cont[2:1001]/res.plac.cont[2:1001])
+  ci_lo_ov <- overall.ve[[2]]
+  ci_hi_ov <- overall.ve[[3]]
+  est_pm <- 1 - log(1-est_cve)/log(1-est_ov)
+  var_pm <- sd_cve^2 / ( n * (1-est_cve)^2 * (log(1-est_ov))^2 ) +
+    sd_ov * (log(1-est_cve))^2 / ((1-est_ov)^2+(log(1-est_ov))^4)
+  sd_pm <- sqrt(var_pm)
+  ci_lo_pm <- est_pm - 1.96*sd_pm
+  ci_hi_pm <- est_pm + 1.96*sd_pm
+  
+  # Save results
+  saveRDS(
+    list(est_cve=est_cve, sd_cve=sd_cve, ci_lo_cve=ci_lo_cve,
+         ci_hi_cve=ci_hi_cve, est_pm=est_pm, sd_pm=sd_pm, ci_lo_pm=ci_lo_pm,
+         ci_hi_pm=ci_hi_pm),
+    paste0(cfg2$analysis," plots/mediation_results_",cfg2$tid,".rds")
+  )
+  
+  # Process results
+  if (F) {
+    
+    df_med <- data.frame(
+      "est_cve" = double(),
+      "sd_cve" = double(),
+      "ci_lo_cve" = double(),
+      "ci_hi_cve" = double(),
+      "est_pm" = double(),
+      "sd_pm" = double(),
+      "ci_lo_pm" = double(),
+      "ci_hi_pm" = double()
+    )
+    for (i in c(1:58)) {
+      file <- paste0("Janssen (partA) plots/Mediation/",
+                     "/mediation_results_",i,".rds")
+      med <- readRDS(file)
+      df_med[round(nrow(df_med)+1),] <- med
+    }
+    write.table(df_med, file="mediation_results.csv", sep=",", row.names=F)
+    
+  }
   
 }
 
@@ -1877,6 +1977,7 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
     
     plot <- create_plot(
       plot_data = trim_plot_data(plot_data_cve),
+      # plot_data = trim_plot_data(filter(plot_data_cve, curve!="CVE, Cox model")),
       which = "CVE",
       zoom_x = cfg2$zoom_x,
       zoom_y = cfg2$zoom_y_cve,

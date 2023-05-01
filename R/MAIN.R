@@ -16,9 +16,9 @@
 #                  cwolock/survML, Avi-Kenny/vaccine
 
 cfg <- list(
-  main_task = "run", # run update analysis.R
+  main_task = "analysis.R", # run update analysis.R
   which_sim = "estimation", # "estimation" "edge" "testing" "Cox" "debugging"
-  level_set_which = "level_set_estimation_xx", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1 level_set_estimation_xx
+  level_set_which = "level_set_estimation_4", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1 level_set_estimation_xx
   # keep = c(1:3,7:9,16:18,22:24),
   num_sim = 1000,
   pkgs = c("vaccine", "dplyr", "boot", "car", "mgcv", "memoise", "EnvStats",
@@ -28,6 +28,7 @@ cfg <- list(
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "scales", "data.table",
                      "latex2exp"),
   parallel = "none",
+  n_cores = 500,
   stop_at_error = F,
   appx = list(t_0=1, x_tol=25, s=0.01) # !!!!! S=0.001
 )
@@ -104,6 +105,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   # )
   
   # Estimation: no edge mass
+  # Used for NPCVE Figures 1-3
   level_set_estimation_1 <- list(
     n = 1000,
     alpha_3 = -2,
@@ -114,17 +116,18 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     surv_true = c("Cox PH", "Complex"), # "Cox PH" "Complex" "exp"
     sampling = "two-phase (50%)", # "iid" "two-phase (50%)"
     wts_type = "estimated", # "true", "estimated"
-    # use_package = c(T,F),
+    use_package = T,
     estimator = list(
       "Grenander (GCM)" = list(
         est = "Grenander",
         params = list(
-          q_n_type = "zero",
+          q_n_type = "zero", # "standard"
           Q_n_type = "Cox PH", # "Cox PH" "Random Forest", "true"
           convex_type = "GCM", # "GCM" "CLS"
           ecdf_type = "linear (mid)",
           edge_corr = "none", # "none" "min"
           deriv_type = "m-spline",
+          mono_cis = F,
           g_n_type = "parametric" # "binning" "parametric" "parametric (edge)" "true"
         )
       ),
@@ -132,76 +135,56 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     )
   )
   
-  # Estimation: !!!!! TEMP TESTING
-  level_set_estimation_xx <- list(
-    n = 1000,
-    # n = c(500,1000,2000,4000),
-    alpha_3 = -2,
-    dir = "decr",
-    sc_params = list("sc_params"=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5)),
-    # distr_S = c("Unif(0,1)"),
-    distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
-    edge = "none", #  "none" "expit 0.4"
-    # surv_true = c("Cox PH"), # "Cox PH" "Complex" "exp"
-    surv_true = c("Cox PH", "Complex"), # "Cox PH" "Complex" "exp"
-    sampling = "two-phase (50%)", # "iid" "two-phase (50%)"
-    wts_type = "estimated", # "true", "estimated"
-    # use_package = T,
-    use_package = c(T,F),
-    estimator = list(
-      # "Grenander (GCM)" = list(
-      #   est = "Grenander",
-      #   params = list(
-      #     q_n_type = "zero", # "standard"
-      #     Q_n_type = "Cox PH", # "Cox PH" "Random Forest", "true"
-      #     convex_type = "GCM", # "GCM" "CLS"
-      #     ecdf_type = "linear (mid)",
-      #     edge_corr = "none", # "none" "min"
-      #     deriv_type = "m-spline",
-      #     g_n_type = "parametric" # "binning" "parametric" "parametric (edge)" "true"
-      #   )
-      # ),
-      
-      # # !!!!!
-      # "Grenander (regular CIs)" = list( # !!!!!
-      #   est = "Grenander",
-      #   params = list(
-      #     q_n_type = "zero", # "standard"
-      #     Q_n_type = "Cox PH", # "Cox PH" "Random Forest", "true"
-      #     convex_type = "GCM", # "GCM" "CLS"
-      #     ecdf_type = "linear (mid)",
-      #     edge_corr = "none", # "none" "min"
-      #     deriv_type = "m-spline",
-      #     g_n_type = "parametric", # "binning" "parametric" "parametric (edge)" "true"
-      #     mono_cis = F
-      #   ) # !!!!!
-      # ), # !!!!!
-      # "Grenander (mono CIs)" = list(
-      #   est = "Grenander",
-      #   params = list(
-      #     q_n_type = "zero", # "standard"
-      #     Q_n_type = "Cox PH", # "Cox PH" "Random Forest", "true"
-      #     convex_type = "GCM", # "GCM" "CLS"
-      #     ecdf_type = "linear (mid)",
-      #     edge_corr = "none", # "none" "min"
-      #     deriv_type = "m-spline",
-      #     g_n_type = "parametric", # "binning" "parametric" "parametric (edge)" "true"
-      #     mono_cis = T
-      #   )
-      # ) # !!!!!
-      # # !!!!!
-      
-      "Cox PH" = list(est="Cox gcomp")
-    )
-  )
-  
   # Estimation: edge mass
+  # Used for NPCVE Figures 8-10
   level_set_estimation_2 <- level_set_estimation_1
   level_set_estimation_2$edge <- "expit 0.4"
   level_set_estimation_2$estimator[[1]]$params$edge_corr <- "min"
   level_set_estimation_2$estimator[[1]]$params$g_n_type <- "parametric (edge)"
   
+  # Estimation: no edge mass
+  # Used for Cox Figures XX-XX
+  level_set_estimation_3 <- list(
+    n = 1000,
+    alpha_3 = -2,
+    dir = "decr",
+    sc_params = list("sc_params"=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5)),
+    distr_S = c("Unif(0,1)", "N(0.5,0.04)"),
+    edge = "none",
+    surv_true = c("Cox PH", "S-shaped", "Cubic"),
+    sampling = "two-phase (50%)",
+    wts_type = "estimated",
+    use_package = T,
+    estimator = list(
+      "Cox (basic)" = list(est="Cox gcomp", spline_df=1, edge_ind=F),
+      "Cox (spline 4 df)" = list(est="Cox gcomp", spline_df=4, edge_ind=F),
+      "Cox (spline 8 df)" = list(est="Cox gcomp", spline_df=8, edge_ind=F)
+    )
+  )
+  
+  # Estimation: no edge mass
+  # Used for Cox Figures XX-XX
+  level_set_estimation_4 <- list(
+    n = 1000,
+    alpha_3 = -2,
+    dir = "decr",
+    sc_params = list("sc_params"=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5)),
+    distr_S = "N(0.5,0.04)",
+    edge = "expit 0.1",
+    surv_true = c("Cox PH", "Step"),
+    sampling = "two-phase (50%)",
+    wts_type = "estimated",
+    use_package = T,
+    estimator = list(
+      "Cox (basic)" = list(est="Cox gcomp",spline_df=1,edge_ind=F),
+      "Cox (edge)" = list(est="Cox gcomp",spline_df=1,edge_ind=T),
+      "Cox (spline 4 df)" = list(est="Cox gcomp",spline_df=4,edge_ind=F),
+      "Cox (edge + spline 4 df)" = list(est="Cox gcomp",spline_df=4,edge_ind=T)
+    )
+  )
+  
   # Hypothesis testing: Unif(0,1)
+  # Used for NPCVE Figure 4
   level_set_testing_1 <- list(
     n = 1000,
     alpha_3 = seq(0,-0.5,-0.1),
@@ -230,59 +213,14 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   )
   
   # Hypothesis testing: N(0.5,0.04)
+  # Used for NPCVE Figure 12
   level_set_testing_2 <- level_set_testing_1
   level_set_testing_2$distr_S <- "N(0.5,0.04)"
   
   # Hypothesis testing: N(0.3+0.4x2,0.09)
+  # Used for NPCVE Figure 13
   level_set_testing_3 <- level_set_testing_1
   level_set_testing_3$distr_S <- "N(0.3+0.4x2,0.09)"
-  
-  # Estimation: ideal params
-  level_set_edge_1 <- list(
-    n = 2000, # 1000
-    alpha_3 = -2,
-    dir = "decr",
-    sc_params = list("sc_params"=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_S = "Unif(0,1)",
-    # distr_S = c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)"),
-    edge = "expit 0.4",
-    surv_true = c("Cox PH", "Complex"), # "Cox PH" "Complex" "exp"
-    sampling = c("two-phase (50%)"), # "iid" "two-phase (50%)"
-    wts_type = "estimated", # "true", "estimated"
-    # simtype = c("old", "new"), # !!!!!
-    use_package = F,
-    estimator = list(
-      "Grenander (Cox PH)" = list(
-        est = "Grenander",
-        params = list(
-          Q_n_type = "Cox PH", # "Cox PH" "Random Forest" asdf
-          omega_n_type = "estimated",
-          g_n_type = "parametric (edge)" # "binning" "parametric" "parametric (edge)" "true"
-        )
-      ),
-      "Grenander (RF)" = list(
-        est = "Grenander",
-        params = list(
-          Q_n_type = "Random Forest", # "Cox PH" "Random Forest" asdf
-          omega_n_type = "estimated",
-          g_n_type = "parametric (edge)" # "binning" "parametric" "parametric (edge)" "true"
-        )
-      )
-    )
-  )
-  
-  # Estimation: ideal params
-  level_set_Cox_1 <- list(
-    n = 500,
-    alpha_3 = -2,
-    dir = "decr",
-    sc_params = list("sc_params"=list(lmbd=1e-3, v=1.5, lmbd2=5e-5, v2=1.5)),
-    distr_S = c("Unif(0,1)", "N(0.5,0.01)", "N(0.5,0.04)"),
-    edge = "none",
-    sampling = "two-phase (50%)", # "iid" "two-phase (50%)"
-    wts_type = c("true", "estimated"),
-    use_package = F # !!!!! Not yet implemented
-  )
   
   level_set <- get(cfg$level_set_which)
   
@@ -325,7 +263,11 @@ if (cfg$main_task=="run") {
       sim %<>% set_config(
         num_sim = cfg$num_sim,
         parallel = cfg$parallel,
+        n_cores = cfg$n_cores,
         stop_at_error = cfg$stop_at_error,
+        # batch_levels = c("surv_true"),
+        # return_batch_id = T,
+        # seed = 123, # !!!!!
         packages = cfg$pkgs
       )
       sim <- do.call(set_levels, c(list(sim), level_set))
@@ -338,7 +280,7 @@ if (cfg$main_task=="run") {
     
     main = { sim %<>% run() },
     
-    last = { sim %>% summarize() %>% print() },
+    last = { sim %>% SimEngine::summarize() %>% print() },
     
     cluster_config = cluster_config
     
@@ -377,6 +319,12 @@ if (F) {
   
   # sim <- readRDS("../SimEngine.out/sim_est_20220824.rds")
   
+  flags <- list(
+    # which_paper = "NPCVE"
+    which_paper = "Cox",
+    Cox_edge = T
+  )
+  
   # Summarize results
   summ_bias <- list()
   if (F) {
@@ -390,9 +338,11 @@ if (F) {
   for (i in c(1:51)) { # for (i in c(1:5)) {
     m <- format(round(i/50-0.02,2), nsmall=2) # m <- format(round(i/4-0.25,2), nsmall=2)
     summ_bias[[i]] <- list(
+      stat = "bias",
       name = paste0("bias_",m),
       estimate = paste0("r_Mn_",m),
-      truth = paste0("r_M0_",m)
+      truth = paste0("r_M0_",m),
+      na.rm = T # !!!!!
     )
     if (F) {
       summ_biasG[[i]] <- list(
@@ -407,30 +357,41 @@ if (F) {
       )
     } # DEBUG: Gamma/Phi
     summ_var[[i]] <- list(
+      stat = "var",
       name = paste0("var_",m),
-      x = paste0("r_Mn_",m)
+      x = paste0("r_Mn_",m),
+      na.rm = T # !!!!!
     )
     summ_sd[[i]] <- list(
+      stat = "sd",
       name = paste0("sd_",m),
-      x = paste0("r_Mn_",m)
+      x = paste0("r_Mn_",m),
+      na.rm = T # !!!!!
     )
     summ_mse[[i]] <- list(
+      stat = "mse",
       name = paste0("mse_",m),
       estimate = paste0("r_Mn_",m),
-      truth = paste0("r_M0_",m)
+      truth = paste0("r_M0_",m),
+      na.rm = T # !!!!!
     )
     summ_cov[[i]] <- list(
+      stat = "coverage",
       name = paste0("cov_",m),
       truth = paste0("r_M0_",m),
       lower = paste0("ci_lo_",m),
       upper = paste0("ci_hi_",m),
-      na.rm = T
+      na.rm = T # !!!!!
     )
   }
-  summ <- summarize(sim, bias=summ_bias, mse=summ_mse, var=summ_var,
-                    sd=summ_sd, coverage=summ_cov)
+  # summ <- summarize(sim, bias=summ_bias, mse=summ_mse, var=summ_var,
+  #                   sd=summ_sd, coverage=summ_cov)
+  summ_metrics <- c(summ_bias, summ_mse, summ_var, summ_sd, summ_cov)
+  summ <- do.call(SimEngine::summarize, c(list(sim), summ_metrics))
+
   if (F) {
-    summ <- summarize(sim, bias=c(summ_bias,summ_biasG,summ_biasP), mse=summ_mse, coverage=summ_cov)
+    summ <- SimEngine::summarize(sim, bias=c(summ_bias,summ_biasG,summ_biasP),
+                                 mse=summ_mse, coverage=summ_cov)
   } # DEBUG: Gamma/Phi
   
   summ %<>% rename("Estimator"=estimator)
@@ -449,32 +410,73 @@ if (F) {
   # PLot Y-axis limits
   plot_lims <- list(b=c(-0.25,0.25), c=c(0,1), m=c(0,0.02),
                     v=c(0,0.01), s=c(0,0.15))
+  # if (flags$Cox_edge) { plot_lims$b <- c(-0.3,0.3) }
   
-  # Set faceting vectors
-  distr_Ss <- c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)")
-  surv_trues <- c("Cox PH", "Complex")
+  if (flags$which_paper=="NPCVE") {
+    
+    # Set faceting vectors
+    surv_trues <- c("Cox PH", "Complex")
+    distr_Ss <- c("Unif(0,1)", "N(0.5,0.04)", "N(0.3+0.4x2,0.09)")
+    
+    # Orange 10/90 quantile lines
+    x2 <- rbinom(10^5, size=1, prob=0.5)
+    q3 <- as.numeric(quantile(
+      rtruncnorm(10^5, a=0, b=1, mean=0.3+0.4*x2, sd=0.3), c(0.1,0.9)
+    ))
+    df_vlines <- data.frame(
+      x = c(qunif(0.1,0,1), qtruncnorm(0.1, a=0, b=1, mean=0.5, sd=0.2), q3[1],
+            qunif(0.9,0,1), qtruncnorm(0.9, a=0, b=1, mean=0.5, sd=0.2), q3[2]),
+      distr_S = rep(distr_Ss,2)
+    )
+    
+    # Grey background densities
+    df_distr_S <- data.frame(
+      x = rep(seq(0,1,0.01),3),
+      ymax = c(rep(1,101),
+               dtruncnorm(seq(0,1,0.01), a=0, b=1, mean=0.5, sd=0.2),
+               0.5*dtruncnorm(seq(0,1,0.01), a=0, b=1, mean=0.3, sd=0.3) +
+                 0.5*dtruncnorm(seq(0,1,0.01), a=0, b=1, mean=0.7, sd=0.3)),
+      distr_S = rep(distr_Ss, each=101),
+      value = 0
+    )
+    
+  } else if (flags$which_paper=="Cox") {
+    
+    # Set faceting vectors
+    surv_trues <- c("Linear", "Cubic", "S-shaped")
+    distr_Ss <- c("Unif(0,1)", "N(0.5,0.04)")
+    if (flags$Cox_edge) {
+      surv_trues <- c("Linear", "Step")
+      distr_Ss <- "N(0.5,0.04)"
+    }
+    
+    # Orange 10/90 quantile lines
+    df_vlines <- data.frame(
+      x = c(qunif(0.1,0,1), qtruncnorm(0.1, a=0, b=1, mean=0.5, sd=0.2),
+            qunif(0.9,0,1), qtruncnorm(0.9, a=0, b=1, mean=0.5, sd=0.2)),
+      distr_S = rep(distr_Ss,2)
+    )
+    
+    # Grey background densities
+    if (flags$Cox_edge) {
+      df_distr_S <- data.frame(
+        x = seq(0,1,0.01),
+        ymax = dtruncnorm(seq(0,1,0.01), a=0, b=1, mean=0.5, sd=0.2),
+        distr_S = rep(distr_Ss, each=101),
+        value = 0
+      )
+    } else {
+      df_distr_S <- data.frame(
+        x = rep(seq(0,1,0.01),2),
+        ymax = c(rep(1,101),
+                 dtruncnorm(seq(0,1,0.01), a=0, b=1, mean=0.5, sd=0.2)),
+        distr_S = rep(distr_Ss, each=101),
+        value = 0
+      )
+    }
+    
+  }
   
-  # Orange 10/90 quantile lines
-  x2 <- rbinom(10^5, size=1, prob=0.5)
-  q3 <- as.numeric(quantile(
-    rtruncnorm(10^5, a=0, b=1, mean=0.3+0.4*x2, sd=0.3), c(0.1,0.9)
-  ))
-  df_vlines <- data.frame(
-    x = c(qunif(0.1,0,1), qtruncnorm(0.1, a=0, b=1, mean=0.5, sd=0.2), q3[1],
-          qunif(0.9,0,1), qtruncnorm(0.9, a=0, b=1, mean=0.5, sd=0.2), q3[2]),
-    distr_S = rep(distr_Ss,2)
-  )
-  
-  # Grey background densities
-  df_distr_S <- data.frame(
-    x = rep(seq(0,1,0.01),3),
-    ymax = c(rep(1,101),
-             dtruncnorm(seq(0,1,0.01), a=0, b=1, mean=0.5, sd=0.2),
-             0.5*dtruncnorm(seq(0,1,0.01), a=0, b=1, mean=0.3, sd=0.3) +
-             0.5*dtruncnorm(seq(0,1,0.01), a=0, b=1, mean=0.7, sd=0.3)),
-    distr_S = rep(distr_Ss, each=101),
-    value = 0
-  )
   if (sim$levels$edge!="none") {
     mass <- as.numeric(strsplit(sim$levels$edge," ",fixed=T)[[1]][2])
     height <- 10 * mass
@@ -494,69 +496,81 @@ if (F) {
   df_distr_s <- mutate(df_distr_S, ymin=plot_lims$s[1],
                        ymax=((ymax*diff(plot_lims$s))/6+plot_lims$s[1]))
   
-  p_data %<>% mutate(
-    Estimator = ifelse(Estimator %in% c("Grenander", "Grenander (GCM)"),
-                       "NPCVE", Estimator)
-  )
+  if (flags$which_paper=="NPCVE") {
+    p_data %<>% mutate(
+      Estimator = ifelse(Estimator %in% c("Grenander", "Grenander (GCM)"),
+                         "NPCVE", Estimator)
+    )
+  } else if (flags$which_paper=="Cox") {
+    p_data %<>% mutate(
+      surv_true = ifelse(surv_true=="Cox PH", "Linear", surv_true)
+    )
+  }
+  
+  # Set up facets
+  if (flags$which_paper=="NPCVE") {
+    f_rows <- dplyr::vars(factor(surv_true, levels=surv_trues))
+    f_cols <- dplyr::vars(factor(distr_S, levels=distr_Ss))
+  } else if (flags$which_paper=="Cox") {
+    f_rows <- dplyr::vars(factor(distr_S, levels=distr_Ss))
+    f_cols <- dplyr::vars(factor(surv_true, levels=surv_trues))
+  }
+  
+  # Set up plot objects
+  p_aes <- aes(x=point, y=value, color=factor(Estimator),
+               group=factor(Estimator))
+  p_ribbon <- function(d) {
+    geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
+                data=d, fill="grey", color=NA, alpha=0.4)
+  }
   
   # Bias plot
-  # Export: 10" x 6"
+  # Export: 10" x 6" (Cox_edge: 7" x 4")
   # Note: change "bias" to "biasG" for Gamma and "biasP" for Phi
-  ggplot(
-    filter(p_data, stat=="bias"),
-    # aes(x=point, y=value, color=factor(use_package), group=factor(use_package))
-    aes(x=point, y=value, color=factor(Estimator), group=factor(Estimator))
-  ) +
-    geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
-                data=df_distr_b, fill="grey", color=NA, alpha=0.4) +
-    geom_vline(aes(xintercept=x), data=df_vlines, color="orange",
-               linetype="dashed") +
+  plot_b <- ggplot(filter(p_data, stat=="bias"), p_aes) +
+    p_ribbon(df_distr_b) +
     geom_line() +
-    facet_grid(rows = dplyr::vars(factor(surv_true, levels=surv_trues)),
-               cols = dplyr::vars(factor(distr_S, levels=distr_Ss))) +
+    facet_grid(rows=f_rows, cols=f_cols) +
     scale_y_continuous(limits=plot_lims$b) + # labels=percent
     # scale_color_manual(values=m_colors) +
     theme(legend.position="bottom") +
     labs(y="Bias", x="S", color="Estimator")
-  
+    
   # Coverage plot
-  # Export: 10" x 6"
-  ggplot(
-    filter(p_data, stat=="cov"),
-    # aes(x=point, y=value, color=factor(use_package), group=factor(use_package))
-    aes(x=point, y=value, color=factor(Estimator), group=factor(Estimator))
-  ) +
-    geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
-                data=df_distr_c, fill="grey", color=NA, alpha=0.4) +
-    geom_vline(aes(xintercept=x), data=df_vlines, color="orange",
-               linetype="dashed") +
+  # Export: 10" x 6" (Cox_edge: 7" x 4")
+  plot_c <- ggplot(filter(p_data, stat=="cov"), p_aes) +
+    p_ribbon(df_distr_c) +
     geom_hline(aes(yintercept=0.95), linetype="longdash", color="grey") +
     geom_line() +
-    facet_grid(rows = dplyr::vars(factor(surv_true, levels=surv_trues)),
-               cols = dplyr::vars(factor(distr_S, levels=distr_Ss))) +
+    facet_grid(rows=f_rows, cols=f_cols) +
     scale_y_continuous(labels=percent, limits=plot_lims$c) +
     # scale_color_manual(values=m_colors) +
     theme(legend.position="bottom") +
     labs(y="Coverage (%)", x="S", color="Estimator")
   
   # Standard deviation plot
-  # Export: 10" x 6"
-  ggplot(
-    filter(p_data, stat=="sd"),
-    # aes(x=point, y=value, color=factor(use_package), group=factor(use_package))
-    aes(x=point, y=value, color=factor(Estimator), group=factor(Estimator))
-  ) +
-    geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
-                data=df_distr_s, fill="grey", color=NA, alpha=0.4) +
-    geom_vline(aes(xintercept=x), data=df_vlines, color="orange",
-               linetype="dashed") +
+  # Export: 10" x 6" (Cox_edge: 7" x 4")
+  plot_s <- ggplot(filter(p_data, stat=="sd"), p_aes) +
+    p_ribbon(df_distr_s) +
     geom_line() +
-    facet_grid(rows = dplyr::vars(factor(surv_true, levels=surv_trues)),
-               cols = dplyr::vars(factor(distr_S, levels=distr_Ss))) +
+    facet_grid(rows=f_rows, cols=f_cols) +
     scale_y_continuous(limits=plot_lims$s) +
     # scale_color_manual(values=m_colors) +
     theme(legend.position="bottom") +
     labs(y="Standard deviation", x="S", color="Estimator")
+  
+  # Print plots (export 10" x 6")
+  if (flags$which_paper=="NPCVE") {
+    p_yellow_lines <- geom_vline(aes(xintercept=x), data=df_vlines,
+                               color="orange", linetype="dashed")
+    print(plot_b + p_yellow_lines)
+    print(plot_c + p_yellow_lines)
+    print(plot_s + p_yellow_lines)
+  } else if (flags$which_paper=="Cox") {
+    print(plot_b)
+    print(plot_c)
+    print(plot_s)
+  }
   
   if (F) {
     # Variance plot
@@ -608,8 +622,6 @@ if (F) {
 
 if (F) {
   
-  print(paste("Start:",Sys.time()))
-  
   # !!!!! Add estimated SD to plots ??? (extract from CIs)
   
   # sim <- readRDS("../SimEngine.out/sim_est_20220824.rds")
@@ -623,7 +635,7 @@ if (F) {
       x = paste0("r_Mn_",m)
     )
   }
-  summ <- summarize(sim, sd=summ_sd)
+  summ <- SimEngine::summarize(sim, sd=summ_sd)
   summ %<>% filter(estimator=="Grenander")
   
   C <- list(
@@ -784,9 +796,106 @@ if (F) {
     theme(legend.position="bottom") +
     labs(y="Standard deviation", x="S", color="")
   
-  # "Start: 2022-11-28 20:26:22"
-  # "End:   2022-11-28 20:39:41"
-  print(paste("End:",Sys.time()))
+}
+
+
+
+#########################################.
+##### VIZ: Sample paths (Cox paper) #####
+#########################################.
+
+if (F) {
+  
+  plot_df <- data.frame(
+    "surv_true" = character(),
+    "estimator" = character(),
+    "row" = integer(),
+    "point" = double(),
+    "value" = double(),
+    "which" = character()
+  )
+  
+  res <- sim$results %>% mutate(
+    surv_true = ifelse(surv_true=="Cox PH", "Linear", surv_true)
+  )
+  
+  surv_trues <- c("Linear", "Cubic", "S-shaped")
+  estimators <- c("Cox (basic)", "Cox (spline 4 df)", "Cox (spline 8 df)")
+  
+  # Add sample paths
+  n_rows <- 10
+  for (s in surv_trues) {
+    for (e in estimators) {
+      
+      res2 <- filter(res, distr_S=="Unif(0,1)" & surv_true==s & estimator==e)
+      res2 <- res2[1:n_rows,]
+      
+      for (row in c(1:n_rows)) {
+        for (i in c(1:51)) {
+          m <- format(round(i/50-0.02,2), nsmall=2)
+          new_row <- list(
+            "surv_true" = s,
+            "estimator" = e,
+            "row" = row,
+            "point" = as.numeric(m),
+            "value" = as.numeric(res2[row,paste0("r_Mn_",m)]),
+            "which" = "Estimate"
+          )
+          plot_df[nrow(plot_df)+1,] <- new_row
+        }
+      }
+      
+    }
+  }
+  
+  # Add true curves
+  for (s in surv_trues) {
+    for (e in estimators) {
+      
+      res2 <- filter(res, distr_S=="Unif(0,1)" & surv_true==s & estimator==e)
+      res2 <- res2[1,]
+      
+      for (i in c(1:51)) {
+        m <- format(round(i/50-0.02,2), nsmall=2)
+        new_row <- list(
+          "surv_true" = s,
+          "estimator" = e,
+          "row" = 0,
+          "point" = as.numeric(m),
+          "value" = as.numeric(res2[1,paste0("r_M0_",m)]),
+          "which" = "Truth"
+        )
+        plot_df[nrow(plot_df)+1,] <- new_row
+      }
+      
+    }
+  }
+  
+  plot_df %<>% mutate(width=ifelse(which=="Estimate", 1, 2))
+  ggplot(
+    plot_df,
+    aes(x=point, y=value, group=factor(row), color=which, alpha=which,
+        linewidth=width)
+  ) +
+    geom_line() +
+    scale_color_manual(values=c("forestgreen","black")) +
+    scale_alpha_discrete(guide="none", range=c(0.5,1)) +
+    scale_linewidth(guide="none", range=c(0.5,1)) +
+    facet_grid(rows = dplyr::vars(factor(surv_true, levels=surv_trues)),
+               cols = dplyr::vars(factor(estimator, levels=estimators))) +
+    theme(legend.position="bottom") +
+    labs(y="Marginalized risk", x="S", color="")
+  
+  # ggplot(
+  #   filter(plot_df, which=="Estimate"),
+  #   aes(x=point, y=value, group=factor(row))
+  # ) +
+  #   geom_line(alpha=0.5, color="forestgreen") +
+  #   geom_line(data=filter(plot_df, which=="Truth"), color="black") +
+  #   facet_grid(rows = dplyr::vars(factor(surv_true, levels=surv_trues)),
+  #              cols = dplyr::vars(factor(estimator, levels=estimators))) +
+  #   theme(legend.position="bottom") +
+  #   labs(y="Marginalized risk", x="S", color="")
   
 }
 
@@ -807,7 +916,7 @@ if (F) {
   # for (i in c(1:ntypes)) {
   #   
   # }
-  summ <- sim %>% summarize(
+  summ <- sim %>% SimEngine::summarize(
     mean = list(
       list(name="reject_1", x="reject_1", na.rm=T),
       list(name="reject_2", x="reject_2", na.rm=T)
@@ -867,7 +976,7 @@ if (F) {
   }
   
   if (F) {
-    summ2 <- sim %>% summarize(
+    summ2 <- sim %>% SimEngine::summarize(
       mean = list(
         list(name="mean_reject_1", x="reject_1", na.rm=T),
         list(name="mean_var_n_1", x="var_n_1", na.rm=T),
@@ -1008,7 +1117,7 @@ if (F) {
   sim <- readRDS("../SimEngine.out/sim_edge_20210921.rds")
   
   # Summarize results
-  summ <- sim %>% summarize(
+  summ <- sim %>% SimEngine::summarize(
     mean = list(name="sd_est", x="sigma2_edge_est", na.rm=T),
     sd = list(name="sd_emp", x="r_Mn", na.rm=T),
     bias_pct = list(name="bias_pct", estimate="r_Mn", truth="r_M0", na.rm=T),

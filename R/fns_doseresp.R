@@ -229,7 +229,7 @@ Pi <- function(sampling, delta, y, x) {
   } else if (sampling=="cycle") {
     probs <- rep(c(0.8,0.6,0.4,0.2), length.out=length(delta))
   } else {
-    ev <- In(delta==1 & y<=C$t_0)
+    ev <- In(delta==1 & y<=C$t_0) # !!!!!
     if (sampling=="two-phase (6%)") {
       probs <- ev + (1-ev)*expit(x$x1+x$x2-3.85)
     } else if (sampling=="two-phase (72%)") {
@@ -2534,6 +2534,11 @@ cox_var <- function(dat_orig, dat, t, points, se_beta=F, se_bshz=F,
                  dat$x, s=dat$s),
     weights = dat$weights * (length(dat$weights)/sum(dat$weights))
   )
+  print("summary(model)") # !!!!!
+  print(summary(model)) # !!!!!
+  print("head(cbind(y=dat$y,delta=dat$delta,dat$x,s=dat$s))") # !!!!!
+  print(head(cbind(y=dat$y,delta=dat$delta,dat$x,s=dat$s))) # !!!!!
+
   beta_n <- as.numeric(model$coefficients)
   
   if (verbose) { print(paste("Check 1 (Cox model fit):", Sys.time())) }
@@ -2920,19 +2925,23 @@ cox_var <- function(dat_orig, dat, t, points, se_beta=F, se_bshz=F,
     
   }
   
+  # Marginalized risk estimates
+  bh <- basehaz(model, centered=FALSE) # !!!! basehaz vs. Lambda_hat
+  index <- max(which((bh$time<C$t_0)==T))
+  est_bshz <- bh$hazard[index]
+  print("est_bshz")
+  print(est_bshz)
+  print("beta_n")
+  print(beta_n)
+  N <- sum(dat$weights)
+  res$est_marg <- unlist(lapply(points, function(s) {
+    (1/N) * sum(unlist(lapply(c(1:N), function(i) {
+      exp(-1*exp(sum(beta_n*c(as.numeric(dat_orig$x[i,]),s)))*est_bshz)
+    })))
+  }))
+  
   # Variance estimate: marginalized survival
   if (se_marg) {
-    
-    # !!!! basehaz vs. Lambda_hat
-    bh <- basehaz(model, centered=FALSE)
-    index <- max(which((bh$time<C$t_0)==T))
-    est_bshz <- bh$hazard[index]
-    N <- sum(dat$weights)
-    res$est_marg <- unlist(lapply(points, function(s) {
-      (1/N) * sum(unlist(lapply(c(1:N), function(i) {
-        exp(-1*exp(sum(beta_n*c(as.numeric(dat_orig$x[i,]),s)))*est_bshz)
-      })))
-    }))
     
     # !!!!! Pre-calculate omega_n values
     

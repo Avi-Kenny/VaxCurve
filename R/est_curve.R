@@ -82,6 +82,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     chk(1)
     vlist <- create_val_list(dat_orig)
+    chk(1.1)
     srvSL <- construct_Q_n(dat, vlist$Q_n, type=p$Q_n_type, print_coeffs=T)
     chk(2)
     Q_n <- srvSL$srv
@@ -420,16 +421,21 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     vlist <- create_val_list(dat_orig)
     
     # Fit Cox model and compute variance
+    se_marg <- F # !!!!!
     res_cox <- cox_var(dat_orig=dat_orig, dat=dat, t=C$t_0,
-                   points=points, se_marg=T) # verbose=T
+                   points=points, se_marg=se_marg) # verbose=T
     
     # Compute CIs (logit transformed)
     ests <- 1-res_cox$est_marg
-    ses <- sqrt(res_cox$var_est_marg)
-    ci_lo <- expit(logit(ests) - 1.96*deriv_logit(ests)*ses)
-    ci_hi <- expit(logit(ests) + 1.96*deriv_logit(ests)*ses)
-    # ci_lo <- (ests - 1.96*ses) %>% pmax(0) %>% pmin(1)
-    # ci_hi <- (ests + 1.96*ses) %>% pmax(0) %>% pmin(1)
+    if (se_marg) {
+      ses <- sqrt(res_cox$var_est_marg)
+      ci_lo <- expit(logit(ests) - 1.96*deriv_logit(ests)*ses)
+      ci_hi <- expit(logit(ests) + 1.96*deriv_logit(ests)*ses)
+      # ci_lo <- (ests - 1.96*ses) %>% pmax(0) %>% pmin(1)
+      # ci_hi <- (ests + 1.96*ses) %>% pmax(0) %>% pmin(1)
+    } else {
+      ses <- ci_lo <- ci_hi <- rep(NA, length(ests))
+    }
     
   }
   

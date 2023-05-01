@@ -12,6 +12,12 @@ if (cfg$which_sim=="estimation") {
   one_simulation <- function() {
     
     # Generate dataset
+    # batch({
+    #   dat_orig <- generate_data(L$n, L$alpha_3, L$distr_S, L$edge, L$surv_true,
+    #                             L$sc_params, L$sampling, L$dir, L$wts_type)
+    # })
+    
+    # Generate dataset
     dat_orig <- generate_data(L$n, L$alpha_3, L$distr_S, L$edge, L$surv_true,
                               L$sc_params, L$sampling, L$dir, L$wts_type)
     
@@ -23,7 +29,7 @@ if (cfg$which_sim=="estimation") {
       {
         attr(dat_orig, "n_orig") <- L$n
         attr(dat_orig, "dim_x") <- 2
-        dat <- list(df_vc=dat_orig)
+        dat <- list(v=dat_orig)
         class(dat) <- "dat_vaccine"
       }
       
@@ -41,10 +47,15 @@ if (cfg$which_sim=="estimation") {
         
       } else if (L$estimator$est=="Cox gcomp") {
         
+        # ests <- vaccine::est_cox(dat=dat, t_0=C$t_0, cve=F, s_out=C$points,
+        #                          ci_type="logit",
+        #                          grid_size=list(y=101, s=101, x=20))
         ests <- vaccine::est_cox(dat=dat, t_0=C$t_0, cve=F, s_out=C$points,
                                  ci_type="logit",
-                                 grid_size=list(y=101, s=101, x=20))
-        
+                                 grid_size=list(y=101, s=101, x=20),
+                                 spline_df=L$estimator$spline_df,
+                                 edge_ind=L$estimator$edge_ind)
+
       } else {
         
         stop("L$estimator$est incorrectly specified.")

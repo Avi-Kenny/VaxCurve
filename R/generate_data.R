@@ -85,6 +85,18 @@ generate_data <- function(n, alpha_3, distr_S, edge, surv_true, sc_params,
       } else {
         lin <- alpha_3*expit(20*(1-s)-10) + C$alpha_2*x$x1*x$x2
       }
+    } else if (surv_true=="S-shaped") {
+      if (dir=="decr") {
+        lin <- C$alpha_1*x$x1 + C$alpha_2*x$x2 + alpha_3*expit(20*s-10)
+      } else {
+        stop("Not programmed")
+      }
+    } else if (surv_true=="Cubic") {
+      if (dir=="decr") {
+        lin <- C$alpha_1*x$x1 + C$alpha_2*x$x2 + alpha_3*s^3
+      } else {
+        stop("Not programmed")
+      }
     } else if (surv_true=="Step") {
       if (dir=="decr") {
         lin <- C$alpha_1*x$x1 + C$alpha_2*x$x2 + (alpha_3/2)*In(s>0)
@@ -108,7 +120,7 @@ generate_data <- function(n, alpha_3, distr_S, edge, surv_true, sc_params,
     # Censoring times (Weibull)
     U <- runif(n)
     H_0_inv2 <- function(t) { ((1/sc_params$lmbd2)*t)^(1/sc_params$v2) }
-    if (surv_true %in% c("Cox PH", "Complex", "Non PH")) {
+    if (surv_true %in% c("Cox PH", "Complex", "S-shaped", "Cubic", "Non PH")) {
       lin <- C$alpha_1*x$x1 + C$alpha_2*x$x2
     } else if (surv_true=="exp") {
       H_0_inv2 <- function(t) { ((1/sc_params$lmbd2)*t) }
@@ -150,6 +162,18 @@ generate_data <- function(n, alpha_3, distr_S, edge, surv_true, sc_params,
         } else {
           alpha_3*expit(20*(1-s)-10) + C$alpha_2*x1*x2
         }
+      } else if (surv_true=="S-shaped") {
+        if (dir=="decr") {
+          C$alpha_1*x1 + C$alpha_2*x2 + alpha_3*expit(20*s-10)
+        } else {
+          stop("Not programmed")
+        }
+      } else if (surv_true=="Cubic") {
+        if (dir=="decr") {
+          C$alpha_1*x1 + C$alpha_2*x2 + alpha_3*s^3
+        } else {
+          stop("Not programmed")
+        }
       } else if (surv_true=="Step") {
         if (dir=="decr") {
           C$alpha_1*x1 + C$alpha_2*x2 + (alpha_3/2)*In(s>0)
@@ -159,7 +183,7 @@ generate_data <- function(n, alpha_3, distr_S, edge, surv_true, sc_params,
       }
     }
     
-    if (surv_true %in% c("Cox PH", "Complex", "Step")) {
+    if (surv_true %in% c("Cox PH", "Complex", "S-shaped", "Cubic", "Step")) {
       Q_0 <- function(t, x1, x2, s) {
         exp( -1 * sc_params$lmbd * (t^sc_params$v) * exp(lin(x1,x2,s)) )
       }

@@ -1,4 +1,330 @@
 
+# Debugging
+if (F) {
+  
+  # data <- dat.vac.seroneg <- subset(dat.mock, Trt==1 & ph1)
+  data <- data.frame(
+    EventTimePrimary = dat$v$y,
+    EventIndPrimary = dat$v$delta,
+    s = dat$v$s,
+    risk_score = dat$v$x$x1,
+    ph2 = dat$v$z,
+    Wstratum = dat$v$strata
+  )
+  marker.name <- "s"
+  tfinal.tpeak <- 181
+  # data.ph2=subset(data, ph2==1)
+  data.ph2 <- dplyr::filter(data, ph2==1)
+  form.s <- Surv(EventTimePrimary, EventIndPrimary) ~ 1 # !!!!!
+  form.0 <- update(form.s, as.formula("~. + risk_score")) # !!!!!
+  f1=update(form.0, as.formula(paste0("~.+",marker.name)))
+  fit.risk.1 <- svycoxph(f1, design=twophase(id=list(~1,~1), strata=list(NULL,~Wstratum), subset=~ph2, data=data))
+  # out=marginalized.risk(fit.risk.1, marker.name, data.ph2, t=t, ss=ss, weights=data.ph2$wt, categorical.s=categorical.s)
+  
+
+  marginalized.risk.svycoxph.boot=function(marker.name, type, data, t, B, ci.type="quantile", numCores=1) {  
+
+    
+    # used in both point est and bootstrap
+    # many variables are not passed but defined in the scope of marginalized.risk.svycoxph.boot
+    fc.1=function(data.ph2, data, categorical.s, n.dean=FALSE){
+      # non-competing risk implementation
+      # inline design object b/c it may also throw an error
+      if ( !inherits(fit.risk.1, "try-error" )) {
+        if (n.dean) c(n.dean= last(coef(fit.risk.1)/sqrt(diag(fit.risk.1$var))) * sqrt(1/fit.risk.1$n + 1/fit.risk.1$nevent), out) else out
+      } else {
+        rep(NA, ifelse(n.dean,1,0)+length(ss))
+      }
+    }
+    
+    if (type==1) {
+      # conditional on S=s (quantitative)
+      # don't sort ss or do ss=ss[!duplicated(ss)] because e.g. 15% will be lost and later code depends on that
+      ss=sort(c(
+        # Lars quantiles so that to be consistent with his analyses, also add every 5% to include s1 and s2 for sensitivity analyses
+        report.assay.values(data[[marker.name]][data$EventIndPrimary==1], marker.name.to.assay(marker.name)), 
+        # 2.5% and 97.5% as the leftmost and rightmost points 
+        wtd.quantile(data[[marker.name]], data$wt, c(0.025,0.05,0.95,0.975)),
+        # equally spaced values so that the curves look good  
+        seq(min(data[[marker.name]], na.rm=TRUE), max(data[[marker.name]], na.rm=TRUE), length=100)[-c(1,100)],
+        # useful for reports
+        if (log10(100)>min(data[[marker.name]], na.rm=TRUE) & log10(100)<max(data[[marker.name]], na.rm=TRUE)) log10(100)
+      ))
+      
+      prob = fc.1(data.ph2, data, n.dean=TRUE, categorical.s=F)
+      if (!comp.risk) {
+        n.dean=prob[1]
+        prob=prob[-1]
+      } 
+      
+    }
+    
+    # bootstrap
+    if(config$case_cohort) ptids.by.stratum=get.ptids.by.stratum.for.bootstrap (data)     
+    seeds=1:B; names(seeds)=seeds
+    out=mclapply(seeds, mc.cores = numCores, FUN=function(seed) {   
+      seed=seed+560
+      if (verbose>=2) myprint(seed)
+      
+      if(config$case_cohort) {
+        dat.b = get.bootstrap.data.cor (data, ptids.by.stratum, seed) 
+      } else {
+        dat.b = bootstrap.case.control.samples(data, seed, delta.name="EventIndPrimary", strata.name="tps.stratum", ph2.name="ph2") 
+      }        
+      dat.b.ph2=subset(dat.b, ph2==1)     
+      
+      if(type==1) {
+        # conditional on s
+        fc.1(dat.b.ph2, dat.b, categorical.s=F, n.dean=T)
+        
+      } else if (type==2) {
+        # conditional on S>=s
+        fc.2(dat.b.ph2)        
+        
+      } else if (type==3) {
+        # conditional on a categorical S
+        fc.1(dat.b.ph2, dat.b, n.dean=F, categorical.s=T)
+        
+      } else if (type==4) {
+        # conditional on S=s (quantitative)
+        fit.risk.b=try(svycoxph(f1, design=twophase(id=list(~1,~1), strata=list(NULL,~Wstratum), subset=~ph2, data=dat.b)))
+        if ( class (fit.risk.b)[1] != "try-error" ) {
+        } else {
+          NA
+        }
+        
+      } else stop("wrong type")
+      
+    })
+    res=do.call(cbind, out)
+    if (type==1 & !comp.risk) {
+      # the first row is n.dean
+      boot.n.dean=res[1,]
+      res=res[-1,]
+    }
+    res=res[,!is.na(res[1,])] # remove NA's
+    if (verbose) str(res)
+    
+    # restore rng state 
+    assign(".Random.seed", save.seed, .GlobalEnv)    
+    
+    if (ci.type=="quantile") {
+      ci.band=t(apply(res, 1, function(x) quantile(x, c(.025,.975), na.rm=T)))
+    } else {
+      stop("only quantile bootstrap CI supported for now")
+    }
+    
+    ret = list(marker=if(type==3) names(prob) else ss, prob=prob, boot=res, lb=ci.band[,1], ub=ci.band[,2], if(type==1 & !comp.risk) n.dean=c(n.dean, boot.n.dean))   
+    if (type==1 & !comp.risk) names(ret)[length(ret)]="n.dean" # this is necessary because when using if, that element won't have a name
+    ret  
+  }
+  
+}
+
+# Truncation issue
+if (F) {
+  
+  library(survival)
+  library(magrittr)
+  library(dplyr)
+  
+  n <- 10000
+  time_birth <- 10*runif(n)
+  lmbd <- 1/5
+  # lmbd <- 1/20
+  H_0_inv <- function(t) { t/lmbd }
+  beta_1 <- 0.5
+  tx <- as.integer(time_birth>7)
+  # z <- rbinom(n, size=1, prob=0.3)
+  # beta_2 <- 5
+  # lin <- beta_1*tx + beta_2*z
+  lin <- beta_1*tx
+  U <- runif(n)
+  age_death <- H_0_inv(-1*log(U)*exp(-1*lin))
+  time_study_start <- 5
+  time_death <- time_birth+age_death
+  comm_id <- sample(c(1:20), n, replace=T)
+  
+  # # Option 1: include all children born after study start
+  # age_start <- rep(0, length(U))
+  # incl <- as.integer(time_birth>time_study_start)
+  
+  # Option 2: include all children alive at study start
+  age_start <- pmax(time_study_start-time_birth,0)
+  incl <- as.integer(time_death>time_study_start)
+  
+  time_cens <- 10
+  age_cens <- time_cens-time_birth
+  age_end <- pmin(age_death,age_cens)
+  delta <- as.integer(age_end==age_death)
+  
+  # Run model
+  df_cox <- filter(data.frame(age_start=age_start, age_end=age_end, delta=delta,
+                              tx=tx, incl=incl, comm_id=comm_id), incl==1)
+  model <- coxph(Surv(age_start, age_end, delta)~tx, data=df_cox)
+  summary(model)
+  print(exp(beta_1))
+  
+  model2 <- coxme(
+    Surv(age_start, age_end, delta) ~ tx + (1|comm_id),
+    data = df_cox
+  )
+  summary(model2)
+  
+  
+}
+
+# Plotting spline
+if (F) {
+  
+  # x <- c(0, rep(c(60,365,730,1095), each=2), 1500)
+  # y <- rep(c(1.412983,.9819709,.8390149,.9493304,1.012977), each=2)
+  # ggplot(data.frame(x=x, y=y), aes(x=x, y=y)) +
+  #   geom_line()
+  
+  # s_coeffs <- log(c(1.002517,.7429874,1.488451,.8494693,1.112713)) # Only cal time trend
+  # s_coeffs <- log(c(1.000547,.9162426,1.14562,.9338781))
+  # s_coeffs <- log(c(1.00107,.8885394,1.197337,.9192548))
+  x <- seq(0,1500, length.out=100)
+  knts <- c(0,90,365,730,1460)
+  K <- length(knts)
+  dk <- function(x,i) {
+    if (i==1) {
+      return(x)
+    } else {
+      i <- round(i-1)
+      num <- max((x-knts[i])^3,0) - (1/(knts[K]-knts[K-1])) * (
+        max((x-knts[K-1])^3,0)*(knts[K]-knts[i]) -
+          max((x-knts[K])^3,0)*(knts[K-1]-knts[i])
+      )
+      den <- (knts[K]-knts[1])^2
+      return(num/den)
+    }
+  }
+  n1 <- sapply(x, function(x) {dk(x,1)})
+  n2 <- sapply(x, function(x) {dk(x,2)})
+  n3 <- sapply(x, function(x) {dk(x,3)})
+  n4 <- sapply(x, function(x) {dk(x,4)})
+  # spl_vals2 <- s_coeffs[1]*n1 + s_coeffs[2]*n2 + s_coeffs[3]*n3 + s_coeffs[4]*n4
+  
+  ggplot(data.frame(x=x, y=exp(spl_vals2)), aes(x=x, y=y)) +
+    geom_line()
+  
+  # Calculating lincom multipliers: 0-1 years
+  print(mean(sapply(c(1:(365*1)), function(x) {dk(x,1)}))) # intgrl_1
+  print(mean(sapply(c(1:(365*1)), function(x) {dk(x,2)}))) # intgrl_2
+  print(mean(sapply(c(1:(365*1)), function(x) {dk(x,3)}))) # intgrl_3
+  print(mean(sapply(c(1:(365*1)), function(x) {dk(x,4)}))) # intgrl_4
+  
+  # Calculating lincom multipliers: 0-2 years
+  print(mean(sapply(c(1:(365*2)), function(x) {dk(x,1)}))) # intgrl_1
+  print(mean(sapply(c(1:(365*2)), function(x) {dk(x,2)}))) # intgrl_2
+  print(mean(sapply(c(1:(365*2)), function(x) {dk(x,3)}))) # intgrl_3
+  print(mean(sapply(c(1:(365*2)), function(x) {dk(x,4)}))) # intgrl_4
+  
+  # Calculating lincom multipliers: 0-3 years
+  print(mean(sapply(c(1:(365*3)), function(x) {dk(x,1)}))) # intgrl_1
+  print(mean(sapply(c(1:(365*3)), function(x) {dk(x,2)}))) # intgrl_2
+  print(mean(sapply(c(1:(365*3)), function(x) {dk(x,3)}))) # intgrl_3
+  print(mean(sapply(c(1:(365*3)), function(x) {dk(x,4)}))) # intgrl_4
+  
+  
+  knts <- c(0,90,365,730,1460)
+  K <- length(knts)
+  dk <- function(x,i) {
+    if (i==1) { return(x) } else {
+      i <- round(i-1)
+      num <- max((x-knts[i])^3,0) - (1/(knts[K]-knts[K-1])) * (
+        max((x-knts[K-1])^3,0)*(knts[K]-knts[i]) -
+          max((x-knts[K])^3,0)*(knts[K-1]-knts[i])
+      )
+      den <- (knts[K]-knts[1])^2
+      return(num/den)
+    }
+  }
+  n1 <- sapply(x, function(x) {dk(x,1)})
+  n2 <- sapply(x, function(x) {dk(x,2)})
+  n3 <- sapply(x, function(x) {dk(x,3)})
+  n4 <- sapply(x, function(x) {dk(x,4)})
+  
+  model <- coxme(Surv(`_t0`, `_t`, `_d`) ~ intervention + s_int1 + s_int2 + s_int3 + s_int4 + s_cal1 + ...)
+  c <- as.numeric(model$coefficients)
+  
+  
+}
+
+# DWD spline basis 2
+if (F) {
+  
+  x <- c(0, 180, 266, 13)
+  K <- 4
+  knts <- c(0,100,200,300)
+  dk <- function (x,k) {
+    num <- max((x-knts[k])^3,0) - max((x-knts[K])^3,0)
+    den <- knts[K] - knts[k]
+    return(num/den)
+  }
+  n2 <- x
+  n3 <- sapply(x, function(x) {dk(x,1)}) - sapply(x, function(x) {dk(x,K-1)})
+  n4 <- sapply(x, function(x) {dk(x,2)}) - sapply(x, function(x) {dk(x,K-1)})
+  print(n2); print(n3); print(n4);
+
+}
+
+# DWD spline basis
+if (F) {
+  
+  library(ggplot2)
+  library(splines)
+  
+  n <- 20
+  x <- runif(n)
+  x[1]<-0; x[n]<-1; # !!!!!
+  y <- 1 + 2*x + sin(5*x) + rnorm(n, sd=0.3)
+  # basis <- ns(x, df=4, intercept=F, Boundary.knots=quantile(x, c(0.05,0.95)))
+  basis <- ns(x, knots=c(0.25,0.5,0.75), intercept=F, Boundary.knots=c(0,1))
+  # basis <- ns(x, knots=c(0.25,0.5,0.75), intercept=T, Boundary.knots=c(0,1))
+  
+  b1 <- basis[,1]
+  b2 <- basis[,2]
+  b3 <- basis[,3]
+  b4 <- basis[,4]
+  # b5 <- basis[,5] # !!!!!
+  
+  # !!!!! Construct basis manually
+  {
+    K <- 5
+    knts <- c(0,0.25,0.5,0.75,1)
+    dk <- function (x,k) {
+      num <- max((x-knts[k])^3,0) - max((x-knts[K])^3,0)
+      den <- knts[K] - knts[k]
+      return(num/den)
+    }
+    # n1 <- 1 # !!!!!
+    n2 <- x
+    n3 <- sapply(x, function(x) {dk(x,1)}) - sapply(x, function(x) {dk(x,K-1)})
+    n4 <- sapply(x, function(x) {dk(x,2)}) - sapply(x, function(x) {dk(x,K-1)})
+    n5 <- sapply(x, function(x) {dk(x,3)}) - sapply(x, function(x) {dk(x,K-1)})
+  }
+  
+  model1 <- lm(y~b1+b2+b3+b4-1)
+  model2 <- lm(y~n2+n3+n4+n5-1)
+  # model <- lm(y~b1+b2+b3+b4+b5)
+  y_pred1 <- predict(model1)
+  y_pred2 <- predict(model2)
+  
+  df_plot <- data.frame(
+    x = rep(x,2),
+    y = c(y_pred1,y_pred2),
+    which = rep(c("ns","manual"), each=length(x))
+  )
+  ggplot(data.frame(x=x, y=y), aes(x=x, y=y)) +
+    geom_point(alpha=0.3) +
+    geom_line(data=df_plot, color="darkgreen") +
+    facet_wrap(~which)
+  
+}
+
 # Comparing new package to old estimates
 if (F) {
   

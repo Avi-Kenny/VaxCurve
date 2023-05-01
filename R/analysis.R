@@ -19,23 +19,23 @@
     stop("Invalid cluster_config$js")
   }
   
-  # Uncomment this code to run multiple analyses (e.g. 1=4=Janssen, 5-14=Moderna)
-  ..tid <- as.integer(Sys.getenv(.tid_var))
-  if (..tid %in% c(1:4)) {
-    which_analysis <- "Janssen"
-    .tid_lst = list(as.character(round(..tid)))
-  } else if (..tid %in% c(5:14)) {
-    which_analysis <- "Moderna"
-    .tid_lst = list(as.character(round(..tid-4)))
-  } else if (..tid %in% c(15:26)) {
-    which_analysis <- "HVTN 705 (ICS)"
-    .tid_lst = list(as.character(round(..tid-14)))
-  } else if (..tid %in% c(27:84)) {
-    which_analysis <- "Janssen (partA)"
-    .tid_lst = list(as.character(round(..tid-26)))
-  }
-  names(.tid_lst) = .tid_var
-  do.call(Sys.setenv, .tid_lst)
+  # # Uncomment this code to run multiple analyses (e.g. 1=4=Janssen, 5-14=Moderna)
+  # ..tid <- as.integer(Sys.getenv(.tid_var))
+  # if (..tid %in% c(1:4)) {
+  #   which_analysis <- "Janssen"
+  #   .tid_lst = list(as.character(round(..tid)))
+  # } else if (..tid %in% c(5:14)) {
+  #   which_analysis <- "Moderna"
+  #   .tid_lst = list(as.character(round(..tid-4)))
+  # } else if (..tid %in% c(15:26)) {
+  #   which_analysis <- "HVTN 705 (ICS)"
+  #   .tid_lst = list(as.character(round(..tid-14)))
+  # } else if (..tid %in% c(27:84)) {
+  #   which_analysis <- "Janssen (partA)"
+  #   .tid_lst = list(as.character(round(..tid-26)))
+  # }
+  # names(.tid_lst) = .tid_var
+  # do.call(Sys.setenv, .tid_lst)
   
   # Set seed
   set.seed(1)
@@ -57,7 +57,7 @@
     hvtn705_abstract_fig = F,
     table_of_cve_vals = F,
     paper_npcve = F,
-    paper_cox = T,
+    paper_cox = F,
     hvtn124_plot = F
   )
   
@@ -68,10 +68,10 @@
     
     # cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox")) # "Qbins", "Cox gcomp"
     # cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Cox")) # "Qbins", "Cox gcomp"
-    cfg2$plot_cve <- list(overall="Cox", est=c("Cox gcomp", "Cox")) # "Cox GAM"
-    cfg2$plot_risk <- list(overall="Cox", est=c("Cox gcomp", "Cox")) # "Cox GAM"
-    # cfg2$plot_cve <- list(overall="Cox", est=c("Cox gcomp", "Cox GAM")) # "Cox GAM", 
-    # cfg2$plot_risk <- list(overall="Cox", est=c("Cox gcomp", "Cox GAM")) # "Cox GAM", 
+    # cfg2$plot_cve <- list(overall="Cox", est=c("Cox gcomp", "Cox")) # "Cox GAM"
+    # cfg2$plot_risk <- list(overall="Cox", est=c("Cox gcomp", "Cox")) # "Cox GAM"
+    cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox gcomp")) # "Cox GAM"
+    cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Cox gcomp")) # "Cox GAM"
     cfg2$marker <- c("Day29bindSpike", "Day29bindRBD", "Day29pseudoneutid50", "Day29ADCP")
     cfg2$lab_title <- c("Binding Antibody to Spike: Day 29", "Binding Antibody to RBD: Day 29", "PsV Neutralization 50% Titer: Day 29", "Phagocytic Score: Day 29")
     cfg2$lab_x <- c("Anti Spike IgG (BAU/ml) (=s)", "Anti RBD IgG (BAU/ml) (=s)", "Pseudovirus-nAb ID50 (IU50/ml) (=s)", "Phagocytic Score (=s)")
@@ -158,10 +158,12 @@
     
     # cfg2$plot_cve <- list(overall="Cox", est=c("Grenander","Cox")) # "Qbins",
     # cfg2$plot_risk <- list(overall="Cox", est=c("Grenander","Cox")) # "Qbins",
-    cfg2$plot_cve <- list(overall="Cox", est=c("Cox gcomp", "Cox"))
-    cfg2$plot_risk <- list(overall="Cox", est=c("Cox gcomp", "Cox"))
+    # cfg2$plot_cve <- list(overall="Cox", est=c("Cox gcomp", "Cox"))
+    # cfg2$plot_risk <- list(overall="Cox", est=c("Cox gcomp", "Cox"))
     # cfg2$plot_cve <- list(overall="Cox", est=c("Cox gcomp", "Cox GAM", "Cox edge"))
     # cfg2$plot_risk <- list(overall="Cox", est=c("Cox gcomp", "Cox GAM", "Cox edge"))
+    cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox gcomp")) # "Cox GAM"
+    cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Cox gcomp")) # "Cox GAM"
     cfg2$marker <- c("Day29bindSpike", "Day57bindSpike", "Day29bindRBD", "Day57bindRBD", "Day29pseudoneutid50", "Day57pseudoneutid50", "Day29pseudoneutid80", "Day57pseudoneutid80", "Day29liveneutmn50", "Day57liveneutmn50")
     cfg2$lab_title <- c("Binding Antibody to Spike: Day 29", "Binding Antibody to Spike: Day 57", "Binding Antibody to RBD: Day 29", "Binding Antibody to RBD: Day 57", "PsV Neutralization 50% Titer: Day 29", "PsV Neutralization 50% Titer: Day 57", "PsV Neutralization 80% Titer: Day 29", "PsV Neutralization 80% Titer: Day 57", "Live Virus Micro Neut 50% Titer: Day 29", "Live Virus Micro Neut 50% Titer: Day 57")
     cfg2$lab_x <- c("Anti Spike IgG (BAU/ml) (=s)", "Anti RBD IgG (BAU/ml) (=s)", "Pseudovirus-nAb ID50 (IU50/ml) (=s)", "Pseudovirus-nAb ID80 (IU80/ml) (=s)", "Live Virus-mnAb ID50 (IU50/ml) (=s)")
@@ -443,8 +445,10 @@
     
     # cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox"))
     # cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Cox"))
-    cfg2$plot_cve <- list(overall="Cox", est=c("Cox gcomp", "Cox")) # "Cox GAM"
-    cfg2$plot_risk <- list(overall="Cox", est=c("Cox gcomp", "Cox")) # "Cox GAM"
+    # cfg2$plot_cve <- list(overall="Cox", est=c("Cox gcomp", "Cox")) # "Cox GAM"
+    # cfg2$plot_risk <- list(overall="Cox", est=c("Cox gcomp", "Cox")) # "Cox GAM"
+    cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox gcomp")) # "Cox GAM"
+    cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Cox gcomp")) # "Cox GAM"
     cfg2$marker <- c("Day210ICS4JMos1gp120IFNg_OR_IL2", "Day210ICS4JMos1gp41IFNg_OR_IL2", "Day210ICS4JMos2GagIFNg_OR_IL2", "Day210ICS4JMos2RNAseIntIFNg_OR_IL2", "Day210ICS4JMos2Sgp120IFNg_OR_IL2", "Day210ICS4JMos2Sgp41IFNg_OR_IL2", "Day210ICS8JMos1gp120IFNg_OR_IL2", "Day210ICS8JMos1gp41IFNg_OR_IL2", "Day210ICS8JMos2GagIFNg_OR_IL2", "Day210ICS8JMos2RNAseIntIFNg_OR_IL2", "Day210ICS8JMos2Sgp120IFNg_OR_IL2", "Day210ICS8JMos2Sgp41IFNg_OR_IL2")
     cfg2$lab_title <- c("Pct CD4+ T-cells expressing IFN-g/IL-2 JMos1 gp120: Day 210", "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos1 gp41: Day 210", "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos2 Gag: Day 210", "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos2 RNAseInt: Day 210", "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos2s gp120: Day 210", "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos2s gp41: Day 210", "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos1 gp120: Day 210", "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos1 gp41: Day 210", "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos2 Gag: Day 210", "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos2 RNAseInt: Day 210", "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos2s gp120: Day 210", "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos2s gp41: Day 210")
     cfg2$lab_x <- c("CD4+ T-cells IFN-g/IL-2 JMos1 gp120 (=s)", "CD4+ T-cells IFN-g/IL-2 JMos1 gp41 (=s)", "CD4+ T-cells IFN-g/IL-2 JMos2 Gag (=s)", "CD4+ T-cells IFN-g/IL-2 JMos2 RNAseInt (=s)", "CD4+ T-cells IFN-g/IL-2 JMos2s gp120 (=s)", "CD4+ T-cells IFN-g/IL-2 JMos2s gp41 (=s)", "CD8+ T-cells IFN-g/IL-2 JMos1 gp120 (=s)", "CD8+ T-cells IFN-g/IL-2 JMos1 gp41 (=s)", "CD8+ T-cells IFN-g/IL-2 JMos2 Gag (=s)", "CD8+ T-cells IFN-g/IL-2 JMos2 RNAseInt (=s)", "CD8+ T-cells IFN-g/IL-2 JMos2s gp120 (=s)", "CD8+ T-cells IFN-g/IL-2 JMos2s gp41 (=s)")
@@ -608,12 +612,16 @@
   
   if (cfg2$analysis=="Janssen (partA)") {
     
-    cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox"))
-    cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Cox"))
+    # cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox"))
+    # cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Cox"))
     # cfg2$plot_cve <- list(overall="Cox", est=c("Cox gcomp", "Cox")) # "Cox GAM"
     # cfg2$plot_risk <- list(overall="Cox", est=c("Cox gcomp", "Cox")) # "Cox GAM"
-    cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox gcomp"))
-    cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Cox gcomp"))
+    # cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox gcomp"))
+    # cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Cox gcomp"))
+    
+    cfg2$plot_cve <- list(overall="Cox", est=c("Grenander")) # !!!!! asdf
+    cfg2$plot_risk <- list(overall="Cox", est=c("Grenander")) # !!!!!
+    
     cfg2$marker <- c("Day29bindSpike", "Day29bindRBD", "Day29pseudoneutid50", "Day29ADCP", "Day29pseudoneutid50la", "Day29pseudoneutid50sa")
     cfg2$lab_title <- c("Binding Antibody to Spike: Day 29", "Binding Antibody to RBD: Day 29", "PsV Neutralization 50% Titer: Day 29", "Phagocytic Score: Day 29", "PsV Neutralization 50% Titer (LA): Day 29", "PsV Neutralization 50% Titer (SA): Day 29")
     cfg2$lab_x <- c("Anti Spike IgG (BAU/ml) (=s)", "Anti RBD IgG (BAU/ml) (=s)", "Pseudovirus-nAb ID50 (IU50/ml) (=s)", "Phagocytic Score (=s)", "Pseudovirus-nAb ID50 LA (IU50/ml) (=s)", "Pseudovirus-nAb ID50 SA (IU50/ml) (=s)")
@@ -668,7 +676,7 @@
       "Risk, Cox (basic)" = c(0,0.975),
       "CVE, Cox (basic)" = c(0,0.975)
     )
-    cfg2$zoom_x <- "zoomed llox" # !!!!! "zoomed llox"
+    cfg2$zoom_x <- "zoomed llox"
     cfg2$zoom_y_cve <- NA
     cfg2$zoom_y_risk <- "zoomed (risk)"
     cfg2$zoom_y_max <- 0.15
@@ -1442,7 +1450,7 @@ if (cfg2$run_analysis &&
   s_orig <- dat_orig$s[!is.na(dat_orig$s)]
   s_grid <- seq(from=min(s_orig), to=max(s_orig), length.out=101)
   
-  use_package <- T # !!!!!
+  use_package <- F # !!!!!
   if (use_package) {
     
     attr(dat_orig, "n_orig") <- length(dat_orig$z)

@@ -19,6 +19,19 @@
     stop("Invalid cluster_config$js")
   }
   
+  # # !!!!!
+  # ..tid <- as.integer(Sys.getenv(.tid_var))
+  # if (..tid %in% c(1,3,5)) {
+  #   temp_use_package <- T
+  #   ..tid <- ifelse(..tid==1, 1, ifelse(..tid==3, 6, 11))
+  # } else if (..tid %in% c(2,4,6)) {
+  #   temp_use_package <- F
+  #   ..tid <- ifelse(..tid==2, 1, ifelse(..tid==4, 6, 11))
+  # }
+  # .tid_lst = list(as.character(..tid))
+  # names(.tid_lst) = .tid_var
+  # do.call(Sys.setenv, .tid_lst)
+  
   # # Uncomment this code to run multiple analyses (e.g. 1=4=Janssen, 5-14=Moderna)
   # ..tid <- as.integer(Sys.getenv(.tid_var))
   # if (..tid %in% c(1:4)) {
@@ -612,16 +625,15 @@
   
   if (cfg2$analysis=="Janssen (partA)") {
     
+    # Initial analysis: 1-58
+    # Second manuscript: 1-3,13-15,25-27,37-39,45-47,49-51,59-64
+    
     # cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox"))
     # cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Cox"))
     # cfg2$plot_cve <- list(overall="Cox", est=c("Cox gcomp", "Cox")) # "Cox GAM"
     # cfg2$plot_risk <- list(overall="Cox", est=c("Cox gcomp", "Cox")) # "Cox GAM"
-    # cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox gcomp"))
-    # cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Cox gcomp"))
-    
-    cfg2$plot_cve <- list(overall="Cox", est=c("Grenander")) # !!!!! asdf
-    cfg2$plot_risk <- list(overall="Cox", est=c("Grenander")) # !!!!!
-    
+    cfg2$plot_cve <- list(overall="Cox", est=c("Grenander", "Cox gcomp"))
+    cfg2$plot_risk <- list(overall="Cox", est=c("Grenander", "Cox gcomp"))
     cfg2$marker <- c("Day29bindSpike", "Day29bindRBD", "Day29pseudoneutid50", "Day29ADCP", "Day29pseudoneutid50la", "Day29pseudoneutid50sa")
     cfg2$lab_title <- c("Binding Antibody to Spike: Day 29", "Binding Antibody to RBD: Day 29", "PsV Neutralization 50% Titer: Day 29", "Phagocytic Score: Day 29", "PsV Neutralization 50% Titer (LA): Day 29", "PsV Neutralization 50% Titer (SA): Day 29")
     cfg2$lab_x <- c("Anti Spike IgG (BAU/ml) (=s)", "Anti RBD IgG (BAU/ml) (=s)", "Pseudovirus-nAb ID50 (IU50/ml) (=s)", "Phagocytic Score (=s)", "Pseudovirus-nAb ID50 LA (IU50/ml) (=s)", "Pseudovirus-nAb ID50 SA (IU50/ml) (=s)")
@@ -651,14 +663,18 @@
                         "janssen_sa_partA",
                         "janssen_sa_partAnonsenior")
     cfg2$cr2_COR <- c("D29IncludeNotMolecConfirmed",
-                      "D29SevereIncludeNotMolecConfirmed")
+                      "D29SevereIncludeNotMolecConfirmed",
+                      "D29ModerateIncludeNotMolecConfirmed")
     cfg2$cr2_marker <- c(1,2,3,4,5)
     cfg2$edge_corr <- c("min")
     cfg2$v <- list(
       id = "Ptid",
-      time = "EventTimePrimaryIncludeNotMolecConfirmedD29",
+      time = c("EventTimePrimaryIncludeNotMolecConfirmedD29",
+               "SevereEventTimePrimaryIncludeNotMolecConfirmedD29",
+               "ModerateEventTimePrimaryIncludeNotMolecConfirmedD29"),
       event = c("EventIndPrimaryIncludeNotMolecConfirmedD29",
-                "SevereEventIndPrimaryIncludeNotMolecConfirmedD29"),
+                "SevereEventIndPrimaryIncludeNotMolecConfirmedD29",
+                "ModerateEventIndPrimaryIncludeNotMolecConfirmedD29"),
       wt = "wt.D29",
       ph1 = "ph1.D29",
       ph2 = "ph2.D29",
@@ -676,7 +692,7 @@
       "Risk, Cox (basic)" = c(0,0.975),
       "CVE, Cox (basic)" = c(0,0.975)
     )
-    cfg2$zoom_x <- "zoomed llox"
+    cfg2$zoom_x <- "zoomed"
     cfg2$zoom_y_cve <- NA
     cfg2$zoom_y_risk <- "zoomed (risk)"
     cfg2$zoom_y_max <- 0.15
@@ -695,34 +711,34 @@
     
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
-      marker = c(rep(c(1:4), 13), c(5,5,5,6,6,5)), # A (marker)
-      lab_x = c(rep(c(1:4), 13), c(5,5,5,6,6,5)), # A (marker)
-      lab_title = c(rep(c(1:4), 13), c(5,5,5,6,6,5)), # A (marker)
-      t_0 = rep(1, 58), # C (same)
-      dataset = c(rep(c(1:11), each=4), rep(1,4), rep(7,4), c(7:11), 7), # D (region X age)
-      cr2_trial = c(rep(c(1:11), each=4), rep(1,4), rep(7,4), c(7:11), 7), # D (region X age)
-      cr2_COR = c(rep(1,44), rep(2,8), rep(1,5), 2), # E (regular or severe)
-      cr2_marker = c(rep(c(1:4),6), rep(c(1,2,3,5),5), c(1:4), c(1,2,3,5), rep(4,6)),
-      edge_corr = rep(1, 58), # C (same)
-      v_id = rep(1, 58), # C (same)
-      v_time = rep(1, 58), # C (same)
-      v_event = c(rep(1,44), rep(2,8), rep(1,5), 2), # E (regular or severe)
-      v_wt = rep(1, 58), # C (same)
-      v_ph1 = rep(1, 58), # C (same)
-      v_ph2 = rep(1, 58), # C (same)
-      v_covariates = c(rep(1,11), rep(2,33), rep(1,4), rep(2,4), rep(2,6)), # B (pooled or not)
-      zoom_x = rep(1, 58), # C (same)
-      zoom_y_cve = rep(1, 58), # C (same)
-      zoom_y_risk = rep(1, 58), # C (same)
-      more_ticks = replace(rep(1,58),c(3,47),2), # G (custom)
-      llox_label = c(rep(c(1,1,2,2), 13), rep(2,6)), # F (llox)
-      llox = c(rep(c(1,1,2,2), 13), rep(2,6)) # F (llox)
+      marker = c(rep(c(1:4), 13), c(5,5,5,6,6,5), c(1,2,3,1,2,3)), # A (marker)
+      lab_x = c(rep(c(1:4), 13), c(5,5,5,6,6,5), c(1,2,3,1,2,3)), # A (marker)
+      lab_title = c(rep(c(1:4), 13), c(5,5,5,6,6,5), c(1,2,3,1,2,3)), # A (marker)
+      t_0 = rep(1, 64), # C (same)
+      dataset = c(rep(c(1:11), each=4), rep(1,4), rep(7,4), c(7:11), 7, c(1,1,1,7,7,7)), # D (region X age)
+      cr2_trial = c(rep(c(1:11), each=4), rep(1,4), rep(7,4), c(7:11), 7, c(1,1,1,7,7,7)), # D (region X age)
+      cr2_COR = c(rep(1,44), rep(2,8), rep(1,5), 2, rep(3,6)), # E (regular/severe/moderate)
+      cr2_marker = c(rep(c(1:4),6), rep(c(1,2,3,5),5), c(1:4), c(1,2,3,5), rep(4,6), c(1,2,3,1,2,3)),
+      edge_corr = rep(1, 64), # C (same)
+      v_id = rep(1, 64), # C (same)
+      v_time = c(rep(1,44), rep(2,8), rep(1,5), 2, rep(3,6)), # E (regular/severe/moderate)
+      v_event = c(rep(1,44), rep(2,8), rep(1,5), 2, rep(3,6)), # E (regular/severe/moderate)
+      v_wt = rep(1, 64), # C (same)
+      v_ph1 = rep(1, 64), # C (same)
+      v_ph2 = rep(1, 64), # C (same)
+      v_covariates = c(rep(1,11), rep(2,33), rep(1,4), rep(2,4), rep(2,6), c(1,1,1,2,2,2)), # B (pooled or not)
+      zoom_x = rep(1, 64), # C (same)
+      zoom_y_cve = rep(1, 64), # C (same)
+      zoom_y_risk = rep(1, 64), # C (same)
+      more_ticks = c(replace(rep(1,58),c(3,47),2), rep(1,6)), # G (custom)
+      llox_label = c(rep(c(1,1,2,2), 13), rep(2,6), c(1,1,2,1,1,2)), # F (llox)
+      llox = c(rep(c(1,1,2,2), 13), rep(2,6), c(1,1,2,1,1,2)) # F (llox)
     )
     
     # Secondary map for variations within a plot
     cfg2$map2 <- data.frame(
-      tid = c(1:58),
-      map_row = c(1:58)
+      tid = c(1:64),
+      map_row = c(1:64)
     )
     
   }
@@ -817,7 +833,7 @@
   
   # Set config based on local vs. cluster
   if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
-    cfg2$tid <- 25
+    cfg2$tid <- 29
     cfg2$dataset <- paste0(cfg2$folder_cluster,cfg2$dataset)
   } else {
     cfg2$tid <- as.integer(Sys.getenv(.tid_var))
@@ -1450,13 +1466,24 @@ if (cfg2$run_analysis &&
   s_orig <- dat_orig$s[!is.na(dat_orig$s)]
   s_grid <- seq(from=min(s_orig), to=max(s_orig), length.out=101)
   
-  use_package <- F # !!!!!
+  use_package <- T # !!!!!
+  # use_package <- temp_use_package # !!!!!
   if (use_package) {
     
-    attr(dat_orig, "n_orig") <- length(dat_orig$z)
-    attr(dat_orig, "dim_x") <- length(dat_orig$x)
-    dat <- list(v=dat_orig)
-    class(dat) <- "dat_vaccine"
+    # attr(dat_orig, "n_orig") <- length(dat_orig$z)
+    # attr(dat_orig, "dim_x") <- length(dat_orig$x)
+    # dat <- list(v=dat_orig)
+    # class(dat) <- "dat_vaccine"
+    
+    dat <- load_data(
+      time = dat_orig$y,
+      event = dat_orig$delta,
+      vacc = rep(1, length(dat_orig$z)),
+      marker = dat_orig$s,
+      covariates = dat_orig$x,
+      weights = dat_orig$weights,
+      ph2 = dat_orig$z
+    )
     
     ests <- vaccine::est_np(
       dat = dat,
@@ -1485,7 +1512,7 @@ if (cfg2$run_analysis &&
     
   }
   
-  # !!!!!
+  # !!!!! Monotone CIs (for est_curve)
   if (F) {
     ci_lo <- ests$ci_lo
     ci_hi <- ests$ci_hi
@@ -1963,6 +1990,7 @@ if (cfg2$run_hyptest) {
       zoom_x <- c(z_x_L - 0.05*(z_x_R-z_x_L),
                   z_x_R + 0.05*(z_x_R-z_x_L))
     } else if (zoom_x[1]=="zoomed") {
+      browser()
       zz <- dplyr::filter(
         plot_data,
         tag %in% c("Gren", "Qbins", "Cox", "Cox gcomp", "Cox GAM", "Cox edge") &
@@ -1973,13 +2001,14 @@ if (cfg2$run_hyptest) {
       zoom_x <- c(z_x_L - 0.05*(z_x_R-z_x_L),
                   z_x_R + 0.05*(z_x_R-z_x_L))
     } else if (zoom_x[1]=="zoomed llox") {
+      browser()
       zz <- dplyr::filter(
         plot_data,
         tag %in% c("Gren", "Qbins", "Cox", "Cox gcomp", "Cox GAM", "Cox edge") &
           !is.na(y)
       )$x
-      z_x_R <- max(zz, na.rm=T)
       z_x_L <- log10(cfg2$llox/2)
+      z_x_R <- max(zz, na.rm=T)
       zoom_x <- c(z_x_L - 0.05*(z_x_R-z_x_L),
                   z_x_R + 0.05*(z_x_R-z_x_L))
     }
@@ -2105,6 +2134,8 @@ if (cfg2$run_hyptest) {
 
 if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
   
+  # if (temp_use_package==F) { stop("TEMP") } # !!!!!
+  
   # Create cutoff values corresponding to cfg2$qnt
   cutoffs <- lapply(cfg2$qnt, function(qnt) {
     as.numeric(quantile(dat_orig$s, na.rm=T, probs=qnt))
@@ -2164,8 +2195,11 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
     )
     
     if (cfg2$analysis=="Janssen (partA)") {
-      svr <- ifelse(cfg2$cr2_COR=="D29SevereIncludeNotMolecConfirmed",
-                    "_severe", "")
+      svr <- case_when(
+        cfg2$cr2_COR=="D29SevereIncludeNotMolecConfirmed" ~ "_severe",
+        cfg2$cr2_COR=="D29ModerateIncludeNotMolecConfirmed" ~ "_moderate",
+        TRUE ~ ""
+      )
       filename <- paste0("cr_tid",sprintf("%02d", cfg2$tid),"_",cfg2$cr2_trial,
                          svr,"_mrk",cfg2$cr2_marker,".pdf")
     } else {

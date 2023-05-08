@@ -82,13 +82,42 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     
     chk(1)
     vlist <- create_val_list(dat_orig)
+    print("asdf vlist")
+    print("unique(vlist$Q_n$t)")
+    print(unique(vlist$Q_n$t))
+    print("unique(vlist$Q_n$x$x1)")
+    print(unique(vlist$Q_n$x$x1))
+    print("unique(vlist$Q_n$x$x2)")
+    print(unique(vlist$Q_n$x$x2))
+    print("unique(vlist$Q_n$x$x3)")
+    print(unique(vlist$Q_n$x$x3))
+    print("unique(vlist$Q_n$s)")
+    print(unique(vlist$Q_n$s))
     chk(1.1)
+    print("asdf dat")
+    print(str(dat))
+    print(sum(dat$delta))
+    print(sum(dat$s, na.rm=T))
+    print(sum(dat$x$x1))
+    print(sum(dat$x$x2))
+    print(sum(dat$x$x3))
+    print(sum(dat$weights))
+    print(sum(dat$strata))
+    print(sum(dat$z))
     srvSL <- construct_Q_n(dat, vlist$Q_n, type=p$Q_n_type, print_coeffs=T)
     chk(2)
     Q_n <- srvSL$srv
     Qc_n <- srvSL$cens
+    print("asdf Q_n(t=50, x=c(-3,1,0), s=0.5)")
+    print(Q_n(t=50, x=c(-3,1,0), s=0.5))
+    print("asdf Qc_n(t=50, x=c(-3,1,0), s=0.5)")
+    print(Qc_n(t=50, x=c(-3,1,0), s=0.5))
     chk(3)
     omega_n <- construct_omega_n(vlist$omega, Q_n, Qc_n, type=p$omega_n_type)
+    print("asdf omega_n(x=c(-3,1,0),s=0.5,y=100,delta=0)")
+    print(omega_n(x=c(-3,1,0),s=0.5,y=100,delta=0))
+    print("asdf omega_n(x=c(-3,1,0),s=0.5,y=100,delta=1)")
+    print(omega_n(x=c(-3,1,0),s=0.5,y=100,delta=1))
     chk(4)
     
     if (F) {
@@ -103,17 +132,34 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     f_sIx_n <- construct_f_sIx_n(dat, vlist$SX_grid, type=p$g_n_type,
                                  k=p$f_sIx_n_bins, s_scale=s_scale,
                                  s_shift=s_shift)
+    print("asdf f_sIx_n(s=0.5, x=c(-3,1,0))")
+    print(f_sIx_n(s=0.5, x=c(-3,1,0)))
     f_s_n <- construct_f_s_n(dat_orig, vlist$S_grid, f_sIx_n)
+    print("asdf f_s_n(s=0.5)")
+    print(f_s_n(s=0.5))
     g_n <- construct_g_n(f_sIx_n, f_s_n)
     chk(5)
     dat2 <- ss(dat, which(dat$s!=0))
     Phi_n <- construct_Phi_n(dat2, type=p$ecdf_type)
+    print("str(ss(dat, which(dat$s!=0)))")
+    print(str(ss(dat, which(dat$s!=0))))
+    print("asdf Phi_n(0.2,0.5,0.8,0.99)")
+    print(Phi_n(0.2))
+    print(Phi_n(0.5))
+    print(Phi_n(0.8))
+    print(Phi_n(0.99))
     n_orig <- length(dat_orig$z)
     p_n <- (1/n_orig) * sum(dat$weights * In(dat$s!=0))
     eta_n <- construct_eta_n(dat, Q_n, p_n, vals=NA)
+    print("asdf eta_n(u=0.5,x=c(-3,1,0))")
+    print(eta_n(u=0.5,x=c(-3,1,0)))
     r_tilde_Mn <- construct_r_tilde_Mn(dat_orig, vals=vlist$S_grid, Q_n)
+    print("asdf r_tilde_Mn(s=0.5)")
+    print(r_tilde_Mn(s=0.5))
     chk(6)
     Gamma_tilde_n <- construct_Gamma_tilde_n(dat, r_tilde_Mn, p_n, vals=NA)
+    print("asdf Gamma_tilde_n(u=0.5)")
+    print(Gamma_tilde_n(u=0.5))
     f_n_srv <- construct_f_n_srv(Q_n=Q_n, Qc_n=Qc_n)
     chk(7)
     q_n <- construct_q_n(type=p$q_n_type, dat, dat_orig, omega_n=omega_n, g_n=g_n,
@@ -123,6 +169,10 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     Gamma_os_n <- construct_Gamma_os_n(dat, dat_orig, omega_n, g_n, eta_n, p_n,
                                        q_n, r_tilde_Mn, Gamma_tilde_n,
                                        vals=vlist$S_grid)
+    print("asdf Gamma_os_n(u=0.1,0.5,0.9)")
+    print(Gamma_os_n(u=0.1))
+    print(Gamma_os_n(u=0.5))
+    print(Gamma_os_n(u=0.9))
     chk(9)
     
     if (F) {
@@ -158,6 +208,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       chk(10)
       g_sn <- construct_g_sn(dat, f_n_srv, g_n, p_n)
       r_Mn_edge_est <- r_Mn_edge(dat_orig, dat, g_sn, g_n, p_n, Q_n, omega_n)
+      print("asdf r_Mn_edge_est")
+      print(r_Mn_edge_est)
       infl_fn_r_Mn_edge <- construct_infl_fn_r_Mn_edge(Q_n, g_sn, omega_n, g_n,
                                                         r_Mn_edge_est, p_n)
       sigma2_edge_est <- (1/n_orig) * sum((
@@ -228,6 +280,10 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     } else {
       r_Mn_Gr <- Vectorize(function(u) { min(max(-1*dGCM(Phi_n(u)),0),1) })
     }
+    print("asdf r_Mn_Gr(u=0.1,0.5,0.9)")
+    print(r_Mn_Gr(u=0.1))
+    print(r_Mn_Gr(u=0.5))
+    print(r_Mn_Gr(u=0.9))
     
     # Compute variance component functions
     chk(18)

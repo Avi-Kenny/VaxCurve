@@ -1542,8 +1542,8 @@ construct_f_sIx_n <- function(dat, vals=NA, type, k=0, z1=F, s_scale=1,
       warning("construct_f_sIx_n: opt_1 did not converge")
     }
     prm_1 <- opt_1$pars
-    print("prm_1") # !!!!!
-    print(prm_1) # !!!!!
+    # print("prm_1") # !!!!!
+    # print(prm_1) # !!!!!
     
     # Filter out observations with s==0
     dat_1 <- ss(dat, which(dat$s!=0))
@@ -1565,8 +1565,8 @@ construct_f_sIx_n <- function(dat, vals=NA, type, k=0, z1=F, s_scale=1,
       warning("construct_f_sIx_n: solnp() did not converge")
     }
     prm_2 <- opt_2$pars
-    print("prm_2") # !!!!!
-    print(prm_2) # !!!!!
+    # print("prm_2") # !!!!!
+    # print(prm_2) # !!!!!
     
     # Remove large intermediate objects
     rm(dat,dat_1,opt_1,opt_2)

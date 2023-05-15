@@ -6,7 +6,7 @@
 
 {
   # Choose analysis
-  which_analysis <- "Janssen (partA)" # "Janssen" "Moderna" "AMP" "AZD1222" "Janssen (partA)" "Profiscov" "HVTN 705 (primary)" "HVTN 705 (all)"
+  which_analysis <- "HVTN 705 (ICS)" # "Janssen" "Moderna" "AMP" "AZD1222" "Janssen (partA)" "Profiscov" "HVTN 705 (primary)" "HVTN 705 (all)"
   
   # Set proper task ID variable
   if (cluster_config$js=="slurm") {
@@ -105,13 +105,9 @@
     cfg2$more_ticks <- 1
     cfg2$folder_local <- "Janssen data/"
     cfg2$folder_cluster <- "Z:/covpn/p3003/analysis/correlates/Part_A_Blinded_Phase_Data/adata/"
-    cfg2$params = list(
-      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="m-spline", # "parametric (edge)"
-      # gamma_type="Super Learner", ci_type="trunc", q_n_type="zero", # Used historically
-      gamma_type="Super Learner", ci_type="logit", q_n_type="zero",
-      omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
-      f_sIx_n_bins=15, Q_n_type="Super Learner"
-    )
+    cfg2$params = list(g_n_type="binning", deriv_type="m-spline",
+                       ci_type="logit", q_n_type="zero", # ci_type="trunc", # Used historically
+                       Q_n_type="Super Learner")
     C <- list(appx=list(t_0=1,x_tol=25,s=0.01))
     
     # Variable map; one row corresponds to one CVE graph
@@ -206,13 +202,9 @@
     cfg2$folder_cluster <- "Z:/covpn/p3001/analysis/correlates/Part_A_Blinded_Phase_Data/adata/"
     cfg2$llox_label <- "LOD" # NEW
     cfg2$llox <- c(0.3076,1.594,2.42,15.02,22.66) # NEW
-    cfg2$params = list(
-      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="m-spline", # "parametric"
-      gamma_type="Super Learner", ci_type="regular", q_n_type="zero", # Used historically
-      # gamma_type="Super Learner", ci_type="logit", q_n_type="zero",
-      omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
-      f_sIx_n_bins=15, Q_n_type="Super Learner"
-    )
+    cfg2$params = list(g_n_type="binning", deriv_type="m-spline",
+                       ci_type="regular", q_n_type="zero",
+                       Q_n_type="Super Learner")
     C <- list(appx=list(t_0=1,x_tol=25,s=0.01))
     
     # Variable map; one row corresponds to one CVE graph
@@ -305,12 +297,9 @@
     cfg2$more_ticks <- 1
     cfg2$folder_local <- "AMP data/"
     cfg2$folder_cluster <- "Z:/vaccine/p704/analysis/datashare/avi_kenny/adata/"
-    cfg2$params = list(
-      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="linear",
-      gamma_type="Super Learner", ci_type="regular", q_n_type="zero",
-      omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
-      f_sIx_n_bins=15, Q_n_type="Super Learner"
-    )
+    cfg2$params = list(g_n_type="binning", deriv_type="linear",
+                       ci_type="regular", q_n_type="zero",
+                       Q_n_type="Super Learner")
     C <- list(appx=list(t_0=10,x_tol=25,s=0.01))
     
     # Variable map; one row corresponds to one CVE graph
@@ -381,7 +370,6 @@
       "Risk, Cox model" = c(0.025,0.975),
       "CVE, Cox model" = c(0.025,0.975)
     )
-    # cfg2$zoom_x <- NA # !!!!! Temporarily switched back to this
     cfg2$zoom_x <- "zoomed" # !!!!! Changed from NA
     cfg2$zoom_y_cve <- "zoomed"
     cfg2$zoom_y_risk <- "zoomed (risk)"
@@ -389,12 +377,9 @@
     cfg2$more_ticks <- 1
     cfg2$folder_local <- "HVTN 705 (all) data/"
     cfg2$folder_cluster <- "Z:/vaccine/p705/analysis/lab/cc/copcor/"
-    cfg2$params = list(
-      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="line",
-      gamma_type="Super Learner", ci_type="regular", q_n_type="zero",
-      omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none",
-      f_sIx_n_bins=15, Q_n_type="Super Learner"
-    )
+    cfg2$params = list(g_n_type="binning", deriv_type="line",
+                       ci_type="regular", q_n_type="zero",
+                       Q_n_type="Super Learner")
     C <- list(appx=list(t_0=10,x_tol=15,s=0.01))
     
     # Variable map; one row corresponds to one CVE graph
@@ -473,12 +458,9 @@
     cfg2$more_ticks <- 1
     cfg2$folder_local <- "HVTN 705 (ICS) data/"
     cfg2$folder_cluster <- "Z:/vaccine/p705/analysis/lab/cc/copcor/"
-    cfg2$params = list(
-      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="line",
-      gamma_type="Super Learner", ci_type="logit", q_n_type="zero",
-      omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none",
-      f_sIx_n_bins=15, Q_n_type="Super Learner"
-    )
+    cfg2$params = list(g_n_type="binning", deriv_type="line",
+                       ci_type="logit", q_n_type="zero",
+                       Q_n_type="Super Learner")
     C <- list(appx=list(t_0=10,x_tol=15,s=0.01))
     
     # Variable map; one row corresponds to one CVE graph
@@ -555,12 +537,9 @@
     cfg2$more_ticks <- 1
     cfg2$folder_local <- "AZD1222 data/"
     cfg2$folder_cluster <- "Z:/covpn/p3002/analysis/correlates/Part_A_Blinded_Phase_Data/adata/"
-    cfg2$params = list(
-      g_n_type="binning", ecdf_type="linear (mid)", deriv_type="line",
-      gamma_type="Super Learner", ci_type="regular", q_n_type="zero",
-      omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none",
-      f_sIx_n_bins=15, Q_n_type="Super Learner"
-    )
+    cfg2$params = list(g_n_type="binning", deriv_type="line",
+                       ci_type="regular", q_n_type="zero",
+                       Q_n_type="Super Learner")
     C <- list(appx=list(t_0=10,x_tol=25,s=0.01))
     
     # Variable map; one row corresponds to one CVE graph
@@ -669,12 +648,9 @@
     cfg2$folder_cluster <- "Z:/covpn/p3003/analysis/correlates/Part_A_Blinded_Phase_Data/adata/"
     cfg2$llox_label <- c("LOD", "LLOQ") # !!!!!
     cfg2$llox <- c(NA, 4.8975) # !!!!!
-    cfg2$params = list(
-      g_n_type="parametric (edge) 2", ecdf_type="linear (mid)", deriv_type="m-spline",
-      gamma_type="Super Learner", ci_type="logit", q_n_type="zero",
-      omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
-      f_sIx_n_bins=15, Q_n_type="Super Learner"
-    )
+    cfg2$params = list(g_n_type="parametric (edge) 2", deriv_type="m-spline",
+                       ci_type="logit", q_n_type="zero",
+                       Q_n_type="Super Learner")
     C <- list(appx=list(t_0=1,x_tol=25,s=0.01))
     
     # Variable map; one row corresponds to one CVE graph
@@ -757,10 +733,9 @@
     cfg2$llox_label <- c("LLOQ", "LOD")
     cfg2$llox <- c(49*0.009, 70*0.009, 72*0.009, 32*0.009, 35*0.0272, 224*0.0272, 53*0.0272, 91*0.0272, 46*0.00236, 27.56)
     cfg2$params = list(
-      g_n_type="parametric", ecdf_type="linear (mid)", deriv_type="m-spline", # "binning"
-      gamma_type="Super Learner", ci_type="logit", q_n_type="zero",
-      omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
-      f_sIx_n_bins=15, Q_n_type="Super Learner"
+      g_n_type="parametric", deriv_type="m-spline", # "binning"
+      ci_type="logit", q_n_type="zero",
+      Q_n_type="Super Learner"
     )
     C <- list(appx=list(t_0=1,x_tol=25,s=0.01))
     
@@ -1371,6 +1346,7 @@ if ("Grenander" %in% cfg2$estimators$cr) {
       ci_type = cfg2$params$ci_type,
       params = list(surv_type = cfg2$params$Q_n_type,
                     density_type = cfg2$params$g_n_type,
+                    deriv_type = cfg2$params$deriv_type,
                     q_n_type = cfg2$params$q_n_type),
       grid_size = list(y=101, s=101, x=5)
     )

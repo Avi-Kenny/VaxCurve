@@ -47,9 +47,6 @@ if (cfg$which_sim=="estimation") {
         
       } else if (L$estimator$est=="Cox gcomp") {
         
-        # ests <- vaccine::est_cox(dat=dat, t_0=C$t_0, cve=F, s_out=C$points,
-        #                          ci_type="logit",
-        #                          grid_size=list(y=101, s=101, x=20))
         ests <- vaccine::est_cox(dat=dat, t_0=C$t_0, cve=F, s_out=C$points,
                                  ci_type="logit",
                                  grid_size=list(y=101, s=101, x=20),

@@ -18,7 +18,7 @@
 cfg <- list(
   main_task = "analysis.R", # run update analysis.R
   which_sim = "estimation", # "estimation" "edge" "testing" "Cox" "debugging"
-  level_set_which = "level_set_estimation_4", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1 level_set_estimation_xx
+  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1 level_set_estimation_xx
   # keep = c(1:3,7:9,16:18,22:24),
   num_sim = 1000,
   pkgs = c("vaccine", "dplyr", "boot", "car", "mgcv", "memoise", "EnvStats",
@@ -131,7 +131,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
           g_n_type = "parametric" # "binning" "parametric" "parametric (edge)" "true"
         )
       ),
-      "Cox PH" = list(est="Cox gcomp")
+      "Cox PH" = list(est="Cox gcomp", spline_df=NA, edge_ind=F)
     )
   )
   
@@ -176,10 +176,11 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     wts_type = "estimated",
     use_package = T,
     estimator = list(
-      "Cox (basic)" = list(est="Cox gcomp",spline_df=1,edge_ind=F),
-      "Cox (edge)" = list(est="Cox gcomp",spline_df=1,edge_ind=T),
-      "Cox (spline 4 df)" = list(est="Cox gcomp",spline_df=4,edge_ind=F),
-      "Cox (edge + spline 4 df)" = list(est="Cox gcomp",spline_df=4,edge_ind=T)
+      "Cox (basic)" = list(est="Cox gcomp", spline_df=1, edge_ind=F),
+      "Cox (edge)" = list(est="Cox gcomp", spline_df=1, edge_ind=T),
+      "Cox (spline 4 df)" = list(est="Cox gcomp", spline_df=4, edge_ind=F),
+      "Cox (edge + spline 4 df)" = list(est="Cox gcomp", spline_df=4,
+                                        edge_ind=T)
     )
   )
   
@@ -320,8 +321,8 @@ if (F) {
   # sim <- readRDS("../SimEngine.out/sim_est_20220824.rds")
   
   flags <- list(
-    # which_paper = "NPCVE"
-    which_paper = "Cox",
+    which_paper = "NPCVE",
+    # which_paper = "Cox",
     Cox_edge = T
   )
   

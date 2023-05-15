@@ -110,7 +110,7 @@
       # gamma_type="Super Learner", ci_type="trunc", q_n_type="zero", # Used historically
       gamma_type="Super Learner", ci_type="logit", q_n_type="zero",
       omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
-      f_sIx_n_bins=15, Q_n_type="Super Learner", q_n_type="zero"
+      f_sIx_n_bins=15, Q_n_type="Super Learner"
     )
     C <- list(appx=list(t_0=1,x_tol=25,s=0.01))
     
@@ -211,7 +211,7 @@
       gamma_type="Super Learner", ci_type="regular", q_n_type="zero", # Used historically
       # gamma_type="Super Learner", ci_type="logit", q_n_type="zero",
       omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
-      f_sIx_n_bins=15, Q_n_type="Super Learner", q_n_type="zero"
+      f_sIx_n_bins=15, Q_n_type="Super Learner"
     )
     C <- list(appx=list(t_0=1,x_tol=25,s=0.01))
     
@@ -309,7 +309,7 @@
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="linear",
       gamma_type="Super Learner", ci_type="regular", q_n_type="zero",
       omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
-      f_sIx_n_bins=15, Q_n_type="Super Learner", q_n_type="new"
+      f_sIx_n_bins=15, Q_n_type="Super Learner"
     )
     C <- list(appx=list(t_0=10,x_tol=25,s=0.01))
     
@@ -393,7 +393,7 @@
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="line",
       gamma_type="Super Learner", ci_type="regular", q_n_type="zero",
       omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none",
-      f_sIx_n_bins=15, Q_n_type="Super Learner", q_n_type="zero"
+      f_sIx_n_bins=15, Q_n_type="Super Learner"
     )
     C <- list(appx=list(t_0=10,x_tol=15,s=0.01))
     
@@ -477,7 +477,7 @@
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="line",
       gamma_type="Super Learner", ci_type="logit", q_n_type="zero",
       omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none",
-      f_sIx_n_bins=15, Q_n_type="Super Learner", q_n_type="zero"
+      f_sIx_n_bins=15, Q_n_type="Super Learner"
     )
     C <- list(appx=list(t_0=10,x_tol=15,s=0.01))
     
@@ -559,7 +559,7 @@
       g_n_type="binning", ecdf_type="linear (mid)", deriv_type="line",
       gamma_type="Super Learner", ci_type="regular", q_n_type="zero",
       omega_n_type="estimated", cf_folds=1, n_bins=5, lod_shift="none",
-      f_sIx_n_bins=15, Q_n_type="Super Learner", q_n_type="new"
+      f_sIx_n_bins=15, Q_n_type="Super Learner"
     )
     C <- list(appx=list(t_0=10,x_tol=25,s=0.01))
     
@@ -673,7 +673,7 @@
       g_n_type="parametric (edge) 2", ecdf_type="linear (mid)", deriv_type="m-spline",
       gamma_type="Super Learner", ci_type="logit", q_n_type="zero",
       omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
-      f_sIx_n_bins=15, Q_n_type="Super Learner", q_n_type="zero"
+      f_sIx_n_bins=15, Q_n_type="Super Learner"
     )
     C <- list(appx=list(t_0=1,x_tol=25,s=0.01))
     
@@ -760,7 +760,7 @@
       g_n_type="parametric", ecdf_type="linear (mid)", deriv_type="m-spline", # "binning"
       gamma_type="Super Learner", ci_type="logit", q_n_type="zero",
       omega_n_type="estimated", cf_folds=1, n_bins=3, lod_shift="none",
-      f_sIx_n_bins=15, Q_n_type="Super Learner", q_n_type="zero"
+      f_sIx_n_bins=15, Q_n_type="Super Learner"
     )
     C <- list(appx=list(t_0=1,x_tol=25,s=0.01))
     

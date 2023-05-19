@@ -19,23 +19,23 @@
     stop("Invalid cluster_config$js")
   }
   
-  # # Uncomment this code to run multiple analyses (e.g. 1=4=Janssen, 5-14=Moderna)
-  # ..tid <- as.integer(Sys.getenv(.tid_var))
-  # if (..tid %in% c(1:4)) {
-  #   which_analysis <- "Janssen"
-  #   .tid_lst = list(as.character(round(..tid)))
-  # } else if (..tid %in% c(5:14)) {
-  #   which_analysis <- "Moderna"
-  #   .tid_lst = list(as.character(round(..tid-4)))
-  # } else if (..tid %in% c(15:26)) {
-  #   which_analysis <- "HVTN 705 (ICS)"
-  #   .tid_lst = list(as.character(round(..tid-14)))
-  # } else if (..tid %in% c(27:84)) {
-  #   which_analysis <- "Janssen (partA)"
-  #   .tid_lst = list(as.character(round(..tid-26)))
-  # }
-  # names(.tid_lst) = .tid_var
-  # do.call(Sys.setenv, .tid_lst)
+  # Uncomment this code to run multiple analyses (e.g. 1=4=Janssen, 5-14=Moderna)
+  ..tid <- as.integer(Sys.getenv(.tid_var))
+  if (..tid %in% c(1:4)) {
+    which_analysis <- "Janssen"
+    .tid_lst = list(as.character(round(..tid)))
+  } else if (..tid %in% c(5:14)) {
+    which_analysis <- "Moderna"
+    .tid_lst = list(as.character(round(..tid-4)))
+  } else if (..tid %in% c(15:26)) {
+    which_analysis <- "HVTN 705 (ICS)"
+    .tid_lst = list(as.character(round(..tid-14)))
+  } else if (..tid %in% c(27:84)) {
+    which_analysis <- "Janssen (partA)"
+    .tid_lst = list(as.character(round(..tid-26)))
+  }
+  names(.tid_lst) = .tid_var
+  do.call(Sys.setenv, .tid_lst)
   
   # Set seed
   set.seed(1)

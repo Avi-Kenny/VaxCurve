@@ -18,7 +18,7 @@
 cfg <- list(
   main_task = "analysis.R", # run update analysis.R
   which_sim = "estimation", # "estimation" "edge" "testing" "Cox" "debugging"
-  level_set_which = "level_set_estimation_1", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1 level_set_estimation_xx
+  level_set_which = "level_set_estimation_2", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1 level_set_estimation_xx
   # keep = c(1:3,7:9,16:18,22:24),
   num_sim = 1000,
   pkgs = c("vaccine", "dplyr", "boot", "car", "mgcv", "memoise", "EnvStats",
@@ -125,7 +125,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
           Q_n_type = "Cox PH", # "Cox PH" "Random Forest", "true"
           convex_type = "GCM", # "GCM" "CLS"
           ecdf_type = "linear (mid)",
-          edge_corr = "none", # "none" "min"
+          edge_corr = F,
           deriv_type = "m-spline",
           mono_cis = F,
           g_n_type = "parametric" # "binning" "parametric" "parametric (edge)" "true"
@@ -139,7 +139,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
   # Used for NPCVE Figures 8-10
   level_set_estimation_2 <- level_set_estimation_1
   level_set_estimation_2$edge <- "expit 0.4"
-  level_set_estimation_2$estimator[[1]]$params$edge_corr <- "min"
+  level_set_estimation_2$estimator[[1]]$params$edge_corr <- T # !!!!!
   level_set_estimation_2$estimator[[1]]$params$g_n_type <- "parametric (edge)"
   
   # Estimation: no edge mass

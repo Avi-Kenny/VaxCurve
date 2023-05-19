@@ -36,7 +36,8 @@ if (cfg$which_sim=="estimation") {
       if (L$estimator$est=="Grenander") {
         
         ests <- vaccine::est_np(dat=dat, t_0=C$t_0, cve=F, s_out=C$points,
-                                edge_corr=F, params=list(
+                                edge_corr=L$estimator$params$edge_corr,
+                                params=list(
                                   surv_type = "Cox",
                                   density_type = L$estimator$params$g_n_type,
                                   deriv_type = L$estimator$params$deriv_type,

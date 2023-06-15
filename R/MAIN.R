@@ -18,7 +18,7 @@
 cfg <- list(
   main_task = "analysis.R", # run update analysis.R
   which_sim = "estimation", # "estimation" "edge" "testing" "Cox" "debugging"
-  level_set_which = "level_set_estimation_2", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1 level_set_estimation_xx
+  level_set_which = "level_set_estimation_5", # level_set_estimation_1 level_set_testing_1 level_set_Cox_1 level_set_estimation_xx
   # keep = c(1:3,7:9,16:18,22:24),
   num_sim = 1000,
   pkgs = c("vaccine", "dplyr", "boot", "car", "mgcv", "memoise", "EnvStats",
@@ -162,7 +162,7 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
     )
   )
   
-  # Estimation: no edge mass
+  # Estimation: edge mass
   # Used for Cox Figures XX-XX
   level_set_estimation_4 <- list(
     n = 1000,
@@ -181,6 +181,25 @@ if (Sys.getenv("sim_run") %in% c("first", "")) {
       "Cox (spline 4 df)" = list(est="Cox gcomp", spline_df=4, edge_ind=F),
       "Cox (edge + spline 4 df)" = list(est="Cox gcomp", spline_df=4,
                                         edge_ind=T)
+    )
+  )
+  
+  # Estimation: variance estimation
+  # Used for Cox Figure XX
+  level_set_estimation_5 <- list(
+    n = c(100, 200, 400, 800, 1600, 3200),
+    alpha_3 = -2,
+    dir = "decr",
+    sc_params = list("sc_params"=list(lmbd=2e-4, v=1.5, lmbd2=5e-5, v2=1.5)),
+    distr_S = c("Unif(0,1)", "N(0.5,0.04)"),
+    edge = "none",
+    surv_true = c("Cox PH", "S-shaped", "Cubic"),
+    sampling = "two-phase (50%)",
+    wts_type = "estimated",
+    use_package = T,
+    return_se = T,
+    estimator = list(
+      "Cox (basic)" = list(est="Cox gcomp", spline_df=1, edge_ind=F)
     )
   )
   
@@ -401,14 +420,14 @@ if (F) {
     data = summ,
     # cols = -c(level_id,n,alpha_3,sc_params,distr_S,edge,
     #           surv_true,sampling,Estimator,dir,wts_type),
-    cols = -c(level_id,n,alpha_3,sc_params,distr_S,edge,
+    cols = -c(level_id,n,alpha_3,sc_params,distr_S,edge,n_reps,
               surv_true,sampling,Estimator,dir,wts_type,use_package),
     names_to = c("stat","point"),
     names_sep = "_"
   )
   p_data %<>% mutate(point = as.numeric(point))
   
-  # PLot Y-axis limits
+  # Plot Y-axis limits
   plot_lims <- list(b=c(-0.25,0.25), c=c(0,1), m=c(0,0.02),
                     v=c(0,0.01), s=c(0,0.15))
   # if (flags$Cox_edge) { plot_lims$b <- c(-0.3,0.3) }
@@ -747,7 +766,7 @@ if (F) {
                   ifelse(stat=="sd0", "True SD", "error"))
   )
   
-  # PLot Y-axis limits
+  # Plot Y-axis limits
   plot_lims <- list(s=c(0,0.15))
   
   # Set faceting vectors
@@ -796,6 +815,104 @@ if (F) {
     scale_y_continuous(limits=plot_lims$s) +
     theme(legend.position="bottom") +
     labs(y="Standard deviation", x="S", color="")
+  
+}
+
+
+
+################################################.
+##### VIZ: Variance estimation (Cox paper) #####
+################################################.
+
+if (F) {
+  
+  # Summarize results
+  summ_mean <- list()
+  summ_sd <- list()
+  for (i in c(1:4)) {
+    pt <- c(1,11,26,41)[i]
+    m <- format(round(pt/50-0.02,2), nsmall=2)
+    summ_mean[[i]] <- list(
+      stat = "mean",
+      name = paste0("estimatedSD_",m),
+      x = paste0("se_",m),
+      na.rm = T # !!!!!
+    )
+    summ_sd[[i]] <- list(
+      stat = "sd",
+      name = paste0("empiricalSD_",m),
+      x = paste0("r_Mn_",m),
+      na.rm = T # !!!!!
+    )
+  }
+  summ_metrics <- c(summ_mean, summ_sd)
+  summ <- do.call(SimEngine::summarize, c(list(sim), summ_metrics))
+  
+  p_data <- pivot_longer(
+    data = summ,
+    cols = -c(level_id,n,alpha_3,sc_params,distr_S,edge,return_se,n_reps,
+              surv_true,sampling,estimator,dir,wts_type,use_package),
+    names_to = c("stat","point"),
+    names_sep = "_"
+  )
+  p_data %<>% mutate(point = as.numeric(point))
+  
+  # Plot Y-axis limits
+  plot_lims <- list(s=c(0,0.13))
+  
+  # Set faceting vectors
+  surv_trues <- c("Linear", "Cubic", "S-shaped")
+  distr_Ss <- c("Unif(0,1)", "N(0.5,0.04)")
+  
+  # Orange 10/90 quantile lines
+  df_vlines <- data.frame(
+    x = c(qunif(0.1,0,1), qtruncnorm(0.1, a=0, b=1, mean=0.5, sd=0.2),
+          qunif(0.9,0,1), qtruncnorm(0.9, a=0, b=1, mean=0.5, sd=0.2)),
+    distr_S = rep(distr_Ss,2)
+  )
+  
+  # Grey background densities
+  df_distr_S <- data.frame(
+    x = rep(seq(0,1,0.01),2),
+    ymax = c(rep(1,101),
+             dtruncnorm(seq(0,1,0.01), a=0, b=1, mean=0.5, sd=0.2)),
+    distr_S = rep(distr_Ss, each=101),
+    value = 0
+  )
+  
+  df_distr_s <- mutate(df_distr_S, ymin=plot_lims$s[1],
+                       ymax=((ymax*diff(plot_lims$s))/6+plot_lims$s[1]))
+  
+  p_data %<>% mutate(
+    surv_true = ifelse(surv_true=="Cox PH", "Linear", surv_true),
+    stat = ifelse(stat=="estimatedSD", "Estimated SD",
+                  ifelse(stat=="empiricalSD", "Empirical SD", "error"))
+  )
+  
+  # Set up facets
+  f_rows <- dplyr::vars(factor(distr_S, levels=distr_Ss))
+  f_cols <- dplyr::vars(factor(surv_true, levels=surv_trues))
+  
+  p_data %<>% filter(point==0.2)
+  
+  # Set up plot objects
+  p_ribbon <- function(d) {
+    geom_ribbon(aes(x=x, ymin=ymin, ymax=ymax, color=NA, group=NA),
+                data=d, fill="grey", color=NA, alpha=0.4)
+  }
+  
+  # Standard deviation plot
+  # Export: 10" x 6"
+  ggplot(p_data, aes(x=n, y=value, color=factor(stat),
+                               group=factor(stat))) +
+    p_ribbon(df_distr_s) +
+    geom_line() +
+    geom_point(alpha=0.5) +
+    facet_grid(rows=f_rows, cols=f_cols) +
+    scale_y_continuous(limits=plot_lims$s) +
+    # scale_color_manual(values=m_colors) +
+    theme(legend.position="bottom") +
+    labs(y="Standard deviation", x="Sample size", color="")
   
 }
 

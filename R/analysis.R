@@ -6,7 +6,7 @@
 
 {
   # Choose analysis
-  which_analysis <- "HVTN 705 (ICS)" # "Janssen" "Moderna" "AMP" "AZD1222" "Janssen (partA)" "Profiscov" "HVTN 705 (primary)" "HVTN 705 (all)"
+  which_analysis <- "Moderna" # "Janssen" "Moderna" "AMP" "AZD1222" "Janssen (partA)" "Profiscov" "HVTN 705 (primary)" "HVTN 705 (all)"
   
   # Set proper task ID variable
   if (cluster_config$js=="slurm") {
@@ -19,23 +19,23 @@
     stop("Invalid cluster_config$js")
   }
   
-  # Uncomment this code to run multiple analyses (e.g. 1=4=Janssen, 5-14=Moderna)
-  ..tid <- as.integer(Sys.getenv(.tid_var))
-  if (..tid %in% c(1:4)) {
-    which_analysis <- "Janssen"
-    .tid_lst = list(as.character(round(..tid)))
-  } else if (..tid %in% c(5:14)) {
-    which_analysis <- "Moderna"
-    .tid_lst = list(as.character(round(..tid-4)))
-  } else if (..tid %in% c(15:26)) {
-    which_analysis <- "HVTN 705 (ICS)"
-    .tid_lst = list(as.character(round(..tid-14)))
-  } else if (..tid %in% c(27:84)) {
-    which_analysis <- "Janssen (partA)"
-    .tid_lst = list(as.character(round(..tid-26)))
-  }
-  names(.tid_lst) = .tid_var
-  do.call(Sys.setenv, .tid_lst)
+  # # Uncomment this code to run multiple analyses (e.g. 1=4=Janssen, 5-14=Moderna)
+  # ..tid <- as.integer(Sys.getenv(.tid_var))
+  # if (..tid %in% c(1:4)) {
+  #   which_analysis <- "Janssen"
+  #   .tid_lst = list(as.character(round(..tid)))
+  # } else if (..tid %in% c(5:14)) {
+  #   which_analysis <- "Moderna"
+  #   .tid_lst = list(as.character(round(..tid-4)))
+  # } else if (..tid %in% c(15:26)) {
+  #   which_analysis <- "HVTN 705 (ICS)"
+  #   .tid_lst = list(as.character(round(..tid-14)))
+  # } else if (..tid %in% c(27:84)) {
+  #   which_analysis <- "Janssen (partA)"
+  #   .tid_lst = list(as.character(round(..tid-26)))
+  # }
+  # names(.tid_lst) = .tid_var
+  # do.call(Sys.setenv, .tid_lst)
   
   # Set seed
   set.seed(1)
@@ -187,15 +187,18 @@
       "Risk, Cox (edge)" = c(0.025,0.975),
       "CVE, Cox (edge)" = c(0.025,0.975)
     )
-    cfg2$zoom_x <- list(
-      c(0.9,3.34),
-      c(0.9,4.04),
-      c(0.9,3.44),
-      c(0.9,4.24),
-      "zoomed llox"
-    )
-    cfg2$zoom_y_cve <- list(c(0.58,1.02)) # "zoomed"
+    # cfg2$zoom_x <- list(
+    #   c(0.9,3.34),
+    #   c(0.9,4.04),
+    #   c(0.9,3.44),
+    #   c(0.9,4.24),
+    #   "zoomed llox"
+    # )
+    cfg2$zoom_x <- "zoomed"
+    # cfg2$zoom_y_cve <- list(c(0.58,1.02)) # "zoomed"
     cfg2$zoom_y_risk <- list(c(-0.002,0.072))
+    cfg2$zoom_y_cve <- "zoomed"
+    # cfg2$zoom_y_risk <- "zoomed (risk)"
     cfg2$zoom_y_max <- NA
     cfg2$more_ticks <- 1
     cfg2$folder_local <- "Moderna data/"
@@ -225,7 +228,8 @@
       v_ph1 = c(1,2,1,2,1,2,1,2,1,2),
       v_ph2 = c(1,2,1,2,1,2,1,2,1,2),
       v_covariates = c(1,1,1,1,1,1,1,1,1,1),
-      zoom_x = c(1,2,3,4,5,5,5,5,5,5),
+      # zoom_x = c(1,2,3,4,5,5,5,5,5,5),
+      zoom_x = c(1,1,1,1,1,1,1,1,1,1),
       zoom_y_cve = c(1,1,1,1,1,1,1,1,1,1),
       zoom_y_risk = c(1,1,1,1,1,1,1,1,1,1),
       more_ticks = c(1,1,1,1,1,1,1,1,1,1),
@@ -338,7 +342,8 @@
   
   if (cfg2$analysis=="HVTN 705 (all)") {
     
-    cfg2$estimators <- list(overall="Cox gcomp", cr=c("Grenander", "Cox gcomp")) # Types: "Cox import", "Grenander", "Cox gcomp", "Qbins", "Cox GAM", "Cox edge"
+    # cfg2$estimators <- list(overall="Cox gcomp", cr=c("Grenander", "Cox gcomp")) # Types: "Cox import", "Grenander", "Cox gcomp", "Qbins", "Cox GAM", "Cox edge"
+    cfg2$estimators <- list(overall="Cox gcomp", cr=c("Cox gcomp", "Cox GAM", "Cox edge")) # Types: "Cox import", "Grenander", "Cox gcomp", "Qbins", "Cox GAM", "Cox edge"
     cfg2$plots <- c("Risk", "CVE")
     cfg2$marker <- c("Day210ELCZ", "Day210ELMo", "Day210ADCPgp140C97ZAfib", "Day210ADCPgp140Mos1fib", "Day210IgG3gp140C97ZAfibritin40delta", "Day210IgG3gp140Mos1fibritin40delta", "Day210IgG340mdw_gp120", "Day210IgG340mdw_gp140", "Day210IgG340mdw_V1V2", "Day210IgG3gp4140delta", "Day210IgG340mdw_multi", "Day210IgG340mdw_gp120_gp140_vm", "Day210IgG50mdw_V1V2", "Day210mdw_xassay", "Day210ADCCCAP8_pk", "Day210ADCCCH58_pk", "Day210ADCCWITO_pk", "Day210ADCCCAP8_pAUC", "Day210ADCCCH58_pAUC", "Day210ADCCWITO_pAUC", "Day210ICS4AnyEnvIFNg_OR_IL2", "Day210ICS8AnyEnvIFNg_OR_IL2", "Day210IgG3AE.A244.V1V2.Tags_293F40delta", "Day210IgG3C.1086C.V1.V2.Tags40delta", "Day210IgG3gp70.001428.2.42.V1V240delta", "Day210IgG3gp70.1012.11.TC21.3257.V1V240delta", "Day210IgG3gp70.1394C9G1.V1V240delta", "Day210IgG3gp70.BF1266.431a.V1V240delta", "Day210IgG3gp70.Ce1086.B2.V1V240delta", "Day210IgG3gp70.B.CaseA.V1.V240delta", "Day210IgGAE.A244.V1V2.Tags_293F50delta", "Day210IgGC.1086C.V1.V2.Tags50delta", "Day210IgGgp70_001428.2.42.V1V250delta", "Day210IgGgp70_1012.11.TC21.3257.V1V250delta", "Day210IgGgp70_1394C9G1.V1V250delta", "Day210IgGgp70_9004SS.A3.4.V1V250delta", "Day210IgGgp70_BF1266.431a.V1V250delta", "Day210IgGgp70_Ce1086.B2.V1V250delta", "Day210IgGgp70.B.CaseA.V1.V250delta")
     cfg2$lab_title <- c("IgG to VT-C (EU/ml): Day 210", "IgG to VT-M (EU/ml): Day 210", "Average phagocytosis score to gp140 C97ZA: Day 210", "Average phagocytosis score to gp140 Mos1: Day 210", "IgG3 Net MFI to gp140 C97ZA: Day 210", "IgG3 Net MFI to gp140 Mosaic: Day 210", "IgG3 gp120 breadth (Weighted avg log10 Net MFI): Day 210", "IgG3 gp140 breadth (Weighted avg log10 Net MFI): Day 210", "IgG3 V1V2 breadth (Weighted avg log10 Net MFI): Day 210", "IgG3 Net MFI to gp41: Day 210", "IgG3 multi-epitope breadth (Wt avg log10 Net MFI): Day 210", "IgG3 gp120 + gp140 breadth (Wt avg log10 Net MFI): Day 210", "IgG V1V2 breadth (Wt avg log10 Net MFI): Day 210", "Overall maximal diversity score: Day 210", "Peak baseline-subtracted pct loss luc activity to CAP8: Day 210", "Peak baseline-subtracted pct loss luc activity to CH58: Day 210", "Peak baseline-subtracted pct loss luc activity to WITO: Day 210", "AUC baseline-subtracted pct loss luc activity to CAP8: Day 210", "AUC baseline-subtracted pct loss luc activity to CH58: Day 210", "AUC baseline-subtracted pct loss luc activity to WITO: Day 210", "Pct CD4+ T-cells expressing IFN-g/IL-2: Day 210", "Pct CD8+ T-cells expressing IFN-g/IL-2: Day 210", "IgG3 Net MFI to AE.A244 V1V2 Tags 293F: Day 210", "IgG3 Net MFI to C.1086C V1V2 Tags: Day 210", "IgG3 Net MFI to gp70-001428.2.42 V1V2: Day 210", "IgG3 Net MFI to gp70-1012.11.TC21.3257 V1V2: Day 210", "IgG3 Net MFI to gp70-1394C9G1 V1V2: Day 210", "IgG3 Net MFI to gp70-BF1266 431a V1V2: Day 210", "IgG3 Net MFI to gp70-Ce1086 B2 V1V2: Day 210", "IgG3 Net MFI to gp70-B.CaseAV1V2: Day 210", "IgG Net MFI to AE.A244 V1V2 Tags 293F: Day 210", "IgG Net MFI to C.1086C V1V2 Tags: Day 210", "IgG Net MFI to gp70-001428.2.42 V1V2: Day 210", "IgG Net MFI to gp70-1012.11.TC21.3257 V1V2: Day 210", "IgG Net MFI to gp70-1394C9G1 V1V2: Day 210", "IgG Net MFI to gp70-9004SS.A3.4 V1V2: Day 210", "IgG Net MFI to gp70-BF1266.431a V1V2: Day 210", "IgG Net MFI to gp70-Ce1086.B2 V1V2: Day 210", "IgG Net MFI to gp70.B.CaseA V1V2: Day 210")
@@ -1349,7 +1354,7 @@ if ("Grenander" %in% cfg2$estimators$cr) {
                     deriv_type = cfg2$params$deriv_type,
                     q_n_type = cfg2$params$q_n_type),
       grid_size = list(y=101, s=101, x=5)
-    )
+    )$cr
     
     saveRDS(ests, paste0(cfg2$analysis," plots/ests_g_",cfg2$tid,".rds"))
     
@@ -1527,7 +1532,7 @@ if ("Cox GAM" %in% cfg2$estimators$cr) {
       s_out = s_grid,
       ci_type = "logit",
       spline_df = 4
-    )
+    )$cr
     
     saveRDS(ests, paste0(cfg2$analysis," plots/ests_z_",cfg2$tid,".rds"))
     
@@ -1577,7 +1582,7 @@ if ("Cox gcomp" %in% cfg2$estimators$cr) {
       s_out = s_grid,
       ci_type = "logit",
       return_extras = T
-    )
+    )$cr
     
     saveRDS(ests, paste0(cfg2$analysis," plots/ests_c_",cfg2$tid,".rds"))
     
@@ -1653,7 +1658,7 @@ if ("Cox edge" %in% cfg2$estimators$cr) {
       s_out = s_grid,
       ci_type = "logit",
       edge_ind = T
-    )
+    )$cr
     
     saveRDS(ests, paste0(cfg2$analysis," plots/ests_e_",cfg2$tid,".rds"))
     

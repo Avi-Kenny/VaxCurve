@@ -84,6 +84,7 @@ if (cfg$which_sim=="estimation") {
       res_list[paste0("r_Mn_",m)] <- ests$est[i]
       res_list[paste0("ci_lo_",m)] <- ests$ci_lo[i]
       res_list[paste0("ci_hi_",m)] <- ests$ci_hi[i]
+      if (!is.null(L$return_se)) { res_list[paste0("se_",m)] <- ests$se[i] }
       
       if (F) {
         res_list[paste0("Gamma_",m)] <- Gamma_true[i]

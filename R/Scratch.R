@@ -1,4 +1,23 @@
 
+# Distribution of nondifferentiable function of normal variable
+if (F) {
+  
+  hist <- function(x, bins=100, xlim=NA){
+    ggplot(data.frame(x=x),aes(x=x)) + geom_histogram(bins=bins)
+  }
+  
+  n_reps <- 10000
+  var <- rep(NA, n_reps)
+  x <- rnorm(n_reps)
+  g <- function(x) { max(x, -2) }
+  for (i in c(1:n_reps)) {
+    # var[i] <- x[i]
+    var[i] <- g(x[i])
+  }
+  hist(var)
+  
+}
+
 # Debugging
 if (F) {
   
@@ -279,11 +298,9 @@ if (F) {
   
   n <- 20
   x <- runif(n)
-  x[1]<-0; x[n]<-1; # !!!!!
   y <- 1 + 2*x + sin(5*x) + rnorm(n, sd=0.3)
   # basis <- ns(x, df=4, intercept=F, Boundary.knots=quantile(x, c(0.05,0.95)))
   basis <- ns(x, knots=c(0.25,0.5,0.75), intercept=F, Boundary.knots=c(0,1))
-  # basis <- ns(x, knots=c(0.25,0.5,0.75), intercept=T, Boundary.knots=c(0,1))
   
   b1 <- basis[,1]
   b2 <- basis[,2]
@@ -300,7 +317,6 @@ if (F) {
       den <- knts[K] - knts[k]
       return(num/den)
     }
-    # n1 <- 1 # !!!!!
     n2 <- x
     n3 <- sapply(x, function(x) {dk(x,1)}) - sapply(x, function(x) {dk(x,K-1)})
     n4 <- sapply(x, function(x) {dk(x,2)}) - sapply(x, function(x) {dk(x,K-1)})
@@ -309,7 +325,6 @@ if (F) {
   
   model1 <- lm(y~b1+b2+b3+b4-1)
   model2 <- lm(y~n2+n3+n4+n5-1)
-  # model <- lm(y~b1+b2+b3+b4+b5)
   y_pred1 <- predict(model1)
   y_pred2 <- predict(model2)
   

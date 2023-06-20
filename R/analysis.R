@@ -54,8 +54,8 @@
   #       dependent on cfg2 variables
   flags <- list(
     hvtn705_abstract_fig = F,
-    table_of_vals = F,
-    save_data_objs = F,
+    table_of_vals = T,
+    save_data_objs = T,
     paper_npcve = F,
     paper_cox = F,
     hvtn124_plot = F
@@ -950,26 +950,25 @@
   )
   
   # Create C$t_0 variable if it is set to zero
-  SubcohortInd <- df_ph1_full[which(df_ph1_full$Trt==1),]$SubcohortInd
-  if (length(SubcohortInd)!=length(dat$v$z)) {
-    stop("Error; lengths differ between SubcohortInd and dat$v.")
-  }
-  indices_1 <- which(dat$v$z==1 & dat$v$delta==1)
-  indices_2 <- which(dat$v$z==1 & SubcohortInd==1)
-  time_1 <- max(dat$v$y[indices_1])
-  time_2 <- sort(dat$v$y[indices_2], decreasing=T)[15] - 1
-  # print(paste("# of PH2 events:", length(indices_1))) # QA
-  s_num <- sum(dat$v$s==min(dat$v$s, na.rm=T), na.rm=T)
-  s_den <- sum(!is.na(dat$v$s))
-  # print(paste("Edge mass:", round(s_num/s_den,2))) # QA
-  if (cfg2$analysis=="Janssen (partA)") {
-    C$t_0 <- min(time_1,time_2)
-  } else {
-    if (cfg2$t_0==0) {
-      C$t_0 <- max(dat$v$y[dat$v$z==1 & dat$v$delta==1])
+  if (cfg2$t_0==0) {
+    if (cfg2$analysis=="Janssen (partA)") {
+      SubcohortInd <- df_ph1_full[df_ph1_full$Trt==1,]$SubcohortInd
+      if (length(SubcohortInd)!=length(dat$v$z)) {
+        stop("Error; lengths differ between SubcohortInd and dat$v.")
+      }
+      indices_1 <- which(dat$v$z==1 & dat$v$delta==1)
+      indices_2 <- which(dat$v$z==1 & SubcohortInd==1)
+      time_1 <- max(dat$v$y[indices_1])
+      time_2 <- sort(dat$v$y[indices_2], decreasing=T)[15] - 1
+      s_num <- sum(dat$v$s==min(dat$v$s, na.rm=T), na.rm=T)
+      s_den <- sum(!is.na(dat$v$s))
+      C$t_0 <- min(time_1,time_2)
     } else {
-      C$t_0 <- cfg2$t_0
+      # Currently unused
+      C$t_0 <- max(dat$v$y[dat$v$z==1 & dat$v$delta==1])
     }
+  } else {
+    C$t_0 <- cfg2$t_0
   }
   
   # Generate grid of points
@@ -1925,7 +1924,7 @@ if (F) {
     aes(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax),
     hist_data,
     color = "brown4",
-    linewidth = 0.4,
+    size = 0.4,
     fill = "brown4",
     alpha = 0.1,
     inherit.aes = F

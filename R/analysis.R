@@ -75,7 +75,6 @@
     cfg2$t_0 <- 54
     # Note: "janssen_pooled_real_..." changed to "janssen_pooled_EUA_"
     cfg2$dataset <- c("janssen_pooled_real_data_processed_with_riskscore.csv", "janssen_pooled_realADCP_data_processed_with_riskscore.csv")
-    cfg2$txct <- T
     cfg2$cr2_trial <- c("janssen_pooled_real", "janssen_pooled_realADCP")
     cfg2$cr2_COR <- "D29IncludeNotMolecConfirmedstart1"
     cfg2$cr2_marker <- c(1,2,3)
@@ -156,7 +155,6 @@
     cfg2$endpoint <- "COVID"
     cfg2$t_0 <- c(126,100) # Try changing to 0
     cfg2$dataset <- "P3001ModernaCOVEimmunemarkerdata_correlates_processed_v1.1_lvmn_added_Jan14_2022.csv"
-    cfg2$txct <- T
     cfg2$cr2_trial <- "moderna_real"
     cfg2$cr2_COR <- c("D29", "D57")
     cfg2$cr2_marker <- c(1,2,3,4,5)
@@ -272,7 +270,6 @@
     cfg2$amp_tx <- c("C3", "T1", "T2", "T1+T2")
     cfg2$t_0 <- c(595,595) # c(601,609)
     cfg2$dataset <- "amp_survival_all.csv"
-    cfg2$txct <- F
     cfg2$cr2_trial <- F
     cfg2$cr2_COR <- F
     cfg2$cr2_marker <- F
@@ -352,7 +349,6 @@
     cfg2$endpoint <- "HIV"
     cfg2$t_0 <- 550
     cfg2$dataset <- "HVTN705_secondcasecontrolprocesseddata_excludeELISpotmarkers.csv"
-    cfg2$txct <- T
     cfg2$cr2_trial <- "hvtn705second"
     cfg2$cr2_COR <- "D210"
     cfg2$cr2_marker <- c(1:39)
@@ -431,7 +427,6 @@
     cfg2$endpoint <- "HIV"
     cfg2$t_0 <- 550
     cfg2$dataset <- "HVTN705_secondcasecontrolprocesseddata_excludeELISpotmarkersaddICSmarkers.csv"
-    cfg2$txct <- T
     cfg2$cr2_trial <- "hvtn705second"
     cfg2$cr2_COR <- "D210"
     cfg2$cr2_marker <- c(1:12)
@@ -512,7 +507,6 @@
     cfg2$endpoint <- "COVID"
     cfg2$t_0 <- c(117,92)
     cfg2$dataset <- c("azd1222_data_processed_with_riskscore.csv", "azd1222_bAb_data_processed_with_riskscore.csv")
-    cfg2$txct <- T
     cfg2$cr2_trial <- c("azd1222", "azd1222_bAb")
     cfg2$cr2_COR <- c("D29", "D57")
     cfg2$cr2_marker <- c(1,2)
@@ -603,7 +597,6 @@
                       "janssen_la_partAnonsenior_data_processed_with_riskscore.csv",
                       "janssen_sa_partA_data_processed_with_riskscore.csv",
                       "janssen_sa_partAnonsenior_data_processed_with_riskscore.csv")
-    cfg2$txct <- T
     cfg2$cr2_trial <- c("janssen_pooled_partA",
                         "janssen_pooled_partAsenior",
                         "janssen_pooled_partAnonsenior",
@@ -709,7 +702,6 @@
     cfg2$t_0 <- c(114,66)
     cfg2$dataset <- c("profiscov_data_processed_with_riskscore.csv",
                       "profiscov_lvmn_data_processed_with_riskscore.csv")
-    cfg2$txct <- T
     cfg2$cr2_trial <- c("profiscov", "profiscov_lvmn") # dummy; not using Cox estimates
     cfg2$cr2_COR <- c("D43", "D91")
     cfg2$cr2_marker <- c(1:9)
@@ -924,16 +916,6 @@
     df_weights <- df_ph1_full[[cfg2$v$wt]]
   }
   
-  # Create data frames specific to treatment and control groups
-  if (cfg2$txct) {
-    
-    tx_rows <- which(df_ph1_full$Trt==1)
-    ct_rows <- which(df_ph1_full$Trt==0)
-    df_tx <- df_ph1_full[tx_rows,]
-    df_ct <- df_ph1_full[ct_rows,]
-
-  }
-
   # Create data structures to hold results
   plot_data_risk <- data.frame(
     x = double(),
@@ -967,11 +949,11 @@
     data = df_ph1
   )
   
-  # Create C$t_0 variable if it is not provided
-  if (length(df_tx[["SubcohortInd"]])!=length(dat$v$z)) {
-    stop("Error; lengths differ between df_tx and dat$v.")
+  # Create C$t_0 variable if it is set to zero
+  SubcohortInd <- df_ph1_full[which(df_ph1_full$Trt==1),]$SubcohortInd
+  if (length(SubcohortInd)!=length(dat$v$z)) {
+    stop("Error; lengths differ between SubcohortInd and dat$v.")
   }
-  SubcohortInd <- df_tx[["SubcohortInd"]]
   indices_1 <- which(dat$v$z==1 & dat$v$delta==1)
   indices_2 <- which(dat$v$z==1 & SubcohortInd==1)
   time_1 <- max(dat$v$y[indices_1])
@@ -2081,6 +2063,8 @@ if (F) {
   mrk_lab <- "Expanded Multi-epitope functions: Day 210"
   title_lab <- "Figure 1-5. HVTN 705 Expanded Multi-epitope functions at Month 7"
   
+  df_tx <- df_ph1_full[which(df_ph1_full$Trt==1),]
+  df_ct <- df_ph1_full[which(df_ph1_full$Trt==0),]
   df_tx2 <- filter(df_tx, Ph2ptids.D210==1)
   df_ct2 <- filter(df_ct, Ph2ptids.D210==1)
   

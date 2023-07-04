@@ -1108,7 +1108,7 @@
     y = double(),
     curve = character(),
     ci_lo = double(),
-    ci_hi = double(),
+    ci_up = double(),
     overall = character()
   )
   plot_data_cve <- plot_data_risk
@@ -1188,8 +1188,8 @@ if (cfg2$estimators$overall %in% c("Cox gcomp", "KM")) {
       x = c(999,999),
       y = rep(ests_ov[ests_ov$stat=="ve","est"], 2),
       curve = rep("Overall VE", 2),
-      ci_lo = rep(ests_ov[ests_ov$stat=="ve","ci_lo"], 2),
-      ci_hi = rep(ests_ov[ests_ov$stat=="ve","ci_hi"], 2),
+      ci_lo = rep(ests_ov[ests_ov$stat=="ve","ci_lower"], 2),
+      ci_up = rep(ests_ov[ests_ov$stat=="ve","ci_upper"], 2),
       overall = c("Overall L", "Overall R")
     ))
   }
@@ -1201,10 +1201,10 @@ if (cfg2$estimators$overall %in% c("Cox gcomp", "KM")) {
             rep(ests_ov[ests_ov$group=="vaccine","est"], 2)),
       curve = c(rep("Placebo overall",2),
                 rep("Vaccine overall",2)),
-      ci_lo = c(rep(ests_ov[ests_ov$group=="placebo","ci_lo"], 2),
-                rep(ests_ov[ests_ov$group=="vaccine","ci_lo"], 2)),
-      ci_hi = c(rep(ests_ov[ests_ov$group=="placebo","ci_hi"], 2),
-                rep(ests_ov[ests_ov$group=="vaccine","ci_hi"], 2)),
+      ci_lo = c(rep(ests_ov[ests_ov$group=="placebo","ci_lower"], 2),
+                rep(ests_ov[ests_ov$group=="vaccine","ci_lower"], 2)),
+      ci_up = c(rep(ests_ov[ests_ov$group=="placebo","ci_upper"], 2),
+                rep(ests_ov[ests_ov$group=="vaccine","ci_upper"], 2)),
       overall = rep(c("Overall L", "Overall R"),2)
     ))
   }
@@ -1284,7 +1284,7 @@ if (cfg2$estimators$overall=="Cox import" ||
       y = rep(overall.ve[[1]], 2),
       curve = rep("Overall VE", 2),
       ci_lo = rep(overall.ve[[2]], 2),
-      ci_hi = rep(overall.ve[[3]], 2),
+      ci_up = rep(overall.ve[[3]], 2),
       overall = c("Overall L", "Overall R")
     ))
   }
@@ -1295,7 +1295,7 @@ if (cfg2$estimators$overall=="Cox import" ||
       y = as.numeric(1-risks$prob/res.plac.cont["est"]),
       curve = rep("CVE, Cox model", length(as.numeric(risks$marker))),
       ci_lo = as.numeric(cox_cve_cis[1,]),
-      ci_hi = as.numeric(cox_cve_cis[2,]),
+      ci_up = as.numeric(cox_cve_cis[2,]),
       overall = rep("", length(as.numeric(risks$marker)))
     ))
   }
@@ -1306,7 +1306,7 @@ if (cfg2$estimators$overall=="Cox import" ||
       y = c(rep(prev.plac["est"], 2), rep(prev.vacc["est"], 2)),
       curve = c(rep("Placebo overall",2), rep("Vaccine overall",2)),
       ci_lo = c(rep(prev.plac["2.5%"], 2), rep(prev.vacc["2.5%"], 2)),
-      ci_hi = c(rep(prev.plac["97.5%"], 2), rep(prev.vacc["97.5%"], 2)),
+      ci_up = c(rep(prev.plac["97.5%"], 2), rep(prev.vacc["97.5%"], 2)),
       overall = rep(c("Overall L", "Overall R"),2)
     ))
   }
@@ -1317,7 +1317,7 @@ if (cfg2$estimators$overall=="Cox import" ||
       y = as.numeric(risks$prob),
       curve = rep("Risk, Cox model", length(as.numeric(risks$marker))),
       ci_lo = as.numeric(cox_risk_cis[1,]),
-      ci_hi = as.numeric(cox_risk_cis[2,]),
+      ci_up = as.numeric(cox_risk_cis[2,]),
       overall = rep("", length(as.numeric(risks$marker)))
     ))
   }
@@ -1336,14 +1336,14 @@ if (cfg2$estimators$overall=="Cox import" ||
     
     # Extract risk estimates and CIs
     ests_risk <- ests$cr$est %>% pmax(0) %>% pmin(1)
-    ci_lo_risk <- ests$cr$ci_lo %>% pmax(0) %>% pmin(1)
-    ci_hi_risk <- ests$cr$ci_hi %>% pmax(0) %>% pmin(1)
+    ci_lo_risk <- ests$cr$ci_lower %>% pmax(0) %>% pmin(1)
+    ci_up_risk <- ests$cr$ci_upper %>% pmax(0) %>% pmin(1)
 
     # Compute CVE estimates
     if (run_cve) {
       ests_cve <- ests$cve$est
-      ci_lo_cve <- ests$cve$ci_lo %>% pmin(1) # Reversing is intentional
-      ci_hi_cve <- ests$cve$ci_hi %>% pmin(1) # Reversing is intentional
+      ci_lo_cve <- ests$cve$ci_lower %>% pmin(1)
+      ci_up_cve <- ests$cve$ci_upper %>% pmin(1)
     }
     
     plot_data_risk <- data.frame(
@@ -1351,7 +1351,7 @@ if (cfg2$estimators$overall=="Cox import" ||
       y = ests_risk,
       curve = rep(lab_risk, length(ests_risk)),
       ci_lo = ci_lo_risk,
-      ci_hi = ci_hi_risk,
+      ci_up = ci_up_risk,
       overall = rep("", length(ests_risk))
     )
     if (run_cve) {
@@ -1360,7 +1360,7 @@ if (cfg2$estimators$overall=="Cox import" ||
         y = ests_cve,
         curve = rep(lab_cve, length(ests_cve)),
         ci_lo = ci_lo_cve,
-        ci_hi = ci_hi_cve,
+        ci_up = ci_up_cve,
         overall = rep("", length(ests_cve))
       )
     } else {
@@ -1462,31 +1462,31 @@ if (F) {
   var_risk <- ests$sigma2_edge_est
   n <- ests$n
   ci_lo_risk <- est_risk - 1.96*sqrt(var_risk/n)
-  ci_hi_risk <- est_risk + 1.96*sqrt(var_risk/n)
+  ci_up_risk <- est_risk + 1.96*sqrt(var_risk/n)
   risk_ct <- ests_ov[ests_ov$group=="placebo","est"]
   cve <- Vectorize(function(x) { 1 - x/risk_ct })
   est_cve <- cve(est_risk)
   sd_cve <- sqrt(var_risk) / risk_ct
-  ci_lo_cve <- cve(ci_hi_risk) %>% pmin(1)
-  ci_hi_cve <- cve(ci_lo_risk) %>% pmin(1)
+  ci_lo_cve <- cve(ci_up_risk) %>% pmin(1)
+  ci_up_cve <- cve(ci_lo_risk) %>% pmin(1)
   
   # PM
   est_ov <- overall.ve[[1]]
   sd_ov <- sd(1-res.vacc.cont[2:1001]/res.plac.cont[2:1001])
   ci_lo_ov <- overall.ve[[2]]
-  ci_hi_ov <- overall.ve[[3]]
+  ci_up_ov <- overall.ve[[3]]
   est_pm <- 1 - log(1-est_cve)/log(1-est_ov)
   var_pm <- sd_cve^2 / ( n * (1-est_cve)^2 * (log(1-est_ov))^2 ) +
     sd_ov * (log(1-est_cve))^2 / ((1-est_ov)^2+(log(1-est_ov))^4)
   sd_pm <- sqrt(var_pm)
   ci_lo_pm <- est_pm - 1.96*sd_pm
-  ci_hi_pm <- est_pm + 1.96*sd_pm
+  ci_up_pm <- est_pm + 1.96*sd_pm
   
   # Save results
   saveRDS(
     list(est_cve=est_cve, sd_cve=sd_cve, ci_lo_cve=ci_lo_cve,
-         ci_hi_cve=ci_hi_cve, est_pm=est_pm, sd_pm=sd_pm, ci_lo_pm=ci_lo_pm,
-         ci_hi_pm=ci_hi_pm),
+         ci_up_cve=ci_up_cve, est_pm=est_pm, sd_pm=sd_pm, ci_lo_pm=ci_lo_pm,
+         ci_up_pm=ci_up_pm),
     paste0(cfg2$analysis," plots/mediation_results_",cfg2$tid,".rds")
   )
   
@@ -1497,11 +1497,11 @@ if (F) {
       "est_cve" = double(),
       "sd_cve" = double(),
       "ci_lo_cve" = double(),
-      "ci_hi_cve" = double(),
+      "ci_up_cve" = double(),
       "est_pm" = double(),
       "sd_pm" = double(),
       "ci_lo_pm" = double(),
-      "ci_hi_pm" = double()
+      "ci_up_pm" = double()
     )
     for (i in c(1:58)) {
       file <- paste0("Janssen (partA) plots/Mediation/",
@@ -1768,7 +1768,7 @@ if (cfg2$run_hyptest) {
   #'     "Placebo overall", "Vaccine overall", "Risk, Cox model",
   #'     "Risk, nonparametric")
   #'   - `ci_lo`: Lower confidence bound for CVE
-  #'   - `ci_hi`: Upper confidence bound for CVE
+  #'   - `ci_up`: Upper confidence bound for CVE
   #' @param which One of c("CVE", "Risk")
   #' @param zoom_x Either a numeric vector of length 2 representing the plot X
   #'     limits, or the string "zoomed", in which case the plot will be zoomed
@@ -1851,13 +1851,13 @@ if (cfg2$run_hyptest) {
     } else if (zoom_y[1]=="zoomed") {
       zz <- dplyr::filter(plot_data, x>=zoom_x[1] & x<=zoom_x[2])
       z_y_L <- min(zz$ci_lo, na.rm=T)
-      z_y_U <- max(zz$ci_hi, na.rm=T)
+      z_y_U <- max(zz$ci_up, na.rm=T)
       zoom_y <- c(z_y_L - 0.05*(z_y_U-z_y_L),
                   z_y_U + 0.05*(z_y_U-z_y_L))
     } else if (zoom_y[1]=="zoomed (risk)") {
       zz <- dplyr::filter(plot_data, x>=zoom_x[1] & x<=zoom_x[2])
       z_y_L <- 0
-      z_y_U <- max(plot_data$ci_hi, na.rm=T)
+      z_y_U <- max(plot_data$ci_up, na.rm=T)
       if (!is.null(zoom_y_max)) { z_y_U <- min(zoom_y_max, z_y_U) }
       zoom_y <- c(z_y_L - 0.05*(z_y_U-z_y_L),
                   z_y_U + 0.05*(z_y_U-z_y_L))
@@ -1890,7 +1890,7 @@ if (cfg2$run_hyptest) {
     y_ticks <- ifelse(which=="CVE", 0.1, 0.01)
     plot <- ggplot(plot_data, aes(x=x, y=y, color=curve)) +
       geom_ribbon(
-        aes(ymin=ci_lo, ymax=ci_hi, fill=curve),
+        aes(ymin=ci_lo, ymax=ci_up, fill=curve),
         alpha = 0.05,
         linetype = "dotted"
       ) +
@@ -1985,7 +1985,7 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
     rows_1 <- which(plot_data$curve %in% which_curves)
     rows_2 <- which(plot_data$x < cut_lo | plot_data$x > cut_hi)
     rows <- intersect(rows_1, rows_2)
-    plot_data[rows, c("y", "ci_lo", "ci_hi")] <- NA
+    plot_data[rows, c("y", "ci_lo", "ci_up")] <- NA
     return(plot_data)
   }
   
@@ -1998,11 +1998,11 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
   if (flags$hvtn705_supress) {
     if (cfg2$marker=="Day210IgGgp70_BF1266.431a.V1V250delta") {
       ind_lo_cve <- min(which(plot_data_cve$curve=="CVE, nonparametric"))
-      ind_hi_cve <- max(which(plot_data_cve$ci_lo<=-2))
-      plot_data_cve[c(ind_lo_cve:ind_hi_cve), c("y", "ci_lo", "ci_hi")] <- NA
+      ind_up_cve <- max(which(plot_data_cve$ci_lo<=-2))
+      plot_data_cve[c(ind_lo_cve:ind_up_cve), c("y", "ci_lo", "ci_up")] <- NA
       ind_lo_risk <- min(which(plot_data_risk$curve=="Risk, nonparametric"))
-      ind_hi_risk <- max(which(plot_data_risk$ci_hi>=0.5))
-      plot_data_risk[c(ind_lo_risk:ind_hi_risk), c("y", "ci_lo", "ci_hi")] <- NA
+      ind_up_risk <- max(which(plot_data_risk$ci_up>=0.5))
+      plot_data_risk[c(ind_lo_risk:ind_up_risk), c("y", "ci_lo", "ci_up")] <- NA
     } else {
       stop("HVTN 705 config changed")
     }
@@ -2240,13 +2240,13 @@ if (F) {
       srv_ov <- survfit(Surv(dat_amp$y,dat_amp$delta)~1)
       risk_ov <- 1 - srv_ov$surv[which.min(abs(srv_ov$time-C$t_0))]
       ci_lo_ov <- 1 - srv_ov$upper[which.min(abs(srv_ov$time-C$t_0))]
-      ci_hi_ov <- 1 - srv_ov$lower[which.min(abs(srv_ov$time-C$t_0))]
+      ci_up_ov <- 1 - srv_ov$lower[which.min(abs(srv_ov$time-C$t_0))]
       km <- data.frame(
         x = c(999,999),
         y = rep(risk_ov, 2),
         curve = rep("Overall risk", 2),
         ci_lo = rep(ci_lo_ov, 2),
-        ci_hi = rep(ci_hi_ov, 2),
+        ci_up = rep(ci_up_ov, 2),
         overall = c("Overall L", "Overall R")
       )
       saveRDS(km, paste0(cfg2$analysis, " plots/km_", i, ".rds"))
@@ -2809,8 +2809,8 @@ if (F) {
     )
     rate_ct <- 1 - srv_ct$surv[which.min(abs(srv_ct$time-C$t_0))]
     ci_lo_ct <- 1 - srv_ct$upper[which.min(abs(srv_ct$time-C$t_0))]
-    ci_hi_ct <- 1 - srv_ct$lower[which.min(abs(srv_ct$time-C$t_0))]
-    var_ct <- ((ci_hi_ct-ci_lo_ct)/3.92)^2
+    ci_up_ct <- 1 - srv_ct$lower[which.min(abs(srv_ct$time-C$t_0))]
+    var_ct <- ((ci_up_ct-ci_lo_ct)/3.92)^2
     
     # Calculate treatment group survival (KM; with SE)
     srv_tx <- survfit(
@@ -2820,8 +2820,8 @@ if (F) {
     )
     rate_tx <- 1 - srv_tx$surv[which.min(abs(srv_tx$time-C$t_0))]
     ci_lo_tx <- 1 - srv_tx$upper[which.min(abs(srv_tx$time-C$t_0))]
-    ci_hi_tx <- 1 - srv_tx$lower[which.min(abs(srv_tx$time-C$t_0))]
-    var_tx <- ((ci_hi_tx-ci_lo_tx)/3.92)^2
+    ci_up_tx <- 1 - srv_tx$lower[which.min(abs(srv_tx$time-C$t_0))]
+    var_tx <- ((ci_up_tx-ci_lo_tx)/3.92)^2
     
     # Calculate overall vaccine efficacy (KM; delta method; with SE+CI)
     ve_overall <- 1 - (rate_tx/rate_ct)
@@ -2900,7 +2900,7 @@ if (F) {
                                     each=length(p_grid)),
                 rep("Overall VE",2)),
       ci_lo = c(ci_lo[1],ci_lo,ests_gcomp,rep(ve_ci[1],2)),
-      ci_hi = c(ci_hi[1],ci_hi,ests_gcomp,rep(ve_ci[2],2))
+      ci_up = c(ci_up[1],ci_up,ests_gcomp,rep(ve_ci[2],2))
     )
     plot_2 <- plot_1 %+% plot_data_2
     suppressMessages({

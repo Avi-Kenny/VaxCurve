@@ -1969,7 +1969,7 @@ if (F) {
   # Construct CIs
   t_quant <- qt(1-(0.05/2), df=(m-1))
   ci_lo <- ests - t_quant*ses
-  ci_hi <- ests + t_quant*ses
+  ci_up <- ests + t_quant*ses
   
 }
 
@@ -2010,7 +2010,7 @@ if (F) {
         point = points[p],
         est = ests[p],
         ci_lo = ests[p] - 1.96*boot_sd,
-        ci_hi = ests[p] + 1.96*boot_sd
+        ci_up = ests[p] + 1.96*boot_sd
       )
     }
     

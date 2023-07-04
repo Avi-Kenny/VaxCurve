@@ -358,7 +358,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     if (p$ci_type=="none") {
       
       ci_lo <- rep(0, length(ests))
-      ci_hi <- rep(0, length(ests))
+      ci_up <- rep(0, length(ests))
       
     } else {
       
@@ -372,34 +372,34 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
       n_orig <- length(dat_orig$z)
       if (p$ci_type=="regular") {
         ci_lo <- ests - (qnt*tau_ns)/(n_orig^(1/3))
-        ci_hi <- ests + (qnt*tau_ns)/(n_orig^(1/3))
+        ci_up <- ests + (qnt*tau_ns)/(n_orig^(1/3))
       } else if (p$ci_type=="logit") {
         ci_lo <- expit(
           logit(ests) - (qnt*tau_ns*deriv_logit(ests))/(n_orig^(1/3))
         )
-        ci_hi <- expit(
+        ci_up <- expit(
           logit(ests) + (qnt*tau_ns*deriv_logit(ests))/(n_orig^(1/3))
         )
       } else if (p$ci_type=="trunc") {
         ci_lo <- ests - (qnt*tau_ns)/(n_orig^(1/3))
-        ci_hi <- ests + (qnt*tau_ns)/(n_orig^(1/3))
+        ci_up <- ests + (qnt*tau_ns)/(n_orig^(1/3))
         ci_lo %<>% pmax(0) %>% pmin(1)
-        ci_hi %<>% pmax(0) %>% pmin(1)
+        ci_up %<>% pmax(0) %>% pmin(1)
       }
       
       # Edge correction
       if (p$edge_corr=="point") {
         ci_lo[1] <- ests[1] - 1.96*sqrt(sigma2_edge_est/n_orig)
-        ci_hi[1] <- ests[1] + 1.96*sqrt(sigma2_edge_est/n_orig)
+        ci_up[1] <- ests[1] + 1.96*sqrt(sigma2_edge_est/n_orig)
       } else if (p$edge_corr=="min") {
         ci_lo2 <- ests[1] - 1.96*sqrt(sigma2_edge_est/n_orig)
-        ci_hi2 <- ests[1] + 1.96*sqrt(sigma2_edge_est/n_orig)
+        ci_up2 <- ests[1] + 1.96*sqrt(sigma2_edge_est/n_orig)
         ci_lo <- In(r_Mn_edge_est<=ests)*pmin(ci_lo,ci_lo2) +
           In(r_Mn_edge_est>ests)*ci_lo
         ci_lo[1] <- ci_lo2
-        ci_hi <- In(r_Mn_edge_est<=ests)*pmin(ci_hi,ci_hi2) +
-          In(r_Mn_edge_est>ests)*ci_hi
-        ci_hi[1] <- ci_hi2
+        ci_up <- In(r_Mn_edge_est<=ests)*pmin(ci_up,ci_up2) +
+          In(r_Mn_edge_est>ests)*ci_up
+        ci_up[1] <- ci_up2
       }
       
     }
@@ -466,7 +466,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     # Construct CIs
     n_orig <- length(dat_orig$z)
     ci_lo <- ests - 1.96*sqrt(sigma2s/n_orig)
-    ci_hi <- ests + 1.96*sqrt(sigma2s/n_orig)
+    ci_up <- ests + 1.96*sqrt(sigma2s/n_orig)
     
   }
   
@@ -486,11 +486,11 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     if (se_marg) {
       ses <- sqrt(res_cox$var_est_marg)
       ci_lo <- expit(logit(ests) - 1.96*deriv_logit(ests)*ses)
-      ci_hi <- expit(logit(ests) + 1.96*deriv_logit(ests)*ses)
+      ci_up <- expit(logit(ests) + 1.96*deriv_logit(ests)*ses)
       # ci_lo <- (ests - 1.96*ses) %>% pmax(0) %>% pmin(1)
-      # ci_hi <- (ests + 1.96*ses) %>% pmax(0) %>% pmin(1)
+      # ci_up <- (ests + 1.96*ses) %>% pmax(0) %>% pmin(1)
     } else {
-      ses <- ci_lo <- ci_hi <- rep(NA, length(ests))
+      ses <- ci_lo <- ci_up <- rep(NA, length(ests))
     }
     
   }
@@ -543,7 +543,7 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
     # Compute CIs
     ests <- r_M4(points)
     ci_lo <- rep(NA, length(points))
-    ci_hi <- rep(NA, length(points))
+    ci_up <- rep(NA, length(points))
     
   }
   
@@ -551,8 +551,8 @@ est_curve <- function(dat_orig, estimator, params, points, dir="decr",
   res <- list(
     point = points_orig,
     est = c(rep(NA,na_head), ests, rep(NA,na_tail)),
-    ci_lo = c(rep(NA,na_head), ci_lo, rep(NA,na_tail)),
-    ci_hi = c(rep(NA,na_head), ci_hi, rep(NA,na_tail))
+    ci_lower = c(rep(NA,na_head), ci_lo, rep(NA,na_tail)),
+    ci_upper = c(rep(NA,na_head), ci_up, rep(NA,na_tail))
   )
   
   if (F) {

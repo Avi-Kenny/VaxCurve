@@ -890,8 +890,8 @@
     ests<-eval(as.name(paste0("ests",i)))
     r_M0 <- attr(dat_orig, "r_M0")
     theta_ests <- ests$est
-    ci_lo <- ests$ci_lo
-    ci_hi <- ests$ci_hi
+    ci_lo <- ests$ci_lower
+    ci_up <- ests$ci_upper
     len <- length(C$points)
     
     # Plot r_Mn (estimate vs. truth)
@@ -900,13 +900,13 @@
       theta = c(theta_ests, r_M0),
       which = rep(c("Est","Truth"), each=len),
       ci_lo = c(ci_lo, r_M0),
-      ci_hi = c(ci_hi, r_M0)
+      ci_up = c(ci_up, r_M0)
     )
     ggplot(plot_data, aes(x=x, y=theta, color=factor(which))) +
       geom_line() +
       # labs(color="Which", title=paste("ests",i)) +
       geom_ribbon(
-        aes(ymin=ci_lo, ymax=ci_hi),
+        aes(ymin=ci_lo, ymax=ci_up),
         alpha = 0.2,
         fill = NA,
         linetype = "dotted"

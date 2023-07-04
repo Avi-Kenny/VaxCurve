@@ -400,7 +400,7 @@ if (F) {
       name = paste0("cov_",m),
       truth = paste0("r_M0_",m),
       lower = paste0("ci_lo_",m),
-      upper = paste0("ci_hi_",m),
+      upper = paste0("ci_up_",m),
       na.rm = T # !!!!!
     )
   }
@@ -1240,7 +1240,7 @@ if (F) {
     sd = list(name="sd_emp", x="r_Mn", na.rm=T),
     bias_pct = list(name="bias_pct", estimate="r_Mn", truth="r_M0", na.rm=T),
     coverage = list(name="coverage", truth="r_M0", lower="ci_lo",
-                    upper="ci_hi", na.rm=T)
+                    upper="ci_up", na.rm=T)
   )
   summ %<>% mutate(
     sd_est = sqrt(sd_est/n)
@@ -1307,7 +1307,7 @@ if (F) {
   r_M0 <- c()
   r_Mn <- c()
   ci_lo <- c()
-  ci_hi <- c()
+  ci_up <- c()
   which <- c()
   
   # Extract simulation data into vectors
@@ -1322,7 +1322,7 @@ if (F) {
       m <- format(round(j/50-0.02,2), nsmall=1)
       r_Mn <- c(r_Mn, d[i+row_offset,paste0("r_Mn_",m)])
       ci_lo <- c(ci_lo, d[i+row_offset,paste0("ci_lo_",m)])
-      ci_hi <- c(ci_hi, d[i+row_offset,paste0("ci_hi_",m)])
+      ci_up <- c(ci_up, d[i+row_offset,paste0("ci_up_",m)])
       which <- c(which, i)
     }
   }
@@ -1331,7 +1331,7 @@ if (F) {
     x = rep(sim$constants$points, n_paths),
     y = r_Mn,
     ci_lo = ci_lo,
-    ci_hi = ci_hi,
+    ci_up = ci_up,
     which = which
   )
   ggplot(
@@ -1349,7 +1349,7 @@ if (F) {
     ) +
     geom_line() +
     geom_ribbon(
-      aes(ymin=ci_lo, ymax=ci_hi),
+      aes(ymin=ci_lo, ymax=ci_up),
       alpha = 0.2,
       linetype = "dotted"
     ) +

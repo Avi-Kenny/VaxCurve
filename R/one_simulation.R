@@ -82,8 +82,8 @@ if (cfg$which_sim=="estimation") {
       m <- format(C$points[i], nsmall=2)
       res_list[paste0("r_M0_",m)] <- r_M0[i]
       res_list[paste0("r_Mn_",m)] <- ests$est[i]
-      res_list[paste0("ci_lo_",m)] <- ests$ci_lo[i]
-      res_list[paste0("ci_hi_",m)] <- ests$ci_hi[i]
+      res_list[paste0("ci_lo_",m)] <- ests$ci_lower[i]
+      res_list[paste0("ci_up_",m)] <- ests$ci_upper[i]
       if (!is.null(L$return_se)) { res_list[paste0("se_",m)] <- ests$se[i] }
       
       if (F) {
@@ -268,7 +268,7 @@ if (cfg$which_sim=="edge") {
       r_Mn = r_Mn_edge_est,
       sigma2_edge_est = sigma2_edge_est,
       ci_lo = r_Mn_edge_est - 1.96*sqrt(sigma2_edge_est/n_orig),
-      ci_hi = r_Mn_edge_est + 1.96*sqrt(sigma2_edge_est/n_orig)
+      ci_up = r_Mn_edge_est + 1.96*sqrt(sigma2_edge_est/n_orig)
     ))
     
   }

@@ -5,8 +5,11 @@
 #################.
 
 {
+  # Print timestamp
+  print(paste("START:", Sys.time()))
+  
   # Choose analysis
-  which_analysis <- "RV144" # "Janssen" "Moderna" "AMP" "AZD1222" "Janssen (partA)" "Profiscov" "HVTN 705 (primary)" "HVTN 705 (all)" "RV144" "HVTN 705 (second)"
+  which_analysis <- "Janssen (partA)" # "Janssen" "Moderna" "AMP" "AZD1222" "Janssen (partA)" "Profiscov" "HVTN 705 (primary)" "HVTN 705 (all)" "RV144" "HVTN 705 (second)"
   
   # Set proper task ID variable
   if (cluster_config$js=="slurm") {
@@ -33,23 +36,23 @@
   # names(.tid_lst) = .tid_var
   # do.call(Sys.setenv, .tid_lst)
   
-  # Uncomment this code to run 84 plots across 4 analyses
-  ..tid <- as.integer(Sys.getenv(.tid_var))
-  if (..tid %in% c(1:4)) {
-    which_analysis <- "Janssen"
-    .tid_lst = list(as.character(round(..tid)))
-  } else if (..tid %in% c(5:14)) {
-    which_analysis <- "Moderna"
-    .tid_lst = list(as.character(round(..tid-4)))
-  } else if (..tid %in% c(15:26)) {
-    which_analysis <- "HVTN 705 (ICS)"
-    .tid_lst = list(as.character(round(..tid-14)))
-  } else if (..tid %in% c(27:84)) {
-    which_analysis <- "Janssen (partA)"
-    .tid_lst = list(as.character(round(..tid-26)))
-  }
-  names(.tid_lst) = .tid_var
-  do.call(Sys.setenv, .tid_lst)
+  # # Uncomment this code to run 84 plots across 4 analyses
+  # ..tid <- as.integer(Sys.getenv(.tid_var))
+  # if (..tid %in% c(1:4)) {
+  #   which_analysis <- "Janssen"
+  #   .tid_lst = list(as.character(round(..tid)))
+  # } else if (..tid %in% c(5:14)) {
+  #   which_analysis <- "Moderna"
+  #   .tid_lst = list(as.character(round(..tid-4)))
+  # } else if (..tid %in% c(15:26)) {
+  #   which_analysis <- "HVTN 705 (ICS)"
+  #   .tid_lst = list(as.character(round(..tid-14)))
+  # } else if (..tid %in% c(27:84)) {
+  #   which_analysis <- "Janssen (partA)"
+  #   .tid_lst = list(as.character(round(..tid-26)))
+  # }
+  # names(.tid_lst) = .tid_var
+  # do.call(Sys.setenv, .tid_lst)
   
   # Set seed
   set.seed(1)
@@ -119,8 +122,8 @@
     cfg2$folder_local <- "Janssen data/"
     cfg2$folder_cluster <- "Z:/covpn/p3003/analysis/correlates/Part_A_Blinded_Phase_Data/adata/"
     cfg2$params = list(g_n_type="binning", deriv_type="m-spline",
-                       ci_type="logit", q_n_type="zero", # ci_type="trunc", # Used historically
-                       Q_n_type="Super Learner")
+                       ci_type="transformed", # ci_type="truncated", # Used historically
+                       Q_n_type="survSL")
     C <- list(appx=list(t_0=1,x_tol=25,s=0.01))
     
     # Variable map; one row corresponds to one CVE graph
@@ -218,8 +221,8 @@
     cfg2$llox_label <- "LOD" # NEW
     cfg2$llox <- c(0.3076,1.594,2.42,15.02,22.66) # NEW
     cfg2$params = list(g_n_type="binning", deriv_type="m-spline",
-                       ci_type="regular", q_n_type="zero",
-                       Q_n_type="Super Learner")
+                       ci_type="regular",
+                       Q_n_type="survSL")
     C <- list(appx=list(t_0=1,x_tol=25,s=0.01))
     
     # Variable map; one row corresponds to one CVE graph
@@ -255,8 +258,8 @@
       tid = c(1:10),
       map_row = c(1:10)
       # tid = c(1:20),
-      # # Q_n_type = rep(c("Cox", "Super Learner"),10),
-      # # ci_type = rep(c("regular", "logit"),10),
+      # # Q_n_type = rep(c("Cox", "survSL"),10),
+      # # ci_type = rep(c("regular", "transformed"),10),
       # edge_ind = rep(c(F,T), 10),
       # map_row = rep(c(1:10), each=2)
     )
@@ -313,8 +316,8 @@
     cfg2$folder_local <- "AMP data/"
     cfg2$folder_cluster <- "Z:/vaccine/p704/analysis/datashare/avi_kenny/adata/"
     cfg2$params = list(g_n_type="binning", deriv_type="linear",
-                       ci_type="regular", q_n_type="zero",
-                       Q_n_type="Super Learner")
+                       ci_type="regular",
+                       Q_n_type="survSL")
     C <- list(appx=list(t_0=10,x_tol=25,s=0.01))
     
     # Variable map; one row corresponds to one CVE graph
@@ -393,8 +396,8 @@
     cfg2$folder_local <- "HVTN 705 (all) data/"
     cfg2$folder_cluster <- "Z:/vaccine/p705/analysis/lab/cc/copcor/"
     cfg2$params = list(g_n_type="binning", deriv_type="line",
-                       ci_type="regular", q_n_type="zero",
-                       Q_n_type="Super Learner")
+                       ci_type="regular",
+                       Q_n_type="survSL")
     C <- list(appx=list(t_0=10,x_tol=15,s=0.01))
     
     # Variable map; one row corresponds to one CVE graph
@@ -478,8 +481,8 @@
       # g_n_type="parametric (edge) 2",
       g_n_type="binning",
       deriv_type="m-spline",
-      ci_type="logit", q_n_type="zero",
-      Q_n_type="Super Learner"
+      ci_type="transformed",
+      Q_n_type="survSL"
     )
     C <- list(appx=list(t_0=10,x_tol=15,s=0.01))
     
@@ -565,8 +568,8 @@
     cfg2$folder_local <- "HVTN 705 (ICS) data/"
     cfg2$folder_cluster <- "Z:/vaccine/p705/analysis/lab/cc/copcor/"
     cfg2$params = list(g_n_type="binning", deriv_type="line",
-                       ci_type="logit", q_n_type="zero",
-                       Q_n_type="Super Learner")
+                       ci_type="transformed",
+                       Q_n_type="survSL")
     C <- list(appx=list(t_0=10,x_tol=15,s=0.01))
     
     # Variable map; one row corresponds to one CVE graph
@@ -643,8 +646,8 @@
     cfg2$folder_local <- "AZD1222 data/"
     cfg2$folder_cluster <- "Z:/covpn/p3002/analysis/correlates/Part_A_Blinded_Phase_Data/adata/"
     cfg2$params = list(g_n_type="binning", deriv_type="line",
-                       ci_type="regular", q_n_type="zero",
-                       Q_n_type="Super Learner")
+                       ci_type="regular",
+                       Q_n_type="survSL")
     C <- list(appx=list(t_0=10,x_tol=25,s=0.01))
     
     # Variable map; one row corresponds to one CVE graph
@@ -752,8 +755,8 @@
     cfg2$llox_label <- c("LOD", "LLOQ") # !!!!!
     cfg2$llox <- c(NA, 4.8975) # !!!!!
     cfg2$params = list(g_n_type="parametric (edge) 2", deriv_type="m-spline",
-                       ci_type="logit", q_n_type="zero",
-                       Q_n_type="Super Learner")
+                       ci_type="transformed",
+                       Q_n_type="survSL")
     C <- list(appx=list(t_0=1,x_tol=25,s=0.01))
     
     # Variable map; one row corresponds to one CVE graph
@@ -836,8 +839,8 @@
     cfg2$llox <- c(49*0.009, 70*0.009, 72*0.009, 32*0.009, 35*0.0272, 224*0.0272, 53*0.0272, 91*0.0272, 46*0.00236, 27.56)
     cfg2$params = list(
       g_n_type="parametric", deriv_type="m-spline", # "binning"
-      ci_type="logit", q_n_type="zero",
-      Q_n_type="Super Learner"
+      ci_type="transformed",
+      Q_n_type="survSL"
     )
     C <- list(appx=list(t_0=1,x_tol=25,s=0.01))
     
@@ -920,9 +923,8 @@
       g_n_type = "binning",
       # g_n_type="parametric (edge) 2",
       deriv_type = "m-spline",
-      ci_type = "logit",
-      q_n_type = "zero",
-      Q_n_type = "Super Learner"
+      ci_type = "transformed",
+      Q_n_type = "survSL"
     )
     C <- list(appx=list(t_0=10,x_tol=15,s=0.01))
     
@@ -959,7 +961,7 @@
   
   # Set config based on local vs. cluster
   if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
-    cfg2$tid <- 1
+    cfg2$tid <- 45
     cfg2$dataset <- paste0(cfg2$folder_cluster,cfg2$dataset)
   } else {
     cfg2$tid <- as.integer(Sys.getenv(.tid_var))
@@ -1167,6 +1169,16 @@
 
 
 
+#########################.
+##### Summary stats #####
+#########################.
+
+{
+  vaccine::summary_stats(dat=dat)
+}
+
+
+
 ###################################.
 ##### Overall ests of risk/VE #####
 ###################################.
@@ -1181,7 +1193,7 @@ if (cfg2$estimators$overall %in% c("Cox gcomp", "KM")) {
     stop("cfg2$estimators$overall incorrectly specified.")
   }
   
-  ests_ov <- vaccine::overall(dat=dat, t_0=C$t_0, method=method)
+  ests_ov <- vaccine::est_overall(dat=dat, t_0=C$t_0, method=method)
   
   if ("CVE" %in% cfg2$plots) {
     plot_data_cve <- rbind(plot_data_cve, data.frame(
@@ -1397,36 +1409,42 @@ if ("Grenander" %in% cfg2$estimators$cr) {
     if (which_analysis=="RV144" ||
         (which_analysis=="HVTN 705 (second)" &&
          cfg2$marker=="Day210IgAA1.con.env03.140.CF10delta")) {
-      ests <- vaccine::est_np(
+      ests <- vaccine::est_ce(
         dat = dat,
+        type = "NP",
         t_0 = C$t_0,
         cve = T,
         s_out = s_grid,
-        edge_corr = as.logical(cfg2$params$edge_corr=="min"),
         ci_type = cfg2$params$ci_type,
         placebo_risk_method = "Cox",
-        dir = "incr",
-        params = list(surv_type = cfg2$params$Q_n_type,
-                      density_type = cfg2$params$g_n_type,
-                      deriv_type = cfg2$params$deriv_type,
-                      q_n_type = cfg2$params$q_n_type),
-        grid_size = list(y=101, s=101, x=5)
+        params_np = vaccine::params_ce_np(
+          dir = "incr",
+          edge_corr = as.logical(cfg2$params$edge_corr=="min"),
+          grid_size = list(y=101, s=101, x=5),
+          surv_type = cfg2$params$Q_n_type,
+          density_type = cfg2$params$g_n_type,
+          deriv_type = cfg2$params$deriv_type
+        )
       )
     } else {
-      ests <- vaccine::est_np(
+      ests <- vaccine::est_ce(
         dat = dat,
+        type = "NP",
         t_0 = C$t_0,
         cve = T,
         s_out = s_grid,
-        edge_corr = as.logical(cfg2$params$edge_corr=="min"),
         ci_type = cfg2$params$ci_type,
         placebo_risk_method = "Cox",
-        # params = list(surv_type = cfg2$params$Q_n_type, # !!!!!
-        params = list(surv_type = "survML-G", # !!!!!
-                      density_type = cfg2$params$g_n_type,
-                      deriv_type = cfg2$params$deriv_type,
-                      q_n_type = cfg2$params$q_n_type),
-        grid_size = list(y=101, s=101, x=5)
+        # return_extras = T,
+        params_np = vaccine::params_ce_np(
+          dir = "decr",
+          edge_corr = as.logical(cfg2$params$edge_corr=="min"),
+          grid_size = list(y=101, s=101, x=5),
+          surv_type = cfg2$params$Q_n_type,
+          # surv_type = "survML-G",
+          density_type = cfg2$params$g_n_type,
+          deriv_type = cfg2$params$deriv_type
+        )
       )
     }
     
@@ -1526,14 +1544,15 @@ if ("Cox (spline 3 df)" %in% cfg2$estimators$cr) {
   calc_ests <- T
   if (calc_ests) {
     
-    ests <- vaccine::est_cox(
+    ests <- vaccine::est_ce(
       dat = dat,
+      type = "Cox",
       t_0 = C$t_0,
       cve = T,
       s_out = s_grid,
-      ci_type = "logit",
+      ci_type = "transformed",
       placebo_risk_method = "Cox",
-      spline_df = 3
+      params_cox = vaccine::params_ce_cox(spline_df=3)
     )
     
     if (flags$save_data_objs) {
@@ -1567,24 +1586,26 @@ if ("Cox (spline 4 df)" %in% cfg2$estimators$cr) {
   if (calc_ests) {
     
     if (which_analysis!="RV144") {
-      ests <- vaccine::est_cox(
+      ests <- vaccine::est_ce(
         dat = dat,
+        type = "Cox",
         t_0 = C$t_0,
         cve = T,
         s_out = s_grid,
-        ci_type = "logit",
+        ci_type = "transformed",
         placebo_risk_method = "Cox",
-        spline_df = 4
+        params_cox = vaccine::params_ce_cox(spline_df=4)
       )
     } else {
-      ests <- vaccine::est_cox(
+      ests <- vaccine::est_ce(
         dat = dat,
+        type = "Cox",
         t_0 = C$t_0,
         cve = T,
         s_out = s_grid,
-        ci_type = "logit",
+        ci_type = "transformed",
         placebo_risk_method = "Cox",
-        spline_knots = c(0,5,6.5,8)
+        params_cox = vaccine::params_ce_cox(spline_knots=c(0,5,6.5,8))
       )
     }
     
@@ -1618,14 +1639,14 @@ if ("Cox gcomp" %in% cfg2$estimators$cr) {
   calc_ests <- F
   if (calc_ests) {
     
-    ests <- vaccine::est_cox(
+    ests <- vaccine::est_ce(
       dat = dat,
+      type = "Cox",
       t_0 = C$t_0,
       cve = T,
       s_out = s_grid,
-      ci_type = "logit",
+      ci_type = "transformed",
       placebo_risk_method = "Cox"
-      # return_extras = T
     )
     
     if (flags$save_data_objs) {
@@ -1659,14 +1680,15 @@ if ("Cox edge" %in% cfg2$estimators$cr) {
   calc_ests <- T
   if (calc_ests) {
     
-    ests <- vaccine::est_cox(
+    ests <- vaccine::est_ce(
       dat = dat,
+      type = "Cox",
       t_0 = C$t_0,
       cve = T,
       s_out = s_grid,
-      ci_type = "logit",
+      ci_type = "transformed",
       placebo_risk_method = "Cox",
-      edge_ind = T
+      params_cox = vaccine::params_ce_cox(edge_ind=T)
     )
     
     if (flags$save_data_objs) {
@@ -1703,8 +1725,7 @@ if (cfg2$run_hyptest) {
     # alt_type = "two-tailed",
     params = list(
       type = c("simple (with constant)", "edge", "combined", "combined 2"),
-      q_n_type = "zero",
-      Q_n_type = "Super Learner"
+      Q_n_type = "survSL"
     )
   )
   
@@ -2117,6 +2138,9 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
     }
     
   }
+  
+  # Print timestamp
+  print(paste("END:", Sys.time()))
   
 }
 

@@ -1,4 +1,26 @@
 
+# Alternative to log(1-CVE) transformation
+if (F) {
+  
+  # logRRs <- seq(-5,5,0.01)
+  logRRs <- seq(-10,-5,0.1) # !!!!!
+  RRs <- exp(logRRs)
+  logRRs2 <- log(RRs+0.01)
+  # RRs <- seq(0.02,50,0.001)
+  # logRRs <- log(RRs)
+  # logRRs2 <- log(RRs+0.01)
+  df_plot <- data.frame(
+    x = rep(RRs,2),
+    y = c(logRRs,logRRs2),
+    which = rep(c("log(x)", "log(x+0.01)"), each=length(RRs))
+  )
+  ggplot(df_plot, aes(x=x, y=y, color=which)) +
+    geom_line() +
+    labs(color="Transformation") +
+    theme(legend.position="bottom")
+
+}
+
 # Distribution of nondifferentiable function of normal variable
 if (F) {
   

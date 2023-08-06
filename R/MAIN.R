@@ -24,7 +24,7 @@ cfg <- list(
   pkgs = c("vaccine", "dplyr", "boot", "car", "mgcv", "memoise", "EnvStats",
            "fdrtool", "splines", "survival", "SuperLearner", "survSuperLearner",
            "randomForestSRC", "CFsurvival", "Rsolnp", "truncnorm", "tidyr",
-           "ranger", "survey", "pbapply", "compiler", "simest", "survML"), # "xgboost"
+           "ranger", "survey", "pbapply", "compiler", "simest"), # "survML" "xgboost"
   pkgs_nocluster = c("ggplot2", "viridis", "sqldf", "scales", "data.table",
                      "latex2exp"),
   parallel = "none",

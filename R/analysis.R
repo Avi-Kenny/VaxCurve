@@ -9,7 +9,7 @@
   print(paste("START:", Sys.time()))
   
   # Choose analysis
-  which_analysis <- "RV144" # "Janssen" "Moderna" "AMP" "AZD1222" "Janssen (partA)" "Profiscov" "HVTN 705 (primary)" "HVTN 705 (all)" "RV144" "HVTN 705 (second)"
+  which_analysis <- "Moderna" # "Janssen" "Moderna" "AMP" "AZD1222" "Janssen (partA)" "Profiscov" "HVTN 705 (primary)" "HVTN 705 (all)" "RV144" "HVTN 705 (second)"
   
   # Set proper task ID variable
   if (cluster_config$js=="slurm") {
@@ -34,29 +34,29 @@
   # names(.tid_lst) = .tid_var
   # do.call(Sys.setenv, .tid_lst)
   
-  # # 128 plots across 4 analyses: uncomment to run
-  # ..tid <- as.integer(Sys.getenv(.tid_var))
-  # if (..tid %in% c(1:4)) { # 4 markers
-  #   which_analysis <- "Janssen"
-  #   .tid_lst = list(as.character(round(..tid)))
-  # } else if (..tid %in% c(5:14)) { # 10 markers
-  #   which_analysis <- "Moderna"
-  #   .tid_lst = list(as.character(round(..tid-4)))
-  # } else if (..tid %in% c(15:53)) { # 39 markers
-  #   which_analysis <- "HVTN 705 (all)"
-  #   .tid_lst = list(as.character(round(..tid-14)))
-  # } else if (..tid %in% c(54:65)) { # 12 markers
-  #   which_analysis <- "HVTN 705 (ICS)"
-  #   .tid_lst = list(as.character(round(..tid-53)))
-  # } else if (..tid %in% c(66:123)) { # 58 markers
-  #   which_analysis <- "Janssen (partA)"
-  #   .tid_lst = list(as.character(round(..tid-65)))
-  # } else if (..tid %in% c(124:128)) { # 5 markers
-  #   which_analysis <- "RV144"
-  #   .tid_lst = list(as.character(round(..tid-123)))
-  # }
-  # names(.tid_lst) = .tid_var
-  # do.call(Sys.setenv, .tid_lst)
+  # 128 plots across 4 analyses: uncomment to run
+  ..tid <- as.integer(Sys.getenv(.tid_var))
+  if (..tid %in% c(1:4)) { # 4 markers
+    which_analysis <- "Janssen"
+    .tid_lst = list(as.character(round(..tid)))
+  } else if (..tid %in% c(5:14)) { # 10 markers
+    which_analysis <- "Moderna"
+    .tid_lst = list(as.character(round(..tid-4)))
+  } else if (..tid %in% c(15:53)) { # 39 markers
+    which_analysis <- "HVTN 705 (all)"
+    .tid_lst = list(as.character(round(..tid-14)))
+  } else if (..tid %in% c(54:65)) { # 12 markers
+    which_analysis <- "HVTN 705 (ICS)"
+    .tid_lst = list(as.character(round(..tid-53)))
+  } else if (..tid %in% c(66:123)) { # 58 markers
+    which_analysis <- "Janssen (partA)"
+    .tid_lst = list(as.character(round(..tid-65)))
+  } else if (..tid %in% c(124:128)) { # 5 markers
+    which_analysis <- "RV144"
+    .tid_lst = list(as.character(round(..tid-123)))
+  }
+  names(.tid_lst) = .tid_var
+  do.call(Sys.setenv, .tid_lst)
   
   # Set seed
   set.seed(1)
@@ -75,8 +75,8 @@
   flags <- list(
     hvtn705_abstract_fig = F,
     table_of_vals = F,
-    save_data_objs = T, # !!!!!
-    save_plot_objs = T, # !!!!!
+    save_data_objs = F, # !!!!!
+    save_plot_objs = F, # !!!!!
     save_diagnostics = F, # !!!!!
     paper_npcve = F,
     paper_cox = F,
@@ -1447,7 +1447,7 @@ if ("Grenander" %in% cfg2$estimators$cr) {
           grid_size = list(y=101, s=101, x=5),
           surv_type = cfg2$params$Q_n_type,
           density_type = cfg2$params$g_n_type,
-          density_bins = 0, # !!!!!
+          # density_bins = 0, # !!!!!
           deriv_type = cfg2$params$deriv_type
         )
       )
@@ -1468,7 +1468,7 @@ if ("Grenander" %in% cfg2$estimators$cr) {
           surv_type = cfg2$params$Q_n_type,
           # surv_type = "survML-G",
           density_type = cfg2$params$g_n_type,
-          density_bins = 0, # !!!!!
+          # density_bins = 0, # !!!!!
           deriv_type = cfg2$params$deriv_type
         )
       )
@@ -1945,11 +1945,10 @@ if (cfg2$run_hyptest) {
     }
     y_ticks <- ifelse(which=="CVE", 0.1, 0.01)
     syc_breaks <- seq(-1,1,y_ticks)
-    if (log10_y_axis) { # !!!!! New section
-      # browser()
+    if (log10_y_axis) {
       # zoom_y[2] <- max(plot_data$y, na.rm=T)
       # zoom_y[2] <- min(zoom_y[2], 0.985)
-      zoom_y[2] <- 0.985
+      zoom_y[2] <- 0.99
       plot_data %<>% mutate(
         y = ifelse(y==1, 0.999, y),
         ci_lo = ifelse(ci_lo==1, 0.999, ci_lo),
@@ -1960,9 +1959,11 @@ if (cfg2$run_hyptest) {
         transform = function(x) { -log10(1-x) },
         inverse = function(x) { 1 - 10^(-x) }
       )
+      # browser() # !!!!! asdf
       hist_data$ymax <- 1 - 10^(-(hist_data$ymax*(-log10(1-zoom_y[2]))))
+      # hist_data$ymax <- 1 - 10^(-((hist_data$ymax-hist_data$ymin)/2*(-log10(1-zoom_y[2]))))
       if (which=="CVE") {
-        syc_breaks <- c(seq(-1,0.8,0.2),0.9,0.95)
+        syc_breaks <- c(-1,0,0.5,0.75,0.9,0.95)
         if (rr_y_axis) {
           syc_sec.axis <- sec_axis(~1-., breaks=(1-syc_breaks),
                                    name="Risk ratio (vaccine/placebo)")
@@ -2754,7 +2755,6 @@ if (F) {
     y_ticks <- ifelse(which=="CVE", 0.1, 0.01)
     syc_breaks <- seq(-1,1,y_ticks)
     if (log10_y_axis) { # !!!!! New section
-      # browser()
       # zoom_y[2] <- max(plot_data$y, na.rm=T)
       # zoom_y[2] <- min(zoom_y[2], 0.985)
       zoom_y[2] <- 0.985
@@ -2770,7 +2770,7 @@ if (F) {
       )
       hist_data$ymax <- 1 - 10^(-(hist_data$ymax*(-log10(1-zoom_y[2]))))
       if (which=="CVE") {
-        syc_breaks <- c(seq(-1,0.8,0.2),0.9,0.95)
+        syc_breaks <- c(-1,0,0.5,0.75,0.9,0.95)
         if (rr_y_axis) {
           syc_sec.axis <- sec_axis(~1-., breaks=(1-syc_breaks),
                                    name="Risk ratio (vaccine/placebo)")

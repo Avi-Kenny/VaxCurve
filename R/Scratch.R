@@ -1,14 +1,22 @@
 
+# CLS illustration (modified)
+if (F) {
+  
+  # TO DO
+  
+}
+
 # Alternative to log(1-CVE) transformation
 if (F) {
   
-  # logRRs <- seq(-5,5,0.01)
-  logRRs <- seq(-10,-5,0.1) # !!!!!
+  # log transform
+  
+  # logRRs <- seq(-5,5,0.1)
+  logRRs <- seq(-5,0,0.1)
   RRs <- exp(logRRs)
-  logRRs2 <- log(RRs+0.01)
-  # RRs <- seq(0.02,50,0.001)
-  # logRRs <- log(RRs)
-  # logRRs2 <- log(RRs+0.01)
+  log2 <- function(x) { log(x+0.01) }
+  exp2 <- function(x) { exp(x) - 0.01 }
+  logRRs2 <- log2(RRs)
   df_plot <- data.frame(
     x = rep(RRs,2),
     y = c(logRRs,logRRs2),
@@ -18,6 +26,25 @@ if (F) {
     geom_line() +
     labs(color="Transformation") +
     theme(legend.position="bottom")
+  
+  # logit transform
+  
+  expit <- function(x) { exp(x) / ( 1 + exp(x) ) }
+  logit <- function(x) { log(x/(1-x)) }
+  logitRs <- seq(-5,5,0.1)
+  # logitRs <- seq(-5,0,0.1)
+  Rs <- expit(logitRs)
+  logitRs2 <- logit(Rs+0.02*(0.5-Rs))
+  df_plot <- data.frame(
+    x = rep(Rs,2),
+    y = c(logitRs,logitRs2),
+    which = rep(c("logit(x)", "logit*(x)"), each=length(Rs))
+  )
+  ggplot(df_plot, aes(x=x, y=y, color=which)) +
+    geom_line() +
+    labs(color="Transformation") +
+    theme(legend.position="bottom")
+  
 
 }
 

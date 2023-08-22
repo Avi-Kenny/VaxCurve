@@ -9,7 +9,10 @@
   print(paste("START:", Sys.time()))
   
   # Choose analysis
-  which_analysis <- "Janssen (partA)" # "Janssen" "Moderna" "AMP" "AZD1222" "Janssen (partA)" "Profiscov" "HVTN 705 (primary)" "HVTN 705 (all)" "RV144" "HVTN 705 (second)"
+  # "Janssen" "Moderna" "AMP" "AZD1222" "Janssen (partA)" "Profiscov"
+  # "HVTN 705 (primary)" "HVTN 705 (all)" "RV144" "HVTN 705 (second)"
+  # "HVTN 705 (compare RV144)"
+  cfg2 <- list(analysis="HVTN 705 (second)" )
   
   # Set proper task ID variable
   if (cluster_config$js=="slurm") {
@@ -28,10 +31,10 @@
     # # RV144 vs HVTN 705: uncomment to run
     # ..tid <- as.integer(Sys.getenv(.tid_var))
     # if (..tid %in% c(1:5)) {
-    #   which_analysis <- "RV144"
+    #   cfg2$analysis <- "RV144"
     #   .tid_lst = list(as.character(round(..tid)))
     # } else if (..tid %in% c(6:10)) {
-    #   which_analysis <- "HVTN 705 (second)"
+    #   cfg2$analysis <- "HVTN 705 (compare RV144)"
     #   .tid_lst = list(as.character(round(..tid-5)))
     # }
     # names(.tid_lst) = .tid_var
@@ -40,22 +43,22 @@
     # # 128 plots across 4 analyses: uncomment to run
     # ..tid <- as.integer(Sys.getenv(.tid_var))
     # if (..tid %in% c(1:4)) { # 4 markers
-    #   which_analysis <- "Janssen"
+    #   cfg2$analysis <- "Janssen"
     #   .tid_lst = list(as.character(round(..tid)))
     # } else if (..tid %in% c(5:14)) { # 10 markers
-    #   which_analysis <- "Moderna"
+    #   cfg2$analysis <- "Moderna"
     #   .tid_lst = list(as.character(round(..tid-4)))
     # } else if (..tid %in% c(15:53)) { # 39 markers
-    #   which_analysis <- "HVTN 705 (all)"
+    #   cfg2$analysis <- "HVTN 705 (all)"
     #   .tid_lst = list(as.character(round(..tid-14)))
     # } else if (..tid %in% c(54:65)) { # 12 markers
-    #   which_analysis <- "HVTN 705 (ICS)"
+    #   cfg2$analysis <- "HVTN 705 (ICS)"
     #   .tid_lst = list(as.character(round(..tid-53)))
     # } else if (..tid %in% c(66:123)) { # 58 markers
-    #   which_analysis <- "Janssen (partA)"
+    #   cfg2$analysis <- "Janssen (partA)"
     #   .tid_lst = list(as.character(round(..tid-65)))
     # } else if (..tid %in% c(124:128)) { # 5 markers
-    #   which_analysis <- "RV144"
+    #   cfg2$analysis <- "RV144"
     #   .tid_lst = list(as.character(round(..tid-123)))
     # }
     # names(.tid_lst) = .tid_var
@@ -66,23 +69,16 @@
   # Set seed
   set.seed(1)
   
-  # Set configuration variables
-  # Note: NA param values are set below based on the task ID
-  # !!!!! Deprecate
-  cfg2 <- list(
-    analysis = which_analysis,
-    run_hyptest = F
-  )
-  
   # Set analysis-specific flags
   # Note: some flags are set at the end of the "Setup" block because they are
   #       dependent on cfg2 variables
   flags <- list(
+    run_hyptest = F,
     hvtn705_abstract_fig = F,
-    table_of_vals = F,
-    save_data_objs = F,
+    table_of_vals = T,
+    save_data_objs = T,
     save_plot_objs = F,
-    save_diagnostics = T,
+    save_diagnostics = F,
     paper_npcve = F,
     paper_cox = F,
     hvtn124_plot = F,
@@ -378,6 +374,61 @@
     
     # Override default config
     cfg2$params$deriv_type <- "line"
+
+    # Analysis-specific config
+    cfg2$marker <- c("Day210ELCZ", "Day210ADCPgp140C97ZAfib", "Day210IgG340mdw_V1V2", "Day210IgG340mdw_gp120_gp140_vm", "Day210ELISpotPTEEnv", "Day210mdw_xassay_overall", "Day210ADCPgp140Mos1fib", "Day210IgG50mdw_V1V2", "Day210ADCCCAP8_pAUC", "Day210ADCCCH58_pAUC", "Day210ADCCWITO_pAUC", "Day210ICS4AnyEnvIFNg_OR_IL2", "Day210ICS8AnyEnvIFNg_OR_IL2", "Day210IgG3AE.A244.V1V2.Tags_293F40delta", "Day210IgG3C.1086C.V1.V2.Tags40delta", "Day210IgG3gp70.001428.2.42.V1V240delta", "Day210IgG3gp70.1012.11.TC21.3257.V1V240delta", "Day210IgG3gp70.1394C9G1.V1V240delta", "Day210IgG3gp70.BF1266.431a.V1V240delta", "Day210IgG3gp70.Ce1086.B2.V1V240delta", "Day210IgG3gp70.B.CaseA.V1.V240delta", "Day210mdw_xassay_select_igg3v1v2")
+    cfg2$lab_title <- c("IgG to gp140 C97ZA (EU/ml)", "Average phagocytosis score to gp140 C97ZA", "IgG3 V1V2 breadth (Wt avg log10 Net MFI)", "IgG3 gp120 + gp140 breadth (Wt avg log10 Net MFI)", "ELISPot PTE Env", "Multi-epitope functions", "Average phagocytosis score to gp140 Mos1", "IgG V1V2 breadth (Wt avg log10 Net MFI)", "AUC baseline-subtracted CAP8 (% loss of luc activity)", "AUC baseline-subtracted CH58 (% loss of luc activity)", "AUC baseline-subtracted WITO (% loss of luc activity)", "CD4+ T cell responses to any Env peptide pools", "CD8+ T cell responses to any Env peptide pools", "IgG3 Net MFI to AE.A244 V1V2 Tags 293F", "IgG3 Net MFI to C.1086C V1V2 Tags", "IgG3 Net MFI to gp70-001428.2.42 V1V2", "IgG3 Net MFI to gp70-1012.11.TC21.3257 V1V2", "IgG3 Net MFI to gp70-1394C9G1 V1V2", "IgG3 Net MFI to gp70-BF1266 431a V1V2", "IgG3 Net MFI to gp70-Ce1086 B2 V1V2", "IgG3 Net MFI to gp70-B.CaseAV1V2", "IgG3 V1V2 breadth (AE.A244/C.1086/B.CaseA)")
+    cfg2$lab_x <- c("IgG to gp140 C97ZA", "ADCP gp140 C97ZA", "IgG3 V1V2 breadth", "IgG3 gp120+gp140 breadth", "ELISPot PTE Env", "Multi-epitope functions", "ADCP gp140 Mos1", "IgG V1V2 breadth", "ADCC AUC CAP8", "ADCC AUC CH58", "ADCC AUC WITO", "Pct CD4+ T-cells expressing IFN-g/IL-2", "Pct CD8+ T-cells expressing IFN-g/IL-2", "IgG3 AE.A244 V1V2 Tags 293F", "IgG3 C.1086C V1V2 Tags", "IgG3 gp70-001428.2.42 V1V2", "IgG3 gp70-1012.11.TC21.3257 V1V2", "IgG3 gp70-1394C9G1 V1V2", "IgG3 gp70-BF1266 431a V1V2", "IgG3 gp70-Ce1086 B2 V1V2", "IgG3 gp70-B.CaseAV1V2", "IgG3 V1V2 A244/1086/CaseA")
+    cfg2$t_0 <- 550
+    cfg2$dataset <- "HVTN705_secondcasecontrolprocesseddata_v9.csv"
+    cfg2$folder_local <- "HVTN 705 (second) data/"
+    cfg2$folder_cluster <- "Z:/vaccine/p705/analysis/lab/cc/copcor/"
+    cfg2$cr2_trial <- "hvtn705second"
+    cfg2$cr2_COR <- "D210"
+    cfg2$v <- list(
+      id = "Subjectid",
+      time = "Ttilde.D210",
+      event = "Delta.D210",
+      wt = "wt.D210",
+      ph1 = "Ph1ptids.D210",
+      ph2 = "Ph2ptids.D210",
+      covariates = "~. + RSA + Age + BMI + Riskscore"
+    )
+    
+    # Variable map; one row corresponds to one CVE graph
+    cfg2$map <- data.frame(
+      endpoint = rep(3, 22),
+      marker = c(1:22),
+      lab_x = c(1:22),
+      lab_title = c(1:22),
+      t_0 = rep(1, 22),
+      dataset = rep(1, 22),
+      cr2_trial = rep(1, 22),
+      cr2_COR = rep(1, 22),
+      cr2_marker = c(1:22),
+      edge_corr = c(1,1,2,1,2,1,1,1,2,2,2,2,2,1,1,2,2,2,2,2,2,1),
+      v_id = rep(1, 22),
+      v_time = rep(1, 22),
+      v_event = rep(1, 22),
+      v_wt = rep(1, 22),
+      v_ph1 = rep(1, 22),
+      v_ph2 = rep(1, 22),
+      v_covariates = rep(1, 22),
+      dir = rep(1, 22),
+      zoom_x = rep(1, 22),
+      zoom_y_cve = rep(1, 22),
+      zoom_y_risk = rep(1, 22),
+      more_ticks = rep(1, 22),
+      llox_label = rep(1, 22),
+      llox = rep(1, 22)
+    )
+    
+  }
+  
+  if (cfg2$analysis=="HVTN 705 (compare RV144)") {
+    
+    # Override default config
+    cfg2$params$deriv_type <- "line"
     cfg2$zoom_y_cve <- list(c(-1,1.05))
     cfg2$zoom_y_max <- 0.1
     
@@ -387,7 +438,7 @@
     cfg2$lab_x <- c("IgG3 AE.A244 V1V2 Tags 293F (=s)", "IgG3 C.1086C V1V2 Tags (=s)", "IgG3 gp70-Ce1086 B2 V1V2 (=s)", "IgG3 gp70-B.CaseAV1V2 (=s)", "IgA A1.con.env03 140 CF (=s)")
     cfg2$t_0 <- 550
     cfg2$dataset <- "HVTN705_secondcasecontrolprocesseddata_v8.csv"
-    cfg2$folder_local <- "HVTN 705 (second) data/"
+    cfg2$folder_local <- "HVTN 705 (compare RV144) data/"
     cfg2$folder_cluster <- "Z:/vaccine/p705/analysis/lab/cc/copcor/"
     cfg2$cr2_trial <- "hvtn705second"
     cfg2$cr2_COR <- "D210"
@@ -1354,7 +1405,7 @@ if ("Cox (spline 4 df)" %in% cfg2$estimators$cr) {
   calc_ests <- T
   if (calc_ests) {
     
-    if (which_analysis!="RV144") {
+    if (cfg2$analysis!="RV144") {
       ests <- vaccine::est_ce(
         dat = dat,
         type = "Cox",
@@ -1486,7 +1537,7 @@ if ("Cox edge" %in% cfg2$estimators$cr) {
 ##### Data analysis (hypothesis test) #####
 ###########################################.
 
-if (cfg2$run_hyptest) {
+if (flags$run_hyptest) {
   
   test_results <- test_2(
     dat_orig = dat$v,
@@ -2605,7 +2656,7 @@ if (F) {
   
   # Load data objects
   folder_144 <- "RV144 plots/"
-  folder_705 <- "HVTN 705 (second) plots/"
+  folder_705 <- "HVTN 705 (compare RV144) plots/"
   hst_144 <- readRDS(paste0(folder_144, "hst_", i, ".rds"))
   hst_705 <- readRDS(paste0(folder_705, "hst_", i, ".rds"))
   cutoffs_144 <- readRDS(paste0(folder_144, "cutoffs_", i, ".rds"))

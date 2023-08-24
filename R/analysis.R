@@ -75,8 +75,8 @@
   flags <- list(
     run_hyptest = F,
     hvtn705_abstract_fig = F,
-    table_of_vals = T,
-    save_data_objs = T,
+    table_of_vals = F,
+    save_data_objs = F,
     save_plot_objs = F,
     save_diagnostics = F,
     paper_npcve = F,
@@ -122,10 +122,11 @@
     cfg2$zoom_x <- "zoomed"
     cfg2$zoom_y_cve <- "zoomed"
     cfg2$zoom_y_risk <- "zoomed (risk)"
-    cfg2$zoom_y_max <- NA
-    cfg2$more_ticks <- 1
+    cfg2$zoom_y_risk_max <- NA
+    cfg2$more_ticks <- c(1,2)
     cfg2$llox_label <- NULL
     cfg2$llox <- NULL
+    cfg2$density_type <- "histogram"
     
   }
   
@@ -323,7 +324,7 @@
 
     # Analysis-specific config
     cfg2$marker <- c("Day210ELCZ", "Day210ELMo", "Day210ADCPgp140C97ZAfib", "Day210ADCPgp140Mos1fib", "Day210IgG3gp140C97ZAfibritin40delta", "Day210IgG3gp140Mos1fibritin40delta", "Day210IgG340mdw_gp120", "Day210IgG340mdw_gp140", "Day210IgG340mdw_V1V2", "Day210IgG3gp4140delta", "Day210IgG340mdw_multi", "Day210IgG340mdw_gp120_gp140_vm", "Day210IgG50mdw_V1V2", "Day210mdw_xassay", "Day210ADCCCAP8_pk", "Day210ADCCCH58_pk", "Day210ADCCWITO_pk", "Day210ADCCCAP8_pAUC", "Day210ADCCCH58_pAUC", "Day210ADCCWITO_pAUC", "Day210ICS4AnyEnvIFNg_OR_IL2", "Day210ICS8AnyEnvIFNg_OR_IL2", "Day210IgG3AE.A244.V1V2.Tags_293F40delta", "Day210IgG3C.1086C.V1.V2.Tags40delta", "Day210IgG3gp70.001428.2.42.V1V240delta", "Day210IgG3gp70.1012.11.TC21.3257.V1V240delta", "Day210IgG3gp70.1394C9G1.V1V240delta", "Day210IgG3gp70.BF1266.431a.V1V240delta", "Day210IgG3gp70.Ce1086.B2.V1V240delta", "Day210IgG3gp70.B.CaseA.V1.V240delta", "Day210IgGAE.A244.V1V2.Tags_293F50delta", "Day210IgGC.1086C.V1.V2.Tags50delta", "Day210IgGgp70_001428.2.42.V1V250delta", "Day210IgGgp70_1012.11.TC21.3257.V1V250delta", "Day210IgGgp70_1394C9G1.V1V250delta", "Day210IgGgp70_9004SS.A3.4.V1V250delta", "Day210IgGgp70_BF1266.431a.V1V250delta", "Day210IgGgp70_Ce1086.B2.V1V250delta", "Day210IgGgp70.B.CaseA.V1.V250delta")
-    cfg2$lab_title <- c("IgG to VT-C (EU/ml): Day 210", "IgG to VT-M (EU/ml): Day 210", "Average phagocytosis score to gp140 C97ZA: Day 210", "Average phagocytosis score to gp140 Mos1: Day 210", "IgG3 Net MFI to gp140 C97ZA: Day 210", "IgG3 Net MFI to gp140 Mosaic: Day 210", "IgG3 gp120 breadth (Weighted avg log10 Net MFI): Day 210", "IgG3 gp140 breadth (Weighted avg log10 Net MFI): Day 210", "IgG3 V1V2 breadth (Weighted avg log10 Net MFI): Day 210", "IgG3 Net MFI to gp41: Day 210", "IgG3 multi-epitope breadth (Wt avg log10 Net MFI): Day 210", "IgG3 gp120 + gp140 breadth (Wt avg log10 Net MFI): Day 210", "IgG V1V2 breadth (Wt avg log10 Net MFI): Day 210", "Overall maximal diversity score: Day 210", "Peak baseline-subtracted pct loss luc activity to CAP8: Day 210", "Peak baseline-subtracted pct loss luc activity to CH58: Day 210", "Peak baseline-subtracted pct loss luc activity to WITO: Day 210", "AUC baseline-subtracted pct loss luc activity to CAP8: Day 210", "AUC baseline-subtracted pct loss luc activity to CH58: Day 210", "AUC baseline-subtracted pct loss luc activity to WITO: Day 210", "Pct CD4+ T-cells expressing IFN-g/IL-2: Day 210", "Pct CD8+ T-cells expressing IFN-g/IL-2: Day 210", "IgG3 Net MFI to AE.A244 V1V2 Tags 293F: Day 210", "IgG3 Net MFI to C.1086C V1V2 Tags: Day 210", "IgG3 Net MFI to gp70-001428.2.42 V1V2: Day 210", "IgG3 Net MFI to gp70-1012.11.TC21.3257 V1V2: Day 210", "IgG3 Net MFI to gp70-1394C9G1 V1V2: Day 210", "IgG3 Net MFI to gp70-BF1266 431a V1V2: Day 210", "IgG3 Net MFI to gp70-Ce1086 B2 V1V2: Day 210", "IgG3 Net MFI to gp70-B.CaseAV1V2: Day 210", "IgG Net MFI to AE.A244 V1V2 Tags 293F: Day 210", "IgG Net MFI to C.1086C V1V2 Tags: Day 210", "IgG Net MFI to gp70-001428.2.42 V1V2: Day 210", "IgG Net MFI to gp70-1012.11.TC21.3257 V1V2: Day 210", "IgG Net MFI to gp70-1394C9G1 V1V2: Day 210", "IgG Net MFI to gp70-9004SS.A3.4 V1V2: Day 210", "IgG Net MFI to gp70-BF1266.431a V1V2: Day 210", "IgG Net MFI to gp70-Ce1086.B2 V1V2: Day 210", "IgG Net MFI to gp70.B.CaseA V1V2: Day 210")
+    cfg2$lab_title <- c("IgG to VT-C (EU/ml): Month 7", "IgG to VT-M (EU/ml): Month 7", "Average phagocytosis score to gp140 C97ZA: Month 7", "Average phagocytosis score to gp140 Mos1: Month 7", "IgG3 Net MFI to gp140 C97ZA: Month 7", "IgG3 Net MFI to gp140 Mosaic: Month 7", "IgG3 gp120 breadth (Weighted avg log10 Net MFI): Month 7", "IgG3 gp140 breadth (Weighted avg log10 Net MFI): Month 7", "IgG3 V1V2 breadth (Weighted avg log10 Net MFI): Month 7", "IgG3 Net MFI to gp41: Month 7", "IgG3 multi-epitope breadth (Wt avg log10 Net MFI): Month 7", "IgG3 gp120 + gp140 breadth (Wt avg log10 Net MFI): Month 7", "IgG V1V2 breadth (Wt avg log10 Net MFI): Month 7", "Overall maximal diversity score: Month 7", "Peak baseline-subtracted pct loss luc activity to CAP8: Month 7", "Peak baseline-subtracted pct loss luc activity to CH58: Month 7", "Peak baseline-subtracted pct loss luc activity to WITO: Month 7", "AUC baseline-subtracted pct loss luc activity to CAP8: Month 7", "AUC baseline-subtracted pct loss luc activity to CH58: Month 7", "AUC baseline-subtracted pct loss luc activity to WITO: Month 7", "Pct CD4+ T-cells expressing IFN-g/IL-2: Month 7", "Pct CD8+ T-cells expressing IFN-g/IL-2: Month 7", "IgG3 Net MFI to AE.A244 V1V2 Tags 293F: Month 7", "IgG3 Net MFI to C.1086C V1V2 Tags: Month 7", "IgG3 Net MFI to gp70-001428.2.42 V1V2: Month 7", "IgG3 Net MFI to gp70-1012.11.TC21.3257 V1V2: Month 7", "IgG3 Net MFI to gp70-1394C9G1 V1V2: Month 7", "IgG3 Net MFI to gp70-BF1266 431a V1V2: Month 7", "IgG3 Net MFI to gp70-Ce1086 B2 V1V2: Month 7", "IgG3 Net MFI to gp70-B.CaseAV1V2: Month 7", "IgG Net MFI to AE.A244 V1V2 Tags 293F: Month 7", "IgG Net MFI to C.1086C V1V2 Tags: Month 7", "IgG Net MFI to gp70-001428.2.42 V1V2: Month 7", "IgG Net MFI to gp70-1012.11.TC21.3257 V1V2: Month 7", "IgG Net MFI to gp70-1394C9G1 V1V2: Month 7", "IgG Net MFI to gp70-9004SS.A3.4 V1V2: Month 7", "IgG Net MFI to gp70-BF1266.431a V1V2: Month 7", "IgG Net MFI to gp70-Ce1086.B2 V1V2: Month 7", "IgG Net MFI to gp70.B.CaseA V1V2: Month 7")
     cfg2$lab_x <- c("IgG to VT-C (=s)", "IgG to VT-M (=s)", "ADCP gp140 C97ZA (=s)", "ADCP gp140 Mos1 (=s)", "IgG3 gp140 C97ZA (=s)", "IgG3 gp140 Mosaic (=s)", "IgG3 gp120 breadth (=s)", "IgG3 gp140 breadth (=s)", "IgG3 V1V2 breadth (=s)", "IgG3 gp41 (=s)", "IgG3 multi-epitope breadth (=s)", "IgG3 gp120+gp140 breadth (=s)", "IgG V1V2 breadth (=s)", "Overall max diversity score (=s)", "ADCC Peak CAP8 (=s)", "ADCC Peak CH58 (=s)", "ADCC Peak WITO (=s)", "ADCC  AUC CAP8 (=s)", "ADCC AUC CH58 (=s)", "ADCC AUC WITO (=s)", "CD4+ T-cells IFN-g/IL-2 (=s)", "CD8+ T-cells IFN-g/IL-2 (=s)", "IgG3 AE.A244 V1V2 Tags 293F (=s)", "IgG3 C.1086C V1V2 Tags (=s)", "IgG3 gp70-001428.2.42 V1V2 (=s)", "IgG3 gp70-1012.11.TC21.3257 V1V2 (=s)", "IgG3 gp70-1394C9G1 V1V2 (=s)", "IgG3 gp70-BF1266 431a V1V2 (=s)", "IgG3 gp70-Ce1086 B2 V1V2 (=s)", "IgG3 gp70-B.CaseAV1V2 (=s)", "IgG AE.A244 V1V2 Tags 293F (=s)", "IgG C.1086C V1V2 Tags (=s)", "IgG gp70-001428.2.42 V1V2 (=s)", "IgG gp70-1012.11.TC21.3257 V1V2 (=s)", "IgG gp70-1394C9G1 V1V2 (=s)", "IgG gp70-9004SS.A3.4 V1V2 (=s)", "IgG gp70-BF1266.431a V1V2 (=s)", "IgG gp70-Ce1086.B2 V1V2 (=s)", "IgG gp70.B.CaseA V1V2 (=s)")
     cfg2$t_0 <- 550
     cfg2$dataset <- "HVTN705_secondcasecontrolprocesseddata_excludeELISpotmarkers.csv"
@@ -374,11 +375,12 @@
     
     # Override default config
     cfg2$params$deriv_type <- "line"
-
+    cfg2$density_type <- "kde"
+    
     # Analysis-specific config
     cfg2$marker <- c("Day210ELCZ", "Day210ADCPgp140C97ZAfib", "Day210IgG340mdw_V1V2", "Day210IgG340mdw_gp120_gp140_vm", "Day210ELISpotPTEEnv", "Day210mdw_xassay_overall", "Day210ADCPgp140Mos1fib", "Day210IgG50mdw_V1V2", "Day210ADCCCAP8_pAUC", "Day210ADCCCH58_pAUC", "Day210ADCCWITO_pAUC", "Day210ICS4AnyEnvIFNg_OR_IL2", "Day210ICS8AnyEnvIFNg_OR_IL2", "Day210IgG3AE.A244.V1V2.Tags_293F40delta", "Day210IgG3C.1086C.V1.V2.Tags40delta", "Day210IgG3gp70.001428.2.42.V1V240delta", "Day210IgG3gp70.1012.11.TC21.3257.V1V240delta", "Day210IgG3gp70.1394C9G1.V1V240delta", "Day210IgG3gp70.BF1266.431a.V1V240delta", "Day210IgG3gp70.Ce1086.B2.V1V240delta", "Day210IgG3gp70.B.CaseA.V1.V240delta", "Day210mdw_xassay_select_igg3v1v2")
-    cfg2$lab_title <- c("IgG to gp140 C97ZA (EU/ml)", "Average phagocytosis score to gp140 C97ZA", "IgG3 V1V2 breadth (Wt avg log10 Net MFI)", "IgG3 gp120 + gp140 breadth (Wt avg log10 Net MFI)", "ELISPot PTE Env", "Multi-epitope functions", "Average phagocytosis score to gp140 Mos1", "IgG V1V2 breadth (Wt avg log10 Net MFI)", "AUC baseline-subtracted CAP8 (% loss of luc activity)", "AUC baseline-subtracted CH58 (% loss of luc activity)", "AUC baseline-subtracted WITO (% loss of luc activity)", "CD4+ T cell responses to any Env peptide pools", "CD8+ T cell responses to any Env peptide pools", "IgG3 Net MFI to AE.A244 V1V2 Tags 293F", "IgG3 Net MFI to C.1086C V1V2 Tags", "IgG3 Net MFI to gp70-001428.2.42 V1V2", "IgG3 Net MFI to gp70-1012.11.TC21.3257 V1V2", "IgG3 Net MFI to gp70-1394C9G1 V1V2", "IgG3 Net MFI to gp70-BF1266 431a V1V2", "IgG3 Net MFI to gp70-Ce1086 B2 V1V2", "IgG3 Net MFI to gp70-B.CaseAV1V2", "IgG3 V1V2 breadth (AE.A244/C.1086/B.CaseA)")
-    cfg2$lab_x <- c("IgG to gp140 C97ZA", "ADCP gp140 C97ZA", "IgG3 V1V2 breadth", "IgG3 gp120+gp140 breadth", "ELISPot PTE Env", "Multi-epitope functions", "ADCP gp140 Mos1", "IgG V1V2 breadth", "ADCC AUC CAP8", "ADCC AUC CH58", "ADCC AUC WITO", "Pct CD4+ T-cells expressing IFN-g/IL-2", "Pct CD8+ T-cells expressing IFN-g/IL-2", "IgG3 AE.A244 V1V2 Tags 293F", "IgG3 C.1086C V1V2 Tags", "IgG3 gp70-001428.2.42 V1V2", "IgG3 gp70-1012.11.TC21.3257 V1V2", "IgG3 gp70-1394C9G1 V1V2", "IgG3 gp70-BF1266 431a V1V2", "IgG3 gp70-Ce1086 B2 V1V2", "IgG3 gp70-B.CaseAV1V2", "IgG3 V1V2 A244/1086/CaseA")
+    cfg2$lab_title <- c("IgG to gp140 C97ZA: Month 7", "ADCP gp140 C97ZA: Month 7", "IgG3 V1V2 breadth: Month 7", "IgG3 gp120+gp140 breadth: Month 7", "ELISPot PTE Env: Month 7", "Multi-epitope functions: Month 7", "ADCP gp140 Mos1: Month 7", "IgG V1V2 breadth: Month 7", "ADCC AUC CAP8: Month 7", "ADCC AUC CH58: Month 7", "ADCC AUC WITO: Month 7", "Pct CD4+ T-cells expressing IFN-g/IL-2: Month 7", "Pct CD8+ T-cells expressing IFN-g/IL-2: Month 7", "IgG3 AE.A244 V1V2 Tags 293F: Month 7", "IgG3 C.1086C V1V2 Tags: Month 7", "IgG3 gp70-001428.2.42 V1V2: Month 7", "IgG3 gp70-1012.11.TC21.3257 V1V2: Month 7", "IgG3 gp70-1394C9G1 V1V2: Month 7", "IgG3 gp70-BF1266 431a V1V2: Month 7", "IgG3 gp70-Ce1086 B2 V1V2: Month 7", "IgG3 gp70-B.CaseAV1V2: Month 7", "IgG3 V1V2 A244/1086/CaseA: Month 7")
+    cfg2$lab_x <- c("IgG to gp140 C97ZA (EU/ml) (=s)", "Average phagocytosis score to gp140 C97ZA (=s)", "IgG3 V1V2 breadth (Wt avg log10 Net MFI) (=s)", "IgG3 gp120 + gp140 breadth (Wt avg log10 Net MFI) (=s)", "ELISPot PTE Env (=s)", "Multi-epitope functions (=s)", "Average phagocytosis score to gp140 Mos1 (=s)", "IgG V1V2 breadth (Wt avg log10 Net MFI) (=s)", "AUC baseline-subtracted CAP8 (% loss of luc activity) (=s)", "AUC baseline-subtracted CH58 (% loss of luc activity) (=s)", "AUC baseline-subtracted WITO (% loss of luc activity) (=s)", "CD4+ T cell responses to any Env peptide pools (=s)", "CD8+ T cell responses to any Env peptide pools (=s)", "IgG3 Net MFI to AE.A244 V1V2 Tags 293F (=s)", "IgG3 Net MFI to C.1086C V1V2 Tags (=s)", "IgG3 Net MFI to gp70-001428.2.42 V1V2 (=s)", "IgG3 Net MFI to gp70-1012.11.TC21.3257 V1V2 (=s)", "IgG3 Net MFI to gp70-1394C9G1 V1V2 (=s)", "IgG3 Net MFI to gp70-BF1266 431a V1V2 (=s)", "IgG3 Net MFI to gp70-Ce1086 B2 V1V2 (=s)", "IgG3 Net MFI to gp70-B.CaseAV1V2 (=s)", "IgG3 V1V2 breadth (AE.A244/C.1086/B.CaseA) (=s)")
     cfg2$t_0 <- 550
     cfg2$dataset <- "HVTN705_secondcasecontrolprocesseddata_v9.csv"
     cfg2$folder_local <- "HVTN 705 (second) data/"
@@ -430,7 +432,7 @@
     # Override default config
     cfg2$params$deriv_type <- "line"
     cfg2$zoom_y_cve <- list(c(-1,1.05))
-    cfg2$zoom_y_max <- 0.1
+    cfg2$zoom_y_risk_max <- 0.1
     
     # Analysis-specific config
     cfg2$marker <- c("Day210IgG3AE.A244.V1V2.Tags_293F40delta", "Day210IgG3C.1086C.V1.V2.Tags40delta", "Day210IgG3gp70.Ce1086.B2.V1V240delta", "Day210IgG3gp70.B.CaseA.V1.V240delta", "Day210IgAA1.con.env03.140.CF10delta")
@@ -489,7 +491,7 @@
 
     # Analysis-specific config
     cfg2$marker <- c("Day210ICS4JMos1gp120IFNg_OR_IL2", "Day210ICS4JMos1gp41IFNg_OR_IL2", "Day210ICS4JMos2GagIFNg_OR_IL2", "Day210ICS4JMos2RNAseIntIFNg_OR_IL2", "Day210ICS4JMos2Sgp120IFNg_OR_IL2", "Day210ICS4JMos2Sgp41IFNg_OR_IL2", "Day210ICS8JMos1gp120IFNg_OR_IL2", "Day210ICS8JMos1gp41IFNg_OR_IL2", "Day210ICS8JMos2GagIFNg_OR_IL2", "Day210ICS8JMos2RNAseIntIFNg_OR_IL2", "Day210ICS8JMos2Sgp120IFNg_OR_IL2", "Day210ICS8JMos2Sgp41IFNg_OR_IL2")
-    cfg2$lab_title <- c("Pct CD4+ T-cells expressing IFN-g/IL-2 JMos1 gp120: Day 210", "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos1 gp41: Day 210", "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos2 Gag: Day 210", "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos2 RNAseInt: Day 210", "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos2s gp120: Day 210", "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos2s gp41: Day 210", "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos1 gp120: Day 210", "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos1 gp41: Day 210", "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos2 Gag: Day 210", "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos2 RNAseInt: Day 210", "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos2s gp120: Day 210", "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos2s gp41: Day 210")
+    cfg2$lab_title <- c("Pct CD4+ T-cells expressing IFN-g/IL-2 JMos1 gp120: Month 7", "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos1 gp41: Month 7", "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos2 Gag: Month 7", "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos2 RNAseInt: Month 7", "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos2s gp120: Month 7", "Pct CD4+ T-cells expressing IFN-g/IL-2 JMos2s gp41: Month 7", "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos1 gp120: Month 7", "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos1 gp41: Month 7", "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos2 Gag: Month 7", "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos2 RNAseInt: Month 7", "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos2s gp120: Month 7", "Pct CD8+ T-cells expressing IFN-g/IL-2 JMos2s gp41: Month 7")
     cfg2$lab_x <- c("CD4+ T-cells IFN-g/IL-2 JMos1 gp120 (=s)", "CD4+ T-cells IFN-g/IL-2 JMos1 gp41 (=s)", "CD4+ T-cells IFN-g/IL-2 JMos2 Gag (=s)", "CD4+ T-cells IFN-g/IL-2 JMos2 RNAseInt (=s)", "CD4+ T-cells IFN-g/IL-2 JMos2s gp120 (=s)", "CD4+ T-cells IFN-g/IL-2 JMos2s gp41 (=s)", "CD8+ T-cells IFN-g/IL-2 JMos1 gp120 (=s)", "CD8+ T-cells IFN-g/IL-2 JMos1 gp41 (=s)", "CD8+ T-cells IFN-g/IL-2 JMos2 Gag (=s)", "CD8+ T-cells IFN-g/IL-2 JMos2 RNAseInt (=s)", "CD8+ T-cells IFN-g/IL-2 JMos2s gp120 (=s)", "CD8+ T-cells IFN-g/IL-2 JMos2s gp41 (=s)")
     cfg2$t_0 <- 550
     cfg2$dataset <- "HVTN705_secondcasecontrolprocesseddata_excludeELISpotmarkersaddICSmarkers.csv"
@@ -603,7 +605,7 @@
     cfg2$qnt[["CVE, nonparametric"]] <- c(0,0.9)
     cfg2$params$g_n_type <- "parametric (edge) 2"
     cfg2$zoom_y_cve <- NA
-    cfg2$zoom_y_max <- 0.15
+    cfg2$zoom_y_risk_max <- 0.15
     cfg2$more_ticks <- c(1,2)
     cfg2$llox_label <- c("LOD", "LLOQ")
     cfg2$llox <- c(NA, 4.8975)
@@ -688,9 +690,10 @@
   if (cfg2$analysis=="Profiscov") {
     
     # Override default config
-    cfg2$params$g_n_type <- "parametric"
+    # cfg2$params$g_n_type <- "parametric" # Historical
     cfg2$zoom_y_cve <- NA
-    cfg2$zoom_y_max <- 0.21
+    cfg2$zoom_y_risk_max <- 0.21
+    cfg2$density_type <- "kde"
     cfg2$llox_label <- c("LLOQ", "LOD")
     cfg2$llox <- c(49*0.009, 70*0.009, 72*0.009, 32*0.009, 35*0.0272, 224*0.0272, 53*0.0272, 91*0.0272, 46*0.00236, 27.56)
     
@@ -701,7 +704,7 @@
     cfg2$lab_title <- c("Binding Antibody to Spike: Day 43", "Binding Antibody to Spike B.1.1.7: Day 43", "Binding Antibody to Spike B.1.351: Day 43", "Binding Antibody to Spike P.1: Day 43", "Binding Antibody to RBD: Day 43", "Binding Antibody to RBD B.1.1.7: Day 43", "Binding Antibody to RBD B.1.351: Day 43", "Binding Antibody to RBD P.1: Day 43", "Binding Antibody to Nucleocapsid: Day 43",
                         "Binding Antibody to Spike: Day 91", "Binding Antibody to Spike B.1.1.7: Day 91", "Binding Antibody to Spike B.1.351: Day 91", "Binding Antibody to Spike P.1: Day 91", "Binding Antibody to RBD: Day 91", "Binding Antibody to RBD B.1.1.7: Day 91", "Binding Antibody to RBD B.1.351: Day 91", "Binding Antibody to RBD P.1: Day 91", "Binding Antibody to Nucleocapsid: Day 91",
                         "Live Virus Micro Neut 50% Titer: Day 43")
-    cfg2$lab_x <- c("Anti Spike IgG (BAU/ml) (=s)", "Anti Spike B.1.1.7 IgG (BAU/ml) (=s)", "Anti Spike B.1.351 IgG (BAU/ml) (=s)", "Anti Spike P.1 IgG (BAU/ml) (=s)", "Anti RBD IgG (BAU/ml) (=s)", "Anti RBD B.1.1.7 IgG (BAU/ml) (=s)", "Anti RBD B.1.351 IgG (BAU/ml) (=s)", "Anti RBD P.1 IgG (BAU/ml) (=s)", "Anti N IgG (BAU/ml) (=s)", "")
+    cfg2$lab_x <- c("Anti Spike IgG (BAU/ml) (=s)", "Anti Spike B.1.1.7 IgG (BAU/ml) (=s)", "Anti Spike B.1.351 IgG (BAU/ml) (=s)", "Anti Spike P.1 IgG (BAU/ml) (=s)", "Anti RBD IgG (BAU/ml) (=s)", "Anti RBD B.1.1.7 IgG (BAU/ml) (=s)", "Anti RBD B.1.351 IgG (BAU/ml) (=s)", "Anti RBD P.1 IgG (BAU/ml) (=s)", "Anti N IgG (BAU/ml) (=s)", "Live Virus-mnAb ID50 (IU50/ml) (=s)")
     cfg2$t_0 <- c(114,66)
     cfg2$dataset <- c("profiscov_data_processed_with_riskscore.csv",
                       "profiscov_lvmn_data_processed_with_riskscore.csv")
@@ -721,7 +724,7 @@
 
     # Variable map; one row corresponds to one CVE graph
     cfg2$map <- data.frame(
-      endpoint = c(1:19), # A (same)
+      endpoint = rep(1, 19), # F (constant)
       marker = c(1:19), # A (same)
       lab_x = c(rep(c(1:9),2),10), # B (marker type)
       lab_title = c(1:19), # A (same)
@@ -730,19 +733,20 @@
       cr2_trial = c(rep(1, 18), 2), # D (regular vs. LVNT)
       cr2_COR = c(rep(c(1,2), each=9), 1), # C (day 43 vs 91)
       cr2_marker = c(rep(c(1:9),2),1), # E (marker order cr2)
-      edge_corr = rep(1, 19), # A (same)
-      v_id = rep(1, 19), # A (same)
+      edge_corr = rep(1, 19), # F (constant)
+      v_id = rep(1, 19), # F (constant)
       v_time = c(rep(c(1,2), each=9), 1), # C (day 43 vs 91)
       v_event = c(rep(c(1,2), each=9), 1), # C (day 43 vs 91)
       v_wt = c(rep(c(1,2), each=9), 1), # C (day 43 vs 91)
       v_ph1 = c(rep(c(1,2), each=9), 1), # C (day 43 vs 91)
       v_ph2 = c(rep(c(1,2), each=9), 1), # C (day 43 vs 91)
-      v_covariates = rep(1, 19), # A (same)
-      dir = rep(1, 19), # A (same)
-      zoom_x = rep(1, 19), # A (same)
-      zoom_y_cve = rep(1, 19), # A (same)
-      zoom_y_risk = rep(1, 19), # A (same)
-      more_ticks = rep(1, 19), # A (same)
+      v_covariates = rep(1, 19), # F (constant)
+      dir = rep(1, 19), # F (constant)
+      zoom_x = rep(1, 19), # F (constant)
+      zoom_y_cve = rep(1, 19), # F (constant)
+      zoom_y_risk = rep(1, 19), # F (constant)
+      more_ticks = c(2,2,2,2,2,2,2,2,1,2,
+                     2,2,2,2,2,2,2,1,2), # F (constant)
       llox_label = c(rep(1, 18), 2), # D (regular vs. LVNT)
       llox = c(rep(c(1:9),2),10) # B (marker type)
     )
@@ -753,7 +757,7 @@
     
     # Override default config
     cfg2$zoom_y_cve <- list(c(-1,1.05))
-    cfg2$zoom_y_max <- 0.05 # !!!!!
+    cfg2$zoom_y_risk_max <- 0.05 # !!!!!
     
     # Analysis-specific config
     cfg2$marker <- c("Day182AEA244V1V2Tags293F", "Day182C1086C_V1_V2Tags", "Day182gp70_C1086CV1V2293F", "Day182gp70_BCaseA_V1_V2", "Day182iga_A1conenv03140CF")
@@ -807,7 +811,7 @@
   
   # Set config based on local vs. cluster
   if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
-    cfg2$tid <- 13
+    cfg2$tid <- 19
     cfg2$dataset <- paste0(cfg2$folder_cluster,cfg2$dataset)
   } else {
     cfg2$tid <- as.integer(Sys.getenv(.tid_var))
@@ -1237,7 +1241,7 @@ if (cfg2$estimators$overall=="Cox import" ||
 
 if ("Grenander" %in% cfg2$estimators$cr) {
   
-  calc_ests <- T
+  calc_ests <- F
   if (calc_ests) {
     
     ests <- vaccine::est_ce(
@@ -1256,7 +1260,7 @@ if ("Grenander" %in% cfg2$estimators$cr) {
         surv_type = cfg2$params$Q_n_type,
         # surv_type = "survML-G",
         density_type = cfg2$params$g_n_type,
-        # density_bins = 0, # !!!!!
+        density_bins = 0, # !!!!!
         deriv_type = cfg2$params$deriv_type
       )
     )
@@ -1456,7 +1460,7 @@ if ("Cox (spline 4 df)" %in% cfg2$estimators$cr) {
 
 if ("Cox gcomp" %in% cfg2$estimators$cr) {
   
-  calc_ests <- T
+  calc_ests <- F
   if (calc_ests) {
     
     ests <- vaccine::est_ce(
@@ -1627,14 +1631,19 @@ if (flags$run_hyptest) {
   #' @param rr_y_axis Boolean; if true, a secondary risk ratio Y-axis will be
   #'     displayed
   #' @param log10_x_axis Boolean; if true, the X-axis values are log-10
+  #' @param case_dots Boolean; if true, dots are plotted on the X-axis
+  #'     corresponding to vaccine cases
+  #' @param density_type One of c("histogram", "kde", "none")
   #' @return A ggplot2 plot object
   #' @notes
   #'   - This function plots pointwise estimates and confidence intervals from
   #'     both Cox model and nonparametric approaches
   # !!!!! cfg2 and dat currently accessed globally
-  create_plot <- function(plot_data, which, zoom_x=NA, zoom_y=NA, zoom_y_max=NA,
-                          labs, hst, rr_y_axis=F, log10_x_axis=F,
-                          log10_y_axis=F, case_dots=F) {
+  create_plot <- function(
+    plot_data, which, zoom_x=NA, zoom_y=NA, zoom_y_max=NA, labs, hst,
+    rr_y_axis=F, log10_x_axis=F, log10_y_axis=F, case_dots=F,
+    density_type="histogram"
+  ) {
     
     # Change curve labels to factors and set color scale
     curves <- c(
@@ -1706,20 +1715,40 @@ if (flags$run_hyptest) {
                   z_y_U + 0.05*(z_y_U-z_y_L))
     }
     
-    # Generate histogram data
-    ymax <- 0.6 * (hst$counts/max(hst$counts)) * (zoom_y[2]/1.05-zoom_y[1]) +
-      zoom_y[1]
-    hist_data <- data.frame(
-      xmin = hst$breaks[-length(hst$breaks)],
-      xmax = hst$breaks[-1],
-      ymin = rep(zoom_y[1], length(hst$counts)),
-      ymax = ymax
-    )
-    
     # Hack to get zoom_y value for HVTN 124 plots
-    if (flags$hvtn124_plot) {
-      zoom_x <<- zoom_x
-      zoom_y <<- zoom_y
+    if (flags$hvtn124_plot) { zoom_x <<- zoom_x; zoom_y <<- zoom_y; }
+    
+    # Generate histogram/KDE data
+    dens_height <- 0.6 * (zoom_y[2]/1.05-zoom_y[1])
+    if (density_type=="histogram") {
+      
+      hist_data <- data.frame(
+        xmin = hst$breaks[-length(hst$breaks)],
+        xmax = hst$breaks[-1],
+        ymin = rep(zoom_y[1], length(hst$counts)),
+        ymax = dens_height * (hst$counts/max(hst$counts)) + zoom_y[1]
+      )
+      
+    } else if (density_type=="kde") {
+      
+      # !!!!! For now, accessing data globally; change
+      df_dens <- data.frame(
+        s = dat$v$s[!is.na(dat$v$s)],
+        weights = dat$v$weights[!is.na(dat$v$s)]
+      )
+      df_dens$weights <- df_dens$weights / sum(df_dens$weights)
+      dens <- stats::density(
+        x = df_dens$s,
+        bw = "ucv",
+        adjust = 2, # !!!!!
+        weights = df_dens$weights
+      )
+      kde_data <- data.frame(
+        x = dens$x,
+        ymin = zoom_y[1],
+        ymax = dens_height * (dens$y/max(dens$y)) + zoom_y[1]
+      )
+      
     }
     
     # Create and return ggplot2 object
@@ -1759,18 +1788,37 @@ if (flags$run_hyptest) {
     } else {
       syc_trans <- "identity"
     }
-    plot <- ggplot(plot_data, aes(x=x, y=y, color=curve)) +
+    
+    # Assemble plot
+    plot <- ggplot(plot_data, aes(x=x, y=y, color=curve))
+    if (density_type=="histogram") {
+      
+       plot <- plot + geom_rect(
+          aes(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax),
+          hist_data,
+          alpha = 0.3,
+          # fill = "forestgreen",
+          fill = "orange",
+          inherit.aes = F
+        )
+      
+    } else if (density_type=="kde") {
+      
+      plot <- plot + geom_ribbon(
+        aes(x=x, ymin=ymin, ymax=ymax),
+        data = kde_data,
+        inherit.aes = F,
+        color = "white",
+        fill = "orange",
+        alpha = 0.3
+      )
+      
+    }
+    plot <- plot +
       geom_ribbon(
         aes(ymin=ci_lo, ymax=ci_up, fill=curve),
         alpha = 0.05,
         linetype = "dotted"
-      ) +
-      geom_rect(
-        aes(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax),
-        hist_data,
-        alpha = 0.3,
-        fill = "forestgreen",
-        inherit.aes = F
       ) +
       geom_line(linewidth=0.7) +
       scale_y_continuous(
@@ -1906,10 +1954,11 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
       which = "Risk",
       zoom_x = cfg2$zoom_x,
       zoom_y = cfg2$zoom_y_risk,
-      zoom_y_max = cfg2$zoom_y_max,
+      zoom_y_max = cfg2$zoom_y_risk_max,
       labs = list(title=cfg2$lab_title, x=cfg2$lab_x, y=cfg2$lab_y),
       hst = hst,
-      log10_x_axis = T
+      log10_x_axis = T,
+      density_type = cfg2$density_type
     )
     
     if (cfg2$analysis=="Janssen (partA)") {
@@ -1980,7 +2029,8 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
       rr_y_axis = T,
       log10_x_axis = T,
       log10_y_axis = log10_y_axis,
-      case_dots = case_dots
+      case_dots = case_dots,
+      density_type = cfg2$density_type
     )
     
     if (cfg2$analysis=="Janssen (partA)") {
@@ -2248,7 +2298,7 @@ if (F) {
 if (F) {
   
   mrk <- "Day210mdw_xassay_overall"
-  mrk_lab <- "Expanded Multi-epitope functions: Day 210"
+  mrk_lab <- "Expanded Multi-epitope functions: Month 7"
   title_lab <- "Figure 1-5. HVTN 705 Expanded Multi-epitope functions at Month 7"
   
   df_tx <- df_ph1_full[which(df_ph1_full$Trt==1),]

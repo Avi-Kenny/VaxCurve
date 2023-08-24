@@ -757,7 +757,7 @@
     
     # Override default config
     cfg2$zoom_y_cve <- list(c(-1,1.05))
-    cfg2$zoom_y_risk_max <- 0.05 # !!!!!
+    cfg2$zoom_y_risk_max <- 0.05
     
     # Analysis-specific config
     cfg2$marker <- c("Day182AEA244V1V2Tags293F", "Day182C1086C_V1_V2Tags", "Day182gp70_C1086CV1V2293F", "Day182gp70_BCaseA_V1_V2", "Day182iga_A1conenv03140CF")
@@ -811,7 +811,7 @@
   
   # Set config based on local vs. cluster
   if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
-    cfg2$tid <- 19
+    cfg2$tid <- 1
     cfg2$dataset <- paste0(cfg2$folder_cluster,cfg2$dataset)
   } else {
     cfg2$tid <- as.integer(Sys.getenv(.tid_var))
@@ -1697,9 +1697,9 @@ if (flags$run_hyptest) {
       zoom_x <- c(z_x_L - 0.05*(z_x_R-z_x_L),
                   z_x_R + 0.05*(z_x_R-z_x_L))
     }
+    # browser() # !!!!!
     if (is.na(zoom_y[1])) {
-      zoom_y <- c(0,1)
-      zoom_y[2] <- zoom_y[2] + 0.05*(zoom_y[2]-zoom_y[1])
+      zoom_y <- c(0,1.05)
     } else if (zoom_y[1]=="zoomed") {
       zz <- dplyr::filter(plot_data, x>=zoom_x[1] & x<=zoom_x[2])
       z_y_L <- min(zz$ci_lo, na.rm=T)
@@ -1710,10 +1710,10 @@ if (flags$run_hyptest) {
       zz <- dplyr::filter(plot_data, x>=zoom_x[1] & x<=zoom_x[2])
       z_y_L <- 0
       z_y_U <- max(plot_data$ci_up, na.rm=T)
-      if (!is.null(zoom_y_max)) { z_y_U <- min(zoom_y_max, z_y_U) }
       zoom_y <- c(z_y_L - 0.05*(z_y_U-z_y_L),
                   z_y_U + 0.05*(z_y_U-z_y_L))
     }
+    if (!is.na(zoom_y_max)) { zoom_y[2] <- min(zoom_y_max, zoom_y[2]) }
     
     # Hack to get zoom_y value for HVTN 124 plots
     if (flags$hvtn124_plot) { zoom_x <<- zoom_x; zoom_y <<- zoom_y; }

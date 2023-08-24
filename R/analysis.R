@@ -375,7 +375,7 @@
     
     # Override default config
     cfg2$params$deriv_type <- "line"
-    cfg2$density_type <- "kde"
+    cfg2$density_type <- "kde edge"
     
     # Analysis-specific config
     cfg2$marker <- c("Day210ELCZ", "Day210ADCPgp140C97ZAfib", "Day210IgG340mdw_V1V2", "Day210IgG340mdw_gp120_gp140_vm", "Day210ELISpotPTEEnv", "Day210mdw_xassay_overall", "Day210ADCPgp140Mos1fib", "Day210IgG50mdw_V1V2", "Day210ADCCCAP8_pAUC", "Day210ADCCCH58_pAUC", "Day210ADCCWITO_pAUC", "Day210ICS4AnyEnvIFNg_OR_IL2", "Day210ICS8AnyEnvIFNg_OR_IL2", "Day210IgG3AE.A244.V1V2.Tags_293F40delta", "Day210IgG3C.1086C.V1.V2.Tags40delta", "Day210IgG3gp70.001428.2.42.V1V240delta", "Day210IgG3gp70.1012.11.TC21.3257.V1V240delta", "Day210IgG3gp70.1394C9G1.V1V240delta", "Day210IgG3gp70.BF1266.431a.V1V240delta", "Day210IgG3gp70.Ce1086.B2.V1V240delta", "Day210IgG3gp70.B.CaseA.V1.V240delta", "Day210mdw_xassay_select_igg3v1v2")
@@ -811,7 +811,7 @@
   
   # Set config based on local vs. cluster
   if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
-    cfg2$tid <- 1
+    cfg2$tid <- 3
     cfg2$dataset <- paste0(cfg2$folder_cluster,cfg2$dataset)
   } else {
     cfg2$tid <- as.integer(Sys.getenv(.tid_var))
@@ -1720,6 +1720,12 @@ if (flags$run_hyptest) {
     
     # Generate histogram/KDE data
     dens_height <- 0.6 * (zoom_y[2]/1.05-zoom_y[1])
+    
+    # !!!!! For now, accessing data globally; change
+    min_s <- min(dat$v$s, na.rm=T)
+    p_edge <- mean(dat$v$s==min_s, na.rm=T) # !!!!! Make this weighted
+    
+    if (p_edge<0.03 & density_type=="kde edge") { density_type <- "kde" }
     if (density_type=="histogram") {
       
       hist_data <- data.frame(
@@ -1740,7 +1746,7 @@ if (flags$run_hyptest) {
       dens <- stats::density(
         x = df_dens$s,
         bw = "ucv",
-        adjust = 2, # !!!!!
+        # adjust = 2, # !!!!!
         weights = df_dens$weights
       )
       kde_data <- data.frame(
@@ -1749,6 +1755,41 @@ if (flags$run_hyptest) {
         ymax = dens_height * (dens$y/max(dens$y)) + zoom_y[1]
       )
       
+    } else if (density_type=="kde edge") {
+      
+      # !!!!! For now, accessing data globally; change
+      df_dens <- data.frame(
+        s = dat$v$s[!is.na(dat$v$s) & dat$v$s!=min_s],
+        weights = dat$v$weights[!is.na(dat$v$s) & dat$v$s!=min_s]
+      )
+      df_dens$weights <- df_dens$weights / sum(df_dens$weights)
+      dens <- stats::density(
+        x = df_dens$s,
+        bw = "ucv",
+        # adjust = 2, # !!!!!
+        weights = df_dens$weights
+      )
+      dens$y <- dens$y * (1-p_edge)
+      
+      plot_width <- zoom_x[2]-zoom_x[1]
+      # rect_x <- c(zoom_x[1]+0.01*plot_width, zoom_x[1]+0.06*plot_width)
+      rect_x <- c(min_s-0.025*plot_width, min_s+0.025*plot_width)
+      rect_y <- p_edge / (rect_x[2]-rect_x[1])
+      inds_to_remove <- dens$x>rect_x[2]
+      dens$x <- dens$x[inds_to_remove]
+      dens$y <- dens$y[inds_to_remove]
+      dens$x[length(dens$x)+1] <- rect_x[1]
+      dens$y[length(dens$y)+1] <- rect_y
+      dens$x[length(dens$x)+1] <- rect_x[2]
+      dens$y[length(dens$y)+1] <- rect_y
+      
+      kde_data <- data.frame(
+        x = dens$x,
+        ymin = zoom_y[1],
+        ymax = dens_height * (dens$y/max(dens$y)) + zoom_y[1]
+      )
+      
+
     }
     
     # Create and return ggplot2 object
@@ -1802,7 +1843,7 @@ if (flags$run_hyptest) {
           inherit.aes = F
         )
       
-    } else if (density_type=="kde") {
+    } else if (density_type %in% c("kde", "kde edge")) {
       
       plot <- plot + geom_ribbon(
         aes(x=x, ymin=ymin, ymax=ymax),
@@ -2013,7 +2054,7 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
           }
         }
         return(x_axis)
-      }  
+      }
     }
     
     log10_y_axis <- as.logical(flags$partA_mnscrpt2)

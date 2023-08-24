@@ -28,17 +28,17 @@
   # Run multiple analyses at once
   {
     
-    # # RV144 vs HVTN 705: uncomment to run
-    # ..tid <- as.integer(Sys.getenv(.tid_var))
-    # if (..tid %in% c(1:5)) {
-    #   cfg2$analysis <- "RV144"
-    #   .tid_lst = list(as.character(round(..tid)))
-    # } else if (..tid %in% c(6:10)) {
-    #   cfg2$analysis <- "HVTN 705 (compare RV144)"
-    #   .tid_lst = list(as.character(round(..tid-5)))
-    # }
-    # names(.tid_lst) = .tid_var
-    # do.call(Sys.setenv, .tid_lst)
+    # RV144 vs HVTN 705: uncomment to run
+    ..tid <- as.integer(Sys.getenv(.tid_var))
+    if (..tid %in% c(1:5)) {
+      cfg2$analysis <- "RV144"
+      .tid_lst = list(as.character(round(..tid)))
+    } else if (..tid %in% c(6:10)) {
+      cfg2$analysis <- "HVTN 705 (compare RV144)"
+      .tid_lst = list(as.character(round(..tid-5)))
+    }
+    names(.tid_lst) = .tid_var
+    do.call(Sys.setenv, .tid_lst)
     
     # # 128 plots across 4 analyses: uncomment to run
     # ..tid <- as.integer(Sys.getenv(.tid_var))
@@ -77,7 +77,7 @@
     hvtn705_abstract_fig = F,
     table_of_vals = F,
     save_data_objs = F,
-    save_plot_objs = F,
+    save_plot_objs = T,
     save_diagnostics = F,
     paper_npcve = F,
     paper_cox = F,
@@ -431,6 +431,7 @@
     
     # Override default config
     cfg2$params$deriv_type <- "line"
+    cfg2$density_type <- "kde edge"
     cfg2$zoom_y_cve <- list(c(-1,1.05))
     cfg2$zoom_y_risk_max <- 0.1
     
@@ -693,7 +694,7 @@
     # cfg2$params$g_n_type <- "parametric" # Historical
     cfg2$zoom_y_cve <- NA
     cfg2$zoom_y_risk_max <- 0.21
-    cfg2$density_type <- "kde"
+    cfg2$density_type <- "kde edge"
     cfg2$llox_label <- c("LLOQ", "LOD")
     cfg2$llox <- c(49*0.009, 70*0.009, 72*0.009, 32*0.009, 35*0.0272, 224*0.0272, 53*0.0272, 91*0.0272, 46*0.00236, 27.56)
     
@@ -758,6 +759,7 @@
     # Override default config
     cfg2$zoom_y_cve <- list(c(-1,1.05))
     cfg2$zoom_y_risk_max <- 0.05
+    cfg2$density_type <- "kde edge"
     
     # Analysis-specific config
     cfg2$marker <- c("Day182AEA244V1V2Tags293F", "Day182C1086C_V1_V2Tags", "Day182gp70_C1086CV1V2293F", "Day182gp70_BCaseA_V1_V2", "Day182iga_A1conenv03140CF")
@@ -811,7 +813,7 @@
   
   # Set config based on local vs. cluster
   if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
-    cfg2$tid <- 3
+    cfg2$tid <- 1
     cfg2$dataset <- paste0(cfg2$folder_cluster,cfg2$dataset)
   } else {
     cfg2$tid <- as.integer(Sys.getenv(.tid_var))
@@ -1782,6 +1784,8 @@ if (flags$run_hyptest) {
       dens$y[length(dens$y)+1] <- rect_y
       dens$x[length(dens$x)+1] <- rect_x[2]
       dens$y[length(dens$y)+1] <- rect_y
+      dens$x[length(dens$x)+1] <- rect_x[2] + plot_width/10^5
+      dens$y[length(dens$y)+1] <- zoom_y[1]
       
       kde_data <- data.frame(
         x = dens$x,
@@ -1838,8 +1842,7 @@ if (flags$run_hyptest) {
           aes(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax),
           hist_data,
           alpha = 0.3,
-          # fill = "forestgreen",
-          fill = "orange",
+          fill = "orange", # "forestgreen"
           inherit.aes = F
         )
       
@@ -1850,7 +1853,7 @@ if (flags$run_hyptest) {
         data = kde_data,
         inherit.aes = F,
         color = "white",
-        fill = "orange",
+        fill = "orange", # "forestgreen"
         alpha = 0.3
       )
       
@@ -2590,10 +2593,10 @@ if (F) {
       zz <- dplyr::filter(plot_data, x>=zoom_x[1] & x<=zoom_x[2])
       z_y_L <- 0
       z_y_U <- max(plot_data$ci_up, na.rm=T)
-      if (!is.null(zoom_y_max)) { z_y_U <- min(zoom_y_max, z_y_U) }
       zoom_y <- c(z_y_L - 0.05*(z_y_U-z_y_L),
                   z_y_U + 0.05*(z_y_U-z_y_L))
     }
+    if (!is.na(zoom_y_max)) { z_y_U <- min(zoom_y_max, z_y_U) }
     
     # Generate histogram data
     ymax_144 <- 0.6 * (hst_144$counts/max(hst_144$counts)) *

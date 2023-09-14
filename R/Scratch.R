@@ -1,11 +1,4 @@
 
-# CLS illustration (modified)
-if (F) {
-  
-  # TO DO
-  
-}
-
 # Alternative to log(1-CVE) transformation
 if (F) {
   

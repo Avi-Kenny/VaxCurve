@@ -40,29 +40,29 @@
     # names(.tid_lst) = .tid_var
     # do.call(Sys.setenv, .tid_lst)
     
-    # # 128 plots across 4 analyses: uncomment to run
-    # ..tid <- as.integer(Sys.getenv(.tid_var))
-    # if (..tid %in% c(1:4)) { # 4 markers
-    #   cfg2$analysis <- "Janssen"
-    #   .tid_lst = list(as.character(round(..tid)))
-    # } else if (..tid %in% c(5:14)) { # 10 markers
-    #   cfg2$analysis <- "Moderna"
-    #   .tid_lst = list(as.character(round(..tid-4)))
-    # } else if (..tid %in% c(15:53)) { # 39 markers
-    #   cfg2$analysis <- "HVTN 705 (all)"
-    #   .tid_lst = list(as.character(round(..tid-14)))
-    # } else if (..tid %in% c(54:65)) { # 12 markers
-    #   cfg2$analysis <- "HVTN 705 (ICS)"
-    #   .tid_lst = list(as.character(round(..tid-53)))
-    # } else if (..tid %in% c(66:123)) { # 58 markers
-    #   cfg2$analysis <- "Janssen (partA)"
-    #   .tid_lst = list(as.character(round(..tid-65)))
-    # } else if (..tid %in% c(124:128)) { # 5 markers
-    #   cfg2$analysis <- "RV144"
-    #   .tid_lst = list(as.character(round(..tid-123)))
-    # }
-    # names(.tid_lst) = .tid_var
-    # do.call(Sys.setenv, .tid_lst)
+    # 128 plots across 4 analyses: uncomment to run
+    ..tid <- as.integer(Sys.getenv(.tid_var))
+    if (..tid %in% c(1:4)) { # 4 markers
+      cfg2$analysis <- "Janssen"
+      .tid_lst = list(as.character(round(..tid)))
+    } else if (..tid %in% c(5:14)) { # 10 markers
+      cfg2$analysis <- "Moderna"
+      .tid_lst = list(as.character(round(..tid-4)))
+    } else if (..tid %in% c(15:53)) { # 39 markers
+      cfg2$analysis <- "HVTN 705 (all)"
+      .tid_lst = list(as.character(round(..tid-14)))
+    } else if (..tid %in% c(54:65)) { # 12 markers
+      cfg2$analysis <- "HVTN 705 (ICS)"
+      .tid_lst = list(as.character(round(..tid-53)))
+    } else if (..tid %in% c(66:123)) { # 58 markers
+      cfg2$analysis <- "Janssen (partA)"
+      .tid_lst = list(as.character(round(..tid-65)))
+    } else if (..tid %in% c(124:128)) { # 5 markers
+      cfg2$analysis <- "RV144"
+      .tid_lst = list(as.character(round(..tid-123)))
+    }
+    names(.tid_lst) = .tid_var
+    do.call(Sys.setenv, .tid_lst)
     
   }
   
@@ -815,7 +815,7 @@
   
   # Set config based on local vs. cluster
   if (Sys.getenv("USERDOMAIN")=="AVI-KENNY-T460") {
-    cfg2$tid <- 47
+    cfg2$tid <- 1
     cfg2$dataset <- paste0(cfg2$folder_cluster,cfg2$dataset)
   } else {
     cfg2$tid <- as.integer(Sys.getenv(.tid_var))
@@ -1037,6 +1037,55 @@
 
 if (cfg2$estimators$overall %in% c("Cox gcomp", "KM")) {
   
+  # !!!!!
+  if (F) {
+    
+    # Create new covariate
+    x1_new <- cut(dat$v$x$x1, breaks=quantile(dat$v$x$x1))
+    x1_new_v2 <- cut(dat$v$x$x1, breaks=quantile(dat$v$x$x1, probs=c(0,0.5,1)))
+    
+    # Unadjusted KM curve (ph1)
+    srv_p <- survfit(Surv(dat$v$y,dat$v$delta)~1)
+    round(1 - srv_p$surv[which.min(abs(srv_p$time-cfg2$t_0))], 3)
+    
+    # Unadjusted KM curve (ph2)
+    y_ph2 <- dat$v$y[dat$v$z==1]
+    delta_ph2 <- dat$v$delta[dat$v$z==1]
+    weight_ph2 <- dat$v$weights[dat$v$z==1]
+    srv_p2 <- survfit(Surv(y_ph2,delta_ph2)~1, weights=weight_ph2)
+    round(1 - srv_p2$surv[which.min(abs(srv_p2$time-cfg2$t_0))],3)
+    
+    srv_p3 <- survfit(Surv(dat$v$y,dat$v$delta)~factor(x1_new)+dat$v$x$x2+dat$v$x$x3)
+    1 - srv_p3$surv[which.min(abs(srv_p3$time-cfg2$t_0))]
+    
+    model <- coxph(Surv(dat$v$y,dat$v$delta)~factor(x1_new)+dat$v$x$x2+dat$v$x$x3)
+    srv_cox <- survfit(model)
+    1 - srv_cox$surv[which.min(abs(srv_cox$time-cfg2$t_0))]
+    
+    
+    srv_df <- data.frame(time=srv_p$time, n.risk=srv_p$n.risk,
+                         n.event=srv_p$n.event, n.censor=srv_p$n.censor,
+                         surv=srv_p$surv, inv_surv=(1-srv_p$surv))
+    print(srv_df)
+    
+    # Plots
+    reg_1 <- dat$v$x$x2
+    reg_2 <- dat$v$x$x3
+    
+    plot(survfit(Surv(dat$v$y,dat$v$delta)~1), ylim=c(0.9,1))
+    plot(survfit(Surv(dat$v$y,dat$v$delta)~reg_1+reg_2), ylim=c(0.9,1))
+    
+    plot(survfit(Surv(dat$v$y,dat$v$delta)~x1_new_v2), ylim=c(0.9,1))
+    plot(survfit(Surv(dat$v$y,dat$v$delta)~x1_new_v2+reg_1+reg_2), ylim=c(0.9,1))
+    
+    
+    # est <- 1 - srv_p$surv[which.min(abs(srv_p$time-t_0))]
+    # ci_lo <- 1 - srv_p$upper[which.min(abs(srv_p$time-t_0))]
+    # ci_up <- 1 - srv_p$lower[which.min(abs(srv_p$time-t_0))]
+    # se <- srv_p$std.err[which.min(abs(srv_p$time-t_0))]
+    
+  }
+  
   if (cfg2$estimators$overall=="Cox gcomp") {
     method <- "Cox"
   } else if (cfg2$estimators$overall=="KM") {
@@ -1239,6 +1288,79 @@ if (cfg2$estimators$overall=="Cox import" ||
 
 
 
+#####################################.
+##### Data analysis (Mediation) #####
+#####################################.
+
+if (flags$run_mediation) {
+  
+  set.seed(cfg2$seed)
+  ests_np_med <- vaccine::est_med(
+    dat = dat,
+    type = "NP",
+    t_0 = cfg2$t_0,
+    scale = "VE",
+    params_np = vaccine::params_med_np(
+      grid_size = list(y=101, s=101, x=5),
+      surv_type = cfg2$params$Q_n_type,
+      density_type = cfg2$params$g_n_type
+      # density_bins = 0 # !!!!!
+    )
+  )
+  saveRDS(ests_np_med, paste0(cfg2$analysis," plots/ests_med_",cfg2$tid,".rds"))
+  
+  print("MEDIATION ANALYSIS RESULTS")
+  print("--------------------------")
+  print(ests_np_med)
+  # stop("Halted after mediation")
+  
+  # Process results
+  if (F) {
+    
+    # Choose analysis
+    # "Janssen" "Moderna" "AMP" "AZD1222" "Janssen (partA)" "Profiscov"
+    # "HVTN 705 (primary)" "HVTN 705 (all)" "RV144" "HVTN 705 (second)"
+    # "HVTN 705 (compare RV144)"
+    analysis <- "Janssen (partA)"
+    if (analysis=="Moderna") {
+      inds <- c(5,7,9)
+    } else if (analysis=="Janssen (partA)") {
+      inds <- c(1:64)
+      # inds <- c(1:58)
+    } else if (analysis=="HVTN 705 (all)") {
+      inds <- c(9,15:22,25:30,33:37,39)
+    }
+    
+    df_med <- data.frame(
+      "i"=integer(),
+      "nde_est"=double(),"nde_se"=double(),"nde_lo"=double(),"nde_up"=double(),
+      "nie_est"=double(),"nie_se"=double(),"nie_lo"=double(),"nie_up"=double(),
+      "pm_est"=double(),"pm_se"=double(),"pm_lo"=double(),"pm_up"=double()
+    )
+
+    for (i in inds) {
+      ests <- readRDS(paste0(analysis," plots/ests_med_",i,".rds"))
+      e_nde <- as.list(ests[ests$effect=="NDE",][2:5])
+      e_nie <- as.list(ests[ests$effect=="NIE",][2:5])
+      e_pm <- as.list(ests[ests$effect=="PM",][2:5])
+      e_all <- c(e_nde, e_nie, e_pm)
+      e_all <- lapply(e_all, function(x) { round(x,3) })
+      df_med[nrow(df_med)+1,] <- c(list(i=i), e_all)
+
+    }
+    write.table(
+      df_med,
+      file = paste0("mediation_results - ",analysis,".csv"),
+      sep = ",",
+      row.names = F
+    )
+    
+  }
+  
+}
+
+
+
 #################################.
 ##### Data analysis (NPCVE) #####
 #################################.
@@ -1256,7 +1378,7 @@ if ("Grenander" %in% cfg2$estimators$cr) {
       cve = T,
       s_out = s_grid,
       ci_type = cfg2$params$ci_type,
-      placebo_risk_method = "Cox",
+      placebo_risk_method = "Cox", # !!!!! Reevaluate this after finishing alternate estimator
       return_extras = T,
       params_np = vaccine::params_ce_np(
         dir = cfg2$dir,
@@ -1293,140 +1415,6 @@ if ("Grenander" %in% cfg2$estimators$cr) {
                         lab_cve="CVE, nonparametric")
   plot_data_risk <- rbind(plot_data_risk, ests2$risk)
   if (run_cve) { plot_data_cve <- rbind(plot_data_cve, ests2$cve) }
-  
-}
-
-
-
-#####################################.
-##### Data analysis (Mediation) #####
-#####################################.
-
-if (flags$run_mediation) {
-  
-  set.seed(cfg2$seed)
-  ests_np_med <- vaccine::est_med(
-    dat = dat,
-    type = "NP",
-    t_0 = cfg2$t_0,
-    scale = "VE",
-    params_np = vaccine::params_med_np(
-      grid_size = list(y=101, s=101, x=5),
-      surv_type = cfg2$params$Q_n_type,
-      density_type = cfg2$params$g_n_type
-      # density_bins = 0 # !!!!!
-    )
-  )
-  saveRDS(ests_np_med, paste0(cfg2$analysis," plots/ests_med_",cfg2$tid,".rds"))
-  
-  
-  print("MEDIATION ANALYSIS RESULTS")
-  print("--------------------------")
-  print(ests_np_med)
-  
-  # !!!!! TEMP
-  print("TEMP")
-  print("----")
-  if (cfg2$edge_corr) {
-    print(paste("ests$extras$r_Mn_edge_est:", ests$extras$r_Mn_edge_est))
-    print(paste("ests$extras$risk_p:", ests$extras$risk_p))
-    print(paste("1-NDE:", 1-(ests$extras$r_Mn_edge_est/ests$extras$risk_p)))
-    print(paste("ests$extras$r_Mn_0:", ests$extras$r_Mn_0))
-    print(paste("ests$extras$r_Mn_Gr_0:", ests$extras$r_Mn_Gr_0))
-  } else {
-    print("cfg2$edge_corr==F")
-  }
-
-  # Process results
-  if (F) {
-    
-    # Choose analysis
-    # "Janssen" "Moderna" "AMP" "AZD1222" "Janssen (partA)" "Profiscov"
-    # "HVTN 705 (primary)" "HVTN 705 (all)" "RV144" "HVTN 705 (second)"
-    # "HVTN 705 (compare RV144)"
-    analysis <- "Janssen (partA)"
-    if (analysis=="Moderna") {
-      inds <- c(5,7,9)
-    } else if (analysis=="Janssen (partA)") {
-      inds <- c(1:64)
-    } else if (analysis=="HVTN 705 (all)") {
-        inds <- c(9,15:22,25:30,33:37,39)
-    }
-    
-    df_med <- data.frame(
-      "i"=integer(),
-      "nde_est"=double(),"nde_se"=double(),"nde_lo"=double(),"nde_up"=double(),
-      "nie_est"=double(),"nie_se"=double(),"nie_lo"=double(),"nie_up"=double(),
-      "pm_est"=double(),"pm_se"=double(),"pm_lo"=double(),"pm_up"=double()
-    )
-    
-    for (i in inds) {
-      ests <- readRDS(paste0(analysis," plots/ests_med_",i,".rds"))
-      e_nde <- as.list(ests[ests$effect=="NDE",])
-      e_nie <- as.list(ests[ests$effect=="NIE",])
-      e_pm <- as.list(ests[ests$effect=="PM",])
-      e_nde$effect<-NULL; e_nie$effect<-NULL; e_pm$effect<-NULL;
-      e_all <- lapply(c(e_nde, e_nie, e_pm), function(x) { round(x,3) })
-      df_med[nrow(df_med)+1,] <- c(list(i=i), e_all)
-    }
-    write.table(
-      df_med,
-      file = paste0("mediation_results - ",analysis,".csv"),
-      sep = ",",
-      row.names = F
-    )
-    
-  }
-  
-  # NDE
-  if (F) {
-    
-    est_risk <- ests$extras$r_Mn_edge_est
-    var_risk <- ests$extras$sigma2_edge_est
-    n <- attr(dat$v, "n_orig")
-    ci_lo_risk <- est_risk - 1.96*sqrt(var_risk/n)
-    ci_up_risk <- est_risk + 1.96*sqrt(var_risk/n)
-    risk_p <- ests_ov[ests_ov$group=="placebo","est"]
-    se_p <- ests_ov[ests_ov$group=="placebo","se"]
-    cve <- Vectorize(function(x) { 1 - x/risk_p })
-    est_cve <- cve(est_risk)
-    sd_cve <- sqrt(var_risk/n) / risk_p
-    ci_lo_cve <- cve(ci_up_risk) %>% pmin(1)
-    ci_up_cve <- cve(ci_lo_risk) %>% pmin(1)
-    
-    print("ORIGINAL")
-    print(paste("est_cr:", est_risk))
-    print(paste("sd_cr:", sqrt(var_risk/n)))
-    print(paste("risk_p:", risk_p))
-    print(paste("se_p:", se_p))
-    print(paste("nde_est:", est_cve))
-    print(paste("nde_sd:", sd_cve))
-    print(paste("nde_lo:", ci_lo_cve))
-    print(paste("nde_up:", ci_up_cve))
-    
-    ests_med <- est_med(dat=dat, type="NP", t_0=cfg2$t_0)
-    est_old <- ests_med[ests_med$effect=="NDE","est"]
-    lo_old <- ests_med[ests_med$effect=="NDE","ci_lower"]
-    up_old <- ests_med[ests_med$effect=="NDE","ci_upper"]
-    ests_med[ests_med$effect=="NDE","est"] <- 1 - est_old
-    ests_med[ests_med$effect=="NDE","ci_lower"] <- 1 - up_old
-    ests_med[ests_med$effect=="NDE","ci_upper"] <- 1 - lo_old
-    print("NEW")
-    print(ests_med)
-    
-    # # PM
-    # est_ov <- overall.ve[[1]]
-    # sd_ov <- sd(1-res.vacc.cont[2:1001]/res.plac.cont[2:1001])
-    # ci_lo_ov <- overall.ve[[2]]
-    # ci_up_ov <- overall.ve[[3]]
-    # est_pm <- 1 - log(1-est_cve)/log(1-est_ov)
-    # var_pm <- sd_cve^2 / ( (1-est_cve)^2 * (log(1-est_ov))^2 ) +
-    #   sd_ov * (log(1-est_cve))^2 / ((1-est_ov)^2+(log(1-est_ov))^4)
-    # sd_pm <- sqrt(var_pm)
-    # ci_lo_pm <- est_pm - 1.96*sd_pm
-    # ci_up_pm <- est_pm + 1.96*sd_pm
-    
-  }
   
 }
 

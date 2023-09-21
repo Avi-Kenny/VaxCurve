@@ -74,7 +74,7 @@
   #       dependent on cfg2 variables
   flags <- list(
     run_hyptest = F,
-    run_mediation = T,
+    run_mediation = F,
     hvtn705_abstract_fig = F,
     table_of_vals = F,
     save_data_objs = F,
@@ -985,36 +985,37 @@
     ph2 = "ph2",
     data = df_ph1
   )
+  dat_v <- dat[dat$a==1,]
   
   # Create cfg2$t_0 variable if it is set to zero
   if (cfg2$t_0==0) {
     if (cfg2$analysis=="Janssen (partA)") {
       SubcohortInd <- df_ph1_full[df_ph1_full$Trt==1,]$SubcohortInd
-      if (length(SubcohortInd)!=length(dat$v$z)) {
+      if (length(SubcohortInd)!=attr(dat, "n_vacc2")) {
         stop("Error; lengths differ between SubcohortInd and dat$v.")
       }
-      indices_1 <- which(dat$v$z==1 & dat$v$delta==1)
-      indices_2 <- which(dat$v$z==1 & SubcohortInd==1)
-      time_1 <- max(dat$v$y[indices_1])
-      time_2 <- sort(dat$v$y[indices_2], decreasing=T)[15] - 1
-      s_num <- sum(dat$v$s==min(dat$v$s, na.rm=T), na.rm=T)
-      s_den <- sum(!is.na(dat$v$s))
+      indices_1 <- which(dat_v$z==1 & dat_v$delta==1)
+      indices_2 <- which(dat_v$z==1 & SubcohortInd==1)
+      time_1 <- max(dat_v$y[indices_1])
+      time_2 <- sort(dat_v$y[indices_2], decreasing=T)[15] - 1
+      s_num <- sum(dat_v$s==min(dat_v$s, na.rm=T), na.rm=T)
+      s_den <- sum(!is.na(dat_v$s))
       cfg2$t_0 <- min(time_1,time_2)
     } else {
-      cfg2$t_0 <- max(dat$v$y[dat$v$z==1 & dat$v$delta==1])
+      cfg2$t_0 <- max(dat_v$y[dat_v$z==1 & dat_v$delta==1])
     }
   }
   
   # Generate grid of points
   s_grid <- seq(
-    from = min(dat$v$s, na.rm=T),
-    to = max(dat$v$s, na.rm=T),
+    from = min(dat_v$s, na.rm=T),
+    to = max(dat_v$s, na.rm=T),
     length.out = 101
   )
   
   # Edge mass
-  edge_mass <- sum(dat$v$s==min(dat$v$s, na.rm=T), na.rm=T) /
-    sum(!is.na(dat$v$s))
+  edge_mass <- sum(dat_v$s==min(dat_v$s, na.rm=T), na.rm=T) /
+    sum(!is.na(dat_v$s))
   print(paste("Edge mass:", round(edge_mass, 2)))
   
 }
@@ -1610,7 +1611,7 @@ if (flags$run_hyptest) {
   
   set.seed(cfg2$seed)
   test_results <- test_2(
-    dat_orig = dat$v,
+    dat_orig = dat_v,
     alt_type = "decr",
     # alt_type = "two-tailed",
     params = list(
@@ -1788,8 +1789,8 @@ if (flags$run_hyptest) {
     dens_height <- 0.6 * (zoom_y[2]/1.05-zoom_y[1])
     
     # !!!!! For now, accessing data globally; change
-    min_s <- min(dat$v$s, na.rm=T)
-    p_edge <- mean(dat$v$s==min_s, na.rm=T) # !!!!! Make this weighted
+    min_s <- min(dat_v$s, na.rm=T)
+    p_edge <- mean(dat_v$s==min_s, na.rm=T) # !!!!! Make this weighted
     
     if (p_edge<0.03 & density_type=="kde edge") { density_type <- "kde" }
     if (density_type=="histogram") {
@@ -1805,8 +1806,8 @@ if (flags$run_hyptest) {
       
       # !!!!! For now, accessing data globally; change
       df_dens <- data.frame(
-        s = dat$v$s[!is.na(dat$v$s)],
-        weights = dat$v$weights[!is.na(dat$v$s)]
+        s = dat_v$s[!is.na(dat_v$s)],
+        weights = dat_v$weights[!is.na(dat_v$s)]
       )
       df_dens$weights <- df_dens$weights / sum(df_dens$weights)
       dens <- stats::density(
@@ -1825,8 +1826,8 @@ if (flags$run_hyptest) {
       
       # !!!!! For now, accessing data globally; change
       df_dens <- data.frame(
-        s = dat$v$s[!is.na(dat$v$s) & dat$v$s!=min_s],
-        weights = dat$v$weights[!is.na(dat$v$s) & dat$v$s!=min_s]
+        s = dat_v$s[!is.na(dat_v$s) & dat_v$s!=min_s],
+        weights = dat_v$weights[!is.na(dat_v$s) & dat_v$s!=min_s]
       )
       df_dens$weights <- df_dens$weights / sum(df_dens$weights)
       dens <- stats::density(
@@ -1981,7 +1982,7 @@ if (flags$run_hyptest) {
     }
     
     if (case_dots) {
-      s_cases <- dat$v$s[dat$v$delta==1]
+      s_cases <- dat_v$s[dat_v$delta==1]
       s_cases <- s_cases[!is.na(s_cases)]
       plot <- plot + geom_jitter(
         mapping = aes(x=x,y=y),
@@ -2011,7 +2012,7 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
   
   # Create cutoff values corresponding to cfg2$qnt
   cutoffs <- lapply(cfg2$qnt, function(qnt) {
-    as.numeric(quantile(dat$v$s, na.rm=T, probs=qnt))
+    as.numeric(quantile(dat_v$s, na.rm=T, probs=qnt))
   })
   
   # Trim estimates at specified quantiles
@@ -2032,8 +2033,8 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
   }
   
   hst <- get.marker.histogram(
-    marker = dat$v$s[!is.na(dat$v$s)],
-    wt = dat$v$weights[!is.na(dat$v$s)],
+    marker = dat_v$s[!is.na(dat_v$s)],
+    wt = dat_v$weights[!is.na(dat_v$s)],
     trial = cfg2$cr2_trial
   )
   
@@ -2164,9 +2165,7 @@ if (nrow(plot_data_risk)>0 || nrow(plot_data_cve)>0) {
       saveRDS(hst, paste0(cfg2$analysis," plots/hst_",cfg2$tid,".rds"))
       saveRDS(cutoffs, paste0(cfg2$analysis," plots/cutoffs_",cfg2$tid,".rds"))
       saveRDS(cfg2, paste0(cfg2$analysis," plots/cfg2_",cfg2$tid,".rds"))
-      dat_v <- list(s=dat$v$s, weights=dat$v$weights)
       saveRDS(dat_v, paste0(cfg2$analysis," plots/dat_v_",cfg2$tid,".rds"))
-      saveRDS(cfg2, paste0(cfg2$analysis," plots/cfg2_",cfg2$tid,".rds"))
     }
     
     if (flags$table_of_vals) {
